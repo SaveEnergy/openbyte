@@ -1,0 +1,227 @@
+package registry
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"sync"
+	"time"
+
+	"github.com/saveenergy/openbyte/internal/config"
+	"github.com/saveenergy/openbyte/internal/logging"
+)
+
+type ServerInfo struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Location     string `json:"location"`
+	Region       string `json:"region,omitempty"`
+	Host         string `json:"host"`
+	TCPPort      int    `json:"tcp_port"`
+	UDPPort      int    `json:"udp_port"`
+	APIEndpoint  string `json:"api_endpoint"`
+	Health       string `json:"health"`
+	CapacityGbps int    `json:"capacity_gbps"`
+	ActiveTests  int    `json:"active_tests"`
+	MaxTests     int    `json:"max_tests"`
+}
+
+type Client struct {
+	config     *config.Config
+	httpClient *http.Client
+	logger     *logging.Logger
+	stopCh     chan struct{}
+	wg         sync.WaitGroup
+	mu         sync.RWMutex
+	registered bool
+}
+
+func NewClient(cfg *config.Config, logger *logging.Logger) *Client {
+	return &Client{
+		config: cfg,
+		httpClient: &http.Client{
+			Timeout: 10 * time.Second,
+		},
+		logger: logger,
+		stopCh: make(chan struct{}),
+	}
+}
+
+func (c *Client) Start(getActiveTests func() int) error {
+	if !c.config.RegistryEnabled {
+		return nil
+	}
+
+	if c.config.RegistryURL == "" {
+		c.logger.Warn("Registry enabled but no URL configured")
+		return nil
+	}
+
+	c.logger.Info("Starting registry client")
+
+	if err := c.register(getActiveTests()); err != nil {
+		c.logger.Error("Initial registration failed")
+	}
+
+	c.wg.Add(1)
+	go c.heartbeatLoop(getActiveTests)
+
+	return nil
+}
+
+func (c *Client) Stop() {
+	if !c.config.RegistryEnabled {
+		return
+	}
+
+	close(c.stopCh)
+	c.wg.Wait()
+
+	if c.registered {
+		c.deregister()
+	}
+}
+
+func (c *Client) register(activeTests int) error {
+	info := c.buildServerInfo(activeTests)
+
+	payload, err := json.Marshal(info)
+	if err != nil {
+		return fmt.Errorf("marshal server info: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, c.config.RegistryURL+"/api/v1/registry/servers", bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if c.config.RegistryAPIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.config.RegistryAPIKey)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("registry returned status %d", resp.StatusCode)
+	}
+
+	c.mu.Lock()
+	c.registered = true
+	c.mu.Unlock()
+
+	c.logger.Info("Registered with registry")
+	return nil
+}
+
+func (c *Client) heartbeat(activeTests int) error {
+	info := c.buildServerInfo(activeTests)
+
+	payload, err := json.Marshal(info)
+	if err != nil {
+		return fmt.Errorf("marshal server info: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v1/registry/servers/%s", c.config.RegistryURL, c.config.ServerID)
+	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if c.config.RegistryAPIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.config.RegistryAPIKey)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return c.register(activeTests)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("registry returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+func (c *Client) deregister() {
+	url := fmt.Sprintf("%s/api/v1/registry/servers/%s", c.config.RegistryURL, c.config.ServerID)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		c.logger.Error("Create deregister request")
+		return
+	}
+
+	if c.config.RegistryAPIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.config.RegistryAPIKey)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		c.logger.Error("Deregister from registry")
+		return
+	}
+	resp.Body.Close()
+
+	c.logger.Info("Deregistered from registry")
+}
+
+func (c *Client) heartbeatLoop(getActiveTests func() int) {
+	defer c.wg.Done()
+
+	ticker := time.NewTicker(c.config.RegistryInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-c.stopCh:
+			return
+		case <-ticker.C:
+			if err := c.heartbeat(getActiveTests()); err != nil {
+				c.logger.Error("Registry heartbeat failed")
+			}
+		}
+	}
+}
+
+func (c *Client) buildServerInfo(activeTests int) ServerInfo {
+	host := c.config.PublicHost
+	if host == "" {
+		host = c.config.BindAddress
+		if host == "0.0.0.0" {
+			host = "localhost"
+		}
+	}
+
+	apiEndpoint := fmt.Sprintf("http://%s:%s", host, c.config.Port)
+
+	return ServerInfo{
+		ID:           c.config.ServerID,
+		Name:         c.config.ServerName,
+		Location:     c.config.ServerLocation,
+		Region:       c.config.ServerRegion,
+		Host:         host,
+		TCPPort:      c.config.TCPTestPort,
+		UDPPort:      c.config.UDPTestPort,
+		APIEndpoint:  apiEndpoint,
+		Health:       "healthy",
+		CapacityGbps: c.config.CapacityGbps,
+		ActiveTests:  activeTests,
+		MaxTests:     c.config.MaxConcurrentTests,
+	}
+}

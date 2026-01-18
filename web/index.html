@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>openByte</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Minimal Header -->
+    <header class="header">
+      <div class="logo">open<span class="logo-accent">Byte</span></div>
+      <div class="server-info" id="serverInfo">
+        <span class="server-dot"></span>
+        <span class="server-text">Connecting...</span>
+      </div>
+    </header>
+
+    <!-- Main Speed Display -->
+    <main class="main">
+      <!-- Idle State: Start Button -->
+      <section class="speed-section" id="idleState">
+        <button class="start-btn" id="startBtn" aria-label="Start speed test">
+          <span class="start-btn-text">GO</span>
+          <span class="start-btn-hint">Click to test your speed</span>
+        </button>
+      </section>
+
+      <!-- Testing State: Speed Counter -->
+      <section class="speed-section hidden" id="testingState">
+        <div class="speed-display">
+          <div class="speed-number" id="speedNumber">0</div>
+          <div class="speed-unit" id="speedUnit">Mbps</div>
+        </div>
+        <div class="test-type" id="testType">↓ Download</div>
+        <div class="progress-ring-container">
+          <svg class="progress-ring" viewBox="0 0 200 200">
+            <circle class="progress-ring-bg" cx="100" cy="100" r="90"/>
+            <circle class="progress-ring-fill" id="progressRing" cx="100" cy="100" r="90"/>
+          </svg>
+        </div>
+        <button class="cancel-btn" id="cancelBtn">Cancel</button>
+      </section>
+
+      <!-- Results State -->
+      <section class="speed-section hidden" id="resultsState">
+        <div class="results-main">
+          <div class="result-card result-primary">
+            <div class="result-icon">↓</div>
+            <div class="result-value" id="downloadResult">0</div>
+            <div class="result-label">Download</div>
+            <div class="result-unit">Mbps</div>
+          </div>
+          <div class="result-card result-secondary">
+            <div class="result-icon">↑</div>
+            <div class="result-value" id="uploadResult">0</div>
+            <div class="result-label">Upload</div>
+            <div class="result-unit">Mbps</div>
+          </div>
+        </div>
+        <div class="results-extra">
+          <div class="extra-stat">
+            <span class="extra-label">Latency</span>
+            <span class="extra-value" id="latencyResult">0 ms</span>
+          </div>
+          <div class="extra-stat">
+            <span class="extra-label">Jitter</span>
+            <span class="extra-value" id="jitterResult">0 ms</span>
+          </div>
+        </div>
+        <div class="results-details" id="resultsDetails">
+          <div class="detail-section">
+            <h3 class="detail-title">Latency Percentiles</h3>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="detail-label">P50</span>
+                <span class="detail-value" id="latencyP50">-</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">P95</span>
+                <span class="detail-value" id="latencyP95">-</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">P99</span>
+                <span class="detail-value" id="latencyP99">-</span>
+              </div>
+            </div>
+          </div>
+          <div class="detail-section">
+            <h3 class="detail-title">RTT Metrics</h3>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="detail-label">Baseline</span>
+                <span class="detail-value" id="rttBaseline">-</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Current</span>
+                <span class="detail-value" id="rttCurrent">-</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Average</span>
+                <span class="detail-value" id="rttAvg">-</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Jitter</span>
+                <span class="detail-value" id="rttJitter">-</span>
+              </div>
+            </div>
+          </div>
+          <div class="detail-section">
+            <h3 class="detail-title">Network Information</h3>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="detail-label">Connection</span>
+                <span class="detail-value" id="networkType">-</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">IPv6</span>
+                <span class="detail-value" id="networkIPv6">-</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Client IP</span>
+                <span class="detail-value" id="networkIP">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="results-actions">
+          <button class="restart-btn" id="restartBtn">Test Again</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Minimal Footer -->
+    <footer class="footer">
+      <div class="footer-links">
+        <button class="footer-link" id="showSettings">Settings</button>
+        <span class="footer-divider">·</span>
+        <a class="footer-link" href="https://github.com/saveenergy/openbyte" target="_blank">GitHub</a>
+      </div>
+    </footer>
+
+    <!-- Settings Modal (hidden by default, opened via showModal()) -->
+    <dialog class="modal" id="settingsModal" aria-labelledby="settingsTitle" closed>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="settingsTitle">Settings</h2>
+          <button class="modal-close" id="closeSettings" type="button" aria-label="Close settings">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="setting-group">
+            <label class="setting-label" for="duration">Test Duration</label>
+            <select class="setting-input" id="duration">
+              <option value="5">5 seconds (quick)</option>
+              <option value="10" selected>10 seconds</option>
+              <option value="20">20 seconds</option>
+              <option value="30">30 seconds</option>
+            </select>
+          </div>
+          <div class="setting-group">
+            <label class="setting-label" for="streams">
+              <span>Parallel Connections</span>
+              <span class="setting-hint" id="streamsHint">(more = higher max speed)</span>
+            </label>
+            <select class="setting-input" id="streams" aria-describedby="streamsHint">
+              <option value="1">1 stream (~150 Mbps)</option>
+              <option value="4">4 streams (~300 Mbps)</option>
+              <option value="8" selected>8 streams (~600 Mbps)</option>
+              <option value="16">16 streams (~1 Gbps+)</option>
+            </select>
+          </div>
+          <div class="setting-group">
+            <label class="setting-label" for="serverSelect">Test Server</label>
+            <select class="setting-input" id="serverSelect">
+              <option value="current">Current Server</option>
+            </select>
+            <span class="server-status" id="serverStatus"></span>
+          </div>
+          <div class="setting-group" id="customServerGroup" style="display: none;">
+            <label class="setting-label" for="customServerUrl">Custom Server URL</label>
+            <input type="text" class="setting-input" id="customServerUrl" placeholder="https://speedtest.example.com">
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- Error Toast -->
+    <div class="toast hidden" id="errorToast">
+      <span class="toast-icon">⚠</span>
+      <span class="toast-message" id="errorMessage">Error</span>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

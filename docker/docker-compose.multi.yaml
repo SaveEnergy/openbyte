@@ -1,0 +1,158 @@
+version: '3.8'
+
+# Multi-server deployment example
+# Deploy multiple speed test servers with different identities
+# Usage: cd docker && docker compose -f docker-compose.yaml -f docker-compose.multi.yaml up
+
+services:
+  # US East server
+  openbyte-us-east:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: server
+    image: openbyte:latest
+    container_name: openbyte-us-east
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "8082:8082"
+      - "8082:8082/udp"
+    environment:
+      - SERVER_ID=us-east-1
+      - SERVER_NAME=US East
+      - SERVER_LOCATION=Virginia
+      - SERVER_REGION=us-east-1
+      - PUBLIC_HOST=${US_EAST_HOST:-}
+      - CAPACITY_GBPS=25
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
+      - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
+      - MAX_CONCURRENT_TESTS=${MAX_CONCURRENT_TESTS:-10}
+      - MAX_CONCURRENT_PER_IP=${MAX_CONCURRENT_PER_IP:-10}
+      - RATE_LIMIT_PER_IP=${RATE_LIMIT_PER_IP:-100}
+      - GLOBAL_RATE_LIMIT=${GLOBAL_RATE_LIMIT:-1000}
+      - WEB_ROOT=${WEB_ROOT:-/app/web}
+      - REGISTRY_ENABLED=${REGISTRY_ENABLED:-false}
+      - REGISTRY_URL=${REGISTRY_URL:-http://registry:8080}
+      - REGISTRY_API_KEY=${REGISTRY_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    profiles:
+      - multi
+
+  # EU West server
+  openbyte-eu-west:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: server
+    image: openbyte:latest
+    container_name: openbyte-eu-west
+    ports:
+      - "8180:8080"
+      - "8181:8081"
+      - "8182:8082"
+      - "8182:8082/udp"
+    environment:
+      - SERVER_ID=eu-west-1
+      - SERVER_NAME=EU West
+      - SERVER_LOCATION=Amsterdam
+      - SERVER_REGION=eu-west-1
+      - PUBLIC_HOST=${EU_WEST_HOST:-}
+      - CAPACITY_GBPS=25
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
+      - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
+      - MAX_CONCURRENT_TESTS=${MAX_CONCURRENT_TESTS:-10}
+      - MAX_CONCURRENT_PER_IP=${MAX_CONCURRENT_PER_IP:-10}
+      - RATE_LIMIT_PER_IP=${RATE_LIMIT_PER_IP:-100}
+      - GLOBAL_RATE_LIMIT=${GLOBAL_RATE_LIMIT:-1000}
+      - WEB_ROOT=${WEB_ROOT:-/app/web}
+      - REGISTRY_ENABLED=${REGISTRY_ENABLED:-false}
+      - REGISTRY_URL=${REGISTRY_URL:-http://registry:8080}
+      - REGISTRY_API_KEY=${REGISTRY_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    profiles:
+      - multi
+
+  # Asia Pacific server
+  openbyte-ap-south:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: server
+    image: openbyte:latest
+    container_name: openbyte-ap-south
+    ports:
+      - "8280:8080"
+      - "8281:8081"
+      - "8282:8082"
+      - "8282:8082/udp"
+    environment:
+      - SERVER_ID=ap-south-1
+      - SERVER_NAME=Asia Pacific
+      - SERVER_LOCATION=Singapore
+      - SERVER_REGION=ap-south-1
+      - PUBLIC_HOST=${AP_SOUTH_HOST:-}
+      - CAPACITY_GBPS=25
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
+      - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
+      - MAX_CONCURRENT_TESTS=${MAX_CONCURRENT_TESTS:-10}
+      - MAX_CONCURRENT_PER_IP=${MAX_CONCURRENT_PER_IP:-10}
+      - RATE_LIMIT_PER_IP=${RATE_LIMIT_PER_IP:-100}
+      - GLOBAL_RATE_LIMIT=${GLOBAL_RATE_LIMIT:-1000}
+      - WEB_ROOT=${WEB_ROOT:-/app/web}
+      - REGISTRY_ENABLED=${REGISTRY_ENABLED:-false}
+      - REGISTRY_URL=${REGISTRY_URL:-http://registry:8080}
+      - REGISTRY_API_KEY=${REGISTRY_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    profiles:
+      - multi
+
+  # Registry service for server discovery
+  # Enable with: docker compose --profile registry up
+  registry:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: server
+    image: openbyte:latest
+    container_name: openbyte-registry
+    ports:
+      - "8000:8080"
+    environment:
+      - SERVER_ID=registry
+      - SERVER_NAME=Registry Service
+      - SERVER_LOCATION=Central
+      - REGISTRY_MODE=true
+      - REGISTRY_API_KEY=${REGISTRY_API_KEY:-}
+      - REGISTRY_SERVER_TTL=60s
+      - WEB_ROOT=${WEB_ROOT:-/app/web}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    profiles:
+      - registry

@@ -1,0 +1,45 @@
+# Binaries
+bin/
+openbyte
+obyte
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories
+vendor/
+
+# Go workspace file
+go.work
+
+# IDE
+.cursor/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+/tmp/
+
+# Agent tasks/results
+.agent/
+
+# Logs
+*.log
+
+# Local deployment script (contains environment/host specifics)
+deploy-openbyte-prod.sh

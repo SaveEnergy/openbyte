@@ -1,0 +1,294 @@
+# Deployment Guide
+
+Production deployment guide for openByte speed test server.
+
+## Prerequisites
+
+- Go 1.25+ installed
+- SSH access to production server
+- Root or sudo access for port binding (<1024)
+- Firewall rules configured (ports 8080, 8081, 8082)
+
+## Quick Deploy
+
+```bash
+# Build binaries
+make build
+
+# Copy to server
+scp bin/openbyte user@server:/opt/openbyte/
+scp -r web/ user@server:/opt/openbyte/
+
+# SSH to server
+ssh user@server
+
+# Create systemd service
+sudo nano /etc/systemd/system/openbyte.service
+```
+
+## Production Deploy Script (Docker + Traefik)
+
+Use `deploy-openbyte-prod.sh` to rsync code and run `docker compose` on the host.
+
+```bash
+ACME_EMAIL="you@example.com" \
+TRUSTED_PROXY_CIDRS="172.20.0.0/16" \
+./deploy-openbyte-prod.sh
+```
+
+Optional overrides:
+
+```bash
+HOST=49.12.213.184 USER=oezmen DOMAIN=openbyte.sqrtops.de REMOTE_DIR=/opt/openbyte ./deploy-openbyte-prod.sh
+```
+
+## Systemd Service
+
+```ini
+[Unit]
+Description=openByte Speed Test Server
+After=network.target
+
+[Service]
+Type=simple
+User=openbyte
+Group=openbyte
+WorkingDirectory=/opt/openbyte
+ExecStart=/opt/openbyte/openbyte
+Restart=always
+RestartSec=5
+
+Environment="SERVER_ID=prod-1"
+Environment="SERVER_NAME=Production Server"
+Environment="SERVER_LOCATION=US-East"
+Environment="PUBLIC_HOST=speedtest.example.com"
+Environment="PORT=8080"
+Environment="TCP_TEST_PORT=8081"
+Environment="UDP_TEST_PORT=8082"
+Environment="MAX_CONCURRENT_TESTS=20"
+Environment="MAX_CONCURRENT_PER_IP=10"
+Environment="RATE_LIMIT_PER_IP=100"
+Environment="GLOBAL_RATE_LIMIT=1000"
+Environment="TRUST_PROXY_HEADERS=true"
+Environment="TRUSTED_PROXY_CIDRS=10.0.0.0/8,192.168.0.0/16"
+Environment="ALLOWED_ORIGINS=https://speedtest.example.com"
+Environment="WEB_ROOT=/opt/openbyte/web"
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## Deployment Steps
+
+### 1. Server Setup
+
+```bash
+# Create user
+sudo useradd -r -s /sbin/nologin openbyte
+sudo mkdir -p /opt/openbyte
+sudo chown openbyte:openbyte /opt/openbyte
+
+# Create log directory
+sudo mkdir -p /var/log/openbyte
+sudo chown openbyte:openbyte /var/log/openbyte
+```
+
+### 2. Build & Transfer
+
+```bash
+# Local machine
+make build
+tar czf openbyte.tar.gz bin/openbyte web/
+
+# Transfer
+scp openbyte.tar.gz user@server:/tmp/
+ssh user@server "cd /opt/openbyte && sudo tar xzf /tmp/openbyte.tar.gz && sudo chown -R openbyte:openbyte /opt/openbyte"
+```
+
+### 3. Configure Firewall
+
+```bash
+# UFW
+sudo ufw allow 8080/tcp
+sudo ufw allow 8081/tcp
+sudo ufw allow 8082/tcp
+sudo ufw allow 8082/udp
+
+# firewalld
+sudo firewall-cmd --permanent --add-port=8080/tcp
+sudo firewall-cmd --permanent --add-port=8081/tcp
+sudo firewall-cmd --permanent --add-port=8082/tcp
+sudo firewall-cmd --permanent --add-port=8082/udp
+sudo firewall-cmd --reload
+```
+
+### 4. Start Service
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable openbyte
+sudo systemctl start openbyte
+sudo systemctl status openbyte
+```
+
+### 5. Verify
+
+```bash
+# Health check
+curl http://localhost:8080/health
+
+# Test from client
+./bin/obyte -S production -d download -t 10
+```
+
+## Multi-Server Deployment
+
+### Server Configuration
+
+Each server needs unique identity:
+
+```bash
+# Server 1 (NYC)
+SERVER_ID=nyc-1
+SERVER_NAME="New York"
+SERVER_LOCATION="US-East"
+PUBLIC_HOST=nyc.speedtest.example.com
+
+# Server 2 (AMS)
+SERVER_ID=ams-1
+SERVER_NAME="Amsterdam"
+SERVER_LOCATION="EU-West"
+PUBLIC_HOST=ams.speedtest.example.com
+```
+
+### Client Configuration
+
+Update `~/.config/obyte/config.yaml`:
+
+```yaml
+default_server: nyc
+servers:
+  nyc:
+    url: https://nyc.speedtest.example.com
+    name: "New York"
+  ams:
+    url: https://ams.speedtest.example.com
+    name: "Amsterdam"
+```
+
+## Reverse Proxy (Nginx)
+
+```nginx
+server {
+    listen 80;
+    server_name speedtest.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+When running behind a proxy, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges so rate limiting and client IP logging are accurate.
+
+## Reverse Proxy (Traefik)
+
+Traefik integration via Docker labels. TCP/UDP test ports must stay exposed directly.
+
+```bash
+# Create traefik network first
+docker network create traefik
+
+# Deploy with Traefik labels
+cd docker
+TRAEFIK_HOST=speedtest.example.com docker compose up -d
+
+# Or with HTTPS override
+docker compose -f docker-compose.yaml -f docker-compose.traefik.yaml up -d
+```
+
+When running behind Traefik, set `TRUSTED_PROXY_CIDRS` to the Traefik network subnet:
+
+```bash
+docker network inspect traefik --format '{{ (index .IPAM.Config 0).Subnet }}'
+```
+
+**Environment variables:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TRAEFIK_HOST` | `speedtest.localhost` | Domain for HTTP routing |
+| `TRAEFIK_ENTRYPOINT` | `web` | Traefik entrypoint name |
+| `TRAEFIK_NETWORK` | `traefik` | External network name |
+| `TRAEFIK_CERTRESOLVER` | `letsencrypt` | TLS cert resolver |
+
+**Important:** TCP (8081) and UDP (8082) ports cannot be proxied through HTTP. They must be:
+- Exposed directly on the host, or
+- Configured as Traefik TCP/UDP routers (advanced)
+
+## Monitoring
+
+### Logs
+
+```bash
+# View logs
+sudo journalctl -u openbyte -f
+
+# Log rotation
+sudo nano /etc/logrotate.d/openbyte
+```
+
+### Health Monitoring
+
+```bash
+# Health check script
+#!/bin/bash
+if ! curl -f http://localhost:8080/health > /dev/null 2>&1; then
+    systemctl restart openbyte
+fi
+```
+
+## Troubleshooting
+
+### Port Already in Use
+
+```bash
+# Find process
+sudo lsof -i :8080
+sudo kill <PID>
+```
+
+### Permission Denied
+
+```bash
+# Check user
+ps aux | grep openbyte
+
+# Fix permissions
+sudo chown -R openbyte:openbyte /opt/openbyte
+```
+
+### High CPU Usage
+
+- Reduce `MAX_CONCURRENT_TESTS`
+- Check for connection leaks
+- Monitor with `htop`
+
+## Rollback
+
+```bash
+# Stop service
+sudo systemctl stop openbyte
+
+# Restore previous binary
+sudo cp /opt/openbyte/openbyte.backup /opt/openbyte/openbyte
+
+# Start service
+sudo systemctl start openbyte
+```

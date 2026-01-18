@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # Single server deployment
+  openbyte:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: server
+    image: openbyte:latest
+    container_name: openbyte
+    ports:
+      - "8080:8080"   # API + Web UI
+      - "8081:8081"   # TCP test port
+      - "8082:8082"   # UDP test port
+      - "8082:8082/udp"
+    environment:
+      - SERVER_ID=${SERVER_ID:-openbyte-1}
+      - SERVER_NAME=${SERVER_NAME:-OpenByte Server}
+      - SERVER_LOCATION=${SERVER_LOCATION:-Local}
+      - SERVER_REGION=${SERVER_REGION:-}
+      - PUBLIC_HOST=${PUBLIC_HOST:-}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
+      - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
+      - CAPACITY_GBPS=${CAPACITY_GBPS:-25}
+      - MAX_CONCURRENT_TESTS=${MAX_CONCURRENT_TESTS:-10}
+      - MAX_CONCURRENT_PER_IP=${MAX_CONCURRENT_PER_IP:-10}
+      - RATE_LIMIT_PER_IP=${RATE_LIMIT_PER_IP:-100}
+      - GLOBAL_RATE_LIMIT=${GLOBAL_RATE_LIMIT:-1000}
+      - WEB_ROOT=${WEB_ROOT:-/app/web}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

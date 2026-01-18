@@ -1,0 +1,155 @@
+package registry
+
+import (
+	"sync"
+	"time"
+)
+
+type Service struct {
+	servers    map[string]*RegisteredServer
+	mu         sync.RWMutex
+	ttl        time.Duration
+	cleanupInt time.Duration
+	stopCh     chan struct{}
+}
+
+type RegisteredServer struct {
+	ServerInfo
+	LastSeen  time.Time `json:"last_seen"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+func NewService(ttl, cleanupInterval time.Duration) *Service {
+	if ttl == 0 {
+		ttl = 60 * time.Second
+	}
+	if cleanupInterval == 0 {
+		cleanupInterval = 30 * time.Second
+	}
+
+	return &Service{
+		servers:    make(map[string]*RegisteredServer),
+		ttl:        ttl,
+		cleanupInt: cleanupInterval,
+		stopCh:     make(chan struct{}),
+	}
+}
+
+func (s *Service) Start() {
+	go s.cleanupLoop()
+}
+
+func (s *Service) Stop() {
+	close(s.stopCh)
+}
+
+func (s *Service) Register(info ServerInfo) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now()
+	s.servers[info.ID] = &RegisteredServer{
+		ServerInfo: info,
+		LastSeen:   now,
+		ExpiresAt:  now.Add(s.ttl),
+	}
+}
+
+func (s *Service) Update(id string, info ServerInfo) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.servers[id]; !exists {
+		return false
+	}
+
+	now := time.Now()
+	s.servers[id] = &RegisteredServer{
+		ServerInfo: info,
+		LastSeen:   now,
+		ExpiresAt:  now.Add(s.ttl),
+	}
+	return true
+}
+
+func (s *Service) Deregister(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.servers[id]; !exists {
+		return false
+	}
+
+	delete(s.servers, id)
+	return true
+}
+
+func (s *Service) Get(id string) (*RegisteredServer, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	server, exists := s.servers[id]
+	if !exists {
+		return nil, false
+	}
+
+	copy := *server
+	return &copy, true
+}
+
+func (s *Service) List() []RegisteredServer {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]RegisteredServer, 0, len(s.servers))
+	for _, server := range s.servers {
+		result = append(result, *server)
+	}
+	return result
+}
+
+func (s *Service) ListHealthy() []RegisteredServer {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	now := time.Now()
+	result := make([]RegisteredServer, 0, len(s.servers))
+	for _, server := range s.servers {
+		if server.ExpiresAt.After(now) && server.Health == "healthy" {
+			result = append(result, *server)
+		}
+	}
+	return result
+}
+
+func (s *Service) Count() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.servers)
+}
+
+func (s *Service) cleanupLoop() {
+	ticker := time.NewTicker(s.cleanupInt)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.stopCh:
+			return
+		case <-ticker.C:
+			s.cleanup()
+		}
+	}
+}
+
+func (s *Service) cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	now := time.Now()
+	for id, server := range s.servers {
+		if server.ExpiresAt.Before(now) {
+			delete(s.servers, id)
+		}
+	}
+}
