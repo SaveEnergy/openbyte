@@ -1,0 +1,66 @@
+version: "3.8"
+
+services:
+  traefik:
+    image: traefik:v3
+    container_name: traefik
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@example.com}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certs:/letsencrypt
+    networks:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`${TRAEFIK_DASHBOARD_HOST:-traefik.localhost}`)"
+      - "traefik.http.routers.dashboard.entrypoints=web"
+      - "traefik.http.routers.dashboard.service=api@internal"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  openbyte:
+    ports:
+      - "8081:8081"
+      - "8082:8082"
+      - "8082:8082/udp"
+    environment:
+      - TRUST_PROXY_HEADERS=true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openbyte.rule=${TRAEFIK_HOST_RULE:-Host(`speedtest.localhost`)}"
+      - "traefik.http.routers.openbyte.entrypoints=web"
+      - "traefik.http.services.openbyte.loadbalancer.server.port=8080"
+      - "traefik.http.routers.openbyte-secure.rule=${TRAEFIK_HOST_RULE:-Host(`speedtest.localhost`)}"
+      - "traefik.http.routers.openbyte-secure.entrypoints=websecure"
+      - "traefik.http.routers.openbyte-secure.tls=true"
+      - "traefik.http.routers.openbyte-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.openbyte-secure.service=openbyte"
+    networks:
+      - traefik
+    restart: unless-stopped
+
+networks:
+  traefik:
+    name: traefik
+    driver: bridge
+
+volumes:
+  traefik-certs:

@@ -1,23 +1,37 @@
-# Build stage
-FROM golang:1.25-alpine AS builder
+# Build stage (base)
+FROM golang:1.25-alpine AS builder-base
 
 WORKDIR /app
+
+# Build metadata
+ARG VERSION=dev
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
 
 # Install build dependencies
 RUN apk add --no-cache git
 
 # Copy go mod files first for caching
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
-# Copy source code
-COPY . .
+# Copy Go source (exclude web assets for cache stability)
+COPY cmd/ ./cmd/
+COPY internal/ ./internal/
+COPY pkg/ ./pkg/
 
 # Build server binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /openbyte ./cmd/server
+FROM builder-base AS builder-server
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /openbyte ./cmd/server
 
 # Build client binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /obyte ./cmd/client
+FROM builder-base AS builder-client
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /obyte ./cmd/client
 
 # Server image
 FROM alpine:3.19 AS server
@@ -27,7 +41,7 @@ RUN apk add --no-cache ca-certificates tzdata curl
 WORKDIR /app
 
 # Copy server binary
-COPY --from=builder /openbyte /app/openbyte
+COPY --from=builder-server /openbyte /app/openbyte
 
 # Copy web assets
 COPY web/ /app/web/
@@ -68,7 +82,7 @@ RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 
 # Copy client binary
-COPY --from=builder /obyte /app/obyte
+COPY --from=builder-client /obyte /app/obyte
 
 # Create non-root user
 RUN adduser -D -H -s /sbin/nologin obyte

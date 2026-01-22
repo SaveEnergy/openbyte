@@ -1,0 +1,17 @@
+.git
+.github
+.cursor
+.gitignore
+.DS_Store
+
+bin/
+dist/
+tmp/
+coverage.out
+coverage.html
+*.log
+
+test/
+**/*_test.go
+**/*.md
+**/node_modules/

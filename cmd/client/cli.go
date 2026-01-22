@@ -78,7 +78,7 @@ func parseFlags() (*Config, map[string]bool) {
 	}
 
 	if *version {
-		fmt.Println("obyte 0.2.0")
+		fmt.Printf("obyte %s\n", version)
 		os.Exit(exitSuccess)
 	}
 

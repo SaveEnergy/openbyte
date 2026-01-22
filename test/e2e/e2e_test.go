@@ -30,6 +30,13 @@ type TestServer struct {
 	baseURL      string
 }
 
+func TestMain(m *testing.M) {
+	if testing.Short() {
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
+}
+
 func NewTestServer(t *testing.T) *TestServer {
 	return NewTestServerWithOrigins(t, nil)
 }

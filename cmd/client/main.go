@@ -11,8 +11,8 @@ import (
 	"golang.org/x/term"
 )
 
-const (
-	version = "0.2.0"
+var (
+	version = "dev"
 
 	exitSuccess   = 0
 	exitFailure   = 1

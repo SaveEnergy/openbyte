@@ -42,6 +42,83 @@ Optional overrides:
 HOST=49.12.213.184 USER=oezmen DOMAIN=openbyte.sqrtops.de REMOTE_DIR=/opt/openbyte ./deploy-openbyte-prod.sh
 ```
 
+## CI Deploy (GHCR + SSH)
+
+Publish Docker image to GitHub Container Registry (GHCR) and deploy via SSH.
+
+### 1. GitHub Actions workflow
+
+Workflow lives at `.github/workflows/ci.yml`:
+- Runs `go test ./...`
+- Builds and pushes `ghcr.io/<owner>/openbyte:latest` and `:SHA`
+- Optionally SSH deploys to your server
+
+### 2. Required secrets (GitHub repo settings)
+
+**Repository variables**
+- `SSH_HOST` — server hostname/IP
+- `SSH_USER` — SSH user
+- `SSH_PORT` — optional (default 22)
+- `REMOTE_DIR` — path containing `docker/docker-compose.ghcr.yaml` (e.g., `/opt/openbyte`)
+- `GHCR_USERNAME` — GHCR username (e.g., `SaveEnergy`)
+- `GHCR_OWNER` — image owner/namespace (e.g., `SaveEnergy`)
+- `IMAGE_TAG` — optional image tag override (e.g., `1.2.3`, default `edge`)
+
+**GHCR pull on server**
+- `GHCR_TOKEN` — PAT with `read:packages` scope
+
+**Secrets**
+- `SSH_KEY` — private key (no passphrase) with Docker access
+
+### 3. Server setup
+
+On the server:
+
+```bash
+mkdir -p /opt/openbyte
+cd /opt/openbyte
+```
+
+Copy `docker/docker-compose.ghcr.yaml` and create a `.env` with runtime values:
+
+```bash
+SERVER_ID=openbyte-1
+SERVER_NAME="OpenByte Server"
+SERVER_LOCATION="EU"
+PUBLIC_HOST="speedtest.example.com"
+ALLOWED_ORIGINS="https://speedtest.example.com"
+TRUST_PROXY_HEADERS=true
+TRUSTED_PROXY_CIDRS="10.0.0.0/8,192.168.0.0/16"
+GHCR_OWNER=SaveEnergy
+IMAGE_TAG=edge
+```
+
+Then, GH Actions can SSH in and run:
+
+```bash
+docker compose -f docker/docker-compose.ghcr.yaml pull
+docker compose -f docker/docker-compose.ghcr.yaml up -d
+```
+
+## Release Pipeline (SemVer)
+
+SemVer release workflow: `.github/workflows/release.yml`.
+
+### 1. Tag and push
+
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+### 2. Outputs
+
+- **Binaries**: GitHub Release assets for each OS/arch
+  - `openbyte_<version>_<os>_<arch>.tar.gz` (linux/darwin)
+  - `openbyte_<version>_<os>_<arch>.zip` (windows)
+- **Container images** on GHCR:
+  - `:1.2.3`, `:1.2`, `:1`, `:latest`
+
 ## Systemd Service
 
 ```ini

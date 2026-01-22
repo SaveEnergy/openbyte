@@ -19,6 +19,8 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+var version = "dev"
+
 func main() {
 	logLevel := logging.LevelInfo
 	if os.Getenv("LOG_LEVEL") == "debug" {

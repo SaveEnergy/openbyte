@@ -53,3 +53,38 @@
 - Add `for`/`aria-labelledby`/`aria-describedby` to modal markup.
 - Style `<dialog>` as box; move overlay to `::backdrop`.
 - Add modal motion, focus-visible rings, reduced-motion guard.
+
+## CI + GHCR Deployment (2026-01-18)
+
+### Findings
+- GHCR publish + SSH deploy fits private server requirement without exposing secrets in repo.
+- Existing Docker compose uses local build; needed GHCR-specific compose file.
+
+### Decisions
+- Add GitHub Actions workflow to test, build, push GHCR image, then optional SSH deploy.
+- Add `docker-compose.ghcr.yaml` and document required secrets in `DEPLOYMENT.md`.
+
+## Release Pipeline (2026-01-18)
+
+### Findings
+- SemVer tagging needed for both binaries and GHCR images.
+- Client version string was hardcoded and needed build-time injection.
+
+### Decisions
+- Add release workflow for tags `v*.*.*` to publish binaries + semver-tagged images.
+- Switch CLI version to build-time variable (`main.version`).
+
+## CI Pipeline Optimization (2026-01-18)
+
+### Findings
+- CI only on `main` push; no PR signal.
+- Docker builds uncached; `latest` updated on main.
+- Docker build context included non-build assets; no `.dockerignore`.
+- E2E tests not gated for PR fast path.
+
+### Decisions
+- Split CI jobs: changes detection, checks, build/push, deploy.
+- Use `edge` + `sha` tags on main; `latest` only on releases.
+- Add Buildx cache, `.dockerignore`, and BuildKit cache mounts.
+- Gate e2e via `testing.Short()`; add nightly confidence workflow.
+- Pin GitHub Actions to SHAs; add dependabot + GHCR cleanup job.
