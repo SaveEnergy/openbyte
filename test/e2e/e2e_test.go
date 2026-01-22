@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -31,6 +32,7 @@ type TestServer struct {
 }
 
 func TestMain(m *testing.M) {
+	flag.Parse()
 	if testing.Short() {
 		os.Exit(0)
 	}
