@@ -1,0 +1,6 @@
+version: '3.8'
+
+services:
+  openbyte:
+    ports:
+      - "8080:8080"   # API + Web UI

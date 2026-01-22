@@ -143,8 +143,15 @@ jobs:
               cd "${{ env.REMOTE_DIR }}"
               docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull
               docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d
-              sleep 5
-              curl -f http://localhost:8080/health'
+              for i in {1..20}; do
+                status=$(docker inspect -f "{{.State.Health.Status}}" openbyte 2>/dev/null || true)
+                if [ "$status" = "healthy" ]; then
+                  exit 0
+                fi
+                sleep 3
+              done
+              docker inspect openbyte --format "{{json .State.Health}}" || true
+              exit 1'
               exit 0
             fi
             set -eu
@@ -152,5 +159,14 @@ jobs:
             cd "${{ env.REMOTE_DIR }}"
             docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull
             docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d
-            sleep 5
-            curl -f http://localhost:8080/health
+            i=1
+            while [ "$i" -le 20 ]; do
+              status=$(docker inspect -f "{{.State.Health.Status}}" openbyte 2>/dev/null || true)
+              if [ "$status" = "healthy" ]; then
+                exit 0
+              fi
+              i=$((i + 1))
+              sleep 3
+            done
+            docker inspect openbyte --format "{{json .State.Health}}" || true
+            exit 1

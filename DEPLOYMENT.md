@@ -79,7 +79,7 @@ mkdir -p /opt/openbyte
 cd /opt/openbyte
 ```
 
-Copy `docker/docker-compose.ghcr.yaml` and create a `.env` with runtime values:
+Copy `docker/docker-compose.ghcr.yaml` (and optionally `docker/docker-compose.ghcr.web.yaml` if you want direct HTTP on port 8080) and create a `.env` with runtime values:
 
 ```bash
 SERVER_ID=openbyte-1
@@ -98,6 +98,13 @@ Then, GH Actions can SSH in and run:
 ```bash
 docker compose -f docker/docker-compose.ghcr.yaml pull
 docker compose -f docker/docker-compose.ghcr.yaml up -d
+```
+
+For direct HTTP access without Traefik, include the web override:
+
+```bash
+docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.web.yaml pull
+docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.web.yaml up -d
 ```
 
 ## Release Pipeline (SemVer)
