@@ -121,4 +121,3 @@ func TestCORSBlockedOrigin(t *testing.T) {
 		t.Errorf("Status code = %d, want %d", w.Code, http.StatusForbidden)
 	}
 }
-

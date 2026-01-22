@@ -13,8 +13,8 @@ import (
 )
 
 type Handler struct {
-	manager *stream.Manager
-	config  *config.Config
+	manager          *stream.Manager
+	config           *config.Config
 	clientIPResolver *ClientIPResolver
 }
 

@@ -40,20 +40,20 @@ func NewInteractiveFormatter(w io.Writer, verbose, noColor bool) *InteractiveFor
 }
 
 type Config struct {
-	Protocol     string
-	Direction    string
-	Duration     int
-	Streams      int
-	PacketSize   int
-	ServerURL    string
-	Server       string
-	APIKey       string
-	Timeout      int
-	JSON         bool
-	Plain        bool
-	Verbose      bool
-	Quiet        bool
-	NoColor      bool
+	Protocol   string
+	Direction  string
+	Duration   int
+	Streams    int
+	PacketSize int
+	ServerURL  string
+	Server     string
+	APIKey     string
+	Timeout    int
+	JSON       bool
+	Plain      bool
+	Verbose    bool
+	Quiet      bool
+	NoColor    bool
 	NoProgress bool
 	WarmUp     int
 	Auto       bool

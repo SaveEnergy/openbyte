@@ -37,14 +37,14 @@ type TestEngineConfig struct {
 }
 
 type LocalMetrics struct {
-	BytesSent        int64
-	BytesReceived    int64
-	PacketsSent      int64
-	PacketsReceived  int64
-	LatencySamples   []time.Duration
-	StartTime        time.Time
-	LastUpdate       time.Time
-	mu               sync.RWMutex
+	BytesSent       int64
+	BytesReceived   int64
+	PacketsSent     int64
+	PacketsReceived int64
+	LatencySamples  []time.Duration
+	StartTime       time.Time
+	LastUpdate      time.Time
+	mu              sync.RWMutex
 }
 
 func NewTestEngine(cfg *TestEngineConfig) *TestEngine {

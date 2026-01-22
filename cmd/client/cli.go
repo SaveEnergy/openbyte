@@ -41,7 +41,7 @@ func parseFlags() (*Config, map[string]bool) {
 	flag.BoolVar(&config.Auto, "auto", false, "Auto-select fastest server")
 	flag.BoolVar(&config.Auto, "a", false, "Auto-select fastest server (short)")
 
-	version := flag.Bool("version", false, "Print version")
+	versionFlag := flag.Bool("version", false, "Print version")
 	help := flag.Bool("help", false, "Show help")
 	flag.BoolVar(help, "h", false, "Show help (short)")
 	servers := flag.Bool("servers", false, "List configured servers")
@@ -77,7 +77,7 @@ func parseFlags() (*Config, map[string]bool) {
 		os.Exit(exitSuccess)
 	}
 
-	if *version {
+	if *versionFlag {
 		fmt.Printf("obyte %s\n", version)
 		os.Exit(exitSuccess)
 	}

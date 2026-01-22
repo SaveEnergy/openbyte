@@ -98,7 +98,7 @@ func (s *Server) HandleStream(w http.ResponseWriter, r *http.Request, streamID s
 	s.removeClient(streamID, conn)
 }
 
-func (s *Server) BroadcastMetrics(streamID string, state types.StreamState) {
+func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 	s.mu.RLock()
 	clients := s.clients[streamID]
 	if clients == nil {

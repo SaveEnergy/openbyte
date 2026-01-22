@@ -46,7 +46,7 @@ func main() {
 		logging.Error("Failed to start stream server", logging.Field{Key: "error", Value: err})
 		log.Fatalf("Failed to start stream server: %v", err)
 	}
-	logging.Info("Stream server started", 
+	logging.Info("Stream server started",
 		logging.Field{Key: "tcp_port", Value: cfg.TCPTestPort},
 		logging.Field{Key: "udp_port", Value: cfg.UDPTestPort})
 
@@ -171,12 +171,12 @@ func main() {
 
 func broadcastMetrics(manager *stream.Manager, wsServer *websocket.Server) {
 	updateCh := manager.GetMetricsUpdateChannel()
-	
+
 	for update := range updateCh {
-		if update.State.Status == types.StreamStatusRunning || 
-		   update.State.Status == types.StreamStatusStarting ||
-		   update.State.Status == types.StreamStatusCompleted ||
-		   update.State.Status == types.StreamStatusFailed {
+		if update.State.Status == types.StreamStatusRunning ||
+			update.State.Status == types.StreamStatusStarting ||
+			update.State.Status == types.StreamStatusCompleted ||
+			update.State.Status == types.StreamStatusFailed {
 			wsServer.BroadcastMetrics(update.StreamID, update.State)
 		}
 	}

@@ -15,13 +15,13 @@ import (
 )
 
 type Router struct {
-	handler        *Handler
-	speedtest      *SpeedTestHandler
-	limiter        *RateLimiter
-	wsServer       interface{}
-	allowedOrigins []string
+	handler          *Handler
+	speedtest        *SpeedTestHandler
+	limiter          *RateLimiter
+	wsServer         interface{}
+	allowedOrigins   []string
 	clientIPResolver *ClientIPResolver
-	webRoot        string
+	webRoot          string
 }
 
 func (r *Router) GetLimiter() *RateLimiter {
@@ -237,18 +237,18 @@ func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 func (r *Router) LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		path := req.URL.Path
-		
+
 		skipLog := strings.HasSuffix(path, "/stream") ||
 			strings.HasSuffix(path, "/download") ||
 			strings.HasSuffix(path, "/upload") ||
 			strings.HasSuffix(path, "/ping")
-		
+
 		if strings.HasPrefix(path, "/api/") && !skipLog {
 			start := time.Now()
 			rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
-			
+
 			next.ServeHTTP(rw, req)
-			
+
 			duration := time.Since(start)
 			logging.Info("HTTP request",
 				logging.Field{Key: "method", Value: req.Method},

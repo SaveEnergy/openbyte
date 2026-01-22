@@ -11,34 +11,34 @@ import (
 )
 
 type Manager struct {
-	streams         map[string]*types.StreamState
-	activeStreams   map[string]string
-	activeByIP      map[string]int
-	metricsUpdateCh chan *MetricsUpdate
-	stopCh          chan struct{}
-	wg              sync.WaitGroup
-	mu              sync.RWMutex
-	maxStreams      int
-	maxStreamsPerIP int
-	retentionPeriod time.Duration
+	streams               map[string]*types.StreamState
+	activeStreams         map[string]string
+	activeByIP            map[string]int
+	metricsUpdateCh       chan *MetricsUpdate
+	stopCh                chan struct{}
+	wg                    sync.WaitGroup
+	mu                    sync.RWMutex
+	maxStreams            int
+	maxStreamsPerIP       int
+	retentionPeriod       time.Duration
 	metricsUpdateInterval time.Duration
 }
 
 type MetricsUpdate struct {
 	StreamID string
-	State    types.StreamState
+	State    types.StreamSnapshot
 }
 
 func NewManager(maxStreams int, maxStreamsPerIP int) *Manager {
 	return &Manager{
-		streams:         make(map[string]*types.StreamState),
-		activeStreams:   make(map[string]string),
-		activeByIP:      make(map[string]int),
-		metricsUpdateCh: make(chan *MetricsUpdate, 100),
-		stopCh:          make(chan struct{}),
-		maxStreams:      maxStreams,
-		maxStreamsPerIP: maxStreamsPerIP,
-		retentionPeriod: 1 * time.Hour,
+		streams:               make(map[string]*types.StreamState),
+		activeStreams:         make(map[string]string),
+		activeByIP:            make(map[string]int),
+		metricsUpdateCh:       make(chan *MetricsUpdate, 100),
+		stopCh:                make(chan struct{}),
+		maxStreams:            maxStreams,
+		maxStreamsPerIP:       maxStreamsPerIP,
+		retentionPeriod:       1 * time.Hour,
 		metricsUpdateInterval: 1 * time.Second,
 	}
 }
