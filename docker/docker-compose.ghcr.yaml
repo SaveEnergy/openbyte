@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   openbyte:
     image: ghcr.io/${GHCR_OWNER:-saveenergy}/openbyte:${IMAGE_TAG:-edge}
