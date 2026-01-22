@@ -137,7 +137,17 @@ jobs:
           key: ${{ env.SSH_KEY }}
           port: ${{ env.SSH_PORT || 22 }}
           script: |
-            set -euo pipefail
+            if command -v bash >/dev/null 2>&1; then
+              bash -lc 'set -euo pipefail
+              echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
+              cd "${{ env.REMOTE_DIR }}"
+              docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull
+              docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d
+              sleep 5
+              curl -f http://localhost:8080/health'
+              exit 0
+            fi
+            set -eu
             echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
             cd "${{ env.REMOTE_DIR }}"
             docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull
