@@ -125,7 +125,9 @@ jobs:
       GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
       SSH_KEY: ${{ secrets.SSH_KEY }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.SSH_HOST != '' && needs.build-push.result == 'success' }}
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.SSH_HOST != '' && needs.build-push.result == 'success') ||
+      (github.event_name == 'workflow_dispatch' && inputs.force_build && vars.SSH_HOST != '' && needs.build-push.result == 'success')
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
