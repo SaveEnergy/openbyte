@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>openByte Downloads</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="logo">open<span class="logo-accent">Byte</span></div>
+      <a class="footer-link" href="/">Speed Test</a>
+    </header>
+
+    <main class="download-main">
+      <section class="download-panel">
+        <h1 class="download-title">Downloads</h1>
+        <p class="download-subtitle">
+          Latest release bundles include the server binary, CLI client, and web assets.
+          Choose your platform below.
+        </p>
+
+        <div class="download-grid" id="downloadGrid">
+          <div class="download-card">
+            <div class="download-card-title">Linux</div>
+            <div class="download-links">
+              <span class="download-meta">Loading...</span>
+            </div>
+          </div>
+          <div class="download-card">
+            <div class="download-card-title">macOS</div>
+            <div class="download-links">
+              <span class="download-meta">Loading...</span>
+            </div>
+          </div>
+          <div class="download-card">
+            <div class="download-card-title">Windows</div>
+            <div class="download-links">
+              <span class="download-meta">Loading...</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="download-meta" style="margin-top: 1.5rem;">
+          Having trouble? Visit the
+          <a class="download-link" href="https://github.com/saveenergy/openbyte/releases/latest" target="_blank">latest release</a>.
+        </p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-links">
+        <a class="footer-link" href="/">Speed Test</a>
+        <span class="footer-divider">·</span>
+        <a class="footer-link" href="https://github.com/saveenergy/openbyte" target="_blank">GitHub</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    const releaseUrl = 'https://api.github.com/repos/saveenergy/openbyte/releases/latest';
+    const releasePage = 'https://github.com/saveenergy/openbyte/releases/latest';
+
+    const targetMap = {
+      linux: ['linux_amd64.tar.gz', 'linux_arm64.tar.gz'],
+      macos: ['darwin_amd64.tar.gz', 'darwin_arm64.tar.gz'],
+      windows: ['windows_amd64.zip']
+    };
+
+    function labelForSuffix(suffix) {
+      if (suffix.includes('arm64')) return 'arm64';
+      if (suffix.includes('amd64')) return 'amd64';
+      return suffix;
+    }
+
+    function findAsset(assets, suffix) {
+      return assets.find((asset) =>
+        asset.name.startsWith('openbyte_') && asset.name.endsWith(suffix)
+      );
+    }
+
+    function renderLinks(container, assets, suffixes) {
+      container.innerHTML = '';
+      let foundAny = false;
+      suffixes.forEach((suffix) => {
+        const asset = findAsset(assets, suffix);
+        if (!asset) return;
+        foundAny = true;
+        const link = document.createElement('a');
+        link.className = 'download-link';
+        link.href = asset.browser_download_url;
+        link.target = '_blank';
+        link.textContent = `${labelForSuffix(suffix)}`;
+        container.appendChild(link);
+      });
+
+      if (!foundAny) {
+        const fallback = document.createElement('a');
+        fallback.className = 'download-link';
+        fallback.href = releasePage;
+        fallback.target = '_blank';
+        fallback.textContent = 'View release assets';
+        container.appendChild(fallback);
+      }
+    }
+
+    fetch(releaseUrl)
+      .then((res) => res.json())
+      .then((data) => {
+        const assets = Array.isArray(data.assets) ? data.assets : [];
+        const cards = document.querySelectorAll('.download-card');
+        if (cards.length < 3) return;
+        renderLinks(cards[0].querySelector('.download-links'), assets, targetMap.linux);
+        renderLinks(cards[1].querySelector('.download-links'), assets, targetMap.macos);
+        renderLinks(cards[2].querySelector('.download-links'), assets, targetMap.windows);
+      })
+      .catch(() => {
+        const links = document.querySelectorAll('.download-links');
+        links.forEach((container) => {
+          container.innerHTML = '';
+          const fallback = document.createElement('a');
+          fallback.className = 'download-link';
+          fallback.href = releasePage;
+          fallback.target = '_blank';
+          fallback.textContent = 'View release assets';
+          container.appendChild(fallback);
+        });
+      });
+  </script>
+</body>
+</html>
