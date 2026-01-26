@@ -19,7 +19,6 @@ jobs:
           package-name: openbyte
           package-type: container
           min-versions-to-keep: 20
-          num-old-versions-to-delete: 50
           ignore-versions: |
             ^latest$
             ^edge$

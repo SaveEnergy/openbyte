@@ -131,3 +131,8 @@
 ### Actions
 - Updated `golang.org/x/crypto` to `v0.45.0` (CVE-2025-47914, CVE-2025-58181).
 - Updated `golang.org/x/net` to `v0.47.0` via transitive upgrade.
+
+## Workflow Fix (2026-01-26)
+
+### Actions
+- Removed invalid input combo in `ghcr-cleanup` (drop `num-old-versions-to-delete` with `min-versions-to-keep`).
