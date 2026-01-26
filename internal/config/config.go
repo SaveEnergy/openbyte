@@ -99,7 +99,7 @@ func DefaultConfig() *Config {
 		GlobalRateLimit:       1000,
 		TrustProxyHeaders:     false,
 		TrustedProxyCIDRs:     nil,
-		AllowedOrigins:        nil,
+		AllowedOrigins:        []string{"*"},
 		TestRetentionPeriod:   1 * time.Hour,
 		WebSocketPingInterval: 30 * time.Second,
 		MetricsUpdateInterval: 1 * time.Second,

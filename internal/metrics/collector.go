@@ -151,10 +151,6 @@ func (c *Collector) GetMetrics() types.Metrics {
 	}
 }
 
-func (c *Collector) GetSnapshot() types.Metrics {
-	return c.GetMetrics()
-}
-
 func (c *Collector) Reset() {
 	atomic.StoreInt64(&c.bytesSent, 0)
 	atomic.StoreInt64(&c.bytesRecv, 0)

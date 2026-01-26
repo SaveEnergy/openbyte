@@ -81,12 +81,12 @@ Uses BEREC-compliant measurement practices:
 | `GLOBAL_RATE_LIMIT` | 1000 | Global rate limit per minute |
 | `TRUST_PROXY_HEADERS` | false | Trust proxy headers for client IP |
 | `TRUSTED_PROXY_CIDRS` | — | Comma-separated trusted proxy CIDRs |
-| `ALLOWED_ORIGINS` | — | Comma-separated CORS/WS allowed origins |
+| `ALLOWED_ORIGINS` | `*` | Comma-separated CORS/WS allowed origins |
 | `WEB_ROOT` | `./web` | Path to static web assets |
 
 Notes:
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
-- For browser clients, set `ALLOWED_ORIGINS` to allowed origins (supports `*` and `*.example.com`).
+- Default CORS allows all origins; set `ALLOWED_ORIGINS` to restrict (supports `*` and `*.example.com`).
 
 ### Client Configuration
 

@@ -1,12 +1,14 @@
-package metrics
+package metrics_test
 
 import (
 	"testing"
 	"time"
+
+	"github.com/saveenergy/openbyte/internal/metrics"
 )
 
 func BenchmarkCollectorGetMetrics(b *testing.B) {
-	collector := NewCollector()
+	collector := metrics.NewCollector()
 	for i := 0; i < 10000; i++ {
 		collector.RecordLatency(time.Duration(i%2000) * time.Millisecond)
 		collector.RecordBytes(1024, "recv")

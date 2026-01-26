@@ -1,8 +1,8 @@
-package stream
+package stream_test
 
-import (
-	"testing"
-)
+import "testing"
+
+const sendBufferSize = 256 * 1024
 
 func BenchmarkDownloadChunkCopy(b *testing.B) {
 	randomData := make([]byte, 1024*1024)

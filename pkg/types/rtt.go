@@ -84,7 +84,7 @@ func (r *RTTCollector) GetMetrics() RTTMetrics {
 	}
 }
 
-func MeasureRTT(addr string, timeout time.Duration) (float64, error) {
+func measureRTT(addr string, timeout time.Duration) (float64, error) {
 	start := time.Now()
 	conn, err := net.DialTimeout("tcp", addr, timeout)
 	if err != nil {
@@ -105,7 +105,7 @@ func MeasureBaselineRTT(addr string, samples int, timeout time.Duration) (float6
 	var count int
 
 	for i := 0; i < samples; i++ {
-		rtt, err := MeasureRTT(addr, timeout)
+		rtt, err := measureRTT(addr, timeout)
 		if err != nil {
 			continue
 		}

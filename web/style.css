@@ -50,6 +50,7 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
 }
 
@@ -66,6 +67,7 @@ body::before {
 
 .app {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -117,12 +119,28 @@ body::before {
   background: var(--error);
 }
 
+.server-dot.warning {
+  background: var(--warning);
+  box-shadow: 0 0 8px rgba(254, 202, 87, 0.35);
+}
+
 .main {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-xl);
+  padding-left: calc(var(--space-xl) + env(safe-area-inset-left));
+  padding-right: calc(var(--space-xl) + env(safe-area-inset-right));
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.results-view .main {
+  align-items: flex-start;
+  padding-top: var(--space-lg);
+  padding-bottom: calc(var(--space-2xl) + env(safe-area-inset-bottom));
 }
 
 .download-main {
@@ -206,6 +224,14 @@ body::before {
   position: relative;
   min-height: 400px;
   padding-bottom: 60px;
+}
+
+.results-view .speed-section {
+  min-height: 0;
+  padding-bottom: var(--space-xl);
+  width: 100%;
+  max-width: 720px;
+  justify-content: flex-start;
 }
 
 .hidden {
@@ -560,6 +586,9 @@ body::before {
 
 .footer {
   padding: var(--space-lg) var(--space-xl);
+  padding-bottom: calc(var(--space-lg) + env(safe-area-inset-bottom));
+  padding-left: calc(var(--space-xl) + env(safe-area-inset-left));
+  padding-right: calc(var(--space-xl) + env(safe-area-inset-right));
   text-align: center;
 }
 
@@ -745,6 +774,15 @@ select.setting-input {
   box-shadow: 0 0 6px var(--error);
 }
 
+.server-status.warning {
+  color: var(--text-secondary);
+}
+
+.server-status.warning::before {
+  background: var(--warning);
+  box-shadow: 0 0 6px var(--warning);
+}
+
 #customServerGroup {
   margin-top: var(--space-md);
 }
@@ -857,6 +895,11 @@ select.setting-input {
   .speed-section {
     width: 220px;
     height: 220px;
+  }
+  
+  .results-view .speed-section {
+    width: 100%;
+    height: auto;
   }
   
   .speed-number {

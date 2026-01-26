@@ -1,10 +1,6 @@
 package errors
 
-import (
-	"context"
-	"errors"
-	"fmt"
-)
+import "fmt"
 
 type StreamError struct {
 	Code     string
@@ -27,7 +23,6 @@ const (
 	ErrCodeStreamAlreadyExists = "STREAM_EXISTS"
 	ErrCodeRateLimitExceeded   = "RATE_LIMIT_EXCEEDED"
 	ErrCodeInvalidConfig       = "INVALID_CONFIG"
-	ErrCodeConnectionFailed    = "CONNECTION_FAILED"
 	ErrCodeResourceExhausted   = "RESOURCE_EXHAUSTED"
 	ErrCodeTimeout             = "TIMEOUT"
 	ErrCodeCancelled           = "CANCELLED"
@@ -49,14 +44,6 @@ func ErrInvalidConfig(msg string, cause error) *StreamError {
 	}
 }
 
-func ErrConnectionFailed(msg string, cause error) *StreamError {
-	return &StreamError{
-		Code:    ErrCodeConnectionFailed,
-		Message: msg,
-		Cause:   cause,
-	}
-}
-
 func ErrResourceExhausted(msg string) *StreamError {
 	return &StreamError{
 		Code:    ErrCodeResourceExhausted,
@@ -70,9 +57,4 @@ func ErrStreamAlreadyExists(streamID string) *StreamError {
 		Message:  "stream already exists",
 		StreamID: streamID,
 	}
-}
-
-func IsContextError(err error) bool {
-	return errors.Is(err, context.Canceled) ||
-		errors.Is(err, context.DeadlineExceeded)
 }

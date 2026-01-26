@@ -1,9 +1,11 @@
-package logging
+package logging_test
 
 import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 type testStringer struct{}
@@ -34,8 +36,8 @@ func TestFormatValueTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := formatValue(tt.input); got != tt.want {
-				t.Fatalf("formatValue got=%q want=%q", got, tt.want)
+			if got := logging.FormatValue(tt.input); got != tt.want {
+				t.Fatalf("FormatValue got=%q want=%q", got, tt.want)
 			}
 		})
 	}

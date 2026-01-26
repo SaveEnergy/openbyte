@@ -122,12 +122,12 @@ func formatFields(fields []Field) string {
 		if i > 0 {
 			result += " "
 		}
-		result += f.Key + "=" + formatValue(f.Value)
+		result += f.Key + "=" + FormatValue(f.Value)
 	}
 	return result
 }
 
-func formatValue(v interface{}) string {
+func FormatValue(v interface{}) string {
 	switch val := v.(type) {
 	case string:
 		return val

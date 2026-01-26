@@ -23,17 +23,6 @@ const state = {
     connectionType: null,
     ipv6: false,
     clientIP: null
-  },
-  rttMetrics: {
-    baseline: null,
-    current: null,
-    avg: null,
-    jitter: null
-  },
-  latencyPercentiles: {
-    p50: null,
-    p95: null,
-    p99: null
   }
 };
 
@@ -50,13 +39,6 @@ const elements = {
   uploadResult: document.getElementById('uploadResult'),
   latencyResult: document.getElementById('latencyResult'),
   jitterResult: document.getElementById('jitterResult'),
-  latencyP50: document.getElementById('latencyP50'),
-  latencyP95: document.getElementById('latencyP95'),
-  latencyP99: document.getElementById('latencyP99'),
-  rttBaseline: document.getElementById('rttBaseline'),
-  rttCurrent: document.getElementById('rttCurrent'),
-  rttAvg: document.getElementById('rttAvg'),
-  rttJitter: document.getElementById('rttJitter'),
   networkType: document.getElementById('networkType'),
   networkIPv6: document.getElementById('networkIPv6'),
   networkIP: document.getElementById('networkIP'),
@@ -174,14 +156,17 @@ function detectNetworkInfo() {
       'other': 'Other'
     };
     
-    state.networkInfo.connectionType = typeMap[conn.type] || null;
+    const mappedType = conn.type ? typeMap[conn.type] || conn.type : null;
+    const effectiveType = conn.effectiveType ? conn.effectiveType.toUpperCase() : null;
+    state.networkInfo.connectionType = mappedType || effectiveType || 'Not supported';
     
     if (elements.networkType) {
-      elements.networkType.textContent = state.networkInfo.connectionType || 'Unknown';
+      elements.networkType.textContent = state.networkInfo.connectionType;
     }
   } else {
+    state.networkInfo.connectionType = 'Not supported';
     if (elements.networkType) {
-      elements.networkType.textContent = 'Unknown';
+      elements.networkType.textContent = 'Not supported';
     }
   }
   
@@ -201,8 +186,12 @@ function detectNetworkInfo() {
       }
     })
     .catch(() => {
+      state.networkInfo.ipv6 = false;
       if (elements.networkIPv6) {
         elements.networkIPv6.textContent = 'Unknown';
+      }
+      if (elements.networkIP) {
+        elements.networkIP.textContent = 'Unknown';
       }
     });
 }
@@ -212,13 +201,15 @@ async function loadServers() {
     const res = await fetch(`${apiBase}/servers`);
     const data = await res.json();
     state.servers = data.servers || [];
-    populateServerSelect();
     
     if (state.servers.length > 0) {
       await selectFastestServer();
     } else {
-      checkServer();
+      state.selectedServer = null;
     }
+    
+    populateServerSelect();
+    checkServer();
   } catch (e) {
     console.error('Failed to load servers:', e);
     checkServer();
@@ -227,12 +218,6 @@ async function loadServers() {
 
 async function selectFastestServer() {
   if (state.servers.length === 0) {
-    checkServer();
-    return;
-  }
-
-  if (state.servers.length === 1) {
-    state.selectedServer = state.servers[0];
     checkServer();
     return;
   }
@@ -264,22 +249,24 @@ async function selectFastestServer() {
 
   const results = await Promise.all(latencyPromises);
   
+  results.forEach(({ server, latency, error }) => {
+    server.reachable = error === null;
+    server.latency = error === null ? latency : null;
+  });
+  
   const reachable = results.filter(r => r.error === null);
   
   if (reachable.length === 0) {
-    console.warn('No servers reachable, using first available');
-    state.selectedServer = state.servers[0];
-    checkServer();
+    console.warn('No servers reachable, defaulting to current');
+    state.selectedServer = null;
     return;
   }
-
+  
   reachable.sort((a, b) => a.latency - b.latency);
   state.selectedServer = reachable[0].server;
   
   console.log('Auto-selected server:', state.selectedServer.name, 
     `(${Math.round(reachable[0].latency)}ms)`);
-  
-  checkServer();
 }
 
 function populateServerSelect() {
@@ -292,10 +279,12 @@ function populateServerSelect() {
   currentOpt.textContent = 'Current Server';
   elements.serverSelect.appendChild(currentOpt);
   
-  state.servers.forEach(server => {
+  const reachableServers = state.servers.filter(server => server.api_endpoint && server.reachable);
+  reachableServers.forEach(server => {
     const opt = document.createElement('option');
     opt.value = server.id;
-    opt.textContent = `${server.name} (${server.location})`;
+    const location = server.location ? ` (${server.location})` : '';
+    opt.textContent = `${server.name}${location}`;
     elements.serverSelect.appendChild(opt);
   });
   
@@ -307,6 +296,12 @@ function populateServerSelect() {
   if (state.settings.serverUrl) {
     elements.serverSelect.value = 'custom';
     showCustomServerInput(true);
+  } else if (state.selectedServer?.id && reachableServers.some(s => s.id === state.selectedServer.id)) {
+    elements.serverSelect.value = state.selectedServer.id;
+    showCustomServerInput(false);
+  } else {
+    elements.serverSelect.value = 'current';
+    showCustomServerInput(false);
   }
 }
 
@@ -341,12 +336,22 @@ function onCustomServerChange() {
   const url = elements.customServerUrl.value.trim();
   if (url) {
     let serverUrl = url;
-    if (!serverUrl.startsWith('http://') && !serverUrl.startsWith('https://')) {
-      serverUrl = 'http://' + serverUrl;
+    if (!/^https?:\/\//i.test(serverUrl)) {
+      const preferred = window.location.protocol === 'https:' ? 'https://' : 'http://';
+      serverUrl = preferred + serverUrl;
     }
-    apiBase = `${serverUrl}/api/v1`;
-    state.settings.serverUrl = serverUrl;
-    state.selectedServer = { id: 'custom', name: 'Custom', location: url, api_endpoint: serverUrl };
+    serverUrl = serverUrl.replace(/\/+$/, '');
+
+    const apiSuffix = '/api/v1';
+    let baseUrl = serverUrl;
+    if (baseUrl.toLowerCase().endsWith(apiSuffix)) {
+      baseUrl = baseUrl.slice(0, -apiSuffix.length);
+    }
+    baseUrl = baseUrl.replace(/\/+$/, '');
+    
+    apiBase = `${baseUrl}/api/v1`;
+    state.settings.serverUrl = baseUrl;
+    state.selectedServer = { id: 'custom', name: 'Custom', location: url, api_endpoint: baseUrl };
     saveSettings();
     checkServer();
   }
@@ -360,36 +365,64 @@ function showCustomServerInput(show) {
 }
 
 async function checkServer() {
-  const healthUrl = state.settings.serverUrl ? `${state.settings.serverUrl}/health` : '/health';
+  const baseUrl = state.settings.serverUrl;
+  const candidates = baseUrl
+    ? [`${baseUrl}/health`, `${apiBase}/health`, `${apiBase}/ping`]
+    : ['/health', `${apiBase}/health`, `${apiBase}/ping`];
   
   try {
-    const res = await fetch(healthUrl);
-    const data = await res.json();
-    if (data.status === 'ok' || data.status === 'healthy') {
-      elements.serverDot.classList.remove('error');
-      elements.serverDot.classList.add('connected');
-      
-      if (state.selectedServer) {
-        elements.serverText.textContent = state.selectedServer.name || 'Ready';
-      } else {
-        elements.serverText.textContent = 'Ready';
+    let ok = false;
+    for (const url of candidates) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        
+        const data = await res.json();
+        if (data.status === 'ok' || data.status === 'healthy' || data.pong === true) {
+          ok = true;
+          break;
+        }
+      } catch (e) {
+        continue;
       }
-      
-      if (elements.serverStatus) {
-        elements.serverStatus.textContent = 'Connected';
-        elements.serverStatus.className = 'server-status connected';
-      }
-    } else {
-      throw new Error('Server degraded');
     }
-  } catch (e) {
-    elements.serverDot.classList.remove('connected');
-    elements.serverDot.classList.add('error');
-    elements.serverText.textContent = 'Offline';
+    
+    if (!ok) {
+      throw new Error('Server offline');
+    }
+    
+    elements.serverDot.classList.remove('error', 'warning');
+    elements.serverDot.classList.add('connected');
+    
+    if (state.selectedServer) {
+      elements.serverText.textContent = state.selectedServer.name || 'Ready';
+    } else {
+      elements.serverText.textContent = 'Ready';
+    }
     
     if (elements.serverStatus) {
-      elements.serverStatus.textContent = 'Offline';
-      elements.serverStatus.className = 'server-status error';
+      elements.serverStatus.textContent = 'Connected';
+      elements.serverStatus.className = 'server-status connected';
+    }
+  } catch (e) {
+    if (baseUrl) {
+      elements.serverDot.classList.remove('connected', 'error');
+      elements.serverDot.classList.add('warning');
+      elements.serverText.textContent = state.selectedServer?.name || 'Custom';
+      
+      if (elements.serverStatus) {
+        elements.serverStatus.textContent = 'Unverified';
+        elements.serverStatus.className = 'server-status warning';
+      }
+    } else {
+      elements.serverDot.classList.remove('connected', 'warning');
+      elements.serverDot.classList.add('error');
+      elements.serverText.textContent = 'Offline';
+      
+      if (elements.serverStatus) {
+        elements.serverStatus.textContent = 'Offline';
+        elements.serverStatus.className = 'server-status error';
+      }
     }
   }
 }
@@ -410,8 +443,6 @@ async function startTest() {
     
     const latency = await measureLatency();
     state.latencyResult = latency;
-    state.rttMetrics.baseline = latency;
-    state.rttMetrics.avg = latency;
     
     if (!state.isRunning) return;
     
@@ -443,7 +474,11 @@ async function startTest() {
   } catch (e) {
     console.error('Test failed:', e);
     if (e.name !== 'AbortError') {
-      showError(e.message || 'Test failed');
+      const isCustom = !!state.settings.serverUrl;
+      const message = isCustom && e instanceof TypeError
+        ? 'Custom server unreachable or blocked by CORS.'
+        : (e.message || 'Test failed');
+      showError(message);
     }
     resetToIdle();
   } finally {
@@ -521,20 +556,18 @@ async function measureLatency() {
   
   if (samples.length === 0) return 0;
   
-  samples.sort((a, b) => a - b);
-  const median = samples[Math.floor(samples.length / 2)];
-  
-  state.latencyPercentiles.p50 = samples[Math.floor(samples.length * 0.5)];
-  state.latencyPercentiles.p95 = samples[Math.floor(samples.length * 0.95)] || samples[samples.length - 1];
-  state.latencyPercentiles.p99 = samples[Math.floor(samples.length * 0.99)] || samples[samples.length - 1];
-  
   if (samples.length >= 2) {
     let sumDiff = 0;
     for (let i = 1; i < samples.length; i++) {
-      sumDiff += Math.abs(samples[i] - samples[i-1]);
+      sumDiff += Math.abs(samples[i] - samples[i - 1]);
     }
     state.jitterResult = sumDiff / (samples.length - 1);
+  } else {
+    state.jitterResult = 0;
   }
+  
+  samples.sort((a, b) => a - b);
+  const median = samples[Math.floor(samples.length / 2)];
   
   return median;
 }
@@ -734,6 +767,7 @@ function showState(stateName) {
   elements.idleState.classList.add('hidden');
   elements.testingState.classList.add('hidden');
   elements.resultsState.classList.add('hidden');
+  document.body.classList.toggle('results-view', stateName === 'results');
   
   switch (stateName) {
     case 'idle':
@@ -772,38 +806,8 @@ function showResults() {
   elements.latencyResult.textContent = `${state.latencyResult.toFixed(1)} ms`;
   elements.jitterResult.textContent = `${state.jitterResult.toFixed(1)} ms`;
   
-  if (elements.latencyP50) {
-    elements.latencyP50.textContent = state.latencyPercentiles.p50 !== null 
-      ? `${state.latencyPercentiles.p50.toFixed(2)} ms` : '-';
-  }
-  if (elements.latencyP95) {
-    elements.latencyP95.textContent = state.latencyPercentiles.p95 !== null 
-      ? `${state.latencyPercentiles.p95.toFixed(2)} ms` : '-';
-  }
-  if (elements.latencyP99) {
-    elements.latencyP99.textContent = state.latencyPercentiles.p99 !== null 
-      ? `${state.latencyPercentiles.p99.toFixed(2)} ms` : '-';
-  }
-  
-  if (elements.rttBaseline) {
-    elements.rttBaseline.textContent = state.rttMetrics.baseline !== null 
-      ? `${state.rttMetrics.baseline.toFixed(2)} ms` : '-';
-  }
-  if (elements.rttCurrent) {
-    elements.rttCurrent.textContent = state.rttMetrics.current !== null 
-      ? `${state.rttMetrics.current.toFixed(2)} ms` : '-';
-  }
-  if (elements.rttAvg) {
-    elements.rttAvg.textContent = state.rttMetrics.avg !== null 
-      ? `${state.rttMetrics.avg.toFixed(2)} ms` : '-';
-  }
-  if (elements.rttJitter) {
-    elements.rttJitter.textContent = state.rttMetrics.jitter !== null 
-      ? `${state.rttMetrics.jitter.toFixed(2)} ms` : '-';
-  }
-  
   if (elements.networkType) {
-    elements.networkType.textContent = state.networkInfo.connectionType || 'Unknown';
+    elements.networkType.textContent = state.networkInfo.connectionType || 'Not supported';
   }
   if (elements.networkIPv6) {
     elements.networkIPv6.textContent = state.networkInfo.ipv6 ? 'Yes' : 'No';
@@ -836,8 +840,6 @@ function resetToIdle() {
   state.uploadResult = 0;
   state.latencyResult = 0;
   state.jitterResult = 0;
-  state.rttMetrics = { baseline: null, current: null, avg: null, jitter: null };
-  state.latencyPercentiles = { p50: null, p95: null, p99: null };
   
   resetProgress();
   showState('idle');

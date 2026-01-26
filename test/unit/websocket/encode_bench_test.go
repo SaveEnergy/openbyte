@@ -1,4 +1,4 @@
-package websocket
+package websocket_test
 
 import (
 	"encoding/json"
@@ -8,8 +8,19 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+type benchMessage struct {
+	Type             string        `json:"type"`
+	StreamID         string        `json:"stream_id"`
+	Status           string        `json:"status"`
+	Progress         float64       `json:"progress,omitempty"`
+	ElapsedSeconds   float64       `json:"elapsed_seconds,omitempty"`
+	RemainingSeconds float64       `json:"remaining_seconds,omitempty"`
+	Metrics          types.Metrics `json:"metrics,omitempty"`
+	Time             int64         `json:"time"`
+}
+
 func BenchmarkEncodeMetricsMessage(b *testing.B) {
-	msg := wsMessage{
+	msg := benchMessage{
 		Type:             "metrics",
 		StreamID:         "bench",
 		Status:           "running",

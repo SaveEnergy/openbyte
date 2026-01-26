@@ -2,8 +2,10 @@ package api
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/config"
@@ -105,16 +107,9 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if mode == "proxy" {
-		if err := h.manager.StartStream(state.Config.ID); err != nil {
-			respondError(w, err, http.StatusInternalServerError)
-			return
-		}
-	} else {
-		if err := h.manager.StartStream(state.Config.ID); err != nil {
-			respondError(w, err, http.StatusInternalServerError)
-			return
-		}
+	if err := h.manager.StartStream(state.Config.ID); err != nil {
+		respondError(w, err, http.StatusInternalServerError)
+		return
 	}
 
 	streamID := state.Config.ID
@@ -131,18 +126,7 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if mode == "client" && h.config != nil {
-		host := r.Host
-		if idx := len(host) - 1; idx > 0 {
-			for i := len(host) - 1; i >= 0; i-- {
-				if host[i] == ':' {
-					host = host[:i]
-					break
-				}
-			}
-		}
-		if host == "" || host == "localhost" {
-			host = "127.0.0.1"
-		}
+		host := normalizeHost(r.Host)
 		resp.TestServerTCP = host + ":" + strconv.Itoa(h.config.TCPTestPort)
 		resp.TestServerUDP = host + ":" + strconv.Itoa(h.config.UDPTestPort)
 		if h.config.QUICEnabled {
@@ -159,16 +143,7 @@ func (h *Handler) GetServers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	host := r.Host
-	for i := len(host) - 1; i >= 0; i-- {
-		if host[i] == ':' {
-			host = host[:i]
-			break
-		}
-	}
-	if host == "" || host == "localhost" {
-		host = "127.0.0.1"
-	}
+	host := normalizeHost(r.Host)
 
 	serverID := "default"
 	serverName := "OpenByte Server"
@@ -374,6 +349,23 @@ func (h *Handler) resolveClientIP(r *http.Request) string {
 		return ipString(parseRemoteIP(r.RemoteAddr))
 	}
 	return h.clientIPResolver.FromRequest(r)
+}
+
+func normalizeHost(host string) string {
+	if host == "" {
+		return "127.0.0.1"
+	}
+	trimmed := host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		trimmed = h
+		if strings.Contains(h, ":") && strings.Contains(host, "[") {
+			trimmed = "[" + h + "]"
+		}
+	}
+	if trimmed == "" || trimmed == "localhost" {
+		return "127.0.0.1"
+	}
+	return trimmed
 }
 
 func respondJSON(w http.ResponseWriter, data interface{}, statusCode int) {

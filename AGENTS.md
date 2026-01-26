@@ -88,3 +88,40 @@
 - Add Buildx cache, `.dockerignore`, and BuildKit cache mounts.
 - Gate e2e via `testing.Short()`; add nightly confidence workflow.
 - Pin GitHub Actions to SHAs; add dependabot + GHCR cleanup job.
+
+## Dead Code Analysis (2026-01-24)
+
+### Findings
+- `pkg/errors/errors.go:52` - `ErrConnectionFailed`: exported, never used.
+- `pkg/errors/errors.go:75` - `IsContextError`: exported, never used.
+- `pkg/types/rtt.go:87` - `MeasureRTT`: exported, only used internally by `MeasureBaselineRTT`.
+- `internal/metrics/calculator.go:10` - `CalculateLatency`: exported, only used in tests (production uses `CalculateLatencyFromHistogram`).
+
+### Actions
+- Removed `ErrConnectionFailed`/`IsContextError`.
+- Renamed `MeasureRTT` to `measureRTT`.
+- Kept `CalculateLatency` for test usage.
+
+## Test Relocation (2026-01-24)
+
+### Actions
+- Moved unit tests/benchmarks into `test/unit/**`.
+- Adjusted router/origin tests to assert CORS behavior via middleware.
+- Adjusted websocket origin tests to use `httptest` + websocket dial.
+- Added `logging.FormatValue` for external tests; benchmarks use local structs/constants.
+
+## Rules + Skills Refresh (2026-01-24)
+
+### Findings
+- Rules/skills verbose; condensed to agentic best-practice checklist.
+
+### Decisions
+- Keep minimal core: workflow, safety, testing, tool order, skill usage.
+
+## Cleanup Pass (2026-01-24)
+
+### Actions
+- Removed duplicate `StartStream` branches in handler.
+- Dropped unused `Collector.GetSnapshot` wrapper.
+- Centralized host normalization in API handlers.
+- Removed unused connection state types from `pkg/types`.

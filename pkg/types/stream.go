@@ -44,28 +44,26 @@ type StreamConfig struct {
 }
 
 type StreamState struct {
-	Config      StreamConfig
-	Status      StreamStatus
-	Progress    float64
-	Metrics     Metrics
-	Network     *NetworkInfo
-	Connections []ConnectionState
-	StartTime   time.Time
-	EndTime     time.Time
-	Error       error
-	mu          sync.RWMutex
+	Config    StreamConfig
+	Status    StreamStatus
+	Progress  float64
+	Metrics   Metrics
+	Network   *NetworkInfo
+	StartTime time.Time
+	EndTime   time.Time
+	Error     error
+	mu        sync.RWMutex
 }
 
 type StreamSnapshot struct {
-	Config      StreamConfig
-	Status      StreamStatus
-	Progress    float64
-	Metrics     Metrics
-	Network     *NetworkInfo
-	Connections []ConnectionState
-	StartTime   time.Time
-	EndTime     time.Time
-	Error       error
+	Config    StreamConfig
+	Status    StreamStatus
+	Progress  float64
+	Metrics   Metrics
+	Network   *NetworkInfo
+	StartTime time.Time
+	EndTime   time.Time
+	Error     error
 }
 
 func (ss *StreamState) UpdateStatus(status StreamStatus) {
@@ -93,24 +91,17 @@ func (ss *StreamState) UpdateMetrics(m Metrics) {
 	}
 }
 
-func (ss *StreamState) UpdateConnections(connections []ConnectionState) {
-	ss.mu.Lock()
-	defer ss.mu.Unlock()
-	ss.Connections = connections
-}
-
 func (ss *StreamState) GetState() StreamSnapshot {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
 	return StreamSnapshot{
-		Config:      ss.Config,
-		Status:      ss.Status,
-		Progress:    ss.Progress,
-		Metrics:     ss.Metrics,
-		Network:     ss.Network,
-		Connections: ss.Connections,
-		StartTime:   ss.StartTime,
-		EndTime:     ss.EndTime,
-		Error:       ss.Error,
+		Config:    ss.Config,
+		Status:    ss.Status,
+		Progress:  ss.Progress,
+		Metrics:   ss.Metrics,
+		Network:   ss.Network,
+		StartTime: ss.StartTime,
+		EndTime:   ss.EndTime,
+		Error:     ss.Error,
 	}
 }

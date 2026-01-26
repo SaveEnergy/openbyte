@@ -1,9 +1,10 @@
-package api
+package api_test
 
 import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/internal/config"
 )
 
@@ -12,7 +13,7 @@ func TestClientIPResolver_TrustedProxy(t *testing.T) {
 	cfg.TrustProxyHeaders = true
 	cfg.TrustedProxyCIDRs = []string{"127.0.0.0/8"}
 
-	resolver := NewClientIPResolver(cfg)
+	resolver := api.NewClientIPResolver(cfg)
 	req := httptest.NewRequest("GET", "http://example.com", nil)
 	req.RemoteAddr = "127.0.0.1:1234"
 	req.Header.Set("X-Forwarded-For", "203.0.113.10, 10.0.0.1")
@@ -28,7 +29,7 @@ func TestClientIPResolver_UntrustedProxy(t *testing.T) {
 	cfg.TrustProxyHeaders = true
 	cfg.TrustedProxyCIDRs = []string{"10.0.0.0/8"}
 
-	resolver := NewClientIPResolver(cfg)
+	resolver := api.NewClientIPResolver(cfg)
 	req := httptest.NewRequest("GET", "http://example.com", nil)
 	req.RemoteAddr = "127.0.0.1:1234"
 	req.Header.Set("X-Forwarded-For", "203.0.113.10")
@@ -44,7 +45,7 @@ func TestClientIPResolver_FallbackToRealIP(t *testing.T) {
 	cfg.TrustProxyHeaders = true
 	cfg.TrustedProxyCIDRs = []string{"127.0.0.0/8"}
 
-	resolver := NewClientIPResolver(cfg)
+	resolver := api.NewClientIPResolver(cfg)
 	req := httptest.NewRequest("GET", "http://example.com", nil)
 	req.RemoteAddr = "127.0.0.1:1234"
 	req.Header.Set("X-Real-IP", "198.51.100.5")
