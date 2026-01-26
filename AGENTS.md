@@ -125,3 +125,9 @@
 - Dropped unused `Collector.GetSnapshot` wrapper.
 - Centralized host normalization in API handlers.
 - Removed unused connection state types from `pkg/types`.
+
+## Dependabot Fix (2026-01-24)
+
+### Actions
+- Updated `golang.org/x/crypto` to `v0.45.0` (CVE-2025-47914, CVE-2025-58181).
+- Updated `golang.org/x/net` to `v0.47.0` via transitive upgrade.
