@@ -658,9 +658,10 @@ async function runDownloadTest(duration, onProgress) {
         
         reader.releaseLock();
       } catch (e) {
-        if (e.name !== 'AbortError') {
-          console.warn('Download stream error:', e.message);
+        if (e.name === 'AbortError') {
+          return;
         }
+        throw e;
       }
     })();
     
@@ -730,6 +731,7 @@ async function runUploadTest(duration, onProgress) {
         
       } catch (e) {
         if (e.name === 'AbortError') break;
+        throw e;
       }
     }
   };

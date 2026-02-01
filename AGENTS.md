@@ -109,6 +109,20 @@
 - Added Playwright/Bun config and basic UI tests.
 - Verified local run via `bunx playwright test`.
 
+## Reliability Fixes (2026-02-01)
+
+### Actions
+- Per-IP rate limiter refill uses float math to avoid low-rate starvation.
+- Speedtest download now handles random-data generation errors.
+- HTTPS pages upgrade server health checks to avoid mixed content.
+- CI checkout fetches tags to derive semver+sha on edge builds.
+
+## Web Mixed Content Fix (2026-02-01)
+
+### Actions
+- Server `/api/v1/servers` now reports scheme based on request headers.
+- Web upload/download streams fail fast on network errors to reduce spam.
+
 ## Dead Code Analysis (2026-01-24)
 
 ### Findings

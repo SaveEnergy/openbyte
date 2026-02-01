@@ -186,7 +186,7 @@ func (h *Handler) GetServers(w http.ResponseWriter, r *http.Request) {
 		activeTests = h.manager.ActiveCount()
 	}
 
-	apiEndpoint := "http://" + host
+	apiEndpoint := requestScheme(r) + "://" + host
 	if h.config != nil && h.config.Port != "80" {
 		apiEndpoint += ":" + h.config.Port
 	}
@@ -386,6 +386,21 @@ func normalizeHost(host string) string {
 		return "127.0.0.1"
 	}
 	return trimmed
+}
+
+func requestScheme(r *http.Request) string {
+	if r == nil {
+		return "http"
+	}
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		if strings.EqualFold(proto, "https") {
+			return "https"
+		}
+	}
+	if r.TLS != nil {
+		return "https"
+	}
+	return "http"
 }
 
 func respondJSON(w http.ResponseWriter, data interface{}, statusCode int) {
