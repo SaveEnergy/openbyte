@@ -103,6 +103,12 @@
 ### Actions
 - Added `/api/v1/version` returning server build version.
 
+## Playwright E2E Setup (2026-02-01)
+
+### Actions
+- Added Playwright/Bun config and basic UI tests.
+- Verified local run via `bunx playwright test`.
+
 ## Dead Code Analysis (2026-01-24)
 
 ### Findings

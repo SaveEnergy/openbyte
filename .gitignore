@@ -17,6 +17,12 @@ obyte
 # Dependency directories
 vendor/
 
+# Node/Bun
+node_modules/
+.playwright/
+playwright-report/
+test-results/
+
 # Go workspace file
 go.work
 

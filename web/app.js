@@ -196,6 +196,25 @@ function detectNetworkInfo() {
     });
 }
 
+function resolveStreams() {
+  if (!state.settings.streams || Number.isNaN(state.settings.streams)) {
+    return 8;
+  }
+  return state.settings.streams;
+}
+
+function resolveChunkSize() {
+  return 1024 * 1024;
+}
+
+function getHealthURL(server) {
+  if (server.api_endpoint) {
+    return `${server.api_endpoint}/health`;
+  }
+  const protocol = window.location.protocol || 'http:';
+  return `${protocol}//${server.host}/health`;
+}
+
 async function loadServers() {
   try {
     const res = await fetch(`${apiBase}/servers`);
@@ -225,9 +244,7 @@ async function selectFastestServer() {
   elements.serverText.textContent = 'Finding fastest...';
 
   const latencyPromises = state.servers.map(async (server) => {
-    const healthUrl = server.api_endpoint 
-      ? `${server.api_endpoint}/health`
-      : `http://${server.host}:8080/health`;
+    const healthUrl = getHealthURL(server);
     
     const start = performance.now();
     try {
