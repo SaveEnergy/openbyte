@@ -10,7 +10,6 @@ type NetworkInfo struct {
 	ServerIP       string `json:"server_ip"`
 	ISP            string `json:"isp,omitempty"`
 	ASN            int    `json:"asn,omitempty"`
-	ConnectionType string `json:"connection_type"`
 	IPv6           bool   `json:"ipv6"`
 	NATDetected    bool   `json:"nat_detected"`
 	MTU            int    `json:"mtu"`
@@ -19,8 +18,7 @@ type NetworkInfo struct {
 
 func NewNetworkInfo() *NetworkInfo {
 	return &NetworkInfo{
-		ConnectionType: "unknown",
-		MTU:            1500,
+		MTU: 1500,
 	}
 }
 
@@ -37,24 +35,6 @@ func (n *NetworkInfo) DetectNAT(localIP, remoteSeenIP string) {
 	local := sanitizeIP(localIP)
 	remote := sanitizeIP(remoteSeenIP)
 	n.NATDetected = local != remote && !isPrivateIP(remote)
-}
-
-func (n *NetworkInfo) DetectConnectionType(ifaceName string) {
-	lower := strings.ToLower(ifaceName)
-	switch {
-	case strings.Contains(lower, "eth") || strings.Contains(lower, "en"):
-		n.ConnectionType = "ethernet"
-	case strings.Contains(lower, "wlan") || strings.Contains(lower, "wifi") || strings.Contains(lower, "wl"):
-		n.ConnectionType = "wifi"
-	case strings.Contains(lower, "cell") || strings.Contains(lower, "rmnet") || strings.Contains(lower, "pdp"):
-		n.ConnectionType = "cellular"
-	case strings.Contains(lower, "lo"):
-		n.ConnectionType = "loopback"
-	case strings.Contains(lower, "tun") || strings.Contains(lower, "tap"):
-		n.ConnectionType = "vpn"
-	default:
-		n.ConnectionType = "unknown"
-	}
 }
 
 func sanitizeIP(addr string) string {

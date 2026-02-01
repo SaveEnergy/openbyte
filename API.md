@@ -21,7 +21,7 @@ Initiate new speed test.
 **Request Body:**
 ```json
 {
-  "protocol": "tcp" | "udp",
+  "protocol": "tcp" | "udp" | "quic",
   "direction": "download" | "upload" | "bidirectional",
   "duration": 30,
   "streams": 4,
@@ -31,7 +31,7 @@ Initiate new speed test.
 ```
 
 **Parameters:**
-- `protocol` (required): "tcp" or "udp"
+- `protocol` (required): "tcp", "udp", or "quic"
 - `direction` (required): "download", "upload", or "bidirectional"
 - `duration` (optional): Test duration in seconds (default: 30, min: 1, max: 300)
 - `streams` (optional): Number of parallel connections (default: 4, min: 1, max: 16)
@@ -47,6 +47,7 @@ Initiate new speed test.
   "websocket_url": "/api/v1/stream/550e8400-e29b-41d4-a716-446655440000/stream",
   "test_server_tcp": "127.0.0.1:8081",
   "test_server_udp": "127.0.0.1:8082",
+  "test_server_quic": "127.0.0.1:8083",
   "status": "running",
   "mode": "client"
 }
@@ -360,11 +361,29 @@ Latency measurement endpoint.
 ```json
 {
   "pong": true,
-  "timestamp": 1704456789123
+  "timestamp": 1704456789123,
+  "client_ip": "203.0.113.10",
+  "ipv6": false
 }
 ```
 
-### 12. WebSocket Stream (Legacy)
+### 12. Version
+
+**GET** `/version`
+
+Build/version information.
+
+**Response:**
+```json
+{
+  "version": "v1.2.3"
+}
+```
+
+**Status Codes:**
+- `200 OK`: Version returned
+
+### 13. WebSocket Stream (Legacy)
 
 **WS** `/stream/{stream_id}/stream`
 

@@ -43,11 +43,11 @@ Open `http://localhost:8080` — minimal fast.com-inspired UI with real-time spe
 
 ## Features
 
-- **Protocols**: TCP, UDP, HTTP streaming
+- **Protocols**: TCP, UDP, QUIC, HTTP streaming
 - **Test Types**: Download, Upload, Bidirectional
 - **Metrics**: Throughput, Latency (P50/P95/P99), Jitter, Packet Loss
 - **RTT**: Baseline and during-test round-trip time measurement
-- **Network Info**: IP, connection type, NAT, MTU detection
+- **Network Info**: IP, NAT, MTU detection
 - **Streaming**: WebSocket real-time metrics
 - **Multi-stream**: 1-16 parallel connections
 - **Multi-server**: Deploy globally, test against nearest server
@@ -71,6 +71,8 @@ Uses BEREC-compliant measurement practices:
 | `PORT` | 8080 | HTTP API port |
 | `TCP_TEST_PORT` | 8081 | TCP test data port |
 | `UDP_TEST_PORT` | 8082 | UDP test data port |
+| `QUIC_ENABLED` | false | Enable QUIC test server |
+| `QUIC_PORT` | 8083 | QUIC test data port |
 | `SERVER_ID` | hostname | Unique server identifier |
 | `SERVER_NAME` | OpenByte Server | Human-readable name |
 | `SERVER_LOCATION` | — | Geographic location |

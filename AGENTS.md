@@ -198,6 +198,11 @@
 ### Actions
 - Show connection type with estimate labels when browser only reports effectiveType.
 
+## Network Info Display Update (2026-02-02)
+
+### Actions
+- Removed connection type display from the web UI due to accuracy concerns.
+
 ## Defaults + Validation Alignment (2026-01-24)
 
 ### Actions

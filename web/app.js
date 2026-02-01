@@ -20,7 +20,6 @@ const state = {
     serverUrl: ''
   },
   networkInfo: {
-    connectionType: null,
     ipv6: false,
     clientIP: null
   }
@@ -39,7 +38,6 @@ const elements = {
   uploadResult: document.getElementById('uploadResult'),
   latencyResult: document.getElementById('latencyResult'),
   jitterResult: document.getElementById('jitterResult'),
-  networkType: document.getElementById('networkType'),
   networkIPv6: document.getElementById('networkIPv6'),
   networkIP: document.getElementById('networkIP'),
   restartBtn: document.getElementById('restartBtn'),
@@ -145,39 +143,6 @@ function saveSettings() {
 }
 
 function detectNetworkInfo() {
-  if (navigator.connection) {
-    const conn = navigator.connection;
-    const typeMap = {
-      'ethernet': 'Ethernet',
-      'wifi': 'WiFi',
-      'cellular': 'Cellular',
-      'wimax': 'WiMAX',
-      'bluetooth': 'Bluetooth',
-      'other': 'Other'
-    };
-    
-    const mappedType = conn.type ? typeMap[conn.type] || conn.type : null;
-    const effectiveType = conn.effectiveType ? conn.effectiveType.toUpperCase() : null;
-    if (mappedType && effectiveType && mappedType !== effectiveType) {
-      state.networkInfo.connectionType = `${mappedType} (estimate: ${effectiveType})`;
-    } else if (mappedType) {
-      state.networkInfo.connectionType = mappedType;
-    } else if (effectiveType) {
-      state.networkInfo.connectionType = `Estimate: ${effectiveType}`;
-    } else {
-      state.networkInfo.connectionType = 'Not supported';
-    }
-    
-    if (elements.networkType) {
-      elements.networkType.textContent = state.networkInfo.connectionType;
-    }
-  } else {
-    state.networkInfo.connectionType = 'Not supported';
-    if (elements.networkType) {
-      elements.networkType.textContent = 'Not supported';
-    }
-  }
-  
   fetch(`${apiBase}/ping`)
     .then(res => res.json())
     .then(data => {
@@ -891,9 +856,6 @@ function showResults() {
   elements.latencyResult.textContent = `${state.latencyResult.toFixed(1)} ms`;
   elements.jitterResult.textContent = `${state.jitterResult.toFixed(1)} ms`;
   
-  if (elements.networkType) {
-    elements.networkType.textContent = state.networkInfo.connectionType || 'Not supported';
-  }
   if (elements.networkIPv6) {
     elements.networkIPv6.textContent = state.networkInfo.ipv6 ? 'Yes' : 'No';
   }

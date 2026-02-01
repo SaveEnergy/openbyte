@@ -32,7 +32,6 @@ func NewQUICEngine(cfg *TestEngineConfig) *QUICEngine {
 	networkInfo := types.NewNetworkInfo()
 	iface := types.GetDefaultInterface()
 	if iface != "" {
-		networkInfo.DetectConnectionType(iface)
 		networkInfo.MTU = types.DetectMTU(iface)
 	}
 	networkInfo.SetClientIP(types.GetLocalIP())
