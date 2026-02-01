@@ -355,12 +355,25 @@ func (s *Server) handleUDP() {
 	buf := make([]byte, s.config.UDPBufferSize)
 	clients := make(map[string]*udpClientState)
 	var clientsMu sync.RWMutex
+	lastCleanup := time.Now()
 
 	for {
 		select {
 		case <-s.ctx.Done():
 			return
 		default:
+			if time.Since(lastCleanup) > 10*time.Second {
+				now := time.Now()
+				clientsMu.Lock()
+				for key, client := range clients {
+					lastSeen := time.Unix(0, atomic.LoadInt64(&client.lastSeenUnix))
+					if now.Sub(lastSeen) > 30*time.Second {
+						delete(clients, key)
+					}
+				}
+				clientsMu.Unlock()
+				lastCleanup = now
+			}
 			s.udpConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 			n, addr, err := s.udpConn.ReadFromUDP(buf)
 			if err != nil {
@@ -377,6 +390,10 @@ func (s *Server) handleUDP() {
 				continue
 			}
 
+			if n < 1 {
+				continue
+			}
+
 			clientKey := addr.String()
 			clientsMu.RLock()
 			client := clients[clientKey]
@@ -385,8 +402,8 @@ func (s *Server) handleUDP() {
 			if client == nil {
 				clientsMu.Lock()
 				client = &udpClientState{
-					addr:     addr,
-					lastSeen: time.Now(),
+					addr:         addr,
+					lastSeenUnix: time.Now().UnixNano(),
 				}
 				clients[clientKey] = client
 				clientsMu.Unlock()
@@ -394,7 +411,7 @@ func (s *Server) handleUDP() {
 				go s.udpSender(client)
 			}
 
-			client.lastSeen = time.Now()
+			atomic.StoreInt64(&client.lastSeenUnix, time.Now().UnixNano())
 
 			cmd := buf[0]
 			switch cmd {
@@ -405,17 +422,19 @@ func (s *Server) handleUDP() {
 			case 'S':
 				atomic.StoreInt32(&client.downloading, 0)
 			default:
-				s.udpConn.WriteToUDP(buf[:n], addr)
+				if _, err := s.udpConn.WriteToUDP(buf[:n], addr); err != nil {
+					logging.Warn("UDP echo error", logging.Field{Key: "error", Value: err})
+				}
 			}
 		}
 	}
 }
 
 type udpClientState struct {
-	addr        *net.UDPAddr
-	downloading int32
-	bytesRecv   int64
-	lastSeen    time.Time
+	addr         *net.UDPAddr
+	downloading  int32
+	bytesRecv    int64
+	lastSeenUnix int64
 }
 
 func (s *Server) udpSender(client *udpClientState) {
@@ -428,11 +447,15 @@ func (s *Server) udpSender(client *udpClientState) {
 		case <-s.ctx.Done():
 			return
 		default:
-			if time.Since(client.lastSeen) > 30*time.Second {
+			lastSeen := time.Unix(0, atomic.LoadInt64(&client.lastSeenUnix))
+			if time.Since(lastSeen) > 30*time.Second {
 				return
 			}
 			if atomic.LoadInt32(&client.downloading) == 1 {
-				_, _ = s.udpConn.WriteToUDP(packet, client.addr)
+				if _, err := s.udpConn.WriteToUDP(packet, client.addr); err != nil {
+					logging.Warn("UDP send error", logging.Field{Key: "error", Value: err})
+					return
+				}
 				if time.Since(lastYield) > 2*time.Millisecond {
 					runtime.Gosched()
 					lastYield = time.Now()

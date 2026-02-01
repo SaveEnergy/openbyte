@@ -15,6 +15,9 @@ type RateLimiter struct {
 	globalTokens     int
 	globalMu         sync.Mutex
 	globalLastRefill time.Time
+	lastCleanup      time.Time
+	cleanupInterval  time.Duration
+	ipLimitTTL       time.Duration
 	clientIPResolver *ClientIPResolver
 }
 
@@ -30,6 +33,9 @@ func NewRateLimiter(cfg *config.Config) *RateLimiter {
 		ipLimits:         make(map[string]*IPLimit),
 		globalTokens:     cfg.GlobalRateLimit,
 		globalLastRefill: time.Now(),
+		lastCleanup:      time.Now(),
+		cleanupInterval:  5 * time.Minute,
+		ipLimitTTL:       10 * time.Minute,
 		clientIPResolver: NewClientIPResolver(cfg),
 	}
 }
@@ -49,6 +55,15 @@ func (rl *RateLimiter) ClientIP(r *http.Request) string {
 		return rl.clientIPResolver.FromRequest(r)
 	}
 	return ipString(parseRemoteIP(r.RemoteAddr))
+}
+
+// SetCleanupPolicy overrides cleanup interval and TTL (mainly for tests).
+func (rl *RateLimiter) SetCleanupPolicy(cleanupInterval, ipLimitTTL time.Duration) {
+	rl.ipMu.Lock()
+	defer rl.ipMu.Unlock()
+	rl.cleanupInterval = cleanupInterval
+	rl.ipLimitTTL = ipLimitTTL
+	rl.lastCleanup = time.Now()
 }
 
 func (rl *RateLimiter) allowGlobal() bool {
@@ -79,11 +94,20 @@ func (rl *RateLimiter) allowGlobal() bool {
 
 func (rl *RateLimiter) allowIP(ip string) bool {
 	rl.ipMu.Lock()
+	now := time.Now()
+	if rl.cleanupInterval > 0 && rl.ipLimitTTL > 0 && now.Sub(rl.lastCleanup) >= rl.cleanupInterval {
+		for key, limit := range rl.ipLimits {
+			if now.Sub(limit.lastRefill) >= rl.ipLimitTTL {
+				delete(rl.ipLimits, key)
+			}
+		}
+		rl.lastCleanup = now
+	}
 	limit, exists := rl.ipLimits[ip]
 	if !exists {
 		limit = &IPLimit{
 			tokens:     rl.config.RateLimitPerIP,
-			lastRefill: time.Now(),
+			lastRefill: now,
 		}
 		rl.ipLimits[ip] = limit
 	}
@@ -92,7 +116,6 @@ func (rl *RateLimiter) allowIP(ip string) bool {
 	limit.mu.Lock()
 	defer limit.mu.Unlock()
 
-	now := time.Now()
 	elapsed := now.Sub(limit.lastRefill)
 
 	if elapsed >= time.Second {
