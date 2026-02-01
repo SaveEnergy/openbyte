@@ -640,6 +640,48 @@ async function runDownloadTest(duration, onProgress) {
   
   const streamPromises = [];
   
+  const downloadStream = async (chunk) => {
+    const res = await fetch(`${apiBase}/download?duration=${duration}&chunk=${chunk}`, {
+      method: 'GET',
+      signal: state.abortController?.signal
+    });
+    
+    if (!res.ok || !res.body) return false;
+    
+    const reader = res.body.getReader();
+    try {
+      while (true) {
+        if (!state.isRunning) break;
+
+        const elapsed = performance.now() - startTime;
+        if (elapsed >= (endTime - startTime)) {
+          await reader.cancel();
+          break;
+        }
+
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        if (!graceComplete && elapsed < graceTime) {
+          graceBytes += value.length;
+        } else {
+          if (!graceComplete) {
+            graceComplete = true;
+            totalBytes = 0;
+          }
+          totalBytes += value.length;
+        }
+        
+        const elapsedSec = (performance.now() - startTime) / 1000;
+        const displayBytes = graceComplete ? totalBytes : graceBytes;
+        onProgress(displayBytes, elapsedSec);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    return true;
+  };
+  
   for (let i = 0; i < numStreams; i++) {
     const delay = i * streamDelay;
     
@@ -647,48 +689,28 @@ async function runDownloadTest(duration, onProgress) {
       await new Promise(r => setTimeout(r, delay));
       
       try {
-        const res = await fetch(`${apiBase}/download?duration=${duration}&chunk=${chunkSize}`, {
-          method: 'GET',
-          signal: state.abortController?.signal
-        });
-        
-        if (!res.ok || !res.body) return 0;
-        
-        const reader = res.body.getReader();
-        
-        while (true) {
-          if (!state.isRunning) break;
-
-          const elapsed = performance.now() - startTime;
-          if (elapsed >= (endTime - startTime)) {
-            await reader.cancel();
-            break;
-          }
-
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          if (!graceComplete && elapsed < graceTime) {
-            graceBytes += value.length;
-          } else {
-            if (!graceComplete) {
-              graceComplete = true;
-              totalBytes = 0;
-            }
-            totalBytes += value.length;
-          }
-          
-          const elapsedSec = (performance.now() - startTime) / 1000;
-          const displayBytes = graceComplete ? totalBytes : graceBytes;
-          onProgress(displayBytes, elapsedSec);
+        if (await downloadStream(chunkSize)) {
+          return;
         }
-        
-        reader.releaseLock();
       } catch (e) {
         if (e.name === 'AbortError') {
           return;
         }
-        throw e;
+        console.warn('Download stream failed, retrying smaller chunk', e);
+      }
+      
+      const fallbackChunk = Math.min(65536, chunkSize);
+      if (fallbackChunk === chunkSize) {
+        return;
+      }
+      
+      try {
+        await downloadStream(fallbackChunk);
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          return;
+        }
+        console.warn('Download stream failed after retry', e);
       }
     })();
     

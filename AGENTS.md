@@ -204,3 +204,8 @@
 - Align web defaults with CLI and API stream defaults.
 - Add client env var docs and extend env parsing for timeout/warmup.
 - Enforce UUID stream IDs at routing layer with test coverage.
+
+## Web Download Retry (2026-01-24)
+
+### Actions
+- Retry HTTP download streams with smaller chunk size on network errors.
