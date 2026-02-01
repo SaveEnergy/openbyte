@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/logging"
@@ -115,6 +116,10 @@ func (r *Router) HandleWithID(fn func(http.ResponseWriter, *http.Request, string
 			http.Error(w, "stream ID required", http.StatusBadRequest)
 			return
 		}
+		if !isValidStreamID(streamID) {
+			http.Error(w, "invalid stream ID", http.StatusBadRequest)
+			return
+		}
 		fn(w, req, streamID)
 	}
 }
@@ -216,6 +221,14 @@ func stripPort(host string) string {
 		return strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
 	}
 	return host
+}
+
+func isValidStreamID(streamID string) bool {
+	if streamID == "" {
+		return false
+	}
+	_, err := uuid.Parse(streamID)
+	return err == nil
 }
 
 type responseWriter struct {

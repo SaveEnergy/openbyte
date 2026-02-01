@@ -210,6 +210,20 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 			fmt.Fprintf(os.Stderr, "obyte: warning: invalid OBYTE_CHUNK_SIZE value '%s' (must be integer), ignoring\n", val)
 		}
 	}
+	if val := os.Getenv("OBYTE_TIMEOUT"); val != "" {
+		if t, err := strconv.Atoi(val); err == nil {
+			result.Timeout = t
+		} else {
+			fmt.Fprintf(os.Stderr, "obyte: warning: invalid OBYTE_TIMEOUT value '%s' (must be integer), ignoring\n", val)
+		}
+	}
+	if val := os.Getenv("OBYTE_WARMUP"); val != "" {
+		if w, err := strconv.Atoi(val); err == nil {
+			result.WarmUp = w
+		} else {
+			fmt.Fprintf(os.Stderr, "obyte: warning: invalid OBYTE_WARMUP value '%s' (must be integer), ignoring\n", val)
+		}
+	}
 	if os.Getenv("NO_COLOR") != "" {
 		result.NoColor = true
 	}
@@ -294,10 +308,10 @@ func validateConfigFile(config *ConfigFile) error {
 	if config.Protocol == "http" && config.Direction == "bidirectional" {
 		return fmt.Errorf("invalid direction for http: %s (must be download or upload)", config.Direction)
 	}
-	if config.Duration < 0 || config.Duration > 300 {
+	if config.Duration != 0 && (config.Duration < 1 || config.Duration > 300) {
 		return fmt.Errorf("invalid duration: %d (must be 1-300 seconds)", config.Duration)
 	}
-	if config.Streams < 0 || config.Streams > 16 {
+	if config.Streams != 0 && (config.Streams < 1 || config.Streams > 16) {
 		return fmt.Errorf("invalid streams: %d (must be 1-16)", config.Streams)
 	}
 	if config.PacketSize < 0 || (config.PacketSize > 0 && (config.PacketSize < 64 || config.PacketSize > 9000)) {

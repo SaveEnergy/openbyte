@@ -15,8 +15,8 @@ const state = {
   servers: [],
   selectedServer: null,
   settings: {
-    duration: 10,
-    streams: 8,  // Default 8 streams for ~600 Mbps capacity
+    duration: 30,
+    streams: 4,  // Default 4 streams for ~300 Mbps capacity
     serverUrl: ''
   },
   networkInfo: {
@@ -158,7 +158,15 @@ function detectNetworkInfo() {
     
     const mappedType = conn.type ? typeMap[conn.type] || conn.type : null;
     const effectiveType = conn.effectiveType ? conn.effectiveType.toUpperCase() : null;
-    state.networkInfo.connectionType = mappedType || effectiveType || 'Not supported';
+    if (mappedType && effectiveType && mappedType !== effectiveType) {
+      state.networkInfo.connectionType = `${mappedType} (estimate: ${effectiveType})`;
+    } else if (mappedType) {
+      state.networkInfo.connectionType = mappedType;
+    } else if (effectiveType) {
+      state.networkInfo.connectionType = `Estimate: ${effectiveType}`;
+    } else {
+      state.networkInfo.connectionType = 'Not supported';
+    }
     
     if (elements.networkType) {
       elements.networkType.textContent = state.networkInfo.connectionType;
@@ -198,7 +206,7 @@ function detectNetworkInfo() {
 
 function resolveStreams() {
   if (!state.settings.streams || Number.isNaN(state.settings.streams)) {
-    return 8;
+    return 4;
   }
   return state.settings.streams;
 }

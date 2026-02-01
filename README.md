@@ -106,6 +106,22 @@ protocol: http
 chunk_size: 1048576
 ```
 
+### Client Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `OBYTE_SERVER_URL` | Server URL (default: `http://localhost:8080`) |
+| `OBYTE_API_KEY` | API key |
+| `OBYTE_PROTOCOL` | Protocol (`tcp`, `udp`, `quic`, `http`) |
+| `OBYTE_DIRECTION` | Direction (`download`, `upload`, `bidirectional`) |
+| `OBYTE_DURATION` | Test duration in seconds |
+| `OBYTE_STREAMS` | Parallel streams (1-16) |
+| `OBYTE_PACKET_SIZE` | Packet size in bytes |
+| `OBYTE_CHUNK_SIZE` | HTTP chunk size in bytes |
+| `OBYTE_TIMEOUT` | Request timeout in seconds |
+| `OBYTE_WARMUP` | Warm-up seconds before measurement |
+| `NO_COLOR` | Disable colors |
+
 ## Multi-Server Deployment
 
 ### Registry Service (Optional)

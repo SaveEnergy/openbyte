@@ -192,3 +192,15 @@
 ### Actions
 - Added safe fetch timeout helper for server health checks.
 - Avoided CORS mode for same-origin health requests.
+
+## Network Info Display (2026-01-24)
+
+### Actions
+- Show connection type with estimate labels when browser only reports effectiveType.
+
+## Defaults + Validation Alignment (2026-01-24)
+
+### Actions
+- Align web defaults with CLI and API stream defaults.
+- Add client env var docs and extend env parsing for timeout/warmup.
+- Enforce UUID stream IDs at routing layer with test coverage.

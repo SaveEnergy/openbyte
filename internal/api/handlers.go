@@ -23,7 +23,11 @@ type Handler struct {
 	version          string
 }
 
-const maxJSONBodyBytes = 1 << 20
+const (
+	maxJSONBodyBytes         = 1 << 20
+	defaultStreamDurationSec = 30
+	defaultStreamCount       = 4
+)
 
 func NewHandler(manager *stream.Manager) *Handler {
 	return &Handler{
@@ -95,6 +99,13 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 	if err := decodeJSONBody(w, r, &req, maxJSONBodyBytes); err != nil {
 		respondJSONBodyError(w, err)
 		return
+	}
+
+	if req.Duration == 0 {
+		req.Duration = defaultStreamDurationSec
+	}
+	if req.Streams == 0 {
+		req.Streams = defaultStreamCount
 	}
 
 	mode := req.Mode
