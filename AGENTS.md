@@ -208,6 +208,11 @@
 ### Actions
 - Removed QUIC server/client support and related config/docs to reduce surface area.
 
+## Unified Binary Refactor (2026-02-02)
+
+### Actions
+- Merged server/client into a single `openbyte` binary with subcommands.
+
 ## Defaults + Validation Alignment (2026-01-24)
 
 ### Actions

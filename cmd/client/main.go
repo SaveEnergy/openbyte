@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"context"
@@ -12,8 +12,6 @@ import (
 )
 
 var (
-	version = "dev"
-
 	exitSuccess   = 0
 	exitFailure   = 1
 	exitUsage     = 2
@@ -31,21 +29,28 @@ const (
 	defaultTimeout    = 60
 )
 
-func main() {
+func Run(args []string, version string) int {
 	configFile, err := loadConfigFile()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "obyte: warning: failed to load config file: %v\n", err)
+		fmt.Fprintf(os.Stderr, "openbyte client: warning: failed to load config file: %v\n", err)
 	}
 
-	flagConfig, flagsSet := parseFlags()
+	flagConfig, flagsSet, exitCode, err := parseFlags(args, version)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "openbyte client: error: %v\n", err)
+		return exitUsage
+	}
+	if exitCode != 0 {
+		return exitCode
+	}
 
 	config := mergeConfig(flagConfig, configFile, flagsSet)
 
 	if config.Auto {
 		fastest, err := selectFastestServer(configFile, config.Verbose)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "obyte: error: %v\n", err)
-			os.Exit(exitFailure)
+			fmt.Fprintf(os.Stderr, "openbyte client: error: %v\n", err)
+			return exitFailure
 		}
 		config.ServerURL = fastest.URL
 		if !config.Quiet {
@@ -58,8 +63,8 @@ func main() {
 	}
 
 	if err := validateConfig(config); err != nil {
-		fmt.Fprintf(os.Stderr, "obyte: error: %v\n", err)
-		os.Exit(exitUsage)
+		fmt.Fprintf(os.Stderr, "openbyte client: error: %v\n", err)
+		return exitUsage
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
@@ -88,6 +93,7 @@ func main() {
 
 	if err := runStream(ctx, config, formatter, &streamID); err != nil {
 		formatter.FormatError(err)
-		os.Exit(exitFailure)
+		return exitFailure
 	}
+	return exitSuccess
 }

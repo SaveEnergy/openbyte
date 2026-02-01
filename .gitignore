@@ -1,7 +1,5 @@
 # Binaries
 bin/
-openbyte
-obyte
 *.exe
 *.exe~
 *.dll
@@ -46,6 +44,3 @@ Thumbs.db
 
 # Logs
 *.log
-
-# Local deployment script (contains environment/host specifics)
-deploy-openbyte-prod.sh

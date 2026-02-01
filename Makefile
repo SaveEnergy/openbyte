@@ -1,28 +1,22 @@
-.PHONY: build server client loadtest test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench ci-test ci-lint
+.PHONY: build openbyte loadtest test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench ci-test ci-lint
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
 # Build targets
-build: server client
+build: openbyte
 
-server:
-	@echo "Building server..."
+openbyte:
+	@echo "Building openbyte..."
 	@mkdir -p bin
-	@go build -ldflags "$(LDFLAGS)" -o bin/openbyte ./cmd/server
-	@echo "✓ Server built: ./bin/openbyte"
-
-client:
-	@echo "Building CLI client..."
-	@mkdir -p bin
-	@go build -ldflags "$(LDFLAGS)" -o bin/obyte ./cmd/client
-	@echo "✓ CLI built: ./bin/obyte"
+	@go build -ldflags "$(LDFLAGS)" -o bin/openbyte ./cmd/openbyte
+	@echo "✓ Binary built: ./bin/openbyte"
 
 loadtest:
 	@echo "Building load test tool..."
 	@mkdir -p bin
-	@go build -ldflags "$(LDFLAGS)" -o bin/obyte-load ./cmd/loadtest
-	@echo "✓ Load test tool built: ./bin/obyte-load"
+	@go build -ldflags "$(LDFLAGS)" -o bin/openbyte-load ./cmd/loadtest
+	@echo "✓ Load test tool built: ./bin/openbyte-load"
 
 # Testing
 test:
@@ -66,12 +60,12 @@ perf-bench:
 run:
 	@echo "Starting server..."
 	@echo "Port: $${PORT:-8080} (set PORT env var to change)"
-	@go run -ldflags "$(LDFLAGS)" ./cmd/server
+	@go run -ldflags "$(LDFLAGS)" ./cmd/openbyte server
 
 run-alt-ports:
 	@echo "Starting server with alternative ports..."
 	@echo "HTTP: 9090, TCP test: 9081, UDP test: 9082"
-	@PORT=9090 TCP_TEST_PORT=9081 UDP_TEST_PORT=9082 go run -ldflags "$(LDFLAGS)" ./cmd/server
+	@PORT=9090 TCP_TEST_PORT=9081 UDP_TEST_PORT=9082 go run -ldflags "$(LDFLAGS)" ./cmd/openbyte server
 
 kill-ports:
 	@echo "Killing processes on ports 8080, 8081, 8082..."
@@ -100,16 +94,16 @@ docker-down:
 # Cleanup
 clean:
 	@echo "Cleaning build artifacts..."
-	@rm -f openbyte obyte obyte-load coverage.out coverage.html
+	@rm -f openbyte openbyte-load coverage.out coverage.html
 	@rm -rf bin/
 	@echo "✓ Cleaned"
 
 perf-smoke: loadtest
 	@echo "Starting server with pprof..."
-	@PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6060 PORT=8080 TCP_TEST_PORT=8081 UDP_TEST_PORT=8082 go run -ldflags "$(LDFLAGS)" ./cmd/server & echo $$! > /tmp/openbyte-perf.pid
+	@PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6060 PORT=8080 TCP_TEST_PORT=8081 UDP_TEST_PORT=8082 go run -ldflags "$(LDFLAGS)" ./cmd/openbyte server & echo $$! > /tmp/openbyte-perf.pid
 	@sleep 2
 	@$(MAKE) perf-bench
-	@./bin/obyte-load --mode tcp-download --host 127.0.0.1 --tcp-port 8081 --duration 5s --concurrency 4
+	@./bin/openbyte-load --mode tcp-download --host 127.0.0.1 --tcp-port 8081 --duration 5s --concurrency 4
 	@curl -s "http://127.0.0.1:6060/debug/pprof/profile?seconds=5" -o /tmp/openbyte-cpu.pprof
 	@kill `cat /tmp/openbyte-perf.pid` || true
 	@echo "✓ Perf smoke complete. Profile: /tmp/openbyte-cpu.pprof"
@@ -119,10 +113,9 @@ help:
 	@echo "openByte Makefile"
 	@echo ""
 	@echo "Targets:"
-	@echo "  build         - Build server and client"
-	@echo "  server        - Build server binary (openbyte)"
-	@echo "  client        - Build CLI client (obyte)"
-	@echo "  loadtest      - Build load test tool (obyte-load)"
+	@echo "  build         - Build openbyte binary"
+	@echo "  openbyte      - Build openbyte binary"
+	@echo "  loadtest      - Build load test tool (openbyte-load)"
 	@echo "  test          - Run tests"
 	@echo "  test-ui       - Run Playwright UI tests"
 	@echo "  ci-test       - Run CI test suite (short)"

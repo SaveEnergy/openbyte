@@ -138,7 +138,7 @@ Type=simple
 User=openbyte
 Group=openbyte
 WorkingDirectory=/opt/openbyte
-ExecStart=/opt/openbyte/openbyte
+ExecStart=/opt/openbyte/openbyte server
 Restart=always
 RestartSec=5
 
@@ -222,7 +222,7 @@ sudo systemctl status openbyte
 curl http://localhost:8080/health
 
 # Test from client
-./bin/obyte -S production -d download -t 10
+./bin/openbyte client -S production -d download -t 10
 ```
 
 ## Multi-Server Deployment
@@ -247,7 +247,7 @@ PUBLIC_HOST=ams.speedtest.example.com
 
 ### Client Configuration
 
-Update `~/.config/obyte/config.yaml`:
+Update `~/.config/openbyte/config.yaml`:
 
 ```yaml
 default_server: nyc

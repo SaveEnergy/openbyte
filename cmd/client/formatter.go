@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"encoding/json"
@@ -19,7 +19,7 @@ func (f *JSONFormatter) FormatComplete(results *StreamResults) {
 }
 
 func (f *JSONFormatter) FormatError(err error) {
-	fmt.Fprintf(os.Stderr, "obyte: error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "openbyte client: error: %v\n", err)
 }
 
 func (f *PlainFormatter) FormatProgress(progress, elapsed, remaining float64) {}
@@ -62,7 +62,7 @@ func (f *PlainFormatter) FormatComplete(results *StreamResults) {
 }
 
 func (f *PlainFormatter) FormatError(err error) {
-	fmt.Fprintf(os.Stderr, "obyte: error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "openbyte client: error: %v\n", err)
 }
 
 func (f *InteractiveFormatter) FormatProgress(progress, elapsed, remaining float64) {
@@ -139,7 +139,7 @@ func (f *InteractiveFormatter) FormatComplete(results *StreamResults) {
 }
 
 func (f *InteractiveFormatter) FormatError(err error) {
-	fmt.Fprintf(os.Stderr, "obyte: error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "openbyte client: error: %v\n", err)
 }
 
 func formatBytes(bytes int64) string {

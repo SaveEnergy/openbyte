@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -18,9 +18,12 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
-var version = "dev"
+var (
+	exitSuccess = 0
+	exitFailure = 1
+)
 
-func main() {
+func Run(version string) int {
 	logLevel := logging.LevelInfo
 	if os.Getenv("LOG_LEVEL") == "debug" {
 		logLevel = logging.LevelDebug
@@ -30,11 +33,11 @@ func main() {
 	cfg := config.DefaultConfig()
 	if err := cfg.LoadFromEnv(); err != nil {
 		logging.Error("Failed to load config", logging.Field{Key: "error", Value: err})
-		log.Fatalf("Failed to load config: %v", err)
+		return exitFailure
 	}
 	if err := cfg.Validate(); err != nil {
 		logging.Error("Invalid configuration", logging.Field{Key: "error", Value: err})
-		log.Fatalf("Invalid configuration: %v", err)
+		return exitFailure
 	}
 
 	pprofServer := startPprofServer(cfg)
@@ -43,7 +46,7 @@ func main() {
 	streamServer, err := stream.NewServer(cfg)
 	if err != nil {
 		logging.Error("Failed to start stream server", logging.Field{Key: "error", Value: err})
-		log.Fatalf("Failed to start stream server: %v", err)
+		return exitFailure
 	}
 	logging.Info("Stream server started",
 		logging.Field{Key: "tcp_port", Value: cfg.TCPTestPort},
@@ -101,6 +104,7 @@ func main() {
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	srvErrCh := make(chan error, 1)
 
 	go func() {
 		fields := []logging.Field{
@@ -110,13 +114,18 @@ func main() {
 		}
 		logging.Info("Server starting", fields...)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logging.Error("Server failed", logging.Field{Key: "error", Value: err})
-			log.Fatalf("Server failed: %v", err)
+			srvErrCh <- err
 		}
 	}()
 
-	sig := <-quit
-	logging.Info("Shutting down server...", logging.Field{Key: "signal", Value: sig.String()})
+	exitCode := exitSuccess
+	select {
+	case sig := <-quit:
+		logging.Info("Shutting down server...", logging.Field{Key: "signal", Value: sig.String()})
+	case err := <-srvErrCh:
+		logging.Error("Server failed", logging.Field{Key: "error", Value: err})
+		exitCode = exitFailure
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -140,6 +149,7 @@ func main() {
 	streamServer.Close()
 
 	logging.Info("Server stopped")
+	return exitCode
 }
 
 func broadcastMetrics(manager *stream.Manager, wsServer *websocket.Server) {

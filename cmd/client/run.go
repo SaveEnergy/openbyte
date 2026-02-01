@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"context"
@@ -18,7 +18,7 @@ func runStream(ctx context.Context, config *Config, formatter OutputFormatter, s
 		return fmt.Errorf("failed to start stream: %v\n\n"+
 			"Troubleshooting:\n"+
 			"  - Check server is running: curl %s/health\n"+
-			"  - Verify server URL: obyte --server-url %s\n"+
+			"  - Verify server URL: openbyte client --server-url %s\n"+
 			"  - Check network connectivity", err, config.ServerURL, config.ServerURL)
 	}
 

@@ -39,8 +39,7 @@ jobs:
             local out="dist/openbyte_${VERSION}_${os}_${arch}"
             mkdir -p "$out"
 
-            GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "$out/openbyte${ext}" ./cmd/server
-            GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "$out/obyte${ext}" ./cmd/client
+            GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "$out/openbyte${ext}" ./cmd/openbyte
             cp -R web "$out/web"
 
             if [ "$os" = "windows" ]; then

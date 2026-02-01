@@ -306,12 +306,12 @@ var bufferPool = sync.Pool{
 ```dockerfile
 FROM golang:1.25-alpine AS builder
 COPY . .
-RUN go build -o openbyte ./cmd/server
+RUN go build -o openbyte ./cmd/openbyte
 
 FROM alpine:3.19
 COPY --from=builder /app/openbyte /app/
 EXPOSE 8080 8081 8082/tcp 8082/udp
-CMD ["/app/openbyte"]
+CMD ["/app/openbyte", "server"]
 ```
 
 ### Systemd
@@ -324,7 +324,7 @@ After=network.target
 [Service]
 Type=simple
 User=openbyte
-ExecStart=/opt/openbyte/openbyte
+ExecStart=/opt/openbyte/openbyte server
 Restart=always
 
 [Install]

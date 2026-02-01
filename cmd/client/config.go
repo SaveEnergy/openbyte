@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"fmt"
@@ -45,6 +45,18 @@ func getConfigPath() string {
 		}
 		configDir = filepath.Join(home, ".config")
 	}
+	return filepath.Join(configDir, "openbyte", "config.yaml")
+}
+
+func getLegacyConfigPath() string {
+	configDir := os.Getenv("XDG_CONFIG_HOME")
+	if configDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
+		configDir = filepath.Join(home, ".config")
+	}
 	return filepath.Join(configDir, "obyte", "config.yaml")
 }
 
@@ -55,7 +67,15 @@ func loadConfigFile() (*ConfigFile, error) {
 	}
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		return nil, nil
+		legacyPath := getLegacyConfigPath()
+		if legacyPath == "" {
+			return nil, nil
+		}
+		if _, legacyErr := os.Stat(legacyPath); os.IsNotExist(legacyErr) {
+			return nil, nil
+		}
+		configPath = legacyPath
+		fmt.Fprintf(os.Stderr, "openbyte client: note: using legacy config path %s\n", legacyPath)
 	}
 
 	data, err := os.ReadFile(configPath)
@@ -186,42 +206,42 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 		if d, err := strconv.Atoi(val); err == nil {
 			result.Duration = d
 		} else {
-			fmt.Fprintf(os.Stderr, "obyte: warning: invalid OBYTE_DURATION value '%s' (must be integer), ignoring\n", val)
+			fmt.Fprintf(os.Stderr, "openbyte client: warning: invalid OBYTE_DURATION value '%s' (must be integer), ignoring\n", val)
 		}
 	}
 	if val := os.Getenv("OBYTE_STREAMS"); val != "" {
 		if s, err := strconv.Atoi(val); err == nil {
 			result.Streams = s
 		} else {
-			fmt.Fprintf(os.Stderr, "obyte: warning: invalid OBYTE_STREAMS value '%s' (must be integer), ignoring\n", val)
+			fmt.Fprintf(os.Stderr, "openbyte client: warning: invalid OBYTE_STREAMS value '%s' (must be integer), ignoring\n", val)
 		}
 	}
 	if val := os.Getenv("OBYTE_PACKET_SIZE"); val != "" {
 		if p, err := strconv.Atoi(val); err == nil {
 			result.PacketSize = p
 		} else {
-			fmt.Fprintf(os.Stderr, "obyte: warning: invalid OBYTE_PACKET_SIZE value '%s' (must be integer), ignoring\n", val)
+			fmt.Fprintf(os.Stderr, "openbyte client: warning: invalid OBYTE_PACKET_SIZE value '%s' (must be integer), ignoring\n", val)
 		}
 	}
 	if val := os.Getenv("OBYTE_CHUNK_SIZE"); val != "" {
 		if c, err := strconv.Atoi(val); err == nil {
 			result.ChunkSize = c
 		} else {
-			fmt.Fprintf(os.Stderr, "obyte: warning: invalid OBYTE_CHUNK_SIZE value '%s' (must be integer), ignoring\n", val)
+			fmt.Fprintf(os.Stderr, "openbyte client: warning: invalid OBYTE_CHUNK_SIZE value '%s' (must be integer), ignoring\n", val)
 		}
 	}
 	if val := os.Getenv("OBYTE_TIMEOUT"); val != "" {
 		if t, err := strconv.Atoi(val); err == nil {
 			result.Timeout = t
 		} else {
-			fmt.Fprintf(os.Stderr, "obyte: warning: invalid OBYTE_TIMEOUT value '%s' (must be integer), ignoring\n", val)
+			fmt.Fprintf(os.Stderr, "openbyte client: warning: invalid OBYTE_TIMEOUT value '%s' (must be integer), ignoring\n", val)
 		}
 	}
 	if val := os.Getenv("OBYTE_WARMUP"); val != "" {
 		if w, err := strconv.Atoi(val); err == nil {
 			result.WarmUp = w
 		} else {
-			fmt.Fprintf(os.Stderr, "obyte: warning: invalid OBYTE_WARMUP value '%s' (must be integer), ignoring\n", val)
+			fmt.Fprintf(os.Stderr, "openbyte client: warning: invalid OBYTE_WARMUP value '%s' (must be integer), ignoring\n", val)
 		}
 	}
 	if os.Getenv("NO_COLOR") != "" {

@@ -21,17 +21,11 @@ COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 COPY pkg/ ./pkg/
 
-# Build server binary
-FROM builder-base AS builder-server
+# Build openbyte binary
+FROM builder-base AS builder-openbyte
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
-    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /openbyte ./cmd/server
-
-# Build client binary
-FROM builder-base AS builder-client
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /obyte ./cmd/client
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /openbyte ./cmd/openbyte
 
 # Server image
 FROM alpine:3.19 AS server
@@ -40,8 +34,8 @@ RUN apk add --no-cache ca-certificates tzdata curl
 
 WORKDIR /app
 
-# Copy server binary
-COPY --from=builder-server /openbyte /app/openbyte
+# Copy openbyte binary
+COPY --from=builder-openbyte /openbyte /app/openbyte
 
 # Copy web assets
 COPY web/ /app/web/
@@ -72,7 +66,7 @@ ENV PORT=8080 \
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-ENTRYPOINT ["/app/openbyte"]
+ENTRYPOINT ["/app/openbyte", "server"]
 
 # Client image
 FROM alpine:3.19 AS client
@@ -81,12 +75,12 @@ RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 
-# Copy client binary
-COPY --from=builder-client /obyte /app/obyte
+# Copy openbyte binary
+COPY --from=builder-openbyte /openbyte /app/openbyte
 
 # Create non-root user
-RUN adduser -D -H -s /sbin/nologin obyte
-USER obyte
+RUN adduser -D -H -s /sbin/nologin openbyte
+USER openbyte
 
-ENTRYPOINT ["/app/obyte"]
+ENTRYPOINT ["/app/openbyte", "client"]
 CMD ["--help"]

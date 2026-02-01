@@ -8,20 +8,20 @@ High-performance network speed test server capable of 25 Gbit/s sustained throug
 
 ```bash
 make build
-./bin/openbyte
+./bin/openbyte server
 
 # With server identity
-SERVER_ID=nyc-1 SERVER_NAME="New York" ./bin/openbyte
+SERVER_ID=nyc-1 SERVER_NAME="New York" ./bin/openbyte server
 ```
 
 ### CLI Client
 
 ```bash
-./bin/obyte -d download -t 30        # 30-second download test
-./bin/obyte -S nyc                   # Use configured server
-./bin/obyte speedtest.example.com    # Use remote server
-./bin/obyte --servers                # List servers
-./bin/obyte -p http -d download      # HTTP streaming download
+./bin/openbyte client -d download -t 30        # 30-second download test
+./bin/openbyte client -S nyc                   # Use configured server
+./bin/openbyte client speedtest.example.com    # Use remote server
+./bin/openbyte client --servers                # List servers
+./bin/openbyte client -p http -d download      # HTTP streaming download
 ```
 
 ### Docker
@@ -91,7 +91,7 @@ Notes:
 
 ### Client Configuration
 
-`~/.config/obyte/config.yaml`:
+`~/.config/openbyte/config.yaml`:
 
 ```yaml
 default_server: nyc
@@ -140,10 +140,10 @@ Run a central registry for automatic server discovery:
 
 ```bash
 # Start registry service
-REGISTRY_MODE=true ./bin/openbyte
+REGISTRY_MODE=true ./bin/openbyte server
 
 # Servers register with registry
-REGISTRY_ENABLED=true REGISTRY_URL=http://registry:8080 ./bin/openbyte
+REGISTRY_ENABLED=true REGISTRY_URL=http://registry:8080 ./bin/openbyte server
 ```
 
 Registry API:
@@ -163,8 +163,10 @@ Registry API:
 
 ```
 cmd/
-  client/     # CLI client
-  server/     # Server entry point
+  openbyte/   # Unified server/client entry point
+  client/     # Client implementation
+  server/     # Server implementation
+  loadtest/   # Load generator
 internal/
   api/        # REST API handlers
   config/     # Configuration

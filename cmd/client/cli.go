@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"flag"
@@ -10,46 +10,50 @@ import (
 	"time"
 )
 
-func parseFlags() (*Config, map[string]bool) {
+func parseFlags(args []string, version string) (*Config, map[string]bool, int, error) {
 	config := &Config{}
 	flagsSet := make(map[string]bool)
 
-	flag.StringVar(&config.Protocol, "protocol", "", "Protocol: tcp, udp, http")
-	flag.StringVar(&config.Protocol, "p", "", "Protocol: tcp, udp, http (short)")
-	flag.StringVar(&config.Direction, "direction", "", "Direction: download, upload, bidirectional")
-	flag.StringVar(&config.Direction, "d", "", "Direction: download, upload, bidirectional (short)")
-	flag.IntVar(&config.Duration, "duration", 0, "Test duration in seconds (1-300)")
-	flag.IntVar(&config.Duration, "t", 0, "Test duration in seconds (1-300) (short)")
-	flag.IntVar(&config.Streams, "streams", 0, "Parallel streams (1-16)")
-	flag.IntVar(&config.Streams, "s", 0, "Parallel streams (1-16) (short)")
-	flag.IntVar(&config.PacketSize, "packet-size", 0, "Packet size in bytes (64-9000)")
-	flag.IntVar(&config.ChunkSize, "chunk-size", 0, "HTTP chunk size in bytes (65536-4194304)")
-	flag.BoolVar(&config.JSON, "json", false, "Output results as JSON")
-	flag.BoolVar(&config.Plain, "plain", false, "Plain text output")
-	flag.BoolVar(&config.Verbose, "verbose", false, "Verbose output")
-	flag.BoolVar(&config.Verbose, "v", false, "Verbose output (short)")
-	flag.BoolVar(&config.Quiet, "quiet", false, "Quiet mode (errors only)")
-	flag.BoolVar(&config.Quiet, "q", false, "Quiet mode (errors only) (short)")
-	flag.BoolVar(&config.NoColor, "no-color", false, "Disable color output")
-	flag.BoolVar(&config.NoProgress, "no-progress", false, "Disable progress indicators")
-	flag.StringVar(&config.Server, "server", "", "Server alias or URL")
-	flag.StringVar(&config.Server, "S", "", "Server alias or URL (short)")
-	flag.StringVar(&config.ServerURL, "server-url", "", "Server URL (override)")
-	flag.StringVar(&config.APIKey, "api-key", "", "API key for authentication")
-	flag.IntVar(&config.Timeout, "timeout", 0, "Request timeout in seconds")
+	flagSet := flag.NewFlagSet("openbyte client", flag.ContinueOnError)
+	flagSet.SetOutput(os.Stdout)
+	flagSet.StringVar(&config.Protocol, "protocol", "", "Protocol: tcp, udp, http")
+	flagSet.StringVar(&config.Protocol, "p", "", "Protocol: tcp, udp, http (short)")
+	flagSet.StringVar(&config.Direction, "direction", "", "Direction: download, upload, bidirectional")
+	flagSet.StringVar(&config.Direction, "d", "", "Direction: download, upload, bidirectional (short)")
+	flagSet.IntVar(&config.Duration, "duration", 0, "Test duration in seconds (1-300)")
+	flagSet.IntVar(&config.Duration, "t", 0, "Test duration in seconds (1-300) (short)")
+	flagSet.IntVar(&config.Streams, "streams", 0, "Parallel streams (1-16)")
+	flagSet.IntVar(&config.Streams, "s", 0, "Parallel streams (1-16) (short)")
+	flagSet.IntVar(&config.PacketSize, "packet-size", 0, "Packet size in bytes (64-9000)")
+	flagSet.IntVar(&config.ChunkSize, "chunk-size", 0, "HTTP chunk size in bytes (65536-4194304)")
+	flagSet.BoolVar(&config.JSON, "json", false, "Output results as JSON")
+	flagSet.BoolVar(&config.Plain, "plain", false, "Plain text output")
+	flagSet.BoolVar(&config.Verbose, "verbose", false, "Verbose output")
+	flagSet.BoolVar(&config.Verbose, "v", false, "Verbose output (short)")
+	flagSet.BoolVar(&config.Quiet, "quiet", false, "Quiet mode (errors only)")
+	flagSet.BoolVar(&config.Quiet, "q", false, "Quiet mode (errors only) (short)")
+	flagSet.BoolVar(&config.NoColor, "no-color", false, "Disable color output")
+	flagSet.BoolVar(&config.NoProgress, "no-progress", false, "Disable progress indicators")
+	flagSet.StringVar(&config.Server, "server", "", "Server alias or URL")
+	flagSet.StringVar(&config.Server, "S", "", "Server alias or URL (short)")
+	flagSet.StringVar(&config.ServerURL, "server-url", "", "Server URL (override)")
+	flagSet.StringVar(&config.APIKey, "api-key", "", "API key for authentication")
+	flagSet.IntVar(&config.Timeout, "timeout", 0, "Request timeout in seconds")
 
-	flag.IntVar(&config.WarmUp, "warmup", 2, "Warm-up seconds before measurement")
-	flag.BoolVar(&config.Auto, "auto", false, "Auto-select fastest server")
-	flag.BoolVar(&config.Auto, "a", false, "Auto-select fastest server (short)")
+	flagSet.IntVar(&config.WarmUp, "warmup", 2, "Warm-up seconds before measurement")
+	flagSet.BoolVar(&config.Auto, "auto", false, "Auto-select fastest server")
+	flagSet.BoolVar(&config.Auto, "a", false, "Auto-select fastest server (short)")
 
-	versionFlag := flag.Bool("version", false, "Print version")
-	help := flag.Bool("help", false, "Show help")
-	flag.BoolVar(help, "h", false, "Show help (short)")
-	servers := flag.Bool("servers", false, "List configured servers")
+	versionFlag := flagSet.Bool("version", false, "Print version")
+	help := flagSet.Bool("help", false, "Show help")
+	flagSet.BoolVar(help, "h", false, "Show help (short)")
+	servers := flagSet.Bool("servers", false, "List configured servers")
 
-	flag.Parse()
+	if err := flagSet.Parse(args); err != nil {
+		return nil, nil, exitUsage, err
+	}
 
-	flag.Visit(func(f *flag.Flag) {
+	flagSet.Visit(func(f *flag.Flag) {
 		flagsSet[f.Name] = true
 		switch f.Name {
 		case "p":
@@ -77,22 +81,22 @@ func parseFlags() (*Config, map[string]bool) {
 
 	if *servers {
 		listServers()
-		os.Exit(exitSuccess)
+		return nil, nil, exitSuccess, nil
 	}
 
 	if *versionFlag {
-		fmt.Printf("obyte %s\n", version)
-		os.Exit(exitSuccess)
+		fmt.Printf("openbyte %s\n", version)
+		return nil, nil, exitSuccess, nil
 	}
 
 	if *help {
 		printUsage()
-		os.Exit(exitSuccess)
+		return nil, nil, exitSuccess, nil
 	}
 
-	args := flag.Args()
-	if len(args) > 0 {
-		server := args[0]
+	rest := flagSet.Args()
+	if len(rest) > 0 {
+		server := rest[0]
 		if strings.HasPrefix(server, "http://") || strings.HasPrefix(server, "https://") {
 			config.ServerURL = server
 			flagsSet["server-url"] = true
@@ -102,13 +106,13 @@ func parseFlags() (*Config, map[string]bool) {
 		}
 	}
 
-	return config, flagsSet
+	return config, flagsSet, 0, nil
 }
 
 func listServers() {
 	configFile, err := loadConfigFile()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "obyte: warning: %v\n", err)
+		fmt.Fprintf(os.Stderr, "openbyte client: warning: %v\n", err)
 	}
 
 	fmt.Println("Configured Servers:")
@@ -117,7 +121,7 @@ func listServers() {
 	if configFile == nil || len(configFile.Servers) == 0 {
 		fmt.Println("  No servers configured.")
 		fmt.Println()
-		fmt.Println("Add servers to ~/.config/obyte/config.yaml:")
+	fmt.Println("Add servers to ~/.config/openbyte/config.yaml:")
 		fmt.Println()
 		fmt.Println("  servers:")
 		fmt.Println("    nyc:")
@@ -146,7 +150,7 @@ func listServers() {
 	fmt.Println()
 	fmt.Println("  * = default server")
 	fmt.Println()
-	fmt.Println("Usage: obyte -S <alias> or obyte <alias>")
+	fmt.Println("Usage: openbyte client -S <alias> or openbyte client <alias>")
 }
 
 type ServerLatency struct {
@@ -246,63 +250,63 @@ func validateConfig(config *Config) error {
 	if config.Protocol != "tcp" && config.Protocol != "udp" && config.Protocol != "http" {
 		return fmt.Errorf("invalid protocol: %s\n\n"+
 			"Protocol must be 'tcp', 'udp', or 'http'.\n"+
-			"Use: obyte -p tcp  or  obyte -p udp  or  obyte -p http\n"+
-			"See: obyte --help", config.Protocol)
+			"Use: openbyte client -p tcp  or  openbyte client -p udp  or  openbyte client -p http\n"+
+			"See: openbyte client --help", config.Protocol)
 	}
 	if config.Protocol == "http" && config.Direction == "bidirectional" {
 		return fmt.Errorf("invalid direction for http: %s\n\n"+
 			"HTTP protocol supports 'download' or 'upload'.\n"+
-			"Use: obyte -p http -d download  or  obyte -p http -d upload\n"+
-			"See: obyte --help", config.Direction)
+			"Use: openbyte client -p http -d download  or  openbyte client -p http -d upload\n"+
+			"See: openbyte client --help", config.Direction)
 	}
 	if config.Direction != "download" && config.Direction != "upload" && config.Direction != "bidirectional" {
 		return fmt.Errorf("invalid direction: %s\n\n"+
 			"Direction must be 'download', 'upload', or 'bidirectional'.\n"+
-			"Use: obyte -d download  or  obyte -d upload  or  obyte -d bidirectional\n"+
-			"See: obyte --help", config.Direction)
+			"Use: openbyte client -d download  or  openbyte client -d upload  or  openbyte client -d bidirectional\n"+
+			"See: openbyte client --help", config.Direction)
 	}
 	if config.Duration < 1 || config.Duration > 300 {
 		return fmt.Errorf("invalid duration: %d\n\n"+
 			"Duration must be between 1 and 300 seconds.\n"+
-			"Use: obyte -t 30  (for 30 seconds)\n"+
-			"See: obyte --help", config.Duration)
+			"Use: openbyte client -t 30  (for 30 seconds)\n"+
+			"See: openbyte client --help", config.Duration)
 	}
 	if config.Streams < 1 || config.Streams > 16 {
 		return fmt.Errorf("invalid streams: %d\n\n"+
 			"Streams must be between 1 and 16.\n"+
-			"Use: obyte -s 4  (for 4 parallel streams)\n"+
-			"See: obyte --help", config.Streams)
+			"Use: openbyte client -s 4  (for 4 parallel streams)\n"+
+			"See: openbyte client --help", config.Streams)
 	}
 	if config.Protocol != "http" {
 		if config.PacketSize < 64 || config.PacketSize > 9000 {
 			return fmt.Errorf("invalid packet size: %d\n\n"+
 				"Packet size must be between 64 and 9000 bytes.\n"+
-				"Use: obyte --packet-size 1500  (for standard MTU)\n"+
-				"See: obyte --help", config.PacketSize)
+				"Use: openbyte client --packet-size 1500  (for standard MTU)\n"+
+				"See: openbyte client --help", config.PacketSize)
 		}
 	}
 	if config.Protocol == "http" {
 		if config.ChunkSize < 65536 || config.ChunkSize > 4194304 {
 			return fmt.Errorf("invalid chunk size: %d\n\n"+
 				"Chunk size must be between 65536 and 4194304 bytes.\n"+
-				"Use: obyte --chunk-size 1048576  (1MB)\n"+
-				"See: obyte --help", config.ChunkSize)
+				"Use: openbyte client --chunk-size 1048576  (1MB)\n"+
+				"See: openbyte client --help", config.ChunkSize)
 		}
 	}
 	return nil
 }
 
 func printUsage() {
-	fmt.Fprintf(os.Stdout, `Usage: obyte [flags] [server]
+	fmt.Fprintf(os.Stdout, `Usage: openbyte client [flags] [server]
 
 Run network speed test (client-side measurement).
 
 Server Selection:
-  obyte <alias>           Use server alias from config
-  obyte <url>             Use server URL directly
-  obyte -S <alias>        Select server by alias
-  obyte -a, --auto        Auto-select fastest server
-  obyte --servers         List configured servers
+  openbyte client <alias>           Use server alias from config
+  openbyte client <url>             Use server URL directly
+  openbyte client -S <alias>        Select server by alias
+  openbyte client -a, --auto        Auto-select fastest server
+  openbyte client --servers         List configured servers
 
 Flags:
   -h, --help              Show help
@@ -329,7 +333,7 @@ Flags:
 Measurement:
   --warmup int            Warm-up seconds before measurement (default: 2)
 
-Configuration file: ~/.config/obyte/config.yaml
+Configuration file: ~/.config/openbyte/config.yaml
 
 Environment variables:
   OBYTE_SERVER_URL        Server URL (default: http://localhost:8080)
@@ -345,10 +349,10 @@ Environment variables:
   NO_COLOR                Disable colors
 
 Examples:
-  obyte                                    # Default test
-  obyte -a                                 # Auto-select fastest server
-  obyte -d upload -t 60                   # Upload test, 60s
-  obyte -p udp -d bidirectional -s 8      # UDP bidirectional, 8 streams
-  obyte --json server.example.com         # JSON output
+  openbyte client                          # Default test
+  openbyte client -a                       # Auto-select fastest server
+  openbyte client -d upload -t 60          # Upload test, 60s
+  openbyte client -p udp -d bidirectional -s 8
+  openbyte client --json server.example.com
 `)
 }
