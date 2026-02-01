@@ -316,7 +316,7 @@ Stream random data to client for download speed measurement.
 
 **Query Parameters:**
 - `duration` (optional): Test duration in seconds (default: 10, max: 60)
-- `chunk` (optional): Chunk size in bytes (default: 65536, range: 1024-1048576)
+- `chunk` (optional): Chunk size in bytes (default: 1048576, range: 65536-4194304)
 
 **Response:**
 - Content-Type: `application/octet-stream`

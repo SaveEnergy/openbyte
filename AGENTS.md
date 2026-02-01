@@ -179,3 +179,10 @@
 - Speedtest random data init failure now falls back to per-request random.
 - WebSocket ping loop now stoppable; server closes cleanly on shutdown.
 - Registry service cleanup loop now waits on stop.
+
+## API Body Limits Pass (2026-01-24)
+
+### Actions
+- Added JSON body size limits for stream start/metrics/complete.
+- Added oversized body regression test for stream start.
+- Updated API download chunk defaults to match implementation.

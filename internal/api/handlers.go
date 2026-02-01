@@ -2,6 +2,8 @@ package api
 
 import (
 	"encoding/json"
+	stdErrors "errors"
+	"io"
 	"net"
 	"net/http"
 	"strconv"
@@ -20,6 +22,8 @@ type Handler struct {
 	clientIPResolver *ClientIPResolver
 	version          string
 }
+
+const maxJSONBodyBytes = 1 << 20
 
 func NewHandler(manager *stream.Manager) *Handler {
 	return &Handler{
@@ -88,8 +92,8 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req StartStreamRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	if err := decodeJSONBody(w, r, &req, maxJSONBodyBytes); err != nil {
+		respondJSONBodyError(w, err)
 		return
 	}
 
@@ -228,8 +232,8 @@ func (h *Handler) ReportMetrics(w http.ResponseWriter, r *http.Request, streamID
 	}
 
 	var metrics types.Metrics
-	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	if err := decodeJSONBody(w, r, &metrics, maxJSONBodyBytes); err != nil {
+		respondJSONBodyError(w, err)
 		return
 	}
 
@@ -250,8 +254,8 @@ func (h *Handler) CompleteStream(w http.ResponseWriter, r *http.Request, streamI
 		Status  string        `json:"status"`
 		Metrics types.Metrics `json:"metrics"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	if err := decodeJSONBody(w, r, &req, maxJSONBodyBytes); err != nil {
+		respondJSONBodyError(w, err)
 		return
 	}
 
@@ -401,6 +405,29 @@ func requestScheme(r *http.Request) string {
 		return "https"
 	}
 	return "http"
+}
+
+func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}, limit int64) error {
+	if limit > 0 {
+		r.Body = http.MaxBytesReader(w, r.Body, limit)
+	}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(dst); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		return stdErrors.New("request body must contain a single JSON object")
+	}
+	return nil
+}
+
+func respondJSONBodyError(w http.ResponseWriter, err error) {
+	var maxErr *http.MaxBytesError
+	if stdErrors.As(err, &maxErr) {
+		http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+	http.Error(w, "invalid request body", http.StatusBadRequest)
 }
 
 func respondJSON(w http.ResponseWriter, data interface{}, statusCode int) {
