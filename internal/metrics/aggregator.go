@@ -15,6 +15,7 @@ type MultiStreamAggregator struct {
 	bucketCounts  []uint32
 	bucketScratch []uint32
 	bucketWidth   time.Duration
+	rr            uint32
 }
 
 var _ CollectorInterface = (*MultiStreamAggregator)(nil)
@@ -156,21 +157,27 @@ func (m *MultiStreamAggregator) Reset() {
 }
 
 func (m *MultiStreamAggregator) RecordBytes(bytes int64, direction string) {
-	if len(m.collectors) > 0 {
-		m.collectors[0].RecordBytes(bytes, direction)
+	collector := m.nextCollector()
+	if collector == nil {
+		return
 	}
+	collector.RecordBytes(bytes, direction)
 }
 
 func (m *MultiStreamAggregator) RecordLatency(latency time.Duration) {
-	if len(m.collectors) > 0 {
-		m.collectors[0].RecordLatency(latency)
+	collector := m.nextCollector()
+	if collector == nil {
+		return
 	}
+	collector.RecordLatency(latency)
 }
 
 func (m *MultiStreamAggregator) RecordPacket(sent bool) {
-	if len(m.collectors) > 0 {
-		m.collectors[0].RecordPacket(sent)
+	collector := m.nextCollector()
+	if collector == nil {
+		return
 	}
+	collector.RecordPacket(sent)
 }
 
 func (m *MultiStreamAggregator) GetMetrics() types.Metrics {
@@ -185,4 +192,15 @@ func (m *MultiStreamAggregator) Close() {
 		collector.Close()
 	}
 	m.collectors = nil
+}
+
+func (m *MultiStreamAggregator) nextCollector() *Collector {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if len(m.collectors) == 0 {
+		return nil
+	}
+	idx := atomic.AddUint32(&m.rr, 1)
+	return m.collectors[int(idx-1)%len(m.collectors)]
 }
