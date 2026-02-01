@@ -65,7 +65,6 @@ type StreamResponse struct {
 	WebSocketURL   string `json:"websocket_url"`
 	TestServerTCP  string `json:"test_server_tcp,omitempty"`
 	TestServerUDP  string `json:"test_server_udp,omitempty"`
-	TestServerQUIC string `json:"test_server_quic,omitempty"`
 	Status         string `json:"status"`
 	Mode           string `json:"mode"`
 }

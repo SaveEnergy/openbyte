@@ -14,8 +14,8 @@ func parseFlags() (*Config, map[string]bool) {
 	config := &Config{}
 	flagsSet := make(map[string]bool)
 
-	flag.StringVar(&config.Protocol, "protocol", "", "Protocol: tcp, udp, quic")
-	flag.StringVar(&config.Protocol, "p", "", "Protocol: tcp, udp, quic (short)")
+	flag.StringVar(&config.Protocol, "protocol", "", "Protocol: tcp, udp, http")
+	flag.StringVar(&config.Protocol, "p", "", "Protocol: tcp, udp, http (short)")
 	flag.StringVar(&config.Direction, "direction", "", "Direction: download, upload, bidirectional")
 	flag.StringVar(&config.Direction, "d", "", "Direction: download, upload, bidirectional (short)")
 	flag.IntVar(&config.Duration, "duration", 0, "Test duration in seconds (1-300)")
@@ -243,10 +243,10 @@ func selectFastestServer(configFile *ConfigFile, verbose bool) (*ServerLatency, 
 }
 
 func validateConfig(config *Config) error {
-	if config.Protocol != "tcp" && config.Protocol != "udp" && config.Protocol != "quic" && config.Protocol != "http" {
+	if config.Protocol != "tcp" && config.Protocol != "udp" && config.Protocol != "http" {
 		return fmt.Errorf("invalid protocol: %s\n\n"+
-			"Protocol must be 'tcp', 'udp', 'quic', or 'http'.\n"+
-			"Use: obyte -p tcp  or  obyte -p udp  or  obyte -p quic  or  obyte -p http\n"+
+			"Protocol must be 'tcp', 'udp', or 'http'.\n"+
+			"Use: obyte -p tcp  or  obyte -p udp  or  obyte -p http\n"+
 			"See: obyte --help", config.Protocol)
 	}
 	if config.Protocol == "http" && config.Direction == "bidirectional" {
@@ -310,7 +310,7 @@ Flags:
   -a, --auto              Auto-select fastest server (lowest latency)
   -S, --server string     Server alias or URL
   --servers               List configured servers
-  -p, --protocol string   Protocol: tcp, udp, quic, http (default: tcp)
+  -p, --protocol string   Protocol: tcp, udp, http (default: tcp)
   -d, --direction string  Direction: download, upload, bidirectional (default: download)
   -t, --duration int      Test duration in seconds (1-300) (default: 30)
   -s, --streams int       Parallel streams (1-16) (default: 4)
@@ -334,7 +334,7 @@ Configuration file: ~/.config/obyte/config.yaml
 Environment variables:
   OBYTE_SERVER_URL        Server URL (default: http://localhost:8080)
   OBYTE_API_KEY           API key
-  OBYTE_PROTOCOL          Protocol (tcp, udp, quic, http)
+  OBYTE_PROTOCOL          Protocol (tcp, udp, http)
   OBYTE_DIRECTION         Direction (download, upload, bidirectional)
   OBYTE_DURATION          Test duration in seconds
   OBYTE_STREAMS           Parallel streams (1-16)

@@ -203,6 +203,11 @@
 ### Actions
 - Removed connection type display from the web UI due to accuracy concerns.
 
+## QUIC Removal (2026-02-02)
+
+### Actions
+- Removed QUIC server/client support and related config/docs to reduce surface area.
+
 ## Defaults + Validation Alignment (2026-01-24)
 
 ### Actions

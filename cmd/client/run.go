@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net"
 	"os"
 	"time"
 
@@ -32,7 +31,7 @@ func runStream(ctx context.Context, config *Config, formatter OutputFormatter, s
 	return streamMetrics(ctx, streamResp.WebSocketURL, formatter, config)
 }
 
-// EngineRunner interface for both TCP/UDP and QUIC engines
+// EngineRunner interface for TCP/UDP engines
 type EngineRunner interface {
 	Run(ctx context.Context) error
 	GetMetrics() EngineMetrics
@@ -43,13 +42,6 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 	testAddr := streamResp.TestServerTCP
 	if config.Protocol == "udp" {
 		testAddr = streamResp.TestServerUDP
-	} else if config.Protocol == "quic" {
-		// For QUIC, derive address from server URL (use QUIC port 8083)
-		testAddr = streamResp.TestServerQUIC
-		if testAddr == "" {
-			// Fallback: derive from TCP address, replace port with 8083
-			testAddr = deriveQUICAddress(streamResp.TestServerTCP)
-		}
 	}
 
 	if testAddr == "" {
@@ -66,12 +58,7 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 		WarmUp:     time.Duration(config.WarmUp) * time.Second,
 	}
 
-	var engine EngineRunner
-	if config.Protocol == "quic" {
-		engine = NewQUICEngine(engineCfg)
-	} else {
-		engine = NewTestEngine(engineCfg)
-	}
+	engine := NewTestEngine(engineCfg)
 
 	startTime := time.Now()
 	testCtx, cancel := context.WithCancel(ctx)
@@ -296,14 +283,3 @@ func createFormatter(config *Config) OutputFormatter {
 	return NewInteractiveFormatter(os.Stdout, config.Verbose, config.NoColor)
 }
 
-// deriveQUICAddress derives QUIC address from TCP address (replaces port with 8083)
-func deriveQUICAddress(tcpAddr string) string {
-	if tcpAddr == "" {
-		return ""
-	}
-	host, _, err := net.SplitHostPort(tcpAddr)
-	if err != nil {
-		return tcpAddr + ":8083"
-	}
-	return net.JoinHostPort(host, "8083")
-}

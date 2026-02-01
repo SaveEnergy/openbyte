@@ -10,7 +10,6 @@ type Protocol string
 const (
 	ProtocolTCP  Protocol = "tcp"
 	ProtocolUDP  Protocol = "udp"
-	ProtocolQUIC Protocol = "quic"
 )
 
 type Direction string

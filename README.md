@@ -43,7 +43,7 @@ Open `http://localhost:8080` — minimal fast.com-inspired UI with real-time spe
 
 ## Features
 
-- **Protocols**: TCP, UDP, QUIC, HTTP streaming
+- **Protocols**: TCP, UDP, HTTP streaming
 - **Test Types**: Download, Upload, Bidirectional
 - **Metrics**: Throughput, Latency (P50/P95/P99), Jitter, Packet Loss
 - **RTT**: Baseline and during-test round-trip time measurement
@@ -71,8 +71,6 @@ Uses BEREC-compliant measurement practices:
 | `PORT` | 8080 | HTTP API port |
 | `TCP_TEST_PORT` | 8081 | TCP test data port |
 | `UDP_TEST_PORT` | 8082 | UDP test data port |
-| `QUIC_ENABLED` | false | Enable QUIC test server |
-| `QUIC_PORT` | 8083 | QUIC test data port |
 | `SERVER_ID` | hostname | Unique server identifier |
 | `SERVER_NAME` | OpenByte Server | Human-readable name |
 | `SERVER_LOCATION` | — | Geographic location |
@@ -124,7 +122,7 @@ make test-ui
 |----------|-------------|
 | `OBYTE_SERVER_URL` | Server URL (default: `http://localhost:8080`) |
 | `OBYTE_API_KEY` | API key |
-| `OBYTE_PROTOCOL` | Protocol (`tcp`, `udp`, `quic`, `http`) |
+| `OBYTE_PROTOCOL` | Protocol (`tcp`, `udp`, `http`) |
 | `OBYTE_DIRECTION` | Direction (`download`, `upload`, `bidirectional`) |
 | `OBYTE_DURATION` | Test duration in seconds |
 | `OBYTE_STREAMS` | Parallel streams (1-16) |

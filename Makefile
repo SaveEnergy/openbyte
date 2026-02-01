@@ -68,22 +68,16 @@ run:
 	@echo "Port: $${PORT:-8080} (set PORT env var to change)"
 	@go run -ldflags "$(LDFLAGS)" ./cmd/server
 
-run-quic:
-	@echo "Starting server with QUIC enabled..."
-	@echo "Ports: HTTP=8080, TCP=8081, UDP=8082, QUIC=8083"
-	@QUIC_ENABLED=true go run -ldflags "$(LDFLAGS)" ./cmd/server
-
 run-alt-ports:
 	@echo "Starting server with alternative ports..."
 	@echo "HTTP: 9090, TCP test: 9081, UDP test: 9082"
 	@PORT=9090 TCP_TEST_PORT=9081 UDP_TEST_PORT=9082 go run -ldflags "$(LDFLAGS)" ./cmd/server
 
 kill-ports:
-	@echo "Killing processes on ports 8080, 8081, 8082, 8083..."
+	@echo "Killing processes on ports 8080, 8081, 8082..."
 	@-lsof -ti :8080 2>/dev/null | xargs kill -9 2>/dev/null || true
 	@-lsof -ti :8081 2>/dev/null | xargs kill -9 2>/dev/null || true
 	@-lsof -ti :8082 2>/dev/null | xargs kill -9 2>/dev/null || true
-	@-lsof -ti :8083 2>/dev/null | xargs kill -9 2>/dev/null || true
 	@sleep 1
 	@echo "✓ Ports cleared"
 
@@ -138,9 +132,8 @@ help:
 	@echo "  perf-bench    - Run perf benchmarks"
 	@echo "  perf-smoke    - Run perf smoke with pprof capture"
 	@echo "  run           - Run server (development, port 8080)"
-	@echo "  run-quic      - Run server with QUIC enabled (ports 8080-8083)"
 	@echo "  run-alt-ports - Run server with alternative ports (9090, 9081, 9082)"
-	@echo "  kill-ports    - Kill processes on ports 8080-8083"
+	@echo "  kill-ports    - Kill processes on ports 8080-8082"
 	@echo "  docker        - Build Docker image"
 	@echo "  docker-up     - Start Docker containers"
 	@echo "  docker-down   - Stop Docker containers"

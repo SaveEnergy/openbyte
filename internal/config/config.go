@@ -60,14 +60,9 @@ type Config struct {
 	RegistryMode      bool
 	RegistryServerTTL time.Duration
 
-	// QUIC/HTTP3 settings
-	QUICEnabled  bool
-	QUICPort     int
-	HTTP3Enabled bool
-	HTTP3Port    int
-	TLSCertFile  string
-	TLSKeyFile   string
-	TLSAutoGen   bool // Auto-generate self-signed cert for dev
+	TLSCertFile string
+	TLSKeyFile  string
+	TLSAutoGen  bool // Auto-generate self-signed cert for dev
 }
 
 func DefaultConfig() *Config {
@@ -110,13 +105,9 @@ func DefaultConfig() *Config {
 		RegistryInterval:      30 * time.Second,
 		RegistryMode:          false,
 		RegistryServerTTL:     60 * time.Second,
-		QUICEnabled:           false,
-		QUICPort:              8083,
-		HTTP3Enabled:          false,
-		HTTP3Port:             8443,
-		TLSCertFile:           "",
-		TLSKeyFile:            "",
-		TLSAutoGen:            true, // Auto-generate for dev by default
+		TLSCertFile: "",
+		TLSKeyFile:  "",
+		TLSAutoGen:  true, // Auto-generate for dev by default
 	}
 }
 
@@ -244,23 +235,6 @@ func (c *Config) LoadFromEnv() error {
 		}
 	}
 
-	// QUIC/HTTP3 settings
-	if enabled := os.Getenv("QUIC_ENABLED"); enabled == "true" || enabled == "1" {
-		c.QUICEnabled = true
-	}
-	if port := os.Getenv("QUIC_PORT"); port != "" {
-		if p, err := strconv.Atoi(port); err == nil && p > 0 {
-			c.QUICPort = p
-		}
-	}
-	if enabled := os.Getenv("HTTP3_ENABLED"); enabled == "true" || enabled == "1" {
-		c.HTTP3Enabled = true
-	}
-	if port := os.Getenv("HTTP3_PORT"); port != "" {
-		if p, err := strconv.Atoi(port); err == nil && p > 0 {
-			c.HTTP3Port = p
-		}
-	}
 	if cert := os.Getenv("TLS_CERT_FILE"); cert != "" {
 		c.TLSCertFile = cert
 	}
@@ -320,10 +294,3 @@ func (c *Config) GetUDPTestAddress() string {
 	return fmt.Sprintf("%s:%d", c.BindAddress, c.UDPTestPort)
 }
 
-func (c *Config) GetQUICAddress() string {
-	return fmt.Sprintf("%s:%d", c.BindAddress, c.QUICPort)
-}
-
-func (c *Config) GetHTTP3Address() string {
-	return fmt.Sprintf("%s:%d", c.BindAddress, c.HTTP3Port)
-}

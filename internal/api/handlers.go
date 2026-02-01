@@ -65,7 +65,6 @@ type StartStreamResponse struct {
 	WebSocketURL   string `json:"websocket_url"`
 	TestServerTCP  string `json:"test_server_tcp,omitempty"`
 	TestServerUDP  string `json:"test_server_udp,omitempty"`
-	TestServerQUIC string `json:"test_server_quic,omitempty"`
 	Status         string `json:"status"`
 	Mode           string `json:"mode"`
 }
@@ -156,9 +155,6 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 		host := normalizeHost(r.Host)
 		resp.TestServerTCP = host + ":" + strconv.Itoa(h.config.TCPTestPort)
 		resp.TestServerUDP = host + ":" + strconv.Itoa(h.config.UDPTestPort)
-		if h.config.QUICEnabled {
-			resp.TestServerQUIC = host + ":" + strconv.Itoa(h.config.QUICPort)
-		}
 	}
 
 	respondJSON(w, resp, http.StatusCreated)
@@ -334,8 +330,6 @@ func (h *Handler) validateConfig(req StartStreamRequest, clientIP string) (types
 		protocol = types.ProtocolTCP
 	case "udp":
 		protocol = types.ProtocolUDP
-	case "quic":
-		protocol = types.ProtocolQUIC
 	default:
 		return types.StreamConfig{}, errors.ErrInvalidConfig("invalid protocol", nil)
 	}

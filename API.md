@@ -21,7 +21,7 @@ Initiate new speed test.
 **Request Body:**
 ```json
 {
-  "protocol": "tcp" | "udp" | "quic",
+  "protocol": "tcp" | "udp",
   "direction": "download" | "upload" | "bidirectional",
   "duration": 30,
   "streams": 4,
@@ -31,7 +31,7 @@ Initiate new speed test.
 ```
 
 **Parameters:**
-- `protocol` (required): "tcp", "udp", or "quic"
+- `protocol` (required): "tcp" or "udp"
 - `direction` (required): "download", "upload", or "bidirectional"
 - `duration` (optional): Test duration in seconds (default: 30, min: 1, max: 300)
 - `streams` (optional): Number of parallel connections (default: 4, min: 1, max: 16)
@@ -47,7 +47,6 @@ Initiate new speed test.
   "websocket_url": "/api/v1/stream/550e8400-e29b-41d4-a716-446655440000/stream",
   "test_server_tcp": "127.0.0.1:8081",
   "test_server_udp": "127.0.0.1:8082",
-  "test_server_quic": "127.0.0.1:8083",
   "status": "running",
   "mode": "client"
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/logging"
-	"github.com/saveenergy/openbyte/internal/quic"
 	"github.com/saveenergy/openbyte/internal/registry"
 	"github.com/saveenergy/openbyte/internal/stream"
 	"github.com/saveenergy/openbyte/internal/websocket"
@@ -92,27 +91,6 @@ func main() {
 		}
 	}
 
-	// Start QUIC server if enabled
-	var quicServer *quic.Server
-	if cfg.QUICEnabled {
-		tlsConfig, err := quic.GetTLSConfig(cfg)
-		if err != nil {
-			logging.Error("Failed to get TLS config for QUIC", logging.Field{Key: "error", Value: err})
-			log.Fatalf("Failed to get TLS config: %v", err)
-		}
-
-		quicServer, err = quic.NewServer(cfg, tlsConfig)
-		if err != nil {
-			logging.Error("Failed to create QUIC server", logging.Field{Key: "error", Value: err})
-			log.Fatalf("Failed to create QUIC server: %v", err)
-		}
-
-		if err := quicServer.Start(); err != nil {
-			logging.Error("Failed to start QUIC server", logging.Field{Key: "error", Value: err})
-			log.Fatalf("Failed to start QUIC server: %v", err)
-		}
-	}
-
 	srv := &http.Server{
 		Addr:         cfg.BindAddress + ":" + cfg.Port,
 		Handler:      muxRouter,
@@ -129,9 +107,6 @@ func main() {
 			{Key: "address", Value: cfg.BindAddress + ":" + cfg.Port},
 			{Key: "tcp_test", Value: cfg.GetTCPTestAddress()},
 			{Key: "udp_test", Value: cfg.GetUDPTestAddress()},
-		}
-		if cfg.QUICEnabled {
-			fields = append(fields, logging.Field{Key: "quic", Value: cfg.GetQUICAddress()})
 		}
 		logging.Info("Server starting", fields...)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -158,10 +133,6 @@ func main() {
 	}
 	if registryService != nil {
 		registryService.Stop()
-	}
-
-	if quicServer != nil {
-		quicServer.Close()
 	}
 
 	wsServer.Close()

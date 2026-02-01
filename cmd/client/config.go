@@ -299,8 +299,8 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 }
 
 func validateConfigFile(config *ConfigFile) error {
-	if config.Protocol != "" && config.Protocol != "tcp" && config.Protocol != "udp" && config.Protocol != "quic" && config.Protocol != "http" {
-		return fmt.Errorf("invalid protocol: %s (must be tcp, udp, quic, or http)", config.Protocol)
+	if config.Protocol != "" && config.Protocol != "tcp" && config.Protocol != "udp" && config.Protocol != "http" {
+		return fmt.Errorf("invalid protocol: %s (must be tcp, udp, or http)", config.Protocol)
 	}
 	if config.Direction != "" && config.Direction != "download" && config.Direction != "upload" && config.Direction != "bidirectional" {
 		return fmt.Errorf("invalid direction: %s (must be download, upload, or bidirectional)", config.Direction)
