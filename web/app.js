@@ -682,35 +682,41 @@ async function runDownloadTest(duration, onProgress) {
     return true;
   };
   
+  const buildChunkAttempts = () => {
+    const preferredFallback = 256 * 1024;
+    const attempts = [chunkSize];
+    if (preferredFallback < chunkSize) {
+      attempts.push(preferredFallback);
+    }
+    if (65536 < attempts[attempts.length - 1]) {
+      attempts.push(65536);
+    }
+    return attempts;
+  };
+
   for (let i = 0; i < numStreams; i++) {
     const delay = i * streamDelay;
     
     const streamPromise = (async () => {
       await new Promise(r => setTimeout(r, delay));
       
-      try {
-        if (await downloadStream(chunkSize)) {
-          return;
+      const attempts = buildChunkAttempts();
+      for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
+        const attemptChunk = attempts[attemptIndex];
+        try {
+          if (await downloadStream(attemptChunk)) {
+            return;
+          }
+        } catch (e) {
+          if (e.name === 'AbortError') {
+            return;
+          }
+          if (attemptIndex < attempts.length - 1) {
+            console.warn('Download stream failed, retrying smaller chunk', e);
+            continue;
+          }
+          console.warn('Download stream failed after retries', e);
         }
-      } catch (e) {
-        if (e.name === 'AbortError') {
-          return;
-        }
-        console.warn('Download stream failed, retrying smaller chunk', e);
-      }
-      
-      const fallbackChunk = Math.min(65536, chunkSize);
-      if (fallbackChunk === chunkSize) {
-        return;
-      }
-      
-      try {
-        await downloadStream(fallbackChunk);
-      } catch (e) {
-        if (e.name === 'AbortError') {
-          return;
-        }
-        console.warn('Download stream failed after retry', e);
       }
     })();
     

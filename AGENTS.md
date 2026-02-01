@@ -210,6 +210,9 @@
 ### Actions
 - Retry HTTP download streams with smaller chunk size on network errors.
 
+### Follow-up
+- Added multi-step chunk fallback (1MB -> 256KB -> 64KB).
+
 ## Playwright CI Integration (2026-01-24)
 
 ### Actions
