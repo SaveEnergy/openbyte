@@ -65,7 +65,10 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 	var chunk []byte
 	if len(h.randomData) < chunkSize {
 		chunk = make([]byte, chunkSize)
-		rand.Read(chunk)
+		if _, err := rand.Read(chunk); err != nil {
+			http.Error(w, "failed to generate random data", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	deadline := time.Now().Add(duration)

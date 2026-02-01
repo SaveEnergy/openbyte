@@ -48,3 +48,23 @@ func TestRateLimiterGlobalRefillVeryLowRate(t *testing.T) {
 		t.Fatalf("expected global refill to allow request at very low rate")
 	}
 }
+
+func TestRateLimiterIPRefillLowRate(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.GlobalRateLimit = 1000
+	cfg.RateLimitPerIP = 30
+	rl := api.NewRateLimiter(cfg)
+
+	ip := "127.0.0.1"
+	for i := 0; i < cfg.RateLimitPerIP; i++ {
+		if !rl.Allow(ip) {
+			t.Fatalf("token %d not allowed", i)
+		}
+	}
+
+	time.Sleep(2 * time.Second)
+
+	if !rl.Allow(ip) {
+		t.Fatalf("expected per-ip refill to allow request at low rate")
+	}
+}

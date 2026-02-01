@@ -96,15 +96,14 @@ func (rl *RateLimiter) allowIP(ip string) bool {
 	elapsed := now.Sub(limit.lastRefill)
 
 	if elapsed >= time.Second {
-		tokensToAdd := int(elapsed.Seconds()) * (rl.config.RateLimitPerIP / 60)
-		if tokensToAdd < 1 {
-			tokensToAdd = 1
+		tokensToAdd := int(elapsed.Seconds() * float64(rl.config.RateLimitPerIP) / 60.0)
+		if tokensToAdd > 0 {
+			limit.tokens += tokensToAdd
+			if limit.tokens > rl.config.RateLimitPerIP {
+				limit.tokens = rl.config.RateLimitPerIP
+			}
+			limit.lastRefill = now
 		}
-		limit.tokens += tokensToAdd
-		if limit.tokens > rl.config.RateLimitPerIP {
-			limit.tokens = rl.config.RateLimitPerIP
-		}
-		limit.lastRefill = now
 	}
 
 	if limit.tokens > 0 {

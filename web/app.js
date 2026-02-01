@@ -209,7 +209,16 @@ function resolveChunkSize() {
 
 function getHealthURL(server) {
   if (server.api_endpoint) {
-    return `${server.api_endpoint}/health`;
+    try {
+      const apiURL = new URL(server.api_endpoint);
+      if (window.location.protocol === 'https:' && apiURL.protocol === 'http:') {
+        apiURL.protocol = 'https:';
+      }
+      apiURL.pathname = apiURL.pathname.replace(/\/+$/, '') + '/health';
+      return apiURL.toString();
+    } catch (e) {
+      return `${server.api_endpoint}/health`;
+    }
   }
   const protocol = window.location.protocol || 'http:';
   return `${protocol}//${server.host}/health`;
