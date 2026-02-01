@@ -156,7 +156,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' && inputs.force_build && vars.SSH_HOST != '' && needs.build-push.result == 'success')
     steps:
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ env.SSH_HOST }}
           username: ${{ env.SSH_USER }}
