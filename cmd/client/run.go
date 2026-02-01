@@ -282,4 +282,3 @@ func createFormatter(config *Config) OutputFormatter {
 	}
 	return NewInteractiveFormatter(os.Stdout, config.Verbose, config.NoColor)
 }
-

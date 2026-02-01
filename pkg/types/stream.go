@@ -8,8 +8,8 @@ import (
 type Protocol string
 
 const (
-	ProtocolTCP  Protocol = "tcp"
-	ProtocolUDP  Protocol = "udp"
+	ProtocolTCP Protocol = "tcp"
+	ProtocolUDP Protocol = "udp"
 )
 
 type Direction string

@@ -6,14 +6,14 @@ import (
 )
 
 type NetworkInfo struct {
-	ClientIP       string `json:"client_ip"`
-	ServerIP       string `json:"server_ip"`
-	ISP            string `json:"isp,omitempty"`
-	ASN            int    `json:"asn,omitempty"`
-	IPv6           bool   `json:"ipv6"`
-	NATDetected    bool   `json:"nat_detected"`
-	MTU            int    `json:"mtu"`
-	Hostname       string `json:"hostname,omitempty"`
+	ClientIP    string `json:"client_ip"`
+	ServerIP    string `json:"server_ip"`
+	ISP         string `json:"isp,omitempty"`
+	ASN         int    `json:"asn,omitempty"`
+	IPv6        bool   `json:"ipv6"`
+	NATDetected bool   `json:"nat_detected"`
+	MTU         int    `json:"mtu"`
+	Hostname    string `json:"hostname,omitempty"`
 }
 
 func NewNetworkInfo() *NetworkInfo {

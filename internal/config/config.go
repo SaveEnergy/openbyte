@@ -105,9 +105,9 @@ func DefaultConfig() *Config {
 		RegistryInterval:      30 * time.Second,
 		RegistryMode:          false,
 		RegistryServerTTL:     60 * time.Second,
-		TLSCertFile: "",
-		TLSKeyFile:  "",
-		TLSAutoGen:  true, // Auto-generate for dev by default
+		TLSCertFile:           "",
+		TLSKeyFile:            "",
+		TLSAutoGen:            true, // Auto-generate for dev by default
 	}
 }
 
@@ -293,4 +293,3 @@ func (c *Config) GetTCPTestAddress() string {
 func (c *Config) GetUDPTestAddress() string {
 	return fmt.Sprintf("%s:%d", c.BindAddress, c.UDPTestPort)
 }
-

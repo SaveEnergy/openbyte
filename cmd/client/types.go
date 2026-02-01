@@ -61,12 +61,12 @@ type Config struct {
 }
 
 type StreamResponse struct {
-	StreamID       string `json:"stream_id"`
-	WebSocketURL   string `json:"websocket_url"`
-	TestServerTCP  string `json:"test_server_tcp,omitempty"`
-	TestServerUDP  string `json:"test_server_udp,omitempty"`
-	Status         string `json:"status"`
-	Mode           string `json:"mode"`
+	StreamID      string `json:"stream_id"`
+	WebSocketURL  string `json:"websocket_url"`
+	TestServerTCP string `json:"test_server_tcp,omitempty"`
+	TestServerUDP string `json:"test_server_udp,omitempty"`
+	Status        string `json:"status"`
+	Mode          string `json:"mode"`
 }
 
 type StartStreamRequest struct {

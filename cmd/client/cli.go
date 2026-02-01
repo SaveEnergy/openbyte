@@ -121,7 +121,7 @@ func listServers() {
 	if configFile == nil || len(configFile.Servers) == 0 {
 		fmt.Println("  No servers configured.")
 		fmt.Println()
-	fmt.Println("Add servers to ~/.config/openbyte/config.yaml:")
+		fmt.Println("Add servers to ~/.config/openbyte/config.yaml:")
 		fmt.Println()
 		fmt.Println("  servers:")
 		fmt.Println("    nyc:")
