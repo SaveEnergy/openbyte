@@ -25,7 +25,9 @@ func NewSpeedTestHandler(maxConcurrent int) *SpeedTestHandler {
 		maxConcurrent: int64(maxConcurrent),
 		randomData:    make([]byte, speedtestRandomSize),
 	}
-	_, _ = rand.Read(handler.randomData)
+	if _, err := rand.Read(handler.randomData); err != nil {
+		handler.randomData = nil
+	}
 	return handler
 }
 
@@ -131,7 +133,11 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	startTime := time.Now()
 
-	totalBytes, _ := io.Copy(io.Discard, r.Body)
+	totalBytes, err := io.Copy(io.Discard, r.Body)
+	if err != nil {
+		http.Error(w, "upload failed", http.StatusInternalServerError)
+		return
+	}
 
 	elapsed := time.Since(startTime)
 	if elapsed.Seconds() == 0 {

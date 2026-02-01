@@ -11,6 +11,7 @@ type Service struct {
 	ttl        time.Duration
 	cleanupInt time.Duration
 	stopCh     chan struct{}
+	wg         sync.WaitGroup
 }
 
 type RegisteredServer struct {
@@ -36,11 +37,13 @@ func NewService(ttl, cleanupInterval time.Duration) *Service {
 }
 
 func (s *Service) Start() {
+	s.wg.Add(1)
 	go s.cleanupLoop()
 }
 
 func (s *Service) Stop() {
 	close(s.stopCh)
+	s.wg.Wait()
 }
 
 func (s *Service) Register(info ServerInfo) {
@@ -129,6 +132,7 @@ func (s *Service) Count() int {
 }
 
 func (s *Service) cleanupLoop() {
+	defer s.wg.Done()
 	ticker := time.NewTicker(s.cleanupInt)
 	defer ticker.Stop()
 

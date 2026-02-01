@@ -79,7 +79,10 @@ func (c *Client) Stop() {
 	close(c.stopCh)
 	c.wg.Wait()
 
-	if c.registered {
+	c.mu.RLock()
+	registered := c.registered
+	c.mu.RUnlock()
+	if registered {
 		c.deregister()
 	}
 }

@@ -20,6 +20,9 @@ type Server struct {
 	sentStatus     map[string]types.StreamStatus
 	allowedOrigins []string
 	pingInterval   time.Duration
+	stopCh         chan struct{}
+	stopOnce       sync.Once
+	wg             sync.WaitGroup
 	mu             sync.RWMutex
 }
 
@@ -33,6 +36,7 @@ func NewServer() *Server {
 		clients:      make(map[string]map[*websocket.Conn]*clientConn),
 		sentStatus:   make(map[string]types.StreamStatus),
 		pingInterval: 30 * time.Second,
+		stopCh:       make(chan struct{}),
 	}
 	server.upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
@@ -203,21 +207,35 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 }
 
 func (s *Server) startPingLoop() {
+	s.wg.Add(1)
 	go func() {
+		defer s.wg.Done()
 		interval := s.getPingInterval()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			s.pingClients()
-			next := s.getPingInterval()
-			if next != interval {
-				ticker.Stop()
-				interval = next
-				ticker = time.NewTicker(interval)
+		for {
+			select {
+			case <-s.stopCh:
+				return
+			case <-ticker.C:
+				s.pingClients()
+				next := s.getPingInterval()
+				if next != interval {
+					ticker.Stop()
+					interval = next
+					ticker = time.NewTicker(interval)
+				}
 			}
 		}
 	}()
+}
+
+func (s *Server) Close() {
+	s.stopOnce.Do(func() {
+		close(s.stopCh)
+	})
+	s.wg.Wait()
 }
 
 func (s *Server) getPingInterval() time.Duration {

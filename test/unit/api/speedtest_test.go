@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -60,5 +62,32 @@ func TestSpeedTestUploadReportsBytes(t *testing.T) {
 	}
 	if resp.Bytes != int64(len(payload)) {
 		t.Fatalf("bytes = %d, want %d", resp.Bytes, len(payload))
+	}
+}
+
+type errReader struct {
+	readOnce bool
+}
+
+func (e *errReader) Read(p []byte) (int, error) {
+	if !e.readOnce {
+		e.readOnce = true
+		p[0] = 'x'
+		return 1, nil
+	}
+	return 0, errors.New("read failure")
+}
+
+func TestSpeedTestUploadHandlesReadError(t *testing.T) {
+	handler := api.NewSpeedTestHandler(10)
+
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/upload", nil)
+	req.Body = io.NopCloser(&errReader{})
+	rec := httptest.NewRecorder()
+
+	handler.Upload(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
 	}
 }

@@ -97,7 +97,10 @@ func (rl *RateLimiter) allowIP(ip string) bool {
 	now := time.Now()
 	if rl.cleanupInterval > 0 && rl.ipLimitTTL > 0 && now.Sub(rl.lastCleanup) >= rl.cleanupInterval {
 		for key, limit := range rl.ipLimits {
-			if now.Sub(limit.lastRefill) >= rl.ipLimitTTL {
+			limit.mu.Lock()
+			lastRefill := limit.lastRefill
+			limit.mu.Unlock()
+			if now.Sub(lastRefill) >= rl.ipLimitTTL {
 				delete(rl.ipLimits, key)
 			}
 		}

@@ -164,6 +164,7 @@ func main() {
 		quicServer.Close()
 	}
 
+	wsServer.Close()
 	manager.Stop()
 	streamServer.Close()
 

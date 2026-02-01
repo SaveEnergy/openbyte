@@ -170,3 +170,12 @@
 
 ### Actions
 - Removed invalid input combo in `ghcr-cleanup` (drop `num-old-versions-to-delete` with `min-versions-to-keep`).
+
+## Deep Analysis Improvements (2026-01-24)
+
+### Actions
+- Rate limiter cleanup reads now lock per-IP state before TTL check.
+- Speedtest upload now handles body read errors; added unit test.
+- Speedtest random data init failure now falls back to per-request random.
+- WebSocket ping loop now stoppable; server closes cleanly on shutdown.
+- Registry service cleanup loop now waits on stop.
