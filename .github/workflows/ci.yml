@@ -79,6 +79,24 @@ jobs:
         if: github.event_name != 'pull_request'
         run: go test ./...
 
+      - name: Set up Bun
+        if: github.event_name != 'pull_request'
+        uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2.1.2
+        with:
+          bun-version: "latest"
+
+      - name: Install Playwright deps
+        if: github.event_name != 'pull_request'
+        run: bun install --no-save
+
+      - name: Install Playwright browsers
+        if: github.event_name != 'pull_request'
+        run: bunx playwright install --with-deps
+
+      - name: Playwright e2e
+        if: github.event_name != 'pull_request'
+        run: bunx playwright test
+
   build-push:
     needs: [checks, changes]
     if: |

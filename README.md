@@ -106,6 +106,16 @@ protocol: http
 chunk_size: 1048576
 ```
 
+## Testing
+
+### UI E2E (Playwright)
+
+```bash
+bunx playwright test
+# or
+make test-ui
+```
+
 ### Client Environment Variables
 
 | Variable | Description |

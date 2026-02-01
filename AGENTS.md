@@ -209,3 +209,8 @@
 
 ### Actions
 - Retry HTTP download streams with smaller chunk size on network errors.
+
+## Playwright CI Integration (2026-01-24)
+
+### Actions
+- Added Playwright UI test target and CI execution via Bun.

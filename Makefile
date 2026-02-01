@@ -1,4 +1,4 @@
-.PHONY: build server client loadtest test clean run help docker docker-up docker-down perf-smoke perf-bench ci-test ci-lint
+.PHONY: build server client loadtest test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench ci-test ci-lint
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
@@ -28,6 +28,10 @@ loadtest:
 test:
 	@echo "Running tests..."
 	@go test ./... -short -v
+
+test-ui:
+	@echo "Running Playwright UI tests..."
+	@bunx playwright test
 
 ci-test:
 	@echo "Running CI tests..."
@@ -126,6 +130,7 @@ help:
 	@echo "  client        - Build CLI client (obyte)"
 	@echo "  loadtest      - Build load test tool (obyte-load)"
 	@echo "  test          - Run tests"
+	@echo "  test-ui       - Run Playwright UI tests"
 	@echo "  ci-test       - Run CI test suite (short)"
 	@echo "  ci-lint       - Run CI lint checks"
 	@echo "  test-race     - Run tests with race detector"
