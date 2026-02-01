@@ -207,6 +207,25 @@ function resolveChunkSize() {
   return 1024 * 1024;
 }
 
+function isSameOriginURL(url) {
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return parsed.origin === window.location.origin;
+  } catch (e) {
+    return false;
+  }
+}
+
+function fetchWithTimeout(url, options, timeoutMs) {
+  if (typeof AbortController === 'undefined' || !timeoutMs) {
+    return fetch(url, options);
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const opts = { ...options, signal: controller.signal };
+  return fetch(url, opts).finally(() => clearTimeout(timer));
+}
+
 function getHealthURL(server) {
   if (server.api_endpoint) {
     try {
@@ -254,14 +273,14 @@ async function selectFastestServer() {
 
   const latencyPromises = state.servers.map(async (server) => {
     const healthUrl = getHealthURL(server);
+    const isSameOrigin = isSameOriginURL(healthUrl);
     
     const start = performance.now();
     try {
-      const res = await fetch(healthUrl, { 
+      const res = await fetchWithTimeout(healthUrl, { 
         method: 'GET',
-        mode: 'cors',
-        signal: AbortSignal.timeout(5000)
-      });
+        mode: isSameOrigin ? 'same-origin' : 'cors'
+      }, 5000);
       const latency = performance.now() - start;
       
       if (res.ok) {

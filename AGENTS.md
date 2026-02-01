@@ -186,3 +186,9 @@
 - Added JSON body size limits for stream start/metrics/complete.
 - Added oversized body regression test for stream start.
 - Updated API download chunk defaults to match implementation.
+
+## Web Server Selection Hardening (2026-01-24)
+
+### Actions
+- Added safe fetch timeout helper for server health checks.
+- Avoided CORS mode for same-origin health requests.
