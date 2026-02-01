@@ -26,6 +26,7 @@ type ConfigFile struct {
 	Duration   int    `yaml:"duration,omitempty"`
 	Streams    int    `yaml:"streams,omitempty"`
 	PacketSize int    `yaml:"packet_size,omitempty"`
+	ChunkSize  int    `yaml:"chunk_size,omitempty"`
 	Timeout    int    `yaml:"timeout,omitempty"`
 	JSON       bool   `yaml:"json,omitempty"`
 	Plain      bool   `yaml:"plain,omitempty"`
@@ -124,6 +125,7 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 	result.Duration = defaultDuration
 	result.Streams = defaultStreams
 	result.PacketSize = defaultPacketSize
+	result.ChunkSize = defaultChunkSize
 	result.Timeout = defaultTimeout
 
 	if configFile != nil {
@@ -153,6 +155,9 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 		}
 		if configFile.PacketSize > 0 {
 			result.PacketSize = configFile.PacketSize
+		}
+		if configFile.ChunkSize > 0 {
+			result.ChunkSize = configFile.ChunkSize
 		}
 		if configFile.Timeout > 0 {
 			result.Timeout = configFile.Timeout
@@ -198,6 +203,13 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 			fmt.Fprintf(os.Stderr, "obyte: warning: invalid OBYTE_PACKET_SIZE value '%s' (must be integer), ignoring\n", val)
 		}
 	}
+	if val := os.Getenv("OBYTE_CHUNK_SIZE"); val != "" {
+		if c, err := strconv.Atoi(val); err == nil {
+			result.ChunkSize = c
+		} else {
+			fmt.Fprintf(os.Stderr, "obyte: warning: invalid OBYTE_CHUNK_SIZE value '%s' (must be integer), ignoring\n", val)
+		}
+	}
 	if os.Getenv("NO_COLOR") != "" {
 		result.NoColor = true
 	}
@@ -233,6 +245,9 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 	}
 	if flagsSet["packet-size"] && flagConfig.PacketSize > 0 {
 		result.PacketSize = flagConfig.PacketSize
+	}
+	if flagsSet["chunk-size"] && flagConfig.ChunkSize > 0 {
+		result.ChunkSize = flagConfig.ChunkSize
 	}
 	if flagsSet["timeout"] && flagConfig.Timeout > 0 {
 		result.Timeout = flagConfig.Timeout
@@ -270,11 +285,14 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 }
 
 func validateConfigFile(config *ConfigFile) error {
-	if config.Protocol != "" && config.Protocol != "tcp" && config.Protocol != "udp" {
-		return fmt.Errorf("invalid protocol: %s (must be tcp or udp)", config.Protocol)
+	if config.Protocol != "" && config.Protocol != "tcp" && config.Protocol != "udp" && config.Protocol != "quic" && config.Protocol != "http" {
+		return fmt.Errorf("invalid protocol: %s (must be tcp, udp, quic, or http)", config.Protocol)
 	}
 	if config.Direction != "" && config.Direction != "download" && config.Direction != "upload" && config.Direction != "bidirectional" {
 		return fmt.Errorf("invalid direction: %s (must be download, upload, or bidirectional)", config.Direction)
+	}
+	if config.Protocol == "http" && config.Direction == "bidirectional" {
+		return fmt.Errorf("invalid direction for http: %s (must be download or upload)", config.Direction)
 	}
 	if config.Duration < 0 || config.Duration > 300 {
 		return fmt.Errorf("invalid duration: %d (must be 1-300 seconds)", config.Duration)
@@ -284,6 +302,9 @@ func validateConfigFile(config *ConfigFile) error {
 	}
 	if config.PacketSize < 0 || (config.PacketSize > 0 && (config.PacketSize < 64 || config.PacketSize > 9000)) {
 		return fmt.Errorf("invalid packet size: %d (must be 64-9000 bytes)", config.PacketSize)
+	}
+	if config.ChunkSize < 0 || (config.ChunkSize > 0 && (config.ChunkSize < 65536 || config.ChunkSize > 4194304)) {
+		return fmt.Errorf("invalid chunk size: %d (must be 65536-4194304 bytes)", config.ChunkSize)
 	}
 	if config.Timeout < 0 {
 		return fmt.Errorf("invalid timeout: %d (must be positive)", config.Timeout)

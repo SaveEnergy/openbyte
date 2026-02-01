@@ -575,7 +575,8 @@ async function measureLatency() {
 // HTTP-based download test
 async function runDownloadTest(duration, onProgress) {
   const startTime = performance.now();
-  const numStreams = state.settings.streams || 8;
+  const numStreams = resolveStreams();
+  const chunkSize = resolveChunkSize();
   const graceTime = 1500;
   const overheadFactor = 1.06;
   const streamDelay = 200;
@@ -593,12 +594,12 @@ async function runDownloadTest(duration, onProgress) {
       await new Promise(r => setTimeout(r, delay));
       
       try {
-        const res = await fetch(`${apiBase}/download?duration=${duration}&chunk=1048576`, {
+        const res = await fetch(`${apiBase}/download?duration=${duration}&chunk=${chunkSize}`, {
           method: 'GET',
           signal: state.abortController?.signal
         });
         
-        if (!res.ok) return 0;
+        if (!res.ok || !res.body) return 0;
         
         const reader = res.body.getReader();
         
@@ -651,11 +652,12 @@ async function runDownloadTest(duration, onProgress) {
 
 async function runUploadTest(duration, onProgress) {
   const startTime = performance.now();
-  const numStreams = state.settings.streams || 8;
+  const numStreams = resolveStreams();
+  const chunkSize = resolveChunkSize();
   const graceTime = 3000;
   const overheadFactor = 1.06;
   const streamDelay = 200;
-  const blobSize = 4 * 1024 * 1024;
+  const blobSize = Math.max(chunkSize, 4 * 1024 * 1024);
   let totalBytes = 0;
   let graceBytes = 0;
   let graceComplete = false;

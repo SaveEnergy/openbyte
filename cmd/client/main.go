@@ -27,6 +27,7 @@ const (
 	defaultDuration   = 30
 	defaultStreams    = 4
 	defaultPacketSize = 1500
+	defaultChunkSize  = 1024 * 1024
 	defaultTimeout    = 60
 )
 

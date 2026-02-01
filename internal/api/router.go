@@ -76,6 +76,7 @@ func (r *Router) SetupRoutes() *mux.Router {
 	v1.HandleFunc("/stream/{id}/metrics", r.HandleWithID(r.handler.ReportMetrics)).Methods("POST")
 	v1.HandleFunc("/stream/{id}/complete", r.HandleWithID(r.handler.CompleteStream)).Methods("POST")
 	v1.HandleFunc("/servers", r.handler.GetServers).Methods("GET")
+	v1.HandleFunc("/version", r.handler.GetVersion).Methods("GET")
 
 	// Speedtest routes (use same subrouter but skip rate limiting internally via handler)
 	v1.HandleFunc("/download", r.speedtest.Download).Methods("GET")

@@ -18,6 +18,7 @@ type Handler struct {
 	manager          *stream.Manager
 	config           *config.Config
 	clientIPResolver *ClientIPResolver
+	version          string
 }
 
 func NewHandler(manager *stream.Manager) *Handler {
@@ -29,6 +30,17 @@ func NewHandler(manager *stream.Manager) *Handler {
 func (h *Handler) SetConfig(cfg *config.Config) {
 	h.config = cfg
 	h.clientIPResolver = NewClientIPResolver(cfg)
+}
+
+func (h *Handler) SetVersion(version string) {
+	if version == "" {
+		version = "dev"
+	}
+	h.version = version
+}
+
+type VersionResponse struct {
+	Version string `json:"version"`
 }
 
 type StartStreamRequest struct {
@@ -199,6 +211,14 @@ func (h *Handler) GetServers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, resp, http.StatusOK)
+}
+
+func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
+	version := h.version
+	if version == "" {
+		version = "dev"
+	}
+	respondJSON(w, VersionResponse{Version: version}, http.StatusOK)
 }
 
 func (h *Handler) ReportMetrics(w http.ResponseWriter, r *http.Request, streamID string) {

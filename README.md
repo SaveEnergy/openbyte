@@ -21,6 +21,7 @@ SERVER_ID=nyc-1 SERVER_NAME="New York" ./bin/openbyte
 ./bin/obyte -S nyc                   # Use configured server
 ./bin/obyte speedtest.example.com    # Use remote server
 ./bin/obyte --servers                # List servers
+./bin/obyte -p http -d download      # HTTP streaming download
 ```
 
 ### Docker
@@ -42,7 +43,7 @@ Open `http://localhost:8080` — minimal fast.com-inspired UI with real-time spe
 
 ## Features
 
-- **Protocols**: TCP and UDP
+- **Protocols**: TCP, UDP, HTTP streaming
 - **Test Types**: Download, Upload, Bidirectional
 - **Metrics**: Throughput, Latency (P50/P95/P99), Jitter, Packet Loss
 - **RTT**: Baseline and during-test round-trip time measurement
@@ -101,6 +102,8 @@ servers:
   ams:
     url: https://speedtest-ams.example.com
     name: "Amsterdam"
+protocol: http
+chunk_size: 1048576
 ```
 
 ## Multi-Server Deployment

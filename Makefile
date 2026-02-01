@@ -1,24 +1,27 @@
 .PHONY: build server client loadtest test clean run help docker docker-up docker-down perf-smoke perf-bench ci-test ci-lint
 
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+LDFLAGS := -s -w -X main.version=$(VERSION)
+
 # Build targets
 build: server client
 
 server:
 	@echo "Building server..."
 	@mkdir -p bin
-	@go build -o bin/openbyte ./cmd/server
+	@go build -ldflags "$(LDFLAGS)" -o bin/openbyte ./cmd/server
 	@echo "✓ Server built: ./bin/openbyte"
 
 client:
 	@echo "Building CLI client..."
 	@mkdir -p bin
-	@go build -o bin/obyte ./cmd/client
+	@go build -ldflags "$(LDFLAGS)" -o bin/obyte ./cmd/client
 	@echo "✓ CLI built: ./bin/obyte"
 
 loadtest:
 	@echo "Building load test tool..."
 	@mkdir -p bin
-	@go build -o bin/obyte-load ./cmd/loadtest
+	@go build -ldflags "$(LDFLAGS)" -o bin/obyte-load ./cmd/loadtest
 	@echo "✓ Load test tool built: ./bin/obyte-load"
 
 # Testing
@@ -59,17 +62,17 @@ perf-bench:
 run:
 	@echo "Starting server..."
 	@echo "Port: $${PORT:-8080} (set PORT env var to change)"
-	@go run ./cmd/server
+	@go run -ldflags "$(LDFLAGS)" ./cmd/server
 
 run-quic:
 	@echo "Starting server with QUIC enabled..."
 	@echo "Ports: HTTP=8080, TCP=8081, UDP=8082, QUIC=8083"
-	@QUIC_ENABLED=true go run ./cmd/server
+	@QUIC_ENABLED=true go run -ldflags "$(LDFLAGS)" ./cmd/server
 
 run-alt-ports:
 	@echo "Starting server with alternative ports..."
 	@echo "HTTP: 9090, TCP test: 9081, UDP test: 9082"
-	@PORT=9090 TCP_TEST_PORT=9081 UDP_TEST_PORT=9082 go run ./cmd/server
+	@PORT=9090 TCP_TEST_PORT=9081 UDP_TEST_PORT=9082 go run -ldflags "$(LDFLAGS)" ./cmd/server
 
 kill-ports:
 	@echo "Killing processes on ports 8080, 8081, 8082, 8083..."
@@ -105,7 +108,7 @@ clean:
 
 perf-smoke: loadtest
 	@echo "Starting server with pprof..."
-	@PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6060 PORT=8080 TCP_TEST_PORT=8081 UDP_TEST_PORT=8082 go run ./cmd/server & echo $$! > /tmp/openbyte-perf.pid
+	@PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6060 PORT=8080 TCP_TEST_PORT=8081 UDP_TEST_PORT=8082 go run -ldflags "$(LDFLAGS)" ./cmd/server & echo $$! > /tmp/openbyte-perf.pid
 	@sleep 2
 	@$(MAKE) perf-bench
 	@./bin/obyte-load --mode tcp-download --host 127.0.0.1 --tcp-port 8081 --duration 5s --concurrency 4

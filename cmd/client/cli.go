@@ -23,6 +23,7 @@ func parseFlags() (*Config, map[string]bool) {
 	flag.IntVar(&config.Streams, "streams", 0, "Parallel streams (1-16)")
 	flag.IntVar(&config.Streams, "s", 0, "Parallel streams (1-16) (short)")
 	flag.IntVar(&config.PacketSize, "packet-size", 0, "Packet size in bytes (64-9000)")
+	flag.IntVar(&config.ChunkSize, "chunk-size", 0, "HTTP chunk size in bytes (65536-4194304)")
 	flag.BoolVar(&config.JSON, "json", false, "Output results as JSON")
 	flag.BoolVar(&config.Plain, "plain", false, "Plain text output")
 	flag.BoolVar(&config.Verbose, "verbose", false, "Verbose output")
@@ -59,6 +60,8 @@ func parseFlags() (*Config, map[string]bool) {
 			flagsSet["duration"] = true
 		case "s":
 			flagsSet["streams"] = true
+		case "chunk-size":
+			flagsSet["chunk-size"] = true
 		case "S":
 			flagsSet["server"] = true
 		case "v":
@@ -240,11 +243,17 @@ func selectFastestServer(configFile *ConfigFile, verbose bool) (*ServerLatency, 
 }
 
 func validateConfig(config *Config) error {
-	if config.Protocol != "tcp" && config.Protocol != "udp" && config.Protocol != "quic" {
+	if config.Protocol != "tcp" && config.Protocol != "udp" && config.Protocol != "quic" && config.Protocol != "http" {
 		return fmt.Errorf("invalid protocol: %s\n\n"+
-			"Protocol must be 'tcp', 'udp', or 'quic'.\n"+
-			"Use: obyte -p tcp  or  obyte -p udp  or  obyte -p quic\n"+
+			"Protocol must be 'tcp', 'udp', 'quic', or 'http'.\n"+
+			"Use: obyte -p tcp  or  obyte -p udp  or  obyte -p quic  or  obyte -p http\n"+
 			"See: obyte --help", config.Protocol)
+	}
+	if config.Protocol == "http" && config.Direction == "bidirectional" {
+		return fmt.Errorf("invalid direction for http: %s\n\n"+
+			"HTTP protocol supports 'download' or 'upload'.\n"+
+			"Use: obyte -p http -d download  or  obyte -p http -d upload\n"+
+			"See: obyte --help", config.Direction)
 	}
 	if config.Direction != "download" && config.Direction != "upload" && config.Direction != "bidirectional" {
 		return fmt.Errorf("invalid direction: %s\n\n"+
@@ -264,11 +273,21 @@ func validateConfig(config *Config) error {
 			"Use: obyte -s 4  (for 4 parallel streams)\n"+
 			"See: obyte --help", config.Streams)
 	}
-	if config.PacketSize < 64 || config.PacketSize > 9000 {
-		return fmt.Errorf("invalid packet size: %d\n\n"+
-			"Packet size must be between 64 and 9000 bytes.\n"+
-			"Use: obyte --packet-size 1500  (for standard MTU)\n"+
-			"See: obyte --help", config.PacketSize)
+	if config.Protocol != "http" {
+		if config.PacketSize < 64 || config.PacketSize > 9000 {
+			return fmt.Errorf("invalid packet size: %d\n\n"+
+				"Packet size must be between 64 and 9000 bytes.\n"+
+				"Use: obyte --packet-size 1500  (for standard MTU)\n"+
+				"See: obyte --help", config.PacketSize)
+		}
+	}
+	if config.Protocol == "http" {
+		if config.ChunkSize < 65536 || config.ChunkSize > 4194304 {
+			return fmt.Errorf("invalid chunk size: %d\n\n"+
+				"Chunk size must be between 65536 and 4194304 bytes.\n"+
+				"Use: obyte --chunk-size 1048576  (1MB)\n"+
+				"See: obyte --help", config.ChunkSize)
+		}
 	}
 	return nil
 }
@@ -291,11 +310,12 @@ Flags:
   -a, --auto              Auto-select fastest server (lowest latency)
   -S, --server string     Server alias or URL
   --servers               List configured servers
-  -p, --protocol string   Protocol: tcp, udp, quic (default: tcp)
+  -p, --protocol string   Protocol: tcp, udp, quic, http (default: tcp)
   -d, --direction string  Direction: download, upload, bidirectional (default: download)
   -t, --duration int      Test duration in seconds (1-300) (default: 30)
   -s, --streams int       Parallel streams (1-16) (default: 4)
   --packet-size int       Packet size in bytes (64-9000) (default: 1500)
+  --chunk-size int        HTTP chunk size in bytes (65536-4194304) (default: 1048576)
   --json                  Output results as JSON
   --plain                 Plain text output
   -v, --verbose           Verbose output
@@ -314,6 +334,7 @@ Configuration file: ~/.config/obyte/config.yaml
 Environment variables:
   OBYTE_SERVER_URL        Server URL (default: http://localhost:8080)
   OBYTE_API_KEY           API key
+  OBYTE_CHUNK_SIZE        HTTP chunk size in bytes
   NO_COLOR                Disable colors
 
 Examples:

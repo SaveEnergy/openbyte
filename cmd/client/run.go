@@ -11,6 +11,9 @@ import (
 )
 
 func runStream(ctx context.Context, config *Config, formatter OutputFormatter, streamID *string) error {
+	if config.Protocol == "http" {
+		return runHTTPStream(ctx, config, formatter)
+	}
 	streamResp, err := startStream(ctx, config)
 	if err != nil {
 		return fmt.Errorf("failed to start stream: %v\n\n"+
@@ -126,6 +129,114 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 					Count: lastMetrics.Latency.Count,
 				},
 				JitterMs:  lastMetrics.JitterMs,
+				Timestamp: time.Now(),
+			}
+			formatter.FormatMetrics(m)
+
+		case <-ctx.Done():
+			cancel()
+			return ctx.Err()
+		}
+	}
+}
+
+func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatter) error {
+	pingCtx, pingCancel := context.WithTimeout(ctx, 10*time.Second)
+	pingSamples, _ := measureHTTPPing(pingCtx, config.ServerURL, 20)
+	pingCancel()
+
+	latencyStats := calculateClientLatency(pingSamples)
+	jitter := calculateClientJitter(pingSamples)
+
+	graceTime := 1500 * time.Millisecond
+	if config.Direction == "upload" {
+		graceTime = 3000 * time.Millisecond
+	}
+
+	httpCfg := &HTTPTestConfig{
+		ServerURL:      config.ServerURL,
+		Duration:       time.Duration(config.Duration) * time.Second,
+		Streams:        config.Streams,
+		ChunkSize:      config.ChunkSize,
+		Direction:      config.Direction,
+		GraceTime:      graceTime,
+		StreamDelay:    200 * time.Millisecond,
+		OverheadFactor: 1.06,
+		APIKey:         config.APIKey,
+		Timeout:        time.Duration(config.Timeout) * time.Second,
+	}
+
+	engine := NewHTTPTestEngine(httpCfg)
+
+	startTime := time.Now()
+	testCtx, cancel := context.WithTimeout(ctx, httpCfg.Duration)
+	defer cancel()
+
+	doneCh := make(chan error, 1)
+	go func() {
+		doneCh <- engine.Run(testCtx)
+	}()
+
+	metricsTicker := time.NewTicker(500 * time.Millisecond)
+	defer metricsTicker.Stop()
+
+	for {
+		select {
+		case err := <-doneCh:
+			metrics := engine.GetMetrics()
+			metrics.Latency = latencyStats
+			metrics.JitterMs = jitter
+
+			totalBytes := metrics.BytesTransferred
+			measuredElapsed := time.Since(startTime)
+			if measuredElapsed > httpCfg.Duration {
+				measuredElapsed = httpCfg.Duration
+			}
+			measuredElapsed -= graceTime
+			if measuredElapsed <= 0 {
+				measuredElapsed = 1 * time.Millisecond
+			}
+			avgSpeed := float64(totalBytes*8) / measuredElapsed.Seconds() / 1_000_000 * httpCfg.OverheadFactor
+			metrics.ThroughputMbps = avgSpeed
+
+			httpConfig := *config
+			httpConfig.PacketSize = config.ChunkSize
+			results := buildResults("http", &httpConfig, metrics, startTime)
+			formatter.FormatComplete(results)
+
+			if err != nil && err != context.DeadlineExceeded && err != context.Canceled {
+				return err
+			}
+			return nil
+
+		case <-metricsTicker.C:
+			metrics := engine.GetMetrics()
+			elapsed := time.Since(startTime)
+			progress := (elapsed.Seconds() / float64(config.Duration)) * 100
+			if progress > 100 {
+				progress = 100
+			}
+			remaining := float64(config.Duration) - elapsed.Seconds()
+			if remaining < 0 {
+				remaining = 0
+			}
+
+			formatter.FormatProgress(progress, elapsed.Seconds(), remaining)
+
+			m := &types.Metrics{
+				ThroughputMbps:    metrics.ThroughputMbps,
+				ThroughputAvgMbps: metrics.ThroughputMbps,
+				BytesTransferred:  metrics.BytesTransferred,
+				Latency: types.LatencyMetrics{
+					MinMs: metrics.Latency.MinMs,
+					MaxMs: metrics.Latency.MaxMs,
+					AvgMs: metrics.Latency.AvgMs,
+					P50Ms: metrics.Latency.P50Ms,
+					P95Ms: metrics.Latency.P95Ms,
+					P99Ms: metrics.Latency.P99Ms,
+					Count: metrics.Latency.Count,
+				},
+				JitterMs:  metrics.JitterMs,
 				Timestamp: time.Now(),
 			}
 			formatter.FormatMetrics(m)

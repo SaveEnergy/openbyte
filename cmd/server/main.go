@@ -57,6 +57,7 @@ func main() {
 
 	apiHandler := api.NewHandler(manager)
 	apiHandler.SetConfig(cfg)
+	apiHandler.SetVersion(version)
 	wsServer := websocket.NewServer()
 	wsServer.SetAllowedOrigins(cfg.AllowedOrigins)
 	wsServer.SetPingInterval(cfg.WebSocketPingInterval)

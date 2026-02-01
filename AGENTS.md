@@ -89,6 +89,20 @@
 - Gate e2e via `testing.Short()`; add nightly confidence workflow.
 - Pin GitHub Actions to SHAs; add dependabot + GHCR cleanup job.
 
+## CLI HTTP Streaming Support (2026-01-27)
+
+### Findings
+- CLI used stream start + raw TCP/UDP/QUIC only; no HTTP streaming path parity with web UI.
+
+### Decisions
+- Add HTTP protocol option in CLI using `/api/v1/download`, `/api/v1/upload`, `/api/v1/ping`.
+- Add `--chunk-size` and config/env support for HTTP chunk size.
+
+## Version Endpoint (2026-02-01)
+
+### Actions
+- Added `/api/v1/version` returning server build version.
+
 ## Dead Code Analysis (2026-01-24)
 
 ### Findings

@@ -45,6 +45,7 @@ type Config struct {
 	Duration   int
 	Streams    int
 	PacketSize int
+	ChunkSize  int
 	ServerURL  string
 	Server     string
 	APIKey     string
