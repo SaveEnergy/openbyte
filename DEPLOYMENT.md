@@ -279,6 +279,16 @@ server {
 }
 ```
 
+**Reverse proxy upload limits (important):**
+
+Speed tests upload multi-megabyte request bodies (default ~4MB per request, repeated). Many reverse proxies default to 1MB and will reject or buffer uploads, which can produce errors or unrealistic upload speeds.
+
+Minimum recommendations:
+- Increase max request body (e.g. `client_max_body_size 35m;` in Nginx).
+- Disable request buffering for upload to avoid early responses:
+  - Nginx: `location /api/v1/upload { proxy_request_buffering off; proxy_http_version 1.1; }`
+- If you enable HTTP/2 or HTTP/3 at the proxy edge, keep the upstream to OpenByte as HTTP/1.1 for `/api/v1/upload`.
+
 When running behind a proxy, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges so rate limiting and client IP logging are accurate.
 
 ## Reverse Proxy (Traefik)
@@ -302,6 +312,12 @@ When running behind Traefik, set `TRUSTED_PROXY_CIDRS` to the Traefik network su
 ```bash
 docker network inspect traefik --format '{{ (index .IPAM.Config 0).Subnet }}'
 ```
+
+For reliable upload tests through Traefik:
+- Ensure the upload router allows large request bodies (e.g. 35MB).
+- Apply buffering middleware only to `/api/v1/upload` to avoid impacting download streams.
+
+The provided Traefik compose files include a dedicated upload router with a 35MB request body limit.
 
 **Environment variables:**
 

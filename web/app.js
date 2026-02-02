@@ -62,6 +62,16 @@ const RING_END_OFFSET = 2;
 let lastModalTrigger = null;
 let toastTimer = null;
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+const isNetworkError = (err) => {
+  if (!err) return false;
+  if (err.name === 'AbortError') return false;
+  if (err.name === 'TypeError') return true;
+  const message = (err.message || '').toLowerCase();
+  return message.includes('network') || message.includes('failed to fetch') || message.includes('http2');
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   loadSettings();
   loadServers();
@@ -598,18 +608,23 @@ async function runDownloadTest(duration, onProgress) {
   const graceTime = 1500;
   const overheadFactor = 1.06;
   const streamDelay = 200;
+  const maxNetworkRetries = 2;
+  const retryDelayMs = 250;
   const endTime = startTime + (duration * 1000);
   let totalBytes = 0;
   let graceBytes = 0;
   let graceComplete = false;
+  let sawNetworkError = false;
   
   const streamPromises = [];
   
   const downloadStream = async (chunk) => {
-    const res = await fetch(`${apiBase}/download?duration=${duration}&chunk=${chunk}`, {
+    const res = await fetchWithTimeout(`${apiBase}/download?duration=${duration}&chunk=${chunk}`, {
       method: 'GET',
+      cache: 'no-store',
+      credentials: 'omit',
       signal: state.abortController?.signal
-    });
+    }, (duration * 1000) + 10000);
     
     if (!res.ok || !res.body) return false;
     
@@ -668,19 +683,34 @@ async function runDownloadTest(duration, onProgress) {
       const attempts = buildChunkAttempts();
       for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
         const attemptChunk = attempts[attemptIndex];
-        try {
-          if (await downloadStream(attemptChunk)) {
-            return;
+        let success = false;
+        for (let retry = 0; retry <= maxNetworkRetries; retry++) {
+          try {
+            if (await downloadStream(attemptChunk)) {
+              success = true;
+              break;
+            }
+          } catch (e) {
+            if (e.name === 'AbortError') {
+              return;
+            }
+            if (isNetworkError(e)) {
+              sawNetworkError = true;
+              if (retry < maxNetworkRetries) {
+                await sleep(retryDelayMs);
+                continue;
+              }
+            }
+            if (attemptIndex < attempts.length - 1) {
+              console.warn('Download stream failed, retrying smaller chunk', e);
+            } else {
+              console.warn('Download stream failed after retries', e);
+            }
+            break;
           }
-        } catch (e) {
-          if (e.name === 'AbortError') {
-            return;
-          }
-          if (attemptIndex < attempts.length - 1) {
-            console.warn('Download stream failed, retrying smaller chunk', e);
-            continue;
-          }
-          console.warn('Download stream failed after retries', e);
+        }
+        if (success) {
+          return;
         }
       }
     })();
@@ -694,6 +724,10 @@ async function runDownloadTest(duration, onProgress) {
   const measureTime = Math.max(0.001, (measuredElapsed - graceTime) / 1000);
   const avgSpeed = (totalBytes * 8 * overheadFactor) / measureTime / 1_000_000;
   
+  if (totalBytes === 0 && sawNetworkError) {
+    throw new Error('Network error during download. Try again or change server.');
+  }
+
   return avgSpeed > 0 ? avgSpeed : 0;
 }
 
@@ -705,9 +739,12 @@ async function runUploadTest(duration, onProgress) {
   const overheadFactor = 1.06;
   const streamDelay = 200;
   const blobSize = Math.max(chunkSize, 4 * 1024 * 1024);
+  const maxNetworkRetries = 2;
+  const retryDelayMs = 250;
   let totalBytes = 0;
   let graceBytes = 0;
   let graceComplete = false;
+  let sawNetworkError = false;
   
   const chunks = [];
   for (let i = 0; i < blobSize; i += 65536) {
@@ -722,16 +759,20 @@ async function runUploadTest(duration, onProgress) {
   const uploadStream = async (delay) => {
     await new Promise(r => setTimeout(r, delay));
     
+    let consecutiveErrors = 0;
     while (performance.now() < endTime && state.isRunning) {
       try {
-        const res = await fetch(`${apiBase}/upload`, {
+        const res = await fetchWithTimeout(`${apiBase}/upload`, {
           method: 'POST',
           body: blob,
           headers: { 'Content-Type': 'application/octet-stream' },
+          cache: 'no-store',
+          credentials: 'omit',
           signal: state.abortController?.signal
-        });
+        }, (duration * 1000) + 10000);
         
         if (!res.ok) continue;
+        consecutiveErrors = 0;
         
         const elapsed = performance.now() - startTime;
         
@@ -751,6 +792,14 @@ async function runUploadTest(duration, onProgress) {
         
       } catch (e) {
         if (e.name === 'AbortError') break;
+        if (isNetworkError(e)) {
+          sawNetworkError = true;
+          consecutiveErrors += 1;
+          if (consecutiveErrors <= maxNetworkRetries) {
+            await sleep(retryDelayMs);
+            continue;
+          }
+        }
         throw e;
       }
     }
@@ -766,6 +815,10 @@ async function runUploadTest(duration, onProgress) {
   const measureTime = Math.max(0.001, (measuredElapsed - graceTime) / 1000);
   const avgSpeed = (totalBytes * 8 * overheadFactor) / measureTime / 1_000_000;
   
+  if (totalBytes === 0 && sawNetworkError) {
+    throw new Error('Network error during upload. Try again or change server.');
+  }
+
   return avgSpeed > 0 ? avgSpeed : 0;
 }
 
