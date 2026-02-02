@@ -38,6 +38,7 @@ const elements = {
   uploadResult: document.getElementById('uploadResult'),
   latencyResult: document.getElementById('latencyResult'),
   jitterResult: document.getElementById('jitterResult'),
+  serverName: document.getElementById('serverName'),
   networkIPv6: document.getElementById('networkIPv6'),
   networkIP: document.getElementById('networkIP'),
   restartBtn: document.getElementById('restartBtn'),
@@ -209,6 +210,23 @@ function fetchWithTimeout(url, options, timeoutMs) {
   return fetch(url, opts).finally(() => clearTimeout(timer));
 }
 
+function resolveServerName() {
+  if (state.selectedServer?.name) {
+    return state.selectedServer.name;
+  }
+  if (state.servers?.length) {
+    const fallback = state.servers[0]?.name;
+    if (fallback) return fallback;
+  }
+  return 'Current Server';
+}
+
+function updateServerName() {
+  if (elements.serverName) {
+    elements.serverName.textContent = resolveServerName();
+  }
+}
+
 function getHealthURL(server) {
   if (server.api_endpoint) {
     try {
@@ -239,9 +257,11 @@ async function loadServers() {
     }
     
     populateServerSelect();
+    updateServerName();
     checkServer();
   } catch (e) {
     console.error('Failed to load servers:', e);
+    updateServerName();
     checkServer();
   }
 }
@@ -287,11 +307,13 @@ async function selectFastestServer() {
   if (reachable.length === 0) {
     console.warn('No servers reachable, defaulting to current');
     state.selectedServer = null;
+    updateServerName();
     return;
   }
   
   reachable.sort((a, b) => a.latency - b.latency);
   state.selectedServer = reachable[0].server;
+  updateServerName();
   
   console.log('Auto-selected server:', state.selectedServer.name, 
     `(${Math.round(reachable[0].latency)}ms)`);
@@ -356,6 +378,7 @@ function onServerChange() {
     }
   }
   
+  updateServerName();
   saveSettings();
   checkServer();
 }
@@ -380,6 +403,7 @@ function onCustomServerChange() {
     apiBase = `${baseUrl}/api/v1`;
     state.settings.serverUrl = baseUrl;
     state.selectedServer = { id: 'custom', name: 'Custom', location: url, api_endpoint: baseUrl };
+    updateServerName();
     saveSettings();
     checkServer();
   }
