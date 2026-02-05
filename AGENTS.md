@@ -289,3 +289,36 @@
 ### Actions
 - `GetServers` detects proxied requests via `X-Forwarded-Proto`/`X-Forwarded-For`/`PublicHost`; skips internal port in `api_endpoint` when proxied.
 - Changed default `WriteTimeout` to 0 (disabled); streaming endpoints manage own duration; `IdleTimeout` + `ReadTimeout` still protect against stuck connections.
+
+## Cancel + Restart 503 Fix (2026-02-05)
+
+### Findings
+- `fetchWithTimeout` created its own `AbortController` and **replaced** the caller's signal, so `cancelTest() → state.abortController.abort()` never reached in-flight downloads.
+- Server-side download handlers kept running for full duration after client cancel; filled `maxConcurrent` (20) slots.
+- Next test start got 503 on every download request; retry logic treated 503 same as network error, retrying across all chunk sizes (3 sizes × 3 retries × 4 streams ≈ 36 failing requests).
+- Upload path had same `fetchWithTimeout` signal override but less severe (while loop checks `isRunning`).
+
+### Actions
+- `fetchWithTimeout` now chains caller's abort signal with its timeout controller via `addEventListener('abort', ...)`.
+- `downloadStream` throws specific error (`.status = 503`) on server overload instead of returning false.
+- Download retry loop checks `state.isRunning` before each retry; exits on 503 with brief backoff instead of retrying.
+- Upload loop breaks on 503 with brief backoff.
+- Added `TestDownloadConcurrentLimitAndRelease`: fills maxConcurrent slots → verifies 503 → cancels all → verifies new download succeeds.
+
+## IPv6 Detection (2026-02-05)
+
+### Findings
+- Server + Traefik properly report IPv6 client IPs via X-Forwarded-For; `curl -6` confirms end-to-end.
+- Browser connects via IPv4 (Happy Eyeballs); server correctly shows IPv4 address.
+- `measureLatency()` discarded ping response bodies; IP info only came from stale page-load probe.
+- No way to force IPv6 from browser `fetch()` API.
+
+### Actions
+- `measureLatency()` now parses first ping response to capture fresh client IP / IPv6 status during test.
+- Added `detectIPv6Capability()`: probes `v6.` subdomain (AAAA-only DNS) to detect IPv6 reachability without forcing the browser.
+- `updateIPv6Display()` shows: "Yes" (in use), IPv6 address (supported but browser chose IPv4), or "No" (unreachable).
+- Updated server `.env` to include `v6.speed.sqrtops.de` in Traefik host rule.
+
+### DNS Requirement
+- Add **AAAA-only** record for `v6.speed.sqrtops.de` → `2a01:4f8:c012:7966::1` (no A record).
+- Traefik auto-issues Let's Encrypt cert once DNS propagates.

@@ -21,6 +21,8 @@ const state = {
   },
   networkInfo: {
     ipv6: false,
+    ipv6Capable: null,
+    ipv6IP: null,
     clientIP: null
   }
 };
@@ -164,20 +166,62 @@ function detectNetworkInfo() {
         if (elements.networkIP) {
           elements.networkIP.textContent = data.client_ip;
         }
-        if (elements.networkIPv6) {
-          elements.networkIPv6.textContent = data.ipv6 ? 'Yes' : 'No';
-        }
       }
     })
     .catch(() => {
       state.networkInfo.ipv6 = false;
-      if (elements.networkIPv6) {
-        elements.networkIPv6.textContent = 'Unknown';
-      }
       if (elements.networkIP) {
         elements.networkIP.textContent = 'Unknown';
       }
+    })
+    .finally(() => {
+      detectIPv6Capability();
     });
+}
+
+// Probe v6. subdomain (AAAA-only) to detect client IPv6 reachability
+function detectIPv6Capability() {
+  const hostname = window.location.hostname;
+  if (!hostname || hostname === 'localhost' || hostname.startsWith('v6.') || hostname.match(/^\d/)) {
+    updateIPv6Display();
+    return;
+  }
+  
+  const v6Url = `${window.location.protocol}//v6.${hostname}/api/v1/ping`;
+  
+  fetch(v6Url, { cache: 'no-store', credentials: 'omit', mode: 'cors' })
+    .then(res => res.ok ? res.json() : Promise.reject())
+    .then(data => {
+      if (data.ipv6 && data.client_ip) {
+        state.networkInfo.ipv6Capable = true;
+        state.networkInfo.ipv6IP = data.client_ip;
+      } else {
+        state.networkInfo.ipv6Capable = false;
+      }
+    })
+    .catch(() => {
+      state.networkInfo.ipv6Capable = false;
+    })
+    .finally(() => {
+      updateIPv6Display();
+    });
+}
+
+function updateIPv6Display() {
+  if (!elements.networkIPv6) return;
+  
+  if (state.networkInfo.ipv6) {
+    elements.networkIPv6.textContent = 'Yes';
+  } else if (state.networkInfo.ipv6Capable && state.networkInfo.ipv6IP) {
+    elements.networkIPv6.textContent = state.networkInfo.ipv6IP;
+    elements.networkIPv6.title = 'IPv6 supported but browser connected via IPv4';
+  } else if (state.networkInfo.ipv6Capable) {
+    elements.networkIPv6.textContent = 'Supported';
+  } else if (state.networkInfo.ipv6Capable === false) {
+    elements.networkIPv6.textContent = 'No';
+  } else {
+    elements.networkIPv6.textContent = '-';
+  }
 }
 
 function resolveStreams() {
@@ -206,6 +250,17 @@ function fetchWithTimeout(url, options, timeoutMs) {
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  // Chain: if caller supplied an abort signal, propagate it
+  const externalSignal = options?.signal;
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      controller.abort();
+    } else {
+      externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+  }
+
   const opts = { ...options, signal: controller.signal };
   return fetch(url, opts).finally(() => clearTimeout(timer));
 }
@@ -586,17 +641,37 @@ async function runTest(direction) {
 async function measureLatency() {
   const samples = [];
   const numSamples = 20;
+  let capturedIP = false;
   
   for (let i = 0; i < numSamples; i++) {
     if (!state.isRunning) break;
     
     const start = performance.now();
     try {
-      await fetch(`${apiBase}/ping`, { 
+      const res = await fetch(`${apiBase}/ping`, { 
         method: 'GET',
         signal: state.abortController?.signal 
       });
       const rtt = performance.now() - start;
+      
+      // Capture IP info from first successful response
+      if (!capturedIP && res.ok) {
+        try {
+          const data = await res.json();
+          if (data.client_ip) {
+            state.networkInfo.clientIP = data.client_ip;
+            state.networkInfo.ipv6 = data.ipv6 || false;
+            if (elements.networkIP) {
+              elements.networkIP.textContent = data.client_ip;
+            }
+            updateIPv6Display();
+          }
+          capturedIP = true;
+        } catch (_) {
+          // JSON parse failed; skip
+        }
+      }
+      
       samples.push(rtt);
       
       updateProgress((i / numSamples) * 100);
@@ -650,7 +725,14 @@ async function runDownloadTest(duration, onProgress) {
       signal: state.abortController?.signal
     }, (duration * 1000) + 10000);
     
-    if (!res.ok || !res.body) return false;
+    if (!res.ok || !res.body) {
+      if (res.status === 503) {
+        const err = new Error('Server overloaded');
+        err.status = 503;
+        throw err;
+      }
+      return false;
+    }
     
     const reader = res.body.getReader();
     try {
@@ -706,16 +788,24 @@ async function runDownloadTest(duration, onProgress) {
       
       const attempts = buildChunkAttempts();
       for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
+        if (!state.isRunning) return;
         const attemptChunk = attempts[attemptIndex];
         let success = false;
         for (let retry = 0; retry <= maxNetworkRetries; retry++) {
+          if (!state.isRunning) return;
           try {
             if (await downloadStream(attemptChunk)) {
               success = true;
               break;
             }
           } catch (e) {
-            if (e.name === 'AbortError') {
+            if (e.name === 'AbortError' || !state.isRunning) {
+              return;
+            }
+            if (e.status === 503) {
+              // Server overloaded (e.g. previous cancelled test still draining)
+              // Brief backoff then give up — retrying makes it worse
+              await sleep(500);
               return;
             }
             if (isNetworkError(e)) {
@@ -795,7 +885,13 @@ async function runUploadTest(duration, onProgress) {
           signal: state.abortController?.signal
         }, (duration * 1000) + 10000);
         
-        if (!res.ok) continue;
+        if (!res.ok) {
+          if (res.status === 503) {
+            await sleep(500);
+            break;
+          }
+          continue;
+        }
         consecutiveErrors = 0;
         
         const elapsed = performance.now() - startTime;
@@ -933,9 +1029,7 @@ function showResults() {
   elements.latencyResult.textContent = `${state.latencyResult.toFixed(1)} ms`;
   elements.jitterResult.textContent = `${state.jitterResult.toFixed(1)} ms`;
   
-  if (elements.networkIPv6) {
-    elements.networkIPv6.textContent = state.networkInfo.ipv6 ? 'Yes' : 'No';
-  }
+  updateIPv6Display();
   
 }
 

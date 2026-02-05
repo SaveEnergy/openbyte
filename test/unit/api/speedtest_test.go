@@ -78,6 +78,61 @@ func (e *errReader) Read(p []byte) (int, error) {
 	return 0, errors.New("read failure")
 }
 
+func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
+	maxConcurrent := 2
+	handler := api.NewSpeedTestHandler(maxConcurrent)
+
+	// Fill all slots with long-running downloads
+	cancels := make([]context.CancelFunc, maxConcurrent)
+	done := make(chan struct{}, maxConcurrent)
+
+	for i := 0; i < maxConcurrent; i++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancels[i] = cancel
+
+		go func() {
+			defer func() { done <- struct{}{} }()
+			req := httptest.NewRequest(http.MethodGet,
+				"http://example.com/api/v1/download?duration=60&chunk=65536", nil)
+			req = req.WithContext(ctx)
+			rec := httptest.NewRecorder()
+			handler.Download(rec, req)
+		}()
+	}
+
+	// Give goroutines time to start and increment activeDownloads
+	time.Sleep(50 * time.Millisecond)
+
+	// New download should get 503
+	reqOver := httptest.NewRequest(http.MethodGet,
+		"http://example.com/api/v1/download?duration=1&chunk=65536", nil)
+	recOver := httptest.NewRecorder()
+	handler.Download(recOver, reqOver)
+	if recOver.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 when at limit, got %d", recOver.Code)
+	}
+
+	// Cancel all running downloads (simulates user pressing cancel)
+	for _, cancel := range cancels {
+		cancel()
+	}
+	for i := 0; i < maxConcurrent; i++ {
+		<-done
+	}
+
+	// After cancellation, new download should succeed
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	t.Cleanup(cancel)
+	reqAfter := httptest.NewRequest(http.MethodGet,
+		"http://example.com/api/v1/download?duration=1&chunk=65536", nil)
+	reqAfter = reqAfter.WithContext(ctx)
+	recAfter := httptest.NewRecorder()
+	handler.Download(recAfter, reqAfter)
+	if recAfter.Code != http.StatusOK {
+		t.Fatalf("expected 200 after cancel freed slots, got %d", recAfter.Code)
+	}
+}
+
 func TestSpeedTestUploadHandlesReadError(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10)
 
