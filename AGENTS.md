@@ -305,20 +305,20 @@
 - Upload loop breaks on 503 with brief backoff.
 - Added `TestDownloadConcurrentLimitAndRelease`: fills maxConcurrent slots → verifies 503 → cancels all → verifies new download succeeds.
 
-## IPv6 Detection (2026-02-05)
+## IPv4/IPv6 Detection (2026-02-05)
 
 ### Findings
-- Server + Traefik properly report IPv6 client IPs via X-Forwarded-For; `curl -6` confirms end-to-end.
-- Browser connects via IPv4 (Happy Eyeballs); server correctly shows IPv4 address.
+- Server + Traefik properly report client IPs via X-Forwarded-For; both `curl -4` and `curl -6` confirm end-to-end.
+- Browser uses Happy Eyeballs — can't control address family from `fetch()`.
 - `measureLatency()` discarded ping response bodies; IP info only came from stale page-load probe.
-- No way to force IPv6 from browser `fetch()` API.
 
 ### Actions
-- `measureLatency()` now parses first ping response to capture fresh client IP / IPv6 status during test.
-- Added `detectIPv6Capability()`: probes `v6.` subdomain (AAAA-only DNS) to detect IPv6 reachability without forcing the browser.
-- `updateIPv6Display()` shows: "Yes" (in use), IPv6 address (supported but browser chose IPv4), or "No" (unreachable).
-- Updated server `.env` to include `v6.speed.sqrtops.de` in Traefik host rule.
+- Separate IPv4 and IPv6 address fields in network info UI (replaced single "Client IP").
+- `detectNetworkInfo()` runs three parallel probes: main ping + `v4.` subdomain (A-only) + `v6.` subdomain (AAAA-only).
+- `measureLatency()` parses first ping response to capture fresh IP during test.
+- Updated server `.env` to include `v4.speed.sqrtops.de` and `v6.speed.sqrtops.de` in Traefik host rule.
 
-### DNS Requirement
-- Add **AAAA-only** record for `v6.speed.sqrtops.de` → `2a01:4f8:c012:7966::1` (no A record).
-- Traefik auto-issues Let's Encrypt cert once DNS propagates.
+### DNS Requirements
+- Add **A-only** record for `v4.<domain>` → server IPv4 address (no AAAA record).
+- Add **AAAA-only** record for `v6.<domain>` → server IPv6 address (no A record).
+- Traefik auto-issues Let's Encrypt certs once DNS propagates.

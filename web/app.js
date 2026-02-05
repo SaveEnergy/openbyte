@@ -168,14 +168,28 @@ function detectNetworkInfo() {
     })
     .catch(() => {});
 
-  // IPv6 probe — AAAA-only subdomain forces IPv6
+  // Dedicated probes — A-only / AAAA-only subdomains force address family
   const hostname = window.location.hostname;
-  const canProbeV6 = hostname && hostname !== 'localhost' &&
-    !hostname.startsWith('v6.') && !hostname.match(/^\d/);
+  const canProbe = hostname && hostname !== 'localhost' &&
+    !hostname.startsWith('v4.') && !hostname.startsWith('v6.') &&
+    !hostname.match(/^\d/);
 
-  const v6Ping = canProbeV6
-    ? fetch(`${window.location.protocol}//v6.${hostname}/api/v1/ping`,
-        { cache: 'no-store', credentials: 'omit', mode: 'cors' })
+  const probeOpts = { cache: 'no-store', credentials: 'omit', mode: 'cors' };
+  const proto = window.location.protocol;
+
+  const v4Ping = canProbe
+    ? fetch(`${proto}//v4.${hostname}/api/v1/ping`, probeOpts)
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(data => {
+          if (!data.ipv6 && data.client_ip) {
+            state.networkInfo.ipv4 = data.client_ip;
+          }
+        })
+        .catch(() => {})
+    : Promise.resolve();
+
+  const v6Ping = canProbe
+    ? fetch(`${proto}//v6.${hostname}/api/v1/ping`, probeOpts)
         .then(res => res.ok ? res.json() : Promise.reject())
         .then(data => {
           if (data.ipv6 && data.client_ip) {
@@ -185,7 +199,7 @@ function detectNetworkInfo() {
         .catch(() => {})
     : Promise.resolve();
 
-  Promise.allSettled([mainPing, v6Ping]).then(() => updateNetworkDisplay());
+  Promise.allSettled([mainPing, v4Ping, v6Ping]).then(() => updateNetworkDisplay());
 }
 
 function updateNetworkDisplay() {
