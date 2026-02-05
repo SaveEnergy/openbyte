@@ -520,19 +520,22 @@ body::before {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-lg);
   font-weight: 600;
+  text-align: center;
 }
 
 .detail-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  align-items: center;
 }
 
 .detail-item {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: var(--space-xs);
 }
 
@@ -545,8 +548,10 @@ body::before {
 
 .detail-value {
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: 1.125rem;
   color: var(--text-secondary);
+  word-break: break-all;
+  text-align: center;
 }
 
 .results-actions {
@@ -949,7 +954,7 @@ select.setting-input {
   }
   
   .detail-grid {
-    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-lg);
   }
   
   .results-actions {
