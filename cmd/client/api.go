@@ -30,7 +30,7 @@ func startStream(ctx context.Context, config *Config) (*StreamResponse, error) {
 	}
 
 	apiURL := config.ServerURL + "/api/v1/stream/start"
-	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, strings.NewReader(string(jsonData)))
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -71,7 +71,12 @@ func cancelStream(serverURL, streamID, apiKey string) {
 	}
 
 	client := &http.Client{Timeout: 5 * time.Second}
-	client.Do(req)
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
 }
 
 func completeStream(config *Config, streamID string, metrics EngineMetrics) {
@@ -94,15 +99,26 @@ func completeStream(config *Config, streamID string, metrics EngineMetrics) {
 		},
 	}
 
-	jsonData, _ := json.Marshal(reqBody)
-	req, _ := http.NewRequest("POST", config.ServerURL+"/api/v1/stream/"+streamID+"/complete", bytes.NewReader(jsonData))
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return
+	}
+	req, err := http.NewRequest("POST", config.ServerURL+"/api/v1/stream/"+streamID+"/complete", bytes.NewReader(jsonData))
+	if err != nil {
+		return
+	}
 	req.Header.Set("Content-Type", "application/json")
 	if config.APIKey != "" {
 		req.Header.Set("Authorization", "Bearer "+config.APIKey)
 	}
 
 	client := &http.Client{Timeout: 5 * time.Second}
-	client.Do(req)
+	resp, err := client.Do(req)
+	if err != nil {
+		return
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
 }
 
 func streamMetrics(ctx context.Context, wsURL string, formatter OutputFormatter, config *Config) error {

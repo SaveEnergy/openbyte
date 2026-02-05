@@ -211,7 +211,7 @@ func (s *Server) handleDownload(conn *net.TCPConn) {
 }
 
 func (s *Server) handleUpload(conn *net.TCPConn) {
-	buf := s.recvPool.Get().([]byte)
+	buf := s.getRecvBuffer()
 	defer s.recvPool.Put(buf)
 	nextDeadline := time.Now().Add(1 * time.Second)
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
@@ -245,7 +245,7 @@ func (s *Server) handleBidirectional(conn *net.TCPConn) {
 
 	go func() {
 		defer wg.Done()
-		buf := s.sendPool.Get().([]byte)
+		buf := s.getSendBuffer()
 		defer s.sendPool.Put(buf)
 		dataLen := len(s.randomData)
 		offset := 0
@@ -291,7 +291,7 @@ func (s *Server) handleBidirectional(conn *net.TCPConn) {
 
 	go func() {
 		defer wg.Done()
-		buf := s.recvPool.Get().([]byte)
+		buf := s.getRecvBuffer()
 		defer s.recvPool.Put(buf)
 		nextDeadline := time.Now().Add(1 * time.Second)
 		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
@@ -317,7 +317,7 @@ func (s *Server) handleBidirectional(conn *net.TCPConn) {
 }
 
 func (s *Server) handleEcho(conn *net.TCPConn) {
-	buf := s.recvPool.Get().([]byte)
+	buf := s.getRecvBuffer()
 	defer s.recvPool.Put(buf)
 	nextDeadline := time.Now().Add(1 * time.Second)
 	conn.SetReadDeadline(time.Now().Add(1 * time.Second))
@@ -343,7 +343,9 @@ func (s *Server) handleEcho(conn *net.TCPConn) {
 			}
 
 			if n > 0 {
-				conn.Write(buf[:n])
+				if _, err := conn.Write(buf[:n]); err != nil {
+					return
+				}
 			}
 		}
 	}
@@ -387,10 +389,6 @@ func (s *Server) handleUDP() {
 			}
 
 			if n == 0 {
-				continue
-			}
-
-			if n < 1 {
 				continue
 			}
 
@@ -465,6 +463,22 @@ func (s *Server) udpSender(client *udpClientState) {
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
+}
+
+func (s *Server) getSendBuffer() []byte {
+	buf, ok := s.sendPool.Get().([]byte)
+	if !ok || len(buf) != sendBufferSize {
+		return make([]byte, sendBufferSize)
+	}
+	return buf
+}
+
+func (s *Server) getRecvBuffer() []byte {
+	buf, ok := s.recvPool.Get().([]byte)
+	if !ok || len(buf) != recvBufferSize {
+		return make([]byte, recvBufferSize)
+	}
+	return buf
 }
 
 func (s *Server) Close() error {

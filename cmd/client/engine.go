@@ -197,9 +197,9 @@ func (e *TestEngine) closeConnections() {
 }
 
 func (e *TestEngine) runWarmUp(ctx context.Context) {
-	buf := make([]byte, 64*1024)
 	for _, conn := range e.connections {
 		go func(c net.Conn) {
+			buf := make([]byte, 64*1024)
 			for {
 				select {
 				case <-ctx.Done():

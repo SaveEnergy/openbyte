@@ -78,6 +78,53 @@ func TestCollector_Concurrent(t *testing.T) {
 	}
 }
 
+func TestCollector_ConcurrentRecordAndRead(t *testing.T) {
+	c := metrics.NewCollector()
+	var wg sync.WaitGroup
+	done := make(chan struct{})
+
+	// Writers: record latency concurrently
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 1000; j++ {
+				select {
+				case <-done:
+					return
+				default:
+					c.RecordLatency(time.Duration(j%100) * time.Millisecond)
+				}
+			}
+		}()
+	}
+
+	// Readers: get metrics concurrently with writes
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 500; j++ {
+				select {
+				case <-done:
+					return
+				default:
+					m := c.GetMetrics()
+					_ = m.Latency.Count
+				}
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(done)
+
+	m := c.GetMetrics()
+	if m.Latency.Count == 0 {
+		t.Error("expected latency samples after concurrent record+read")
+	}
+}
+
 func TestCollector_Reset(t *testing.T) {
 	c := metrics.NewCollector()
 

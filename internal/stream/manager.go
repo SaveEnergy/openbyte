@@ -231,7 +231,19 @@ func (m *Manager) GetActiveStreams() []string {
 }
 
 func (m *Manager) ActiveCount() int {
-	return len(m.GetActiveStreams())
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	count := 0
+	for _, state := range m.streams {
+		snapshot := state.GetState()
+		if snapshot.Status == types.StreamStatusRunning ||
+			snapshot.Status == types.StreamStatusStarting ||
+			snapshot.Status == types.StreamStatusPending {
+			count++
+		}
+	}
+	return count
 }
 
 func (m *Manager) cleanupExpiredStreams() {
@@ -250,34 +262,77 @@ func (m *Manager) cleanupExpiredStreams() {
 }
 
 func (m *Manager) cleanup() {
-	m.mu.Lock()
+	m.mu.RLock()
 	retentionPeriod := m.retentionPeriod
+	streamIDs := make([]string, 0, len(m.streams))
+	streamStates := make([]*types.StreamState, 0, len(m.streams))
+	for streamID, state := range m.streams {
+		streamIDs = append(streamIDs, streamID)
+		streamStates = append(streamStates, state)
+	}
+	m.mu.RUnlock()
 
 	now := time.Now()
+	type cleanupAction struct {
+		streamID string
+		fail     bool
+		remove   bool
+	}
+	actions := make([]cleanupAction, 0, len(streamStates))
 
-	for streamID, state := range m.streams {
+	for i, state := range streamStates {
 		snapshot := state.GetState()
-
 		if snapshot.Status == types.StreamStatusRunning || snapshot.Status == types.StreamStatusStarting {
 			maxDuration := snapshot.Config.Duration + 30*time.Second
 			if now.Sub(snapshot.StartTime) > maxDuration {
-				state.UpdateStatus(types.StreamStatusFailed)
-				m.releaseActiveStreamLocked(streamID)
-				delete(m.streams, streamID)
-				continue
+				actions = append(actions, cleanupAction{streamID: streamIDs[i], fail: true, remove: true})
 			}
+			continue
 		}
-
 		if snapshot.Status == types.StreamStatusCompleted ||
 			snapshot.Status == types.StreamStatusFailed ||
 			snapshot.Status == types.StreamStatusCancelled {
 			if !snapshot.EndTime.IsZero() && now.Sub(snapshot.EndTime) > retentionPeriod {
-				m.releaseActiveStreamLocked(streamID)
-				delete(m.streams, streamID)
+				actions = append(actions, cleanupAction{streamID: streamIDs[i], remove: true})
 			}
 		}
 	}
-	m.mu.Unlock()
+
+	if len(actions) == 0 {
+		return
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, action := range actions {
+		state, exists := m.streams[action.streamID]
+		if !exists {
+			continue
+		}
+		snapshot := state.GetState()
+		if action.fail {
+			if snapshot.Status == types.StreamStatusRunning || snapshot.Status == types.StreamStatusStarting {
+				maxDuration := snapshot.Config.Duration + 30*time.Second
+				if now.Sub(snapshot.StartTime) > maxDuration {
+					state.UpdateStatus(types.StreamStatusFailed)
+					m.releaseActiveStreamLocked(action.streamID)
+					delete(m.streams, action.streamID)
+				}
+			}
+			continue
+		}
+		if action.remove {
+			if snapshot.Status == types.StreamStatusCompleted ||
+				snapshot.Status == types.StreamStatusFailed ||
+				snapshot.Status == types.StreamStatusCancelled {
+				if !snapshot.EndTime.IsZero() && now.Sub(snapshot.EndTime) > retentionPeriod {
+					m.releaseActiveStreamLocked(action.streamID)
+					delete(m.streams, action.streamID)
+				}
+			}
+		}
+	}
 }
 
 func (m *Manager) releaseActiveStream(streamID string) {
@@ -326,21 +381,25 @@ func (m *Manager) broadcastMetrics() {
 
 func (m *Manager) sendMetricsUpdates() {
 	m.mu.RLock()
-	defer m.mu.RUnlock()
-
+	updates := make([]*MetricsUpdate, 0, len(m.streams))
 	for streamID, state := range m.streams {
 		snapshot := state.GetState()
 		if snapshot.Status == types.StreamStatusRunning ||
 			snapshot.Status == types.StreamStatusStarting ||
 			snapshot.Status == types.StreamStatusCompleted ||
 			snapshot.Status == types.StreamStatusFailed {
-			select {
-			case m.metricsUpdateCh <- &MetricsUpdate{
+			updates = append(updates, &MetricsUpdate{
 				StreamID: streamID,
 				State:    snapshot,
-			}:
-			default:
-			}
+			})
+		}
+	}
+	m.mu.RUnlock()
+
+	for _, update := range updates {
+		select {
+		case m.metricsUpdateCh <- update:
+		default:
 		}
 	}
 }

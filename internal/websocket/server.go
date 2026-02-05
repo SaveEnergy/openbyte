@@ -2,7 +2,6 @@ package websocket
 
 import (
 	"encoding/json"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -189,6 +188,9 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 
 	data, err := json.Marshal(msg)
 	if err != nil {
+		logging.Warn("WebSocket metrics marshal failed",
+			logging.Field{Key: "stream_id", Value: streamID},
+			logging.Field{Key: "error", Value: err})
 		return
 	}
 
@@ -298,7 +300,7 @@ func (s *Server) isAllowedOrigin(origin string, host string) bool {
 		return sameOrigin(origin, host)
 	}
 
-	originHostValue := originHost(origin)
+	originHostValue := types.OriginHost(origin)
 	for _, allowed := range allowedOrigins {
 		allowed = strings.TrimSpace(allowed)
 		if allowed == "" {
@@ -316,7 +318,7 @@ func (s *Server) isAllowedOrigin(origin string, host string) bool {
 				return true
 			}
 		}
-		allowedHost := originHost(allowed)
+		allowedHost := types.OriginHost(allowed)
 		if allowedHost != "" && originHostValue != "" && strings.EqualFold(allowedHost, originHostValue) {
 			return true
 		}
@@ -329,31 +331,11 @@ func sameOrigin(origin string, host string) bool {
 	if err != nil {
 		return false
 	}
-	originHost := stripPort(parsed.Host)
-	requestHost := stripPort(host)
-	return strings.EqualFold(originHost, requestHost)
+	originH := types.StripHostPort(parsed.Host)
+	requestH := types.StripHostPort(host)
+	return strings.EqualFold(originH, requestH)
 }
 
-func stripPort(host string) string {
-	if host == "" {
-		return host
-	}
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		return h
-	}
-	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
-		return strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
-	}
-	return host
-}
-
-func originHost(origin string) string {
-	parsed, err := url.Parse(origin)
-	if err == nil && parsed.Host != "" {
-		return stripPort(parsed.Host)
-	}
-	return stripPort(origin)
-}
 
 type wsMessage struct {
 	Type             string        `json:"type"`

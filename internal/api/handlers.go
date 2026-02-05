@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	stdErrors "errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/config"
+	"github.com/saveenergy/openbyte/internal/logging"
 	"github.com/saveenergy/openbyte/internal/stream"
 	"github.com/saveenergy/openbyte/pkg/errors"
 	"github.com/saveenergy/openbyte/pkg/types"
@@ -346,8 +348,13 @@ func (h *Handler) validateConfig(req StartStreamRequest, clientIP string) (types
 		return types.StreamConfig{}, errors.ErrInvalidConfig("invalid direction", nil)
 	}
 
-	if req.Duration < 1 || req.Duration > 300 {
-		return types.StreamConfig{}, errors.ErrInvalidConfig("duration must be 1-300 seconds", nil)
+	maxDurationSec := 300
+	if h.config != nil && h.config.MaxTestDuration > 0 {
+		maxDurationSec = int(h.config.MaxTestDuration.Seconds())
+	}
+	if req.Duration < 1 || req.Duration > maxDurationSec {
+		return types.StreamConfig{}, errors.ErrInvalidConfig(
+			fmt.Sprintf("duration must be 1-%d seconds", maxDurationSec), nil)
 	}
 
 	if req.Streams < 1 || req.Streams > 16 {
@@ -438,7 +445,10 @@ func respondJSONBodyError(w http.ResponseWriter, err error) {
 func respondJSON(w http.ResponseWriter, data interface{}, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		logging.Warn("JSON response encode failed",
+			logging.Field{Key: "error", Value: err})
+	}
 }
 
 func respondError(w http.ResponseWriter, err error, statusCode int) {

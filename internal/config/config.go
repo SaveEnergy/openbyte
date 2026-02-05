@@ -179,6 +179,11 @@ func (c *Config) LoadFromEnv() error {
 			c.RateLimitPerIP = l
 		}
 	}
+	if limit := os.Getenv("GLOBAL_RATE_LIMIT"); limit != "" {
+		if l, err := strconv.Atoi(limit); err == nil && l > 0 {
+			c.GlobalRateLimit = l
+		}
+	}
 	if limit := os.Getenv("MAX_CONCURRENT_PER_IP"); limit != "" {
 		if l, err := strconv.Atoi(limit); err == nil && l > 0 {
 			c.MaxConcurrentPerIP = l
@@ -264,6 +269,9 @@ func (c *Config) Validate() error {
 	if c.MaxConcurrentTests <= 0 {
 		return fmt.Errorf("max concurrent tests must be > 0")
 	}
+	if c.MaxTestDuration <= 0 {
+		return fmt.Errorf("max test duration must be > 0")
+	}
 	if c.MaxStreams <= 0 || c.MaxStreams > 16 {
 		return fmt.Errorf("max streams must be 1-16")
 	}
@@ -275,6 +283,12 @@ func (c *Config) Validate() error {
 	}
 	if c.RateLimitPerIP <= 0 {
 		return fmt.Errorf("rate limit per IP must be > 0")
+	}
+	if c.GlobalRateLimit <= 0 {
+		return fmt.Errorf("global rate limit must be > 0")
+	}
+	if c.GlobalRateLimit < c.RateLimitPerIP {
+		return fmt.Errorf("global rate limit must be >= rate limit per IP")
 	}
 	if c.TrustProxyHeaders && len(c.TrustedProxyCIDRs) > 0 {
 		for _, entry := range c.TrustedProxyCIDRs {

@@ -253,7 +253,7 @@ func measureHTTPPing(ctx context.Context, serverURL string, samples int) ([]time
 		return nil, nil
 	}
 	pingURL := stringsTrimSuffix(serverURL) + "/api/v1/ping"
-	client := &http.Client{}
+	client := &http.Client{Timeout: 10 * time.Second}
 	results := make([]time.Duration, 0, samples)
 
 	for i := 0; i < samples; i++ {

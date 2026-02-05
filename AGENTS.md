@@ -232,3 +232,50 @@
 
 ### Actions
 - Added Playwright UI test target and CI execution via Bun.
+
+## Deep Analysis Fixes (2026-02-02)
+
+### Actions
+- Added mutex to latency histogram; race-safe Record/Reset/CopyTo.
+- Manager cleanup/broadcast avoid long lock holds; channel sends outside lock.
+- Stream server uses safe buffer pool gets; echo write handles errors.
+- WebSocket metrics marshal now logs errors.
+- Registry client logs response close failures.
+- Config validates global rate limit + max test duration; loads GLOBAL_RATE_LIMIT env.
+- GHCR compose exposes 8080; Traefik GHCR env parity with standard compose.
+- Added config unit tests for env parsing + validation.
+
+## Code Quality Pass (2026-02-05)
+
+### Findings
+- `handleEcho` indentation broken after echo write fix.
+- Redundant `n < 1` after `n == 0` in `handleUDP`.
+- `ActiveCount()` built full slice just to count.
+- API `validateConfig` hardcoded 300s max duration; ignored `config.MaxTestDuration`.
+- `respondJSON` silently dropped `json.Encode` errors.
+- `elapsed.Seconds() == 0` float comparison fragile in speedtest upload.
+- `originHost`/`stripPort` duplicated between `api/router.go` and `websocket/server.go`.
+- Speedtest Ping/Upload used manual JSON string construction; no escaping safety.
+- Registry client didn't drain response body; prevented HTTP connection reuse.
+- `SnapshotLatencyStats` returned 7 unnamed values; error-prone call sites.
+- `isPrivateIP` re-parsed CIDR strings on every call.
+
+### Actions
+- Fixed indentation in `handleEcho`; removed dead `n < 1` check.
+- `ActiveCount()` counts under RLock without slice allocation.
+- `validateConfig` reads `config.MaxTestDuration` for upper bound.
+- `respondJSON` logs encode errors via `logging.Warn`.
+- Upload elapsed check uses `elapsed <= 0`.
+- Extracted `StripHostPort`/`OriginHost` to `pkg/types/network.go`; both packages use shared helpers.
+- Speedtest Ping/Upload responses use `json.NewEncoder` instead of string concat.
+- Registry client drains response body before close via `drainAndClose` helper.
+- `SnapshotLatencyStats` returns named `LatencySnapshot` struct.
+- `isPrivateIP` uses package-level pre-parsed `[]*net.IPNet`.
+- Added tests: `StripHostPort`/`OriginHost`, max duration validation, concurrent Record+GetMetrics race test.
+- `SnapshotLatencyStats` returns named `LatencySnapshot` struct (was 7 unnamed values).
+- `isPrivateIP` pre-parses CIDR blocks at package init (was re-parsing per call).
+- Fixed data race in client `runWarmUp`: shared buffer across goroutines → per-goroutine buffer.
+- Client `cancelStream`/`completeStream` now drain+close response bodies for connection reuse.
+- `completeStream` handles `json.Marshal`/`http.NewRequest` errors.
+- Removed unnecessary `string(jsonData)` copy in `startStream`.
+- `measureHTTPPing` HTTP client now has 10s timeout.

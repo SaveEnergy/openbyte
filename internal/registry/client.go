@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -109,7 +110,7 @@ func (c *Client) register(activeTests int) error {
 	if err != nil {
 		return fmt.Errorf("send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer drainAndClose(resp, c.logger)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("registry returned status %d", resp.StatusCode)
@@ -146,7 +147,7 @@ func (c *Client) heartbeat(activeTests int) error {
 	if err != nil {
 		return fmt.Errorf("send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer drainAndClose(resp, c.logger)
 
 	if resp.StatusCode == http.StatusNotFound {
 		return c.register(activeTests)
@@ -179,7 +180,7 @@ func (c *Client) deregister() {
 		c.logger.Error("Deregister from registry")
 		return
 	}
-	resp.Body.Close()
+	drainAndClose(resp, c.logger)
 
 	c.logger.Info("Deregistered from registry")
 }
@@ -199,6 +200,13 @@ func (c *Client) heartbeatLoop(getActiveTests func() int) {
 				c.logger.Error("Registry heartbeat failed")
 			}
 		}
+	}
+}
+
+func drainAndClose(resp *http.Response, logger *logging.Logger) {
+	io.Copy(io.Discard, resp.Body)
+	if err := resp.Body.Close(); err != nil && logger != nil {
+		logger.Warn("Registry response close failed")
 	}
 }
 

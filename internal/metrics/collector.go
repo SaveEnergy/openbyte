@@ -174,12 +174,31 @@ func (c *Collector) Reset() {
 
 func (c *Collector) Close() {}
 
-func (c *Collector) SnapshotLatencyStats(dst []uint32) (uint32, int64, time.Duration, time.Duration, time.Duration, time.Duration, int64) {
+// LatencySnapshot holds a point-in-time copy of latency statistics.
+type LatencySnapshot struct {
+	Overflow    uint32
+	Count       int64
+	Min         time.Duration
+	Max         time.Duration
+	Sum         time.Duration
+	JitterSum   time.Duration
+	JitterCount int64
+}
+
+func (c *Collector) SnapshotLatencyStats(dst []uint32) LatencySnapshot {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	overflow := uint32(0)
 	if c.latencyHistogram != nil {
 		overflow = c.latencyHistogram.CopyTo(dst)
 	}
-	return overflow, c.latencyCount, c.latencyMin, c.latencyMax, c.latencySum, c.jitterSum, c.jitterCount
+	return LatencySnapshot{
+		Overflow:    overflow,
+		Count:       c.latencyCount,
+		Min:         c.latencyMin,
+		Max:         c.latencyMax,
+		Sum:         c.latencySum,
+		JitterSum:   c.jitterSum,
+		JitterCount: c.jitterCount,
+	}
 }

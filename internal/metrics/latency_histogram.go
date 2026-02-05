@@ -1,11 +1,15 @@
 package metrics
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 type LatencyHistogram struct {
 	bucketWidth time.Duration
 	buckets     []uint32
 	overflow    uint32
+	mu          sync.Mutex
 }
 
 func NewLatencyHistogram(bucketWidth time.Duration, bucketCount int) *LatencyHistogram {
@@ -30,6 +34,8 @@ func (h *LatencyHistogram) BucketCount() int {
 }
 
 func (h *LatencyHistogram) Record(sample time.Duration) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	if sample < 0 {
 		sample = 0
 	}
@@ -42,6 +48,8 @@ func (h *LatencyHistogram) Record(sample time.Duration) {
 }
 
 func (h *LatencyHistogram) Reset() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	for i := range h.buckets {
 		h.buckets[i] = 0
 	}
@@ -49,6 +57,8 @@ func (h *LatencyHistogram) Reset() {
 }
 
 func (h *LatencyHistogram) CopyTo(dst []uint32) uint32 {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	copy(dst, h.buckets)
 	return h.overflow
 }

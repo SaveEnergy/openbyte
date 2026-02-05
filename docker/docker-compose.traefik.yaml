@@ -79,7 +79,7 @@ services:
       - "traefik.http.routers.openbyte.entrypoints=web"
       - "traefik.http.services.openbyte.loadbalancer.server.port=8080"
       # Upload router with larger body limit
-      - "traefik.http.routers.openbyte-upload.rule=Host(`${TRAEFIK_HOST:-speedtest.localhost}`) && PathPrefix(`/api/v1/upload`)"
+      - "traefik.http.routers.openbyte-upload.rule=(Host(`${TRAEFIK_HOST:-speedtest.localhost}`)) && PathPrefix(`/api/v1/upload`)"
       - "traefik.http.routers.openbyte-upload.entrypoints=web"
       - "traefik.http.routers.openbyte-upload.priority=100"
       - "traefik.http.routers.openbyte-upload.middlewares=openbyte-upload-body"
@@ -90,7 +90,7 @@ services:
       - "traefik.http.routers.openbyte-secure.tls.certresolver=letsencrypt"
       - "traefik.http.routers.openbyte-secure.service=openbyte"
       # HTTPS upload router with larger body limit
-      - "traefik.http.routers.openbyte-upload-secure.rule=Host(`${TRAEFIK_HOST:-speedtest.localhost}`) && PathPrefix(`/api/v1/upload`)"
+      - "traefik.http.routers.openbyte-upload-secure.rule=(Host(`${TRAEFIK_HOST:-speedtest.localhost}`)) && PathPrefix(`/api/v1/upload`)"
       - "traefik.http.routers.openbyte-upload-secure.entrypoints=websecure"
       - "traefik.http.routers.openbyte-upload-secure.tls=true"
       - "traefik.http.routers.openbyte-upload-secure.tls.certresolver=letsencrypt"

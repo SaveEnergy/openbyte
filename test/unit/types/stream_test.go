@@ -7,6 +7,48 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+func TestStripHostPort(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"", ""},
+		{"example.com", "example.com"},
+		{"example.com:8080", "example.com"},
+		{"[::1]:8080", "::1"},
+		{"[::1]", "::1"},
+		{"127.0.0.1:3000", "127.0.0.1"},
+		{"127.0.0.1", "127.0.0.1"},
+	}
+	for _, tc := range tests {
+		got := types.StripHostPort(tc.input)
+		if got != tc.want {
+			t.Errorf("StripHostPort(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
+func TestOriginHost(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"https://example.com", "example.com"},
+		{"https://example.com:8443", "example.com"},
+		{"http://localhost:3000", "localhost"},
+		{"http://[::1]:8080", "::1"},
+		{"example.com", "example.com"},
+		{"example.com:8080", "example.com"},
+		{"", ""},
+	}
+	for _, tc := range tests {
+		got := types.OriginHost(tc.input)
+		if got != tc.want {
+			t.Errorf("OriginHost(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
 func TestStreamState_UpdateStatus(t *testing.T) {
 	state := &types.StreamState{
 		Config: types.StreamConfig{

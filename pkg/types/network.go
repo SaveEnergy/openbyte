@@ -2,6 +2,7 @@ package types
 
 import (
 	"net"
+	"net/url"
 	"strings"
 )
 
@@ -44,26 +45,28 @@ func sanitizeIP(addr string) string {
 	return addr
 }
 
-func isPrivateIP(ipStr string) bool {
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return false
-	}
+var privateNets []*net.IPNet
 
-	privateBlocks := []string{
+func init() {
+	for _, cidr := range []string{
 		"10.0.0.0/8",
 		"172.16.0.0/12",
 		"192.168.0.0/16",
 		"fc00::/7",
 		"fe80::/10",
+	} {
+		_, network, _ := net.ParseCIDR(cidr)
+		privateNets = append(privateNets, network)
 	}
+}
 
-	for _, block := range privateBlocks {
-		_, cidr, err := net.ParseCIDR(block)
-		if err != nil {
-			continue
-		}
-		if cidr.Contains(ip) {
+func isPrivateIP(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	for _, network := range privateNets {
+		if network.Contains(ip) {
 			return true
 		}
 	}
@@ -117,4 +120,27 @@ func DetectMTU(ifaceName string) int {
 		return 1500
 	}
 	return iface.MTU
+}
+
+// StripHostPort removes the port from a host string, handling IPv6 brackets.
+func StripHostPort(host string) string {
+	if host == "" {
+		return host
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		return h
+	}
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		return strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
+	}
+	return host
+}
+
+// OriginHost extracts the hostname from an origin URL string.
+func OriginHost(origin string) string {
+	parsed, err := url.Parse(origin)
+	if err == nil && parsed.Host != "" {
+		return StripHostPort(parsed.Host)
+	}
+	return StripHostPort(origin)
 }

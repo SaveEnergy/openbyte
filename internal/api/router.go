@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/logging"
+	"github.com/saveenergy/openbyte/pkg/types"
 )
 
 type Router struct {
@@ -167,7 +167,7 @@ func (r *Router) isAllowedOrigin(origin string) bool {
 	if len(r.allowedOrigins) == 0 {
 		return false
 	}
-	originHostValue := originHost(origin)
+	originHostValue := types.OriginHost(origin)
 	for _, allowed := range r.allowedOrigins {
 		allowed = strings.TrimSpace(allowed)
 		if allowed == "" {
@@ -185,7 +185,7 @@ func (r *Router) isAllowedOrigin(origin string) bool {
 				return true
 			}
 		}
-		allowedHost := originHost(allowed)
+		allowedHost := types.OriginHost(allowed)
 		if allowedHost != "" && originHostValue != "" && strings.EqualFold(allowedHost, originHostValue) {
 			return true
 		}
@@ -202,26 +202,6 @@ func (r *Router) isAllowAllOrigins() bool {
 	return false
 }
 
-func originHost(origin string) string {
-	parsed, err := url.Parse(origin)
-	if err == nil && parsed.Host != "" {
-		return stripPort(parsed.Host)
-	}
-	return stripPort(origin)
-}
-
-func stripPort(host string) string {
-	if host == "" {
-		return host
-	}
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		return h
-	}
-	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
-		return strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
-	}
-	return host
-}
 
 func isValidStreamID(streamID string) bool {
 	if streamID == "" {

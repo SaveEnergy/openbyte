@@ -2,6 +2,7 @@ package api
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strconv"
@@ -140,16 +141,18 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	elapsed := time.Since(startTime)
-	if elapsed.Seconds() == 0 {
+	if elapsed <= 0 {
 		elapsed = time.Millisecond
 	}
 	throughputMbps := float64(totalBytes*8) / elapsed.Seconds() / 1_000_000
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"bytes":` + strconv.FormatInt(totalBytes, 10) +
-		`,"duration_ms":` + strconv.FormatInt(elapsed.Milliseconds(), 10) +
-		`,"throughput_mbps":` + strconv.FormatFloat(throughputMbps, 'f', 2, 64) + `}`))
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"bytes":          totalBytes,
+		"duration_ms":    elapsed.Milliseconds(),
+		"throughput_mbps": throughputMbps,
+	})
 }
 
 func (h *SpeedTestHandler) Ping(w http.ResponseWriter, r *http.Request) {
@@ -159,8 +162,12 @@ func (h *SpeedTestHandler) Ping(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"pong":true,"timestamp":` + strconv.FormatInt(time.Now().UnixMilli(), 10) +
-		`,"client_ip":"` + clientIP + `","ipv6":` + strconv.FormatBool(isIPv6) + `}`))
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"pong":      true,
+		"timestamp": time.Now().UnixMilli(),
+		"client_ip": clientIP,
+		"ipv6":      isIPv6,
+	})
 }
 
 func (h *SpeedTestHandler) resolveClientIP(r *http.Request) string {

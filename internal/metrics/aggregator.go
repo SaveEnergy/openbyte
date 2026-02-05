@@ -87,21 +87,21 @@ func (m *MultiStreamAggregator) GetAggregatedMetrics() types.Metrics {
 			for i := range m.bucketScratch {
 				m.bucketScratch[i] = 0
 			}
-			collectorOverflow, count, min, max, sum, jitterSum, jitterCount := collector.SnapshotLatencyStats(m.bucketScratch)
-			overflow += collectorOverflow
-			totalLatencyCount += count
-			totalLatencySum += sum
-			if count > 0 {
-				if !hasLatency || min < totalLatencyMin {
-					totalLatencyMin = min
+			snap := collector.SnapshotLatencyStats(m.bucketScratch)
+			overflow += snap.Overflow
+			totalLatencyCount += snap.Count
+			totalLatencySum += snap.Sum
+			if snap.Count > 0 {
+				if !hasLatency || snap.Min < totalLatencyMin {
+					totalLatencyMin = snap.Min
 				}
-				if !hasLatency || max > totalLatencyMax {
-					totalLatencyMax = max
+				if !hasLatency || snap.Max > totalLatencyMax {
+					totalLatencyMax = snap.Max
 				}
 				hasLatency = true
 			}
-			totalJitterSum += jitterSum
-			totalJitterCount += jitterCount
+			totalJitterSum += snap.JitterSum
+			totalJitterCount += snap.JitterCount
 			for i, v := range m.bucketScratch {
 				m.bucketCounts[i] += v
 			}
