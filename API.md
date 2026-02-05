@@ -354,7 +354,7 @@ Receive data from client for upload speed measurement.
 
 **GET** `/ping`
 
-Latency measurement endpoint.
+Latency measurement and network detection endpoint. Used for latency sampling (20 pings per test) and client IP / IPv6 detection.
 
 **Response:**
 ```json
@@ -364,6 +364,25 @@ Latency measurement endpoint.
   "client_ip": "203.0.113.10",
   "ipv6": false
 }
+```
+
+**Response Fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pong` | bool | Always `true` |
+| `timestamp` | int | Server timestamp (Unix milliseconds) |
+| `client_ip` | string | Client IP as seen by the server (respects `X-Forwarded-For` when `TRUST_PROXY_HEADERS=true`) |
+| `ipv6` | bool | `true` if `client_ip` is an IPv6 address |
+
+**IPv6 Detection:**
+
+The web UI uses this endpoint in two ways:
+
+1. **Main connection probe** — calls `/ping` on page load and during latency measurement. Reports the address family of the actual browser connection.
+2. **IPv6 capability probe** — calls `/ping` on the `v6.` subdomain (AAAA-only DNS). If the response has `ipv6: true`, the client has IPv6 connectivity even if the browser chose IPv4 for the main connection.
+
+See [Deployment Guide](DEPLOYMENT.md#ipv6-support) for DNS setup.
 ```
 
 ### 12. Version

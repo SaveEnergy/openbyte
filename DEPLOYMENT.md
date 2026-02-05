@@ -332,6 +332,97 @@ The provided Traefik compose files include a dedicated upload router with a 35MB
 - Exposed directly on the host, or
 - Configured as Traefik TCP/UDP routers (advanced)
 
+## IPv6 Support
+
+openByte supports dual-stack (IPv4 + IPv6) deployments. The web UI detects client IPv6 capability using a dedicated AAAA-only subdomain probe.
+
+### How It Works
+
+1. On page load, the UI calls `/api/v1/ping` to detect the client's IP and address family.
+2. It then probes `v6.<hostname>` — a subdomain with only a DNS AAAA record (no A record). This forces the connection over IPv6.
+3. If the probe succeeds, the client has IPv6 connectivity. The UI displays the client's IPv6 address even if the browser chose IPv4 for the main connection (via Happy Eyeballs).
+
+### DNS Setup
+
+Add an **AAAA-only** record for the IPv6 probe subdomain. Do **not** add an A record — the whole point is to force IPv6.
+
+```
+v6.speedtest.example.com.  AAAA  2001:db8::1
+```
+
+Verify with:
+
+```bash
+# Should return only the AAAA record
+dig AAAA v6.speedtest.example.com
+
+# Should fail (no A record)
+dig A v6.speedtest.example.com
+
+# End-to-end test
+curl -6 https://v6.speedtest.example.com/api/v1/ping
+```
+
+### Traefik Configuration
+
+Add the `v6.` subdomain to the Traefik host rule. In `.env`:
+
+```bash
+TRAEFIK_HOST_RULE="Host(`speedtest.example.com`) || Host(`v6.speedtest.example.com`)"
+```
+
+Traefik auto-issues a Let's Encrypt certificate for the new subdomain via HTTP-01 challenge over IPv6. Ensure Traefik listens on IPv6 (default for `traefik:v3`).
+
+### Nginx Configuration
+
+For Nginx deployments, add a server block for the IPv6 subdomain:
+
+```nginx
+server {
+    listen [::]:80;
+    listen [::]:443 ssl;
+    server_name v6.speedtest.example.com;
+
+    # Same proxy config as the main domain
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### Firewall (IPv6)
+
+If using UFW or firewalld, allow IPv6 traffic on the same ports:
+
+```bash
+# UFW (allows both IPv4 and IPv6 by default)
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+# firewalld
+sudo firewall-cmd --permanent --add-port=80/tcp
+sudo firewall-cmd --permanent --add-port=443/tcp
+sudo firewall-cmd --reload
+
+# Verify IPv6 is not blocked
+sudo ip6tables -L -n | grep -E '80|443'
+```
+
+### Display States
+
+The web UI IPv6 field shows:
+
+| Value | Meaning |
+|-------|---------|
+| **Yes** | Test connection is using IPv6 |
+| **IPv6 address** | IPv6 is reachable but browser chose IPv4 (Happy Eyeballs) |
+| **No** | IPv6 probe failed — client or server lacks IPv6 |
+| **-** | Detection not yet complete |
+
 ## Monitoring
 
 ### Logs

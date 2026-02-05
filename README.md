@@ -47,7 +47,7 @@ Open `http://localhost:8080` — minimal fast.com-inspired UI with real-time spe
 - **Test Types**: Download, Upload, Bidirectional
 - **Metrics**: Throughput, Latency (P50/P95/P99), Jitter, Packet Loss
 - **RTT**: Baseline and during-test round-trip time measurement
-- **Network Info**: IP, NAT, MTU detection
+- **Network Info**: Client IP, IPv6 detection, NAT, MTU
 - **Streaming**: WebSocket real-time metrics
 - **Multi-stream**: 1-16 parallel connections
 - **Multi-server**: Deploy globally, test against nearest server
@@ -89,6 +89,16 @@ Notes:
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
 - Default CORS allows all origins; set `ALLOWED_ORIGINS` to restrict (supports `*` and `*.example.com`).
 - If running behind a reverse proxy, increase max request body size (e.g. 35MB) and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.
+
+### IPv6 Detection
+
+The web UI detects IPv6 capability by probing a `v6.` subdomain (AAAA-only DNS record). To enable:
+
+1. Add a DNS **AAAA** record for `v6.<your-domain>` pointing to your server's IPv6 address (no A record).
+2. Include `v6.<your-domain>` in your Traefik host rule or reverse proxy config.
+3. Traefik auto-issues a Let's Encrypt certificate for the new subdomain.
+
+The UI then shows: **Yes** (connection is IPv6), the **IPv6 address** (IPv6 supported but browser chose IPv4), or **No** (no IPv6 reachability). See [Deployment Guide](DEPLOYMENT.md) for details.
 
 ### Client Configuration
 
