@@ -202,7 +202,6 @@ func (r *Router) isAllowAllOrigins() bool {
 	return false
 }
 
-
 func isValidStreamID(streamID string) bool {
 	if streamID == "" {
 		return false

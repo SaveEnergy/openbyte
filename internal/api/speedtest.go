@@ -149,8 +149,8 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"bytes":          totalBytes,
-		"duration_ms":    elapsed.Milliseconds(),
+		"bytes":           totalBytes,
+		"duration_ms":     elapsed.Milliseconds(),
 		"throughput_mbps": throughputMbps,
 	})
 }

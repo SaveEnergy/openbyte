@@ -336,7 +336,6 @@ func sameOrigin(origin string, host string) bool {
 	return strings.EqualFold(originH, requestH)
 }
 
-
 type wsMessage struct {
 	Type             string        `json:"type"`
 	StreamID         string        `json:"stream_id"`
