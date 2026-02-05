@@ -527,8 +527,8 @@ Web Browser                             Server
 
 **Limits:**
 - Per IP: 100 requests per minute (default `RATE_LIMIT_PER_IP`)
-- Per IP: 10 active tests max (default `MAX_CONCURRENT_PER_IP`)
 - Global: 1000 requests per minute (default `GLOBAL_RATE_LIMIT`)
+- HTTP download/upload concurrency auto-scales with `CAPACITY_GBPS`
 
 ## CORS and WebSocket Origins
 

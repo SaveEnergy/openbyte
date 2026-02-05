@@ -9,9 +9,14 @@ import (
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/api"
+	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/stream"
 	"github.com/saveenergy/openbyte/pkg/types"
 )
+
+func testConfig() *config.Config {
+	return config.DefaultConfig()
+}
 
 func TestAPI_StartStream(t *testing.T) {
 	manager := stream.NewManager(10, 2)
@@ -74,7 +79,7 @@ func TestAPI_GetStreamStatus(t *testing.T) {
 	req := httptest.NewRequest("GET", "/api/v1/stream/"+state.Config.ID+"/status", nil)
 	w := httptest.NewRecorder()
 
-	router := api.NewRouter(handler)
+	router := api.NewRouter(handler, testConfig())
 	router.SetupRoutes().ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
@@ -88,7 +93,7 @@ func TestCORSAllowedOrigin(t *testing.T) {
 	defer manager.Stop()
 
 	handler := api.NewHandler(manager)
-	router := api.NewRouter(handler)
+	router := api.NewRouter(handler, testConfig())
 	router.SetAllowedOrigins([]string{"https://example.com"})
 
 	req := httptest.NewRequest("GET", "/health", nil)
@@ -108,7 +113,7 @@ func TestCORSBlockedOrigin(t *testing.T) {
 	defer manager.Stop()
 
 	handler := api.NewHandler(manager)
-	router := api.NewRouter(handler)
+	router := api.NewRouter(handler, testConfig())
 	router.SetAllowedOrigins([]string{"https://example.com"})
 
 	req := httptest.NewRequest("OPTIONS", "/health", nil)

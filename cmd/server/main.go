@@ -64,7 +64,7 @@ func Run(version string) int {
 	wsServer.SetAllowedOrigins(cfg.AllowedOrigins)
 	wsServer.SetPingInterval(cfg.WebSocketPingInterval)
 
-	router := api.NewRouter(apiHandler)
+	router := api.NewRouter(apiHandler, cfg)
 	router.SetRateLimiter(cfg)
 	router.SetClientIPResolver(api.NewClientIPResolver(cfg))
 	router.SetAllowedOrigins(cfg.AllowedOrigins)

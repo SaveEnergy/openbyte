@@ -68,12 +68,20 @@
         </div>
         <div class="results-extra">
           <div class="extra-stat">
-            <span class="extra-label">Latency</span>
+            <span class="extra-label">Idle Latency</span>
             <span class="extra-value" id="latencyResult">0 ms</span>
           </div>
           <div class="extra-stat">
             <span class="extra-label">Jitter</span>
             <span class="extra-value" id="jitterResult">0 ms</span>
+          </div>
+          <div class="extra-stat">
+            <span class="extra-label">Loaded Latency</span>
+            <span class="extra-value" id="loadedLatencyResult">0 ms</span>
+          </div>
+          <div class="extra-stat">
+            <span class="extra-label">Bufferbloat</span>
+            <span class="extra-value" id="bufferbloatResult">-</span>
           </div>
         </div>
         <div class="results-details" id="resultsDetails">
@@ -132,9 +140,10 @@
             </label>
             <select class="setting-input" id="streams" aria-describedby="streamsHint">
               <option value="1">1 stream (~150 Mbps)</option>
-              <option value="4" selected>4 streams (~300 Mbps)</option>
-              <option value="8">8 streams (~600 Mbps)</option>
-              <option value="16">16 streams (~1 Gbps+)</option>
+              <option value="4" selected>4 streams (~600 Mbps)</option>
+              <option value="8">8 streams (~1 Gbps)</option>
+              <option value="16">16 streams (~2 Gbps+)</option>
+              <option value="32">32 streams (~5 Gbps+)</option>
             </select>
           </div>
           <div class="setting-group">

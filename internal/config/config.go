@@ -80,7 +80,7 @@ func DefaultConfig() *Config {
 		CapacityGbps:          25,
 		MaxConcurrentTests:    10,
 		MaxTestDuration:       300 * time.Second,
-		MaxStreams:            16,
+		MaxStreams:            32,
 		TCPBufferSize:         64 * 1024,
 		UDPBufferSize:         1500,
 		ReadTimeout:           15 * time.Second,
@@ -157,7 +157,7 @@ func (c *Config) LoadFromEnv() error {
 		}
 	}
 	if max := os.Getenv("MAX_STREAMS"); max != "" {
-		if m, err := strconv.Atoi(max); err == nil && m > 0 && m <= 16 {
+		if m, err := strconv.Atoi(max); err == nil && m > 0 && m <= 64 {
 			c.MaxStreams = m
 		}
 	}
@@ -272,8 +272,8 @@ func (c *Config) Validate() error {
 	if c.MaxTestDuration <= 0 {
 		return fmt.Errorf("max test duration must be > 0")
 	}
-	if c.MaxStreams <= 0 || c.MaxStreams > 16 {
-		return fmt.Errorf("max streams must be 1-16")
+	if c.MaxStreams <= 0 || c.MaxStreams > 64 {
+		return fmt.Errorf("max streams must be 1-64")
 	}
 	if c.PprofEnabled && c.PprofAddress == "" {
 		return fmt.Errorf("pprof address cannot be empty when enabled")
@@ -298,6 +298,18 @@ func (c *Config) Validate() error {
 		}
 	}
 	return nil
+}
+
+// MaxConcurrentHTTP returns the concurrent download/upload limit for
+// HTTP speed tests, derived from CapacityGbps. Each HTTP stream can
+// push ~150 Mbps on a single TCP connection, so we allow roughly
+// 8 slots per Gbps of declared capacity with a floor of 50.
+func (c *Config) MaxConcurrentHTTP() int {
+	limit := c.CapacityGbps * 8
+	if limit < 50 {
+		limit = 50
+	}
+	return limit
 }
 
 func (c *Config) GetTCPTestAddress() string {

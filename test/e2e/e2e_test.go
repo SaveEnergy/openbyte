@@ -58,7 +58,7 @@ func NewTestServerWithOrigins(t *testing.T, allowedOrigins []string) *TestServer
 	manager.Start()
 
 	handler := api.NewHandler(manager)
-	router := api.NewRouter(handler)
+	router := api.NewRouter(handler, cfg)
 	router.SetRateLimiter(cfg)
 
 	wsServer := ws.NewServer()

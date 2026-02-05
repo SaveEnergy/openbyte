@@ -29,10 +29,10 @@ func (r *Router) GetLimiter() *RateLimiter {
 	return r.limiter
 }
 
-func NewRouter(handler *Handler) *Router {
+func NewRouter(handler *Handler, cfg *config.Config) *Router {
 	return &Router{
 		handler:   handler,
-		speedtest: NewSpeedTestHandler(20),
+		speedtest: NewSpeedTestHandler(cfg.MaxConcurrentHTTP()),
 	}
 }
 

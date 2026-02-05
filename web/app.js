@@ -7,6 +7,8 @@ const state = {
   uploadResult: 0,
   latencyResult: 0,
   jitterResult: 0,
+  downloadLatency: 0,
+  uploadLatency: 0,
   currentSpeed: 0,
   progress: 0,
   ws: null,
@@ -16,7 +18,7 @@ const state = {
   selectedServer: null,
   settings: {
     duration: 30,
-    streams: 4,  // Default 4 streams for ~300 Mbps capacity
+    streams: 4,  // Default 4 streams for ~600 Mbps capacity
     serverUrl: ''
   },
   networkInfo: {
@@ -38,6 +40,8 @@ const elements = {
   uploadResult: document.getElementById('uploadResult'),
   latencyResult: document.getElementById('latencyResult'),
   jitterResult: document.getElementById('jitterResult'),
+  loadedLatencyResult: document.getElementById('loadedLatencyResult'),
+  bufferbloatResult: document.getElementById('bufferbloatResult'),
   serverName: document.getElementById('serverName'),
   networkIPv4: document.getElementById('networkIPv4'),
   networkIPv6: document.getElementById('networkIPv6'),
@@ -220,6 +224,27 @@ function resolveStreams() {
 
 function resolveChunkSize() {
   return 1024 * 1024;
+}
+
+// Detect HTTP protocol and return appropriate overhead factor
+function detectOverheadFactor() {
+  try {
+    const entries = performance.getEntriesByType('resource');
+    // Find the most recent API fetch to detect protocol
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const e = entries[i];
+      if (e.name && e.name.includes('/api/v1/') && e.nextHopProtocol) {
+        if (e.nextHopProtocol === 'h2' || e.nextHopProtocol === 'h3') {
+          // HTTP/2: ~9 bytes frame header per chunk — negligible
+          return 1.0;
+        }
+        // HTTP/1.1: chunked encoding + headers overhead
+        return 1.02;
+      }
+    }
+  } catch (_) {}
+  // Fallback: conservative estimate
+  return 1.02;
 }
 
 function isSameOriginURL(url) {
@@ -590,6 +615,8 @@ async function runTest(direction) {
   const startTime = performance.now();
   let lastUpdate = startTime;
   let lastBytes = 0;
+  let ewmaSpeed = 0;
+  const ewmaAlpha = 0.3; // ~1s effective smoothing window
   
   const onProgress = (bytes, elapsed) => {
     const now = performance.now();
@@ -598,24 +625,38 @@ async function runTest(direction) {
     if (intervalMs >= 200) {
       const intervalBytes = bytes - lastBytes;
       
-      // Only update if we have positive progress
       if (intervalBytes > 0 && intervalMs > 0) {
         const instantSpeed = (intervalBytes * 8) / (intervalMs / 1000) / 1_000_000;
-        updateSpeed(Math.max(0, instantSpeed), direction);
+        // EWMA smoothing for stable live display
+        ewmaSpeed = ewmaSpeed === 0
+          ? instantSpeed
+          : ewmaAlpha * instantSpeed + (1 - ewmaAlpha) * ewmaSpeed;
+        updateSpeed(Math.max(0, ewmaSpeed), direction);
       }
       
       updateProgress(Math.min(100, (elapsed / duration) * 100));
       
       lastUpdate = now;
-      lastBytes = Math.max(lastBytes, bytes); // Never decrease lastBytes
+      lastBytes = Math.max(lastBytes, bytes);
     }
   };
+  
+  // Run loaded latency probe in background during the test
+  const latencyProbe = startLoadedLatencyProbe(state.abortController?.signal);
   
   let result;
   if (direction === 'download') {
     result = await runDownloadTest(duration, onProgress);
   } else {
     result = await runUploadTest(duration, onProgress);
+  }
+  
+  await latencyProbe.stop();
+  const loadedLatency = latencyProbe.getMedian();
+  if (direction === 'download') {
+    state.downloadLatency = loadedLatency;
+  } else {
+    state.uploadLatency = loadedLatency;
   }
 
   if (state.isRunning) {
@@ -626,8 +667,9 @@ async function runTest(direction) {
 }
 
 async function measureLatency() {
-  const samples = [];
-  const numSamples = 20;
+  const rawSamples = [];
+  const numSamples = 24;
+  const warmUpPings = 2; // First pings include DNS/TLS overhead
   let capturedIP = false;
   
   for (let i = 0; i < numSamples; i++) {
@@ -659,7 +701,7 @@ async function measureLatency() {
         }
       }
       
-      samples.push(rtt);
+      rawSamples.push(rtt);
       
       updateProgress((i / numSamples) * 100);
       updateSpeed(rtt, 'latency');
@@ -668,22 +710,128 @@ async function measureLatency() {
     }
   }
   
-  if (samples.length === 0) return 0;
+  if (rawSamples.length === 0) return 0;
   
-  if (samples.length >= 2) {
+  // Discard warm-up pings (DNS/TLS overhead)
+  const samples = rawSamples.length > warmUpPings
+    ? rawSamples.slice(warmUpPings)
+    : rawSamples;
+  
+  // IQR outlier filter
+  const filtered = filterOutliersIQR(samples);
+  
+  if (filtered.length >= 2) {
     let sumDiff = 0;
-    for (let i = 1; i < samples.length; i++) {
-      sumDiff += Math.abs(samples[i] - samples[i - 1]);
+    for (let i = 1; i < filtered.length; i++) {
+      sumDiff += Math.abs(filtered[i] - filtered[i - 1]);
     }
-    state.jitterResult = sumDiff / (samples.length - 1);
+    state.jitterResult = sumDiff / (filtered.length - 1);
   } else {
     state.jitterResult = 0;
   }
   
-  samples.sort((a, b) => a - b);
-  const median = samples[Math.floor(samples.length / 2)];
+  filtered.sort((a, b) => a - b);
+  const median = filtered[Math.floor(filtered.length / 2)];
   
   return median;
+}
+
+function filterOutliersIQR(samples) {
+  if (samples.length < 4) return samples.slice();
+  const sorted = samples.slice().sort((a, b) => a - b);
+  const q1 = sorted[Math.floor(sorted.length * 0.25)];
+  const q3 = sorted[Math.floor(sorted.length * 0.75)];
+  const iqr = q3 - q1;
+  const lower = q1 - 1.5 * iqr;
+  const upper = q3 + 1.5 * iqr;
+  return samples.filter(s => s >= lower && s <= upper);
+}
+
+// Background latency measurement during load (bufferbloat detection)
+function startLoadedLatencyProbe(signal) {
+  const samples = [];
+  let running = true;
+  
+  const loop = async () => {
+    while (running && state.isRunning) {
+      const start = performance.now();
+      try {
+        await fetch(`${apiBase}/ping`, {
+          method: 'GET',
+          cache: 'no-store',
+          signal
+        });
+        samples.push(performance.now() - start);
+      } catch (_) {
+        if (!running) break;
+      }
+      await sleep(500);
+    }
+  };
+  
+  const promise = loop();
+  
+  return {
+    stop() { running = false; return promise; },
+    getMedian() {
+      if (samples.length === 0) return 0;
+      const filtered = filterOutliersIQR(samples);
+      if (filtered.length === 0) return 0;
+      filtered.sort((a, b) => a - b);
+      return filtered[Math.floor(filtered.length / 2)];
+    }
+  };
+}
+
+// Dynamic warm-up: detects when throughput stabilizes
+function createWarmUpDetector(durationMs) {
+  const windowMs = 500;
+  const stabilityThreshold = 0.15; // 15% variance
+  const requiredStableWindows = 3;
+  const maxGraceMs = Math.min(durationMs * 0.3, 5000);
+  
+  let windowBytes = 0;
+  let windowStart = 0;
+  let detectorStart = 0;
+  let recentSpeeds = [];
+  let settled = false;
+  
+  return {
+    settled() { return settled; },
+    
+    record(bytes, now) {
+      if (settled) return;
+      if (detectorStart === 0) {
+        detectorStart = now;
+        windowStart = now;
+      }
+      windowBytes += bytes;
+      const windowElapsed = now - windowStart;
+      
+      if (windowElapsed >= windowMs) {
+        const speed = (windowBytes * 8) / (windowElapsed / 1000);
+        recentSpeeds.push(speed);
+        windowBytes = 0;
+        windowStart = now;
+        
+        // Check stability over last N windows
+        if (recentSpeeds.length >= requiredStableWindows) {
+          const recent = recentSpeeds.slice(-requiredStableWindows);
+          const avg = recent.reduce((a, b) => a + b) / recent.length;
+          const maxDev = Math.max(...recent.map(s => Math.abs(s - avg) / avg));
+          if (maxDev < stabilityThreshold) {
+            settled = true;
+            return;
+          }
+        }
+        
+        // Hard cap: don't spend more than maxGraceMs warming up
+        if (now - detectorStart > maxGraceMs) {
+          settled = true;
+        }
+      }
+    }
+  };
 }
 
 // HTTP-based download test
@@ -691,16 +839,16 @@ async function runDownloadTest(duration, onProgress) {
   const startTime = performance.now();
   const numStreams = resolveStreams();
   const chunkSize = resolveChunkSize();
-  const graceTime = 1500;
-  const overheadFactor = 1.06;
   const streamDelay = 200;
   const maxNetworkRetries = 2;
   const retryDelayMs = 250;
   const endTime = startTime + (duration * 1000);
   let totalBytes = 0;
-  let graceBytes = 0;
-  let graceComplete = false;
+  let allBytes = 0;
   let sawNetworkError = false;
+  
+  const warmUp = createWarmUpDetector(duration * 1000);
+  let measureStartTime = 0;
   
   const streamPromises = [];
   
@@ -726,8 +874,8 @@ async function runDownloadTest(duration, onProgress) {
       while (true) {
         if (!state.isRunning) break;
 
-        const elapsed = performance.now() - startTime;
-        if (elapsed >= (endTime - startTime)) {
+        const now = performance.now();
+        if (now >= endTime) {
           await reader.cancel();
           break;
         }
@@ -735,18 +883,21 @@ async function runDownloadTest(duration, onProgress) {
         const { done, value } = await reader.read();
         if (done) break;
         
-        if (!graceComplete && elapsed < graceTime) {
-          graceBytes += value.length;
-        } else {
-          if (!graceComplete) {
-            graceComplete = true;
+        allBytes += value.length;
+        
+        if (!warmUp.settled()) {
+          warmUp.record(value.length, now);
+          if (warmUp.settled()) {
+            // Warm-up just ended — reset measurement
             totalBytes = 0;
+            measureStartTime = now;
           }
+        } else {
           totalBytes += value.length;
         }
         
-        const elapsedSec = (performance.now() - startTime) / 1000;
-        const displayBytes = graceComplete ? totalBytes : graceBytes;
+        const elapsedSec = (now - startTime) / 1000;
+        const displayBytes = warmUp.settled() ? totalBytes : allBytes;
         onProgress(displayBytes, elapsedSec);
       }
     } finally {
@@ -790,8 +941,6 @@ async function runDownloadTest(duration, onProgress) {
               return;
             }
             if (e.status === 503) {
-              // Server overloaded (e.g. previous cancelled test still draining)
-              // Brief backoff then give up — retrying makes it worse
               await sleep(500);
               return;
             }
@@ -821,8 +970,10 @@ async function runDownloadTest(duration, onProgress) {
   
   await Promise.all(streamPromises);
   
-  const measuredElapsed = Math.min(performance.now(), endTime) - startTime;
-  const measureTime = Math.max(0.001, (measuredElapsed - graceTime) / 1000);
+  const overheadFactor = detectOverheadFactor();
+  const endNow = Math.min(performance.now(), endTime);
+  const actualMeasureStart = measureStartTime > 0 ? measureStartTime : startTime;
+  const measureTime = Math.max(0.001, (endNow - actualMeasureStart) / 1000);
   const avgSpeed = (totalBytes * 8 * overheadFactor) / measureTime / 1_000_000;
   
   if (totalBytes === 0 && sawNetworkError) {
@@ -836,16 +987,16 @@ async function runUploadTest(duration, onProgress) {
   const startTime = performance.now();
   const numStreams = resolveStreams();
   const chunkSize = resolveChunkSize();
-  const graceTime = 3000;
-  const overheadFactor = 1.06;
   const streamDelay = 200;
   const blobSize = Math.max(chunkSize, 4 * 1024 * 1024);
   const maxNetworkRetries = 2;
   const retryDelayMs = 250;
   let totalBytes = 0;
-  let graceBytes = 0;
-  let graceComplete = false;
+  let allBytes = 0;
   let sawNetworkError = false;
+  
+  const warmUp = createWarmUpDetector(duration * 1000);
+  let measureStartTime = 0;
   
   const chunks = [];
   for (let i = 0; i < blobSize; i += 65536) {
@@ -881,20 +1032,21 @@ async function runUploadTest(duration, onProgress) {
         }
         consecutiveErrors = 0;
         
-        const elapsed = performance.now() - startTime;
+        const now = performance.now();
+        allBytes += blobSize;
         
-        if (!graceComplete && elapsed < graceTime) {
-          graceBytes += blobSize;
-        } else {
-          if (!graceComplete) {
-            graceComplete = true;
+        if (!warmUp.settled()) {
+          warmUp.record(blobSize, now);
+          if (warmUp.settled()) {
             totalBytes = 0;
+            measureStartTime = now;
           }
+        } else {
           totalBytes += blobSize;
         }
         
-        const elapsedSec = (performance.now() - startTime) / 1000;
-        const displayBytes = graceComplete ? totalBytes : graceBytes;
+        const elapsedSec = (now - startTime) / 1000;
+        const displayBytes = warmUp.settled() ? totalBytes : allBytes;
         onProgress(displayBytes, elapsedSec);
         
       } catch (e) {
@@ -918,8 +1070,10 @@ async function runUploadTest(duration, onProgress) {
   }
   await Promise.all(streams);
   
-  const measuredElapsed = Math.min(performance.now(), endTime) - startTime;
-  const measureTime = Math.max(0.001, (measuredElapsed - graceTime) / 1000);
+  const overheadFactor = detectOverheadFactor();
+  const endNow = Math.min(performance.now(), endTime);
+  const actualMeasureStart = measureStartTime > 0 ? measureStartTime : startTime;
+  const measureTime = Math.max(0.001, (endNow - actualMeasureStart) / 1000);
   const avgSpeed = (totalBytes * 8 * overheadFactor) / measureTime / 1_000_000;
   
   if (totalBytes === 0 && sawNetworkError) {
@@ -1016,6 +1170,29 @@ function showResults() {
   elements.latencyResult.textContent = `${state.latencyResult.toFixed(1)} ms`;
   elements.jitterResult.textContent = `${state.jitterResult.toFixed(1)} ms`;
   
+  // Loaded latency: use the worse of download/upload loaded latency
+  const loadedLatency = Math.max(state.downloadLatency, state.uploadLatency);
+  if (elements.loadedLatencyResult) {
+    elements.loadedLatencyResult.textContent = loadedLatency > 0
+      ? `${loadedLatency.toFixed(1)} ms`
+      : '-';
+  }
+  
+  // Bufferbloat grade based on latency increase under load
+  if (elements.bufferbloatResult && state.latencyResult > 0 && loadedLatency > 0) {
+    const increase = loadedLatency - state.latencyResult;
+    let grade;
+    if (increase < 5) grade = 'A+';
+    else if (increase < 15) grade = 'A';
+    else if (increase < 30) grade = 'B';
+    else if (increase < 60) grade = 'C';
+    else if (increase < 150) grade = 'D';
+    else grade = 'F';
+    elements.bufferbloatResult.textContent = grade;
+  } else if (elements.bufferbloatResult) {
+    elements.bufferbloatResult.textContent = '-';
+  }
+  
   updateNetworkDisplay();
   
 }
@@ -1045,6 +1222,8 @@ function resetToIdle() {
   state.uploadResult = 0;
   state.latencyResult = 0;
   state.jitterResult = 0;
+  state.downloadLatency = 0;
+  state.uploadLatency = 0;
   
   resetProgress();
   showState('idle');

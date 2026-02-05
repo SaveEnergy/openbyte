@@ -149,8 +149,7 @@ Environment="PUBLIC_HOST=speedtest.example.com"
 Environment="PORT=8080"
 Environment="TCP_TEST_PORT=8081"
 Environment="UDP_TEST_PORT=8082"
-Environment="MAX_CONCURRENT_TESTS=20"
-Environment="MAX_CONCURRENT_PER_IP=10"
+Environment="CAPACITY_GBPS=25"
 Environment="RATE_LIMIT_PER_IP=100"
 Environment="GLOBAL_RATE_LIMIT=1000"
 Environment="TRUST_PROXY_HEADERS=true"
@@ -477,7 +476,7 @@ sudo chown -R openbyte:openbyte /opt/openbyte
 
 ### High CPU Usage
 
-- Reduce `MAX_CONCURRENT_TESTS`
+- Reduce `CAPACITY_GBPS` (HTTP concurrency scales with it)
 - Check for connection leaks
 - Monitor with `htop`
 

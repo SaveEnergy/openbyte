@@ -75,9 +75,7 @@ Uses BEREC-compliant measurement practices:
 | `SERVER_NAME` | OpenByte Server | Human-readable name |
 | `SERVER_LOCATION` | — | Geographic location |
 | `PUBLIC_HOST` | — | Public hostname/IP |
-| `CAPACITY_GBPS` | 25 | Maximum capacity |
-| `MAX_CONCURRENT_TESTS` | 10 | Maximum parallel tests |
-| `MAX_CONCURRENT_PER_IP` | 10 | Maximum active tests per client IP |
+| `CAPACITY_GBPS` | 25 | Server link capacity; HTTP concurrency limits auto-scale from this |
 | `RATE_LIMIT_PER_IP` | 100 | Rate limit per IP per minute |
 | `GLOBAL_RATE_LIMIT` | 1000 | Global rate limit per minute |
 | `TRUST_PROXY_HEADERS` | false | Trust proxy headers for client IP |

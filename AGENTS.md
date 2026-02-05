@@ -322,3 +322,38 @@
 - Add **A-only** record for `v4.<domain>` → server IPv4 address (no AAAA record).
 - Add **AAAA-only** record for `v6.<domain>` → server IPv6 address (no A record).
 - Traefik auto-issues Let's Encrypt certs once DNS propagates.
+
+## Speed Test Accuracy Improvements (2026-02-05)
+
+### Findings
+- Live speed display used raw 200ms interval values (noisy, erratic numbers).
+- Latency measurement included DNS/TLS cold-start pings inflating median and jitter.
+- No loaded latency / bufferbloat detection — only idle latency measured.
+- Fixed grace periods (1.5s download, 3s upload) wrong for both slow and fast connections.
+- Fixed 1.06 overhead factor assumed HTTP/1.1; HTTP/2 framing overhead is negligible.
+- Stream count options capped at 16; no guidance for gigabit+ links.
+
+### Actions
+- **EWMA smoothing**: live speed display uses exponentially weighted moving average (alpha=0.3, ~1s window). Final result still uses raw `totalBytes / elapsed`.
+- **Latency outlier filtering**: 24 samples (up from 20), discard first 2 warm-up pings, IQR-based outlier filter before computing median/jitter. `filterOutliersIQR()` shared by idle and loaded latency.
+- **Loaded latency / bufferbloat**: background ping loop (500ms interval) during download and upload phases via `startLoadedLatencyProbe()`. Results displayed as "Loaded Latency" + letter grade (A+ through F) based on latency increase under load.
+- **Dynamic warm-up**: `createWarmUpDetector()` tracks 500ms rolling throughput windows. Grace ends when last 3 windows vary < 15%. Hard cap at `min(duration * 0.3, 5s)`. Replaces fixed 1.5s/3s grace periods.
+- **Protocol-aware overhead**: `detectOverheadFactor()` uses Resource Timing API `nextHopProtocol`. Returns 1.0 for HTTP/2+, 1.02 for HTTP/1.1 (was hardcoded 1.06).
+- **Stream count options**: added 32-stream option; updated capacity estimates in dropdown.
+- HTML: added "Idle Latency", "Loaded Latency", and "Bufferbloat" result fields.
+
+## Capacity-Derived Concurrency Limits (2026-02-05)
+
+### Findings
+- `NewSpeedTestHandler(20)` was hardcoded; 32-stream users would get 503s.
+- `MAX_STREAMS` validation capped at 16; incompatible with new 32-stream UI option.
+- `MAX_CONCURRENT_TESTS` and `MAX_CONCURRENT_PER_IP` only affect TCP/UDP stream manager, not HTTP speed tests — misleading in docs.
+
+### Actions
+- Added `Config.MaxConcurrentHTTP()` → derives from `CapacityGbps`: `max(capacity * 8, 50)`. At 1 Gbps → 50; at 25 Gbps → 200.
+- `NewRouter` now accepts `*config.Config`; passes `MaxConcurrentHTTP()` to `NewSpeedTestHandler`.
+- Raised `MaxStreams` validation cap from 16 to 64; default from 16 to 32.
+- Removed `MAX_CONCURRENT_TESTS`, `MAX_CONCURRENT_PER_IP`, `MAX_STREAMS` from Dockerfile defaults and compose files (good defaults via config).
+- Removed from README env var table (still work as overrides, just not primary config surface).
+- Updated DEPLOYMENT.md and API.md to reference `CAPACITY_GBPS` for scaling guidance.
+- Added config unit tests for `MaxConcurrentHTTP()` and `MaxStreams` validation.

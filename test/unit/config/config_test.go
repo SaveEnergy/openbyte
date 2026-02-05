@@ -82,3 +82,39 @@ func TestConfigValidateMaxTestDurationPositive(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestMaxConcurrentHTTPScalesWithCapacity(t *testing.T) {
+	tests := []struct {
+		capacity int
+		wantMin  int
+	}{
+		{1, 50},   // floor
+		{5, 50},   // still floor
+		{10, 80},  // 10 * 8
+		{25, 200}, // 25 * 8
+	}
+	for _, tt := range tests {
+		cfg := config.DefaultConfig()
+		cfg.CapacityGbps = tt.capacity
+		got := cfg.MaxConcurrentHTTP()
+		if got != tt.wantMin {
+			t.Errorf("CapacityGbps=%d: MaxConcurrentHTTP()=%d, want %d", tt.capacity, got, tt.wantMin)
+		}
+	}
+}
+
+func TestMaxStreamsValidation(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.MaxStreams = 32
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("MaxStreams=32 should be valid: %v", err)
+	}
+	cfg.MaxStreams = 64
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("MaxStreams=64 should be valid: %v", err)
+	}
+	cfg.MaxStreams = 65
+	if err := cfg.Validate(); err == nil {
+		t.Fatalf("MaxStreams=65 should be invalid")
+	}
+}
