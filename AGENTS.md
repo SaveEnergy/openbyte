@@ -279,3 +279,13 @@
 - `completeStream` handles `json.Marshal`/`http.NewRequest` errors.
 - Removed unnecessary `string(jsonData)` copy in `startStream`.
 - `measureHTTPPing` HTTP client now has 10s timeout.
+
+## Proxy + Streaming Fixes (2026-02-05)
+
+### Findings
+- `GetServers` appended internal container port (`:8080`) to `api_endpoint` even behind reverse proxy, making health check URLs unreachable (e.g. `https://host:8080/health` instead of `https://host/health`).
+- Default `WriteTimeout` (15s) killed streaming download connections mid-transfer, causing `ERR_HTTP2_PROTOCOL_ERROR` through Traefik.
+
+### Actions
+- `GetServers` detects proxied requests via `X-Forwarded-Proto`/`X-Forwarded-For`/`PublicHost`; skips internal port in `api_endpoint` when proxied.
+- Changed default `WriteTimeout` to 0 (disabled); streaming endpoints manage own duration; `IdleTimeout` + `ReadTimeout` still protect against stuck connections.

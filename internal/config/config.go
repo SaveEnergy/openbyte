@@ -84,7 +84,7 @@ func DefaultConfig() *Config {
 		TCPBufferSize:         64 * 1024,
 		UDPBufferSize:         1500,
 		ReadTimeout:           15 * time.Second,
-		WriteTimeout:          15 * time.Second,
+		WriteTimeout:          0, // disabled; streaming endpoints manage own duration
 		IdleTimeout:           60 * time.Second,
 		PprofEnabled:          false,
 		PprofAddress:          "127.0.0.1:6060",

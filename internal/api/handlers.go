@@ -199,9 +199,14 @@ func (h *Handler) GetServers(w http.ResponseWriter, r *http.Request) {
 		activeTests = h.manager.ActiveCount()
 	}
 
-	apiEndpoint := requestScheme(r) + "://" + host
-	if h.config != nil && h.config.Port != "80" {
-		apiEndpoint += ":" + h.config.Port
+	scheme := requestScheme(r)
+	isProxied := r.Header.Get("X-Forwarded-Proto") != "" || r.Header.Get("X-Forwarded-For") != "" ||
+		(h.config != nil && h.config.PublicHost != "")
+	apiEndpoint := scheme + "://" + host
+	if h.config != nil && !isProxied {
+		if (scheme == "http" && h.config.Port != "80") || (scheme == "https" && h.config.Port != "443") {
+			apiEndpoint += ":" + h.config.Port
+		}
 	}
 
 	resp := ServersResponse{
