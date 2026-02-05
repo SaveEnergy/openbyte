@@ -20,10 +20,8 @@ const state = {
     serverUrl: ''
   },
   networkInfo: {
-    ipv6: false,
-    ipv6Capable: null,
-    ipv6IP: null,
-    clientIP: null
+    ipv4: null,
+    ipv6: null
   }
 };
 
@@ -41,8 +39,8 @@ const elements = {
   latencyResult: document.getElementById('latencyResult'),
   jitterResult: document.getElementById('jitterResult'),
   serverName: document.getElementById('serverName'),
+  networkIPv4: document.getElementById('networkIPv4'),
   networkIPv6: document.getElementById('networkIPv6'),
-  networkIP: document.getElementById('networkIP'),
   restartBtn: document.getElementById('restartBtn'),
   cancelBtn: document.getElementById('cancelBtn'),
   serverInfo: document.getElementById('serverInfo'),
@@ -156,71 +154,46 @@ function saveSettings() {
 }
 
 function detectNetworkInfo() {
-  fetch(`${apiBase}/ping`)
+  // Main ping — captures whichever address family the browser chose
+  const mainPing = fetch(`${apiBase}/ping`)
     .then(res => res.json())
     .then(data => {
       if (data.client_ip) {
-        state.networkInfo.clientIP = data.client_ip;
-        state.networkInfo.ipv6 = data.ipv6 || false;
-        
-        if (elements.networkIP) {
-          elements.networkIP.textContent = data.client_ip;
+        if (data.ipv6) {
+          state.networkInfo.ipv6 = data.client_ip;
+        } else {
+          state.networkInfo.ipv4 = data.client_ip;
         }
       }
     })
-    .catch(() => {
-      state.networkInfo.ipv6 = false;
-      if (elements.networkIP) {
-        elements.networkIP.textContent = 'Unknown';
-      }
-    })
-    .finally(() => {
-      detectIPv6Capability();
-    });
-}
+    .catch(() => {});
 
-// Probe v6. subdomain (AAAA-only) to detect client IPv6 reachability
-function detectIPv6Capability() {
+  // IPv6 probe — AAAA-only subdomain forces IPv6
   const hostname = window.location.hostname;
-  if (!hostname || hostname === 'localhost' || hostname.startsWith('v6.') || hostname.match(/^\d/)) {
-    updateIPv6Display();
-    return;
-  }
-  
-  const v6Url = `${window.location.protocol}//v6.${hostname}/api/v1/ping`;
-  
-  fetch(v6Url, { cache: 'no-store', credentials: 'omit', mode: 'cors' })
-    .then(res => res.ok ? res.json() : Promise.reject())
-    .then(data => {
-      if (data.ipv6 && data.client_ip) {
-        state.networkInfo.ipv6Capable = true;
-        state.networkInfo.ipv6IP = data.client_ip;
-      } else {
-        state.networkInfo.ipv6Capable = false;
-      }
-    })
-    .catch(() => {
-      state.networkInfo.ipv6Capable = false;
-    })
-    .finally(() => {
-      updateIPv6Display();
-    });
+  const canProbeV6 = hostname && hostname !== 'localhost' &&
+    !hostname.startsWith('v6.') && !hostname.match(/^\d/);
+
+  const v6Ping = canProbeV6
+    ? fetch(`${window.location.protocol}//v6.${hostname}/api/v1/ping`,
+        { cache: 'no-store', credentials: 'omit', mode: 'cors' })
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(data => {
+          if (data.ipv6 && data.client_ip) {
+            state.networkInfo.ipv6 = data.client_ip;
+          }
+        })
+        .catch(() => {})
+    : Promise.resolve();
+
+  Promise.allSettled([mainPing, v6Ping]).then(() => updateNetworkDisplay());
 }
 
-function updateIPv6Display() {
-  if (!elements.networkIPv6) return;
-  
-  if (state.networkInfo.ipv6) {
-    elements.networkIPv6.textContent = 'Yes';
-  } else if (state.networkInfo.ipv6Capable && state.networkInfo.ipv6IP) {
-    elements.networkIPv6.textContent = state.networkInfo.ipv6IP;
-    elements.networkIPv6.title = 'IPv6 supported but browser connected via IPv4';
-  } else if (state.networkInfo.ipv6Capable) {
-    elements.networkIPv6.textContent = 'Supported';
-  } else if (state.networkInfo.ipv6Capable === false) {
-    elements.networkIPv6.textContent = 'No';
-  } else {
-    elements.networkIPv6.textContent = '-';
+function updateNetworkDisplay() {
+  if (elements.networkIPv4) {
+    elements.networkIPv4.textContent = state.networkInfo.ipv4 || '-';
+  }
+  if (elements.networkIPv6) {
+    elements.networkIPv6.textContent = state.networkInfo.ipv6 || '-';
   }
 }
 
@@ -659,12 +632,12 @@ async function measureLatency() {
         try {
           const data = await res.json();
           if (data.client_ip) {
-            state.networkInfo.clientIP = data.client_ip;
-            state.networkInfo.ipv6 = data.ipv6 || false;
-            if (elements.networkIP) {
-              elements.networkIP.textContent = data.client_ip;
+            if (data.ipv6) {
+              state.networkInfo.ipv6 = data.client_ip;
+            } else {
+              state.networkInfo.ipv4 = data.client_ip;
             }
-            updateIPv6Display();
+            updateNetworkDisplay();
           }
           capturedIP = true;
         } catch (_) {
@@ -1029,7 +1002,7 @@ function showResults() {
   elements.latencyResult.textContent = `${state.latencyResult.toFixed(1)} ms`;
   elements.jitterResult.textContent = `${state.jitterResult.toFixed(1)} ms`;
   
-  updateIPv6Display();
+  updateNetworkDisplay();
   
 }
 
