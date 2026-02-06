@@ -50,7 +50,9 @@ type Config struct {
 	WebSocketPingInterval time.Duration
 	MetricsUpdateInterval time.Duration
 
-	WebRoot string
+	WebRoot          string
+	DataDir          string
+	MaxStoredResults int
 
 	RegistryEnabled  bool
 	RegistryURL      string
@@ -98,7 +100,9 @@ func DefaultConfig() *Config {
 		TestRetentionPeriod:   1 * time.Hour,
 		WebSocketPingInterval: 30 * time.Second,
 		MetricsUpdateInterval: 1 * time.Second,
-		WebRoot:               "./web",
+		WebRoot:               "",
+		DataDir:               "./data",
+		MaxStoredResults:      10000,
 		RegistryEnabled:       false,
 		RegistryURL:           "",
 		RegistryAPIKey:        "",
@@ -120,14 +124,18 @@ func (c *Config) LoadFromEnv() error {
 	}
 
 	if port := os.Getenv("TCP_TEST_PORT"); port != "" {
-		if p, err := strconv.Atoi(port); err == nil {
-			c.TCPTestPort = p
+		p, err := strconv.Atoi(port)
+		if err != nil {
+			return fmt.Errorf("invalid TCP_TEST_PORT %q: %w", port, err)
 		}
+		c.TCPTestPort = p
 	}
 	if port := os.Getenv("UDP_TEST_PORT"); port != "" {
-		if p, err := strconv.Atoi(port); err == nil {
-			c.UDPTestPort = p
+		p, err := strconv.Atoi(port)
+		if err != nil {
+			return fmt.Errorf("invalid UDP_TEST_PORT %q: %w", port, err)
 		}
+		c.UDPTestPort = p
 	}
 
 	if id := os.Getenv("SERVER_ID"); id != "" {
@@ -146,20 +154,26 @@ func (c *Config) LoadFromEnv() error {
 		c.PublicHost = host
 	}
 	if cap := os.Getenv("CAPACITY_GBPS"); cap != "" {
-		if g, err := strconv.Atoi(cap); err == nil && g > 0 {
-			c.CapacityGbps = g
+		g, err := strconv.Atoi(cap)
+		if err != nil || g <= 0 {
+			return fmt.Errorf("invalid CAPACITY_GBPS %q: must be a positive integer", cap)
 		}
+		c.CapacityGbps = g
 	}
 
 	if max := os.Getenv("MAX_CONCURRENT_TESTS"); max != "" {
-		if m, err := strconv.Atoi(max); err == nil && m > 0 {
-			c.MaxConcurrentTests = m
+		m, err := strconv.Atoi(max)
+		if err != nil || m <= 0 {
+			return fmt.Errorf("invalid MAX_CONCURRENT_TESTS %q: must be a positive integer", max)
 		}
+		c.MaxConcurrentTests = m
 	}
 	if max := os.Getenv("MAX_STREAMS"); max != "" {
-		if m, err := strconv.Atoi(max); err == nil && m > 0 && m <= 64 {
-			c.MaxStreams = m
+		m, err := strconv.Atoi(max)
+		if err != nil || m <= 0 || m > 64 {
+			return fmt.Errorf("invalid MAX_STREAMS %q: must be 1-64", max)
 		}
+		c.MaxStreams = m
 	}
 
 	if enabled := os.Getenv("PPROF_ENABLED"); enabled == "true" || enabled == "1" {
@@ -169,25 +183,33 @@ func (c *Config) LoadFromEnv() error {
 		c.PprofAddress = addr
 	}
 	if interval := os.Getenv("PERF_STATS_INTERVAL"); interval != "" {
-		if d, err := time.ParseDuration(interval); err == nil && d > 0 {
-			c.PerfStatsInterval = d
+		d, err := time.ParseDuration(interval)
+		if err != nil || d <= 0 {
+			return fmt.Errorf("invalid PERF_STATS_INTERVAL %q: must be a positive duration (e.g. 10s)", interval)
 		}
+		c.PerfStatsInterval = d
 	}
 
 	if limit := os.Getenv("RATE_LIMIT_PER_IP"); limit != "" {
-		if l, err := strconv.Atoi(limit); err == nil && l > 0 {
-			c.RateLimitPerIP = l
+		l, err := strconv.Atoi(limit)
+		if err != nil || l <= 0 {
+			return fmt.Errorf("invalid RATE_LIMIT_PER_IP %q: must be a positive integer", limit)
 		}
+		c.RateLimitPerIP = l
 	}
 	if limit := os.Getenv("GLOBAL_RATE_LIMIT"); limit != "" {
-		if l, err := strconv.Atoi(limit); err == nil && l > 0 {
-			c.GlobalRateLimit = l
+		l, err := strconv.Atoi(limit)
+		if err != nil || l <= 0 {
+			return fmt.Errorf("invalid GLOBAL_RATE_LIMIT %q: must be a positive integer", limit)
 		}
+		c.GlobalRateLimit = l
 	}
 	if limit := os.Getenv("MAX_CONCURRENT_PER_IP"); limit != "" {
-		if l, err := strconv.Atoi(limit); err == nil && l > 0 {
-			c.MaxConcurrentPerIP = l
+		l, err := strconv.Atoi(limit)
+		if err != nil || l <= 0 {
+			return fmt.Errorf("invalid MAX_CONCURRENT_PER_IP %q: must be a positive integer", limit)
 		}
+		c.MaxConcurrentPerIP = l
 	}
 	if trust := os.Getenv("TRUST_PROXY_HEADERS"); trust == "true" || trust == "1" {
 		c.TrustProxyHeaders = true
@@ -214,6 +236,16 @@ func (c *Config) LoadFromEnv() error {
 	}
 	if webRoot := os.Getenv("WEB_ROOT"); webRoot != "" {
 		c.WebRoot = webRoot
+	}
+	if dataDir := os.Getenv("DATA_DIR"); dataDir != "" {
+		c.DataDir = dataDir
+	}
+	if max := os.Getenv("MAX_STORED_RESULTS"); max != "" {
+		m, err := strconv.Atoi(max)
+		if err != nil || m <= 0 {
+			return fmt.Errorf("invalid MAX_STORED_RESULTS %q: must be a positive integer", max)
+		}
+		c.MaxStoredResults = m
 	}
 
 	if enabled := os.Getenv("REGISTRY_ENABLED"); enabled == "true" || enabled == "1" {
@@ -278,9 +310,7 @@ func (c *Config) Validate() error {
 	if c.PprofEnabled && c.PprofAddress == "" {
 		return fmt.Errorf("pprof address cannot be empty when enabled")
 	}
-	if c.WebRoot == "" {
-		return fmt.Errorf("web root cannot be empty")
-	}
+	// WebRoot empty means use embedded assets; no validation needed
 	if c.RateLimitPerIP <= 0 {
 		return fmt.Errorf("rate limit per IP must be > 0")
 	}
@@ -289,6 +319,12 @@ func (c *Config) Validate() error {
 	}
 	if c.GlobalRateLimit < c.RateLimitPerIP {
 		return fmt.Errorf("global rate limit must be >= rate limit per IP")
+	}
+	if c.DataDir == "" {
+		return fmt.Errorf("data directory cannot be empty")
+	}
+	if c.MaxStoredResults <= 0 {
+		return fmt.Errorf("max stored results must be > 0")
 	}
 	if c.TrustProxyHeaders && len(c.TrustedProxyCIDRs) > 0 {
 		for _, entry := range c.TrustedProxyCIDRs {

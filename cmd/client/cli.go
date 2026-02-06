@@ -22,8 +22,8 @@ func parseFlags(args []string, version string) (*Config, map[string]bool, int, e
 	flagSet.StringVar(&config.Direction, "d", "", "Direction: download, upload, bidirectional (short)")
 	flagSet.IntVar(&config.Duration, "duration", 0, "Test duration in seconds (1-300)")
 	flagSet.IntVar(&config.Duration, "t", 0, "Test duration in seconds (1-300) (short)")
-	flagSet.IntVar(&config.Streams, "streams", 0, "Parallel streams (1-16)")
-	flagSet.IntVar(&config.Streams, "s", 0, "Parallel streams (1-16) (short)")
+	flagSet.IntVar(&config.Streams, "streams", 0, "Parallel streams (1-64)")
+	flagSet.IntVar(&config.Streams, "s", 0, "Parallel streams (1-64) (short)")
 	flagSet.IntVar(&config.PacketSize, "packet-size", 0, "Packet size in bytes (64-9000)")
 	flagSet.IntVar(&config.ChunkSize, "chunk-size", 0, "HTTP chunk size in bytes (65536-4194304)")
 	flagSet.BoolVar(&config.JSON, "json", false, "Output results as JSON")
@@ -271,9 +271,9 @@ func validateConfig(config *Config) error {
 			"Use: openbyte client -t 30  (for 30 seconds)\n"+
 			"See: openbyte client --help", config.Duration)
 	}
-	if config.Streams < 1 || config.Streams > 16 {
+	if config.Streams < 1 || config.Streams > 64 {
 		return fmt.Errorf("invalid streams: %d\n\n"+
-			"Streams must be between 1 and 16.\n"+
+			"Streams must be between 1 and 64.\n"+
 			"Use: openbyte client -s 4  (for 4 parallel streams)\n"+
 			"See: openbyte client --help", config.Streams)
 	}
@@ -317,7 +317,7 @@ Flags:
   -p, --protocol string   Protocol: tcp, udp, http (default: tcp)
   -d, --direction string  Direction: download, upload, bidirectional (default: download)
   -t, --duration int      Test duration in seconds (1-300) (default: 30)
-  -s, --streams int       Parallel streams (1-16) (default: 4)
+  -s, --streams int       Parallel streams (1-64) (default: 4)
   --packet-size int       Packet size in bytes (64-9000) (default: 1500)
   --chunk-size int        HTTP chunk size in bytes (65536-4194304) (default: 1048576)
   --json                  Output results as JSON
@@ -341,7 +341,7 @@ Environment variables:
   OBYTE_PROTOCOL          Protocol (tcp, udp, http)
   OBYTE_DIRECTION         Direction (download, upload, bidirectional)
   OBYTE_DURATION          Test duration in seconds
-  OBYTE_STREAMS           Parallel streams (1-16)
+  OBYTE_STREAMS           Parallel streams (1-64)
   OBYTE_PACKET_SIZE       Packet size in bytes
   OBYTE_CHUNK_SIZE        HTTP chunk size in bytes
   OBYTE_TIMEOUT           Request timeout in seconds

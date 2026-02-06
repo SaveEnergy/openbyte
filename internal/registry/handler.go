@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 
@@ -44,10 +45,13 @@ func (h *Handler) authenticate(r *http.Request) bool {
 	}
 
 	if len(auth) > 7 && auth[:7] == "Bearer " {
-		return auth[7:] == h.apiKey
+		return subtle.ConstantTimeCompare([]byte(auth[7:]), []byte(h.apiKey)) == 1
 	}
 	return false
 }
+
+// maxRegistryBodySize limits JSON request bodies for registry endpoints.
+const maxRegistryBodySize = 1024 * 64 // 64 KB
 
 func (h *Handler) ListServers(w http.ResponseWriter, r *http.Request) {
 	healthy := r.URL.Query().Get("healthy") == "true"
@@ -60,10 +64,12 @@ func (h *Handler) ListServers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"servers": servers,
 		"count":   len(servers),
-	})
+	}); err != nil {
+		h.logger.Warn("encode list response", logging.Field{Key: "error", Value: err})
+	}
 }
 
 func (h *Handler) GetServer(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +83,9 @@ func (h *Handler) GetServer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(server)
+	if err := json.NewEncoder(w).Encode(server); err != nil {
+		h.logger.Warn("encode server response", logging.Field{Key: "error", Value: err})
+	}
 }
 
 func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
@@ -86,6 +94,7 @@ func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxRegistryBodySize)
 	var info ServerInfo
 	if err := json.NewDecoder(r.Body).Decode(&info); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -104,10 +113,12 @@ func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":    "registered",
 		"server_id": info.ID,
-	})
+	}); err != nil {
+		h.logger.Warn("encode register response", logging.Field{Key: "error", Value: err})
+	}
 }
 
 func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
@@ -119,6 +130,7 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxRegistryBodySize)
 	var info ServerInfo
 	if err := json.NewDecoder(r.Body).Decode(&info); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -133,10 +145,12 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":    "updated",
 		"server_id": id,
-	})
+	}); err != nil {
+		h.logger.Warn("encode update response", logging.Field{Key: "error", Value: err})
+	}
 }
 
 func (h *Handler) DeregisterServer(w http.ResponseWriter, r *http.Request) {
@@ -156,16 +170,20 @@ func (h *Handler) DeregisterServer(w http.ResponseWriter, r *http.Request) {
 	h.logger.Info("Server deregistered", logging.Field{Key: "id", Value: id})
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":    "deregistered",
 		"server_id": id,
-	})
+	}); err != nil {
+		h.logger.Warn("encode deregister response", logging.Field{Key: "error", Value: err})
+	}
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":  "healthy",
 		"servers": h.service.Count(),
-	})
+	}); err != nil {
+		h.logger.Warn("encode health response", logging.Field{Key: "error", Value: err})
+	}
 }

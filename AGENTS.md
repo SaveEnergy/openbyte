@@ -357,3 +357,181 @@
 - Removed from README env var table (still work as overrides, just not primary config surface).
 - Updated DEPLOYMENT.md and API.md to reference `CAPACITY_GBPS` for scaling guidance.
 - Added config unit tests for `MaxConcurrentHTTP()` and `MaxStreams` validation.
+
+## SQLite Result Storage + Share Button (2026-02-05)
+
+### Findings
+- No persistence for test results; users couldn't share or revisit results.
+- Docker builds use `CGO_ENABLED=0` — need pure Go SQLite driver.
+
+### Decisions
+- `modernc.org/sqlite` (pure Go, no CGO) for cross-compilation compatibility.
+- 8-char base62 IDs via `crypto/rand` for short, URL-safe result links.
+- 90-day retention + configurable max count (default 10,000) with hourly cleanup.
+- Results saved automatically on test completion; share button copies URL to clipboard.
+- Shared results page (`/results/{id}`) serves static HTML that fetches data via API.
+
+### Actions
+- Created `internal/results/store.go` — SQLite storage with migration, save, get, cleanup loop.
+- Created `internal/results/handler.go` — POST/GET handlers with validation.
+- Created `web/results.html` — shared result viewer matching existing UI style.
+- Added `DataDir` + `MaxStoredResults` to config with env support (`DATA_DIR`, `MAX_STORED_RESULTS`).
+- Wired results store + handler into router and server main; cleanup on shutdown.
+- Added share button to `web/index.html`; auto-save logic + clipboard share in `web/app.js`.
+- Styled share button in `web/style.css`.
+- Added `DATA_DIR` env + `/app/data` volume to Dockerfile and all compose files.
+- Added `data/` and `*.db` to `.gitignore`.
+- Added unit tests: store CRUD, trim-to-max, handler validation, round-trip.
+- Full test suite passes with race detection.
+
+## Improvement Round 1 (2026-02-05)
+
+### Findings
+- `validateConfig` hardcoded stream limit to 16; config allows up to 64.
+- JSON encode errors silently ignored in results handler and speedtest handlers.
+- Config `Validate()` missing checks for `DataDir` and `MaxStoredResults`.
+- SQLite store missing `db.Ping()` health check on open.
+- Bufferbloat grade calculation duplicated in `showResults()` and `saveAndEnableShare()`.
+- Missing OG/description meta tags on both HTML pages.
+- Share button missing `:focus-visible` styles; external links missing `rel="noopener"`.
+- Invalid `closed` attribute on `<dialog>` element.
+- Results page error/loading views using inline styles.
+- Unsafe type assertions (`sync.Pool.Get()`) in collector and client engine could panic.
+
+### Actions
+- `validateConfig` now uses `h.config.MaxStreams` instead of hardcoded 16.
+- Added `json.Encode` error logging in results handler (`Save`, `Get`) and speedtest (`Upload`, `Ping`).
+- Added `DataDir` and `MaxStoredResults` validation to `config.Validate()`.
+- Added `db.Ping()` health check in `results.New()`.
+- Extracted `computeBufferbloatGrade()` utility function in `app.js`; used in both `showResults` and `saveAndEnableShare`.
+- Added `<meta name="description">`, `og:title`, `og:description`, `og:type` to `index.html` and `results.html`.
+- Added `:focus-visible` styles for `.share-btn` and `.restart-btn`; `rel="noopener noreferrer"` on external links.
+- Removed invalid `closed` attribute from `<dialog>`.
+- Moved results page inline styles to CSS classes (`.error-view`, `.error-code`, `.error-message`, `.loading-text`, `.btn-link`).
+- Added ARIA `role="status" aria-live="polite"` to results loading view.
+- Fixed unsafe `sync.Pool` type assertions in `collector.go` and `engine.go` — safe assertion with fallback allocation.
+
+## Improvement Round 2 (2026-02-05)
+
+### Findings
+- CLI stream validation hardcoded to max 16; server allows 64.
+- `API.md` missing `/api/v1/results` endpoint docs.
+- `README.md` missing `DATA_DIR` and `MAX_STORED_RESULTS` env vars.
+- `DEPLOYMENT.md` systemd example missing `DATA_DIR`.
+- `download.html` missing meta tags and `rel="noopener"` on external links.
+- Missing unit tests for config `DataDir`/`MaxStoredResults` validation and handler stream limit.
+
+### Actions
+- Updated CLI stream limit from 16 to 64 in `cli.go` (flags, validation, help text, env docs) and `config.go`.
+- Added full saved results API section to `API.md` (POST, GET, page route).
+- Added `DATA_DIR` and `MAX_STORED_RESULTS` to `README.md` env table.
+- Added `DATA_DIR` to `DEPLOYMENT.md` systemd service example.
+- Added meta tags (`description`, `og:title`, `og:description`, `og:type`) and `rel="noopener noreferrer"` to `download.html`.
+- Added `TestDataDirValidation`, `TestMaxStoredResultsValidation` to config tests.
+- Added `TestStartStreamRespectsMaxStreams` to handler tests — verifies dynamic stream limit from config.
+
+## Improvement Round 3 (2026-02-05)
+
+### Findings
+- Dynamically created `<a>` elements in `download.html` missing `rel="noopener noreferrer"`.
+- Results store `Save()` didn't handle unique ID collisions; INSERT would fail on rare duplicates.
+- `validateConfig` fallback `maxStreams` was still 16 instead of 32 (matching default config).
+- Results handler `Save()` missing `Content-Type: application/json` validation.
+- Stale "1-16" stream references in `API.md`, `README.md`, and `ARCHITECTURE.md`.
+
+### Actions
+- Added `rel="noopener noreferrer"` to all dynamically created download links (3 locations).
+- Added retry loop (max 5 attempts) to `Store.Save()` on UNIQUE constraint violations.
+- Updated `maxStreams` fallback from 16 to 32 in `validateConfig`.
+- Added `Content-Type` validation to results handler `Save()` — returns 415 on non-JSON.
+- Updated stream limit references from "1-16" to "1-64" in `API.md`, `README.md`, `ARCHITECTURE.md`.
+
+## Download Page Redesign (2026-02-05)
+
+### Findings
+- Download page was barebones — three cards with architecture links, no version info, no file sizes, no platform detection, no install instructions.
+
+### Actions
+- Redesigned `web/download.html` with:
+  - Auto-detected platform recommendation (OS + architecture via WebGL renderer for Apple Silicon).
+  - Prominent primary download button with file size.
+  - Alternate architecture link.
+  - Version tag + release date from GitHub API.
+  - Quick Install section with tabbed commands (curl/docker for Linux/macOS, powershell/docker for Windows).
+  - All Platforms grid with file sizes per asset.
+  - Docker section with copy-to-clipboard.
+- Updated `web/style.css` with new download page component styles (recommended card, primary button, install tabs, code blocks, asset rows, copy buttons, docker card).
+
+## Embedded Web Assets (2026-02-05)
+
+### Findings
+- Web assets (~50KB) were served from disk via `http.Dir`; required bundling `web/` in releases and Docker images.
+- `WEB_ROOT` env var defaulted to `./web`, causing "directory not found" errors in single-binary deployments.
+
+### Decisions
+- Use `//go:embed` in `web/embed.go` to bake all static assets into the binary.
+- Router defaults to embedded `http.FS(web.Assets)`; `WEB_ROOT` env overrides to disk for dev.
+- `results.html` served via `http.ServeContent` from the resolved FS.
+
+### Actions
+- Created `web/embed.go` with `//go:embed *.html *.css *.js`.
+- Updated `internal/api/router.go`: replaced `http.Dir(webRoot)` with `resolveWebFS()` (embedded default, disk override).
+- Updated `internal/config/config.go`: `WebRoot` default now empty (embedded); removed empty-string validation.
+- Removed `COPY web/ /app/web/` from `docker/Dockerfile` (web/ still copied to build stage for embed).
+- Removed `cp -R web "$out/web"` from `.github/workflows/release.yml`.
+- Removed `WEB_ROOT` env from all Docker Compose files.
+- Updated `README.md`, `DEPLOYMENT.md`, `web/download.html` to reflect embedded assets.
+- Removed `WEB_ROOT=./web` from `playwright.config.js`.
+
+## Improvement Round 4 (2026-02-06)
+
+### Findings
+- Unsafe `sync.Pool` type assertions in `engine.go` (bidirectional) and `http_engine.go` (download) — panic risk.
+- UDP sender `copy` panics if `UDPBufferSize > randomDataSize` — no bounds check.
+- Registry handler: API key compared with `==` (timing attack); no body size limits; all `json.Encode` return values silently dropped.
+- TOCTOU race on `activeDownloads`/`activeUploads` counter — check-then-increment allows exceeding max by 1.
+- Router `results.html` handler: `f.Stat()` error unchecked — nil stat dereference panic.
+- `HealthCheck` `w.Write` error unchecked.
+- Mixed `log.Printf` + `logging.Error` in server shutdown.
+- `JSONFormatter` drops encode errors.
+- `randomData` init failure logged to no-one.
+- Dead code: RTC rate-limit skip paths, streamID fallback, unused `saveConfigFile`.
+- Deprecated `version: '3.8'` in compose files.
+
+### Actions
+- Safe pool assertions with fallback in `engine.go` (bidirectional goroutines) and `http_engine.go`.
+- Added bounds check in `udpSender` for `UDPBufferSize > randomDataSize`.
+- Registry: `subtle.ConstantTimeCompare` for API key auth; `MaxBytesReader(64KB)` on register/update; all `json.Encode` calls checked+logged.
+- Atomically increment-then-check for download/upload concurrency (eliminates TOCTOU).
+- Router: `f.Stat()` error checked, returns 404 on failure.
+- `HealthCheck` write error logged.
+- Removed duplicate `log.Printf` from server shutdown; removed unused `log` import.
+- `JSONFormatter.FormatComplete` now logs encode errors.
+- `randomData` init failure now logged with warning.
+- Removed dead `rtc/offer`, `rtc/ice` rate-limit skip paths.
+- Removed dead `streamID` fallback in `StartStream`.
+- Removed unused `saveConfigFile` from client config.
+- Removed deprecated `version: '3.8'` from `docker-compose.yaml`, `docker-compose.traefik.yaml`, `docker-compose.multi.yaml`.
+
+### Deferred
+- `ServerInfo` dedup across `api` and `registry` packages — requires shared types package, skip for now.
+- CLI HTTP engine hardcoded overhead/grace — separate improvement scope.
+- Registry API documentation in `API.md` — follow-up.
+- UDP single-threaded read loop — architectural change, separate scope.
+
+## Improvement Round 5 (2026-02-06)
+
+### Findings
+- Alpine 3.19 in Dockerfile reached EOL (Nov 2025).
+- Makefile `perf-bench` target pointed to old paths (`./internal/*`) after test relocation.
+- SQLite `MaxOpenConns(1)` serializes all DB access; WAL mode supports concurrent readers.
+- Stats goroutine in `perf.go` had no stop channel — leaked on server shutdown.
+- `LoadFromEnv` silently ignored invalid numeric env vars (TCP_TEST_PORT, CAPACITY_GBPS, rate limits, etc.).
+
+### Actions
+- Bumped Alpine from 3.19 to 3.21 in Dockerfile (both server and client stages).
+- Fixed Makefile `perf-bench` paths to `./test/unit/*`; changed `-run Test` to `-run ^$$` to skip tests.
+- Increased SQLite `MaxOpenConns` to 3, `MaxIdleConns` to 2 for WAL concurrent reads.
+- `startRuntimeStatsLogger` now returns a stop function; called during shutdown.
+- `LoadFromEnv` now returns errors for invalid TCP_TEST_PORT, UDP_TEST_PORT, CAPACITY_GBPS, MAX_CONCURRENT_TESTS, MAX_STREAMS, RATE_LIMIT_PER_IP, GLOBAL_RATE_LIMIT, MAX_CONCURRENT_PER_IP, PERF_STATS_INTERVAL, MAX_STORED_RESULTS.
+- Updated config tests to expect errors for invalid env values.

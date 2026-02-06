@@ -141,9 +141,6 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	streamID := state.Config.ID
-	if streamID == "" {
-		streamID = config.ID
-	}
 	wsURL := "/api/v1/stream/" + streamID + "/stream"
 
 	resp := StartStreamResponse{
@@ -362,8 +359,13 @@ func (h *Handler) validateConfig(req StartStreamRequest, clientIP string) (types
 			fmt.Sprintf("duration must be 1-%d seconds", maxDurationSec), nil)
 	}
 
-	if req.Streams < 1 || req.Streams > 16 {
-		return types.StreamConfig{}, errors.ErrInvalidConfig("streams must be 1-16", nil)
+	maxStreams := 32
+	if h.config != nil && h.config.MaxStreams > 0 {
+		maxStreams = h.config.MaxStreams
+	}
+	if req.Streams < 1 || req.Streams > maxStreams {
+		return types.StreamConfig{}, errors.ErrInvalidConfig(
+			fmt.Sprintf("streams must be 1-%d", maxStreams), nil)
 	}
 
 	packetSize := req.PacketSize

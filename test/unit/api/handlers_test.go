@@ -75,3 +75,41 @@ func TestStartStreamRespectsMaxTestDuration(t *testing.T) {
 		t.Fatalf("duration beyond max: status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }
+
+func TestStartStreamRespectsMaxStreams(t *testing.T) {
+	mgr := stream.NewManager(10, 10)
+	mgr.Start()
+	defer mgr.Stop()
+
+	handler := api.NewHandler(mgr)
+	cfg := config.DefaultConfig()
+	cfg.MaxStreams = 32
+	handler.SetConfig(cfg)
+
+	// 32 streams should succeed
+	payload := map[string]interface{}{
+		"protocol":  "tcp",
+		"direction": "download",
+		"duration":  10,
+		"streams":   32,
+	}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	handler.StartStream(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("32 streams with MaxStreams=32: status = %d, want %d; body: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	// 33 streams should be rejected
+	payload["streams"] = 33
+	body, _ = json.Marshal(payload)
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
+	rec = httptest.NewRecorder()
+	handler.StartStream(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("33 streams with MaxStreams=32: status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}

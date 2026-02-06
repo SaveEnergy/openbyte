@@ -15,7 +15,9 @@ func (f *JSONFormatter) FormatProgress(progress, elapsed, remaining float64) {}
 func (f *JSONFormatter) FormatMetrics(metrics *types.Metrics) {}
 
 func (f *JSONFormatter) FormatComplete(results *StreamResults) {
-	json.NewEncoder(f.writer).Encode(results)
+	if err := json.NewEncoder(f.writer).Encode(results); err != nil {
+		fmt.Fprintf(os.Stderr, "openbyte client: error encoding JSON: %v\n", err)
+	}
 }
 
 func (f *JSONFormatter) FormatError(err error) {

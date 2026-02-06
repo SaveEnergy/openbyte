@@ -40,7 +40,6 @@ jobs:
             mkdir -p "$out"
 
             GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "$out/openbyte${ext}" ./cmd/openbyte
-            cp -R web "$out/web"
 
             if [ "$os" = "windows" ]; then
               (cd "$out" && zip -r "../openbyte_${VERSION}_${os}_${arch}.zip" .)

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="openByte speed test result — download, upload, latency, and bufferbloat.">
+  <meta property="og:title" content="openByte — Speed Test Result">
+  <meta property="og:description" content="See this internet speed test result on openByte.">
+  <meta property="og:type" content="website">
+  <title>openByte — Shared Result</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="results-view">
+  <div class="app">
+    <header class="header">
+      <div class="brand">
+        <a href="/" style="text-decoration:none"><div class="logo">open<span class="logo-accent">Byte</span></div></a>
+        <div class="server-name" id="serverName">Shared Result</div>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="speed-section" id="resultView">
+        <div class="results-main" id="resultsMain">
+          <div class="result-card result-primary">
+            <div class="result-icon">↓</div>
+            <div class="result-value" id="downloadResult">-</div>
+            <div class="result-label">Download</div>
+            <div class="result-unit">Mbps</div>
+          </div>
+          <div class="result-card result-secondary">
+            <div class="result-icon">↑</div>
+            <div class="result-value" id="uploadResult">-</div>
+            <div class="result-label">Upload</div>
+            <div class="result-unit">Mbps</div>
+          </div>
+        </div>
+        <div class="results-extra">
+          <div class="extra-stat">
+            <span class="extra-label">Idle Latency</span>
+            <span class="extra-value" id="latencyResult">-</span>
+          </div>
+          <div class="extra-stat">
+            <span class="extra-label">Jitter</span>
+            <span class="extra-value" id="jitterResult">-</span>
+          </div>
+          <div class="extra-stat">
+            <span class="extra-label">Loaded Latency</span>
+            <span class="extra-value" id="loadedLatencyResult">-</span>
+          </div>
+          <div class="extra-stat">
+            <span class="extra-label">Bufferbloat</span>
+            <span class="extra-value" id="bufferbloatResult">-</span>
+          </div>
+        </div>
+        <div class="results-details">
+          <div class="detail-section">
+            <h3 class="detail-title">Network Information</h3>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="detail-label">IPv4</span>
+                <span class="detail-value" id="networkIPv4">-</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">IPv6</span>
+                <span class="detail-value" id="networkIPv6">-</span>
+              </div>
+            </div>
+          </div>
+          <div class="detail-section">
+            <h3 class="detail-title" id="serverLabel" style="display:none">Server</h3>
+            <div class="detail-grid">
+              <div class="detail-item" id="serverItem" style="display:none">
+                <span class="detail-value" id="serverValue">-</span>
+              </div>
+            </div>
+          </div>
+          <div class="detail-section">
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="detail-label">Tested</span>
+                <span class="detail-value" id="testedAt">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="results-actions">
+          <a href="/" class="restart-btn btn-link">Run Your Own Test</a>
+        </div>
+      </section>
+
+      <section class="speed-section hidden" id="errorView">
+        <div class="error-view">
+          <div class="error-code">404</div>
+          <div class="error-message">Result not found or has expired.</div>
+          <a href="/" class="restart-btn btn-link">Run a Speed Test</a>
+        </div>
+      </section>
+
+      <section class="speed-section hidden" id="loadingView" role="status" aria-live="polite">
+        <div class="loading loading-text">Loading result...</div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-links">
+        <a class="footer-link" href="/">Speed Test</a>
+        <span class="footer-divider">&middot;</span>
+        <a class="footer-link" href="https://github.com/saveenergy/openbyte" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (function() {
+      const parts = window.location.pathname.split('/');
+      const id = parts[parts.length - 1];
+      if (!id || !/^[0-9a-zA-Z]{8}$/.test(id)) {
+        showError();
+        return;
+      }
+
+      document.getElementById('loadingView').classList.remove('hidden');
+      document.getElementById('resultView').classList.add('hidden');
+
+      fetch('/api/v1/results/' + id)
+        .then(function(res) {
+          if (!res.ok) throw new Error(res.status);
+          return res.json();
+        })
+        .then(function(data) {
+          document.getElementById('loadingView').classList.add('hidden');
+          document.getElementById('resultView').classList.remove('hidden');
+          renderResult(data);
+        })
+        .catch(function() {
+          showError();
+        });
+
+      function showError() {
+        document.getElementById('loadingView').classList.add('hidden');
+        document.getElementById('resultView').classList.add('hidden');
+        document.getElementById('errorView').classList.remove('hidden');
+      }
+
+      function formatSpeed(speed) {
+        if (speed >= 1000) return { value: (speed / 1000).toFixed(2), unit: 'Gbps' };
+        return { value: speed.toFixed(1), unit: 'Mbps' };
+      }
+
+      function renderResult(d) {
+        var dl = formatSpeed(d.download_mbps);
+        var ul = formatSpeed(d.upload_mbps);
+
+        document.getElementById('downloadResult').textContent = dl.value;
+        document.getElementById('uploadResult').textContent = ul.value;
+
+        var dlUnit = document.querySelector('.result-primary .result-unit');
+        var ulUnit = document.querySelector('.result-secondary .result-unit');
+        if (dlUnit) dlUnit.textContent = dl.unit;
+        if (ulUnit) ulUnit.textContent = ul.unit;
+
+        document.getElementById('latencyResult').textContent =
+          d.latency_ms > 0 ? d.latency_ms.toFixed(1) + ' ms' : '-';
+        document.getElementById('jitterResult').textContent =
+          d.jitter_ms > 0 ? d.jitter_ms.toFixed(1) + ' ms' : '-';
+        document.getElementById('loadedLatencyResult').textContent =
+          d.loaded_latency_ms > 0 ? d.loaded_latency_ms.toFixed(1) + ' ms' : '-';
+        document.getElementById('bufferbloatResult').textContent =
+          d.bufferbloat_grade || '-';
+
+        document.getElementById('networkIPv4').textContent = d.ipv4 || '-';
+        document.getElementById('networkIPv6').textContent = d.ipv6 || '-';
+
+        if (d.server_name) {
+          document.getElementById('serverLabel').style.display = '';
+          document.getElementById('serverItem').style.display = '';
+          document.getElementById('serverValue').textContent = d.server_name;
+        }
+
+        if (d.created_at) {
+          try {
+            var date = new Date(d.created_at);
+            document.getElementById('testedAt').textContent = date.toLocaleString();
+          } catch(_) {}
+        }
+
+        document.title = 'openByte — ' + dl.value + ' ' + dl.unit + ' / ' +
+          ul.value + ' ' + ul.unit;
+      }
+    })();
+  </script>
+</body>
+</html>

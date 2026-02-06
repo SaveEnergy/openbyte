@@ -1,0 +1,123 @@
+package results
+
+import (
+	"encoding/json"
+	"net/http"
+	"regexp"
+	"strings"
+
+	"github.com/gorilla/mux"
+	"github.com/saveenergy/openbyte/internal/logging"
+)
+
+var validID = regexp.MustCompile(`^[0-9a-zA-Z]{8}$`)
+
+const maxResultBodyBytes = 4096
+
+type Handler struct {
+	store *Store
+}
+
+func NewHandler(store *Store) *Handler {
+	return &Handler{store: store}
+}
+
+type saveRequest struct {
+	DownloadMbps     float64 `json:"download_mbps"`
+	UploadMbps       float64 `json:"upload_mbps"`
+	LatencyMs        float64 `json:"latency_ms"`
+	JitterMs         float64 `json:"jitter_ms"`
+	LoadedLatencyMs  float64 `json:"loaded_latency_ms"`
+	BufferbloatGrade string  `json:"bufferbloat_grade"`
+	IPv4             string  `json:"ipv4"`
+	IPv6             string  `json:"ipv6"`
+	ServerName       string  `json:"server_name"`
+}
+
+type saveResponse struct {
+	ID  string `json:"id"`
+	URL string `json:"url"`
+}
+
+func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
+	ct := r.Header.Get("Content-Type")
+	if ct != "" && !strings.HasPrefix(ct, "application/json") {
+		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxResultBodyBytes)
+
+	var req saveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.DownloadMbps < 0 || req.UploadMbps < 0 || req.LatencyMs < 0 ||
+		req.JitterMs < 0 || req.LoadedLatencyMs < 0 {
+		http.Error(w, "numeric fields must be >= 0", http.StatusBadRequest)
+		return
+	}
+	if req.DownloadMbps > 100000 || req.UploadMbps > 100000 ||
+		req.LatencyMs > 60000 || req.JitterMs > 60000 || req.LoadedLatencyMs > 60000 {
+		http.Error(w, "values out of reasonable range", http.StatusBadRequest)
+		return
+	}
+	if len(req.ServerName) > 200 || len(req.IPv4) > 45 || len(req.IPv6) > 45 ||
+		len(req.BufferbloatGrade) > 5 {
+		http.Error(w, "field too long", http.StatusBadRequest)
+		return
+	}
+
+	result := Result{
+		DownloadMbps:     req.DownloadMbps,
+		UploadMbps:       req.UploadMbps,
+		LatencyMs:        req.LatencyMs,
+		JitterMs:         req.JitterMs,
+		LoadedLatencyMs:  req.LoadedLatencyMs,
+		BufferbloatGrade: req.BufferbloatGrade,
+		IPv4:             req.IPv4,
+		IPv6:             req.IPv6,
+		ServerName:       req.ServerName,
+	}
+
+	id, err := h.store.Save(result)
+	if err != nil {
+		http.Error(w, "failed to save result", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	if err := json.NewEncoder(w).Encode(saveResponse{
+		ID:  id,
+		URL: "/results/" + id,
+	}); err != nil {
+		logging.Warn("results: encode save response", logging.Field{Key: "error", Value: err})
+	}
+}
+
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	if !validID.MatchString(id) {
+		http.Error(w, "invalid result ID", http.StatusBadRequest)
+		return
+	}
+
+	result, err := h.store.Get(id)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if result == nil {
+		http.Error(w, "result not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		logging.Warn("results: encode get response", logging.Field{Key: "error", Value: err})
+	}
+}

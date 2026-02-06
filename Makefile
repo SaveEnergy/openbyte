@@ -52,9 +52,9 @@ test-coverage:
 
 perf-bench:
 	@echo "Running perf benchmarks..."
-	@go test ./internal/metrics -run Test -bench . -benchtime=1s
-	@go test ./internal/websocket -run Test -bench . -benchtime=1s
-	@go test ./internal/stream -run Test -bench . -benchtime=1s
+	@go test ./test/unit/metrics -run ^$$ -bench . -benchtime=1s
+	@go test ./test/unit/websocket -run ^$$ -bench . -benchtime=1s
+	@go test ./test/unit/stream -run ^$$ -bench . -benchtime=1s
 
 # Development
 run:

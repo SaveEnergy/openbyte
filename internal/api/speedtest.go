@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 type SpeedTestHandler struct {
@@ -27,6 +29,8 @@ func NewSpeedTestHandler(maxConcurrent int) *SpeedTestHandler {
 		randomData:    make([]byte, speedtestRandomSize),
 	}
 	if _, err := rand.Read(handler.randomData); err != nil {
+		logging.Warn("speedtest: random data init failed, using per-request random",
+			logging.Field{Key: "error", Value: err})
 		handler.randomData = nil
 	}
 	return handler
@@ -37,11 +41,11 @@ func (h *SpeedTestHandler) SetClientIPResolver(resolver *ClientIPResolver) {
 }
 
 func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
-	if atomic.LoadInt64(&h.activeDownloads) >= h.maxConcurrent {
+	if v := atomic.AddInt64(&h.activeDownloads, 1); v > h.maxConcurrent {
+		atomic.AddInt64(&h.activeDownloads, -1)
 		http.Error(w, "too many concurrent downloads", http.StatusServiceUnavailable)
 		return
 	}
-	atomic.AddInt64(&h.activeDownloads, 1)
 	defer atomic.AddInt64(&h.activeDownloads, -1)
 
 	durationStr := r.URL.Query().Get("duration")
@@ -125,11 +129,11 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
-	if atomic.LoadInt64(&h.activeUploads) >= h.maxConcurrent {
+	if v := atomic.AddInt64(&h.activeUploads, 1); v > h.maxConcurrent {
+		atomic.AddInt64(&h.activeUploads, -1)
 		http.Error(w, "too many concurrent uploads", http.StatusServiceUnavailable)
 		return
 	}
-	atomic.AddInt64(&h.activeUploads, 1)
 	defer atomic.AddInt64(&h.activeUploads, -1)
 
 	startTime := time.Now()
@@ -148,11 +152,13 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"bytes":           totalBytes,
 		"duration_ms":     elapsed.Milliseconds(),
 		"throughput_mbps": throughputMbps,
-	})
+	}); err != nil {
+		logging.Warn("speedtest: encode upload response", logging.Field{Key: "error", Value: err})
+	}
 }
 
 func (h *SpeedTestHandler) Ping(w http.ResponseWriter, r *http.Request) {
@@ -162,12 +168,14 @@ func (h *SpeedTestHandler) Ping(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"pong":      true,
 		"timestamp": time.Now().UnixMilli(),
 		"client_ip": clientIP,
 		"ipv6":      isIPv6,
-	})
+	}); err != nil {
+		logging.Warn("speedtest: encode ping response", logging.Field{Key: "error", Value: err})
+	}
 }
 
 func (h *SpeedTestHandler) resolveClientIP(r *http.Request) string {

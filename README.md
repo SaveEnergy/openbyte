@@ -49,7 +49,7 @@ Open `http://localhost:8080` — minimal fast.com-inspired UI with real-time spe
 - **RTT**: Baseline and during-test round-trip time measurement
 - **Network Info**: Client IP, IPv6 detection, NAT, MTU
 - **Streaming**: WebSocket real-time metrics
-- **Multi-stream**: 1-16 parallel connections
+- **Multi-stream**: 1-64 parallel connections
 - **Multi-server**: Deploy globally, test against nearest server
 - **Output**: JSON, plain text, interactive CLI
 
@@ -81,7 +81,9 @@ Uses BEREC-compliant measurement practices:
 | `TRUST_PROXY_HEADERS` | false | Trust proxy headers for client IP |
 | `TRUSTED_PROXY_CIDRS` | — | Comma-separated trusted proxy CIDRs |
 | `ALLOWED_ORIGINS` | `*` | Comma-separated CORS/WS allowed origins |
-| `WEB_ROOT` | `./web` | Path to static web assets |
+| `WEB_ROOT` | *(embedded)* | Override path to static web assets (for development) |
+| `DATA_DIR` | `./data` | Path to SQLite database directory |
+| `MAX_STORED_RESULTS` | 10000 | Maximum stored test results (older results auto-purged) |
 
 Notes:
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
@@ -134,7 +136,7 @@ make test-ui
 | `OBYTE_PROTOCOL` | Protocol (`tcp`, `udp`, `http`) |
 | `OBYTE_DIRECTION` | Direction (`download`, `upload`, `bidirectional`) |
 | `OBYTE_DURATION` | Test duration in seconds |
-| `OBYTE_STREAMS` | Parallel streams (1-16) |
+| `OBYTE_STREAMS` | Parallel streams (1-64) |
 | `OBYTE_PACKET_SIZE` | Packet size in bytes |
 | `OBYTE_CHUNK_SIZE` | HTTP chunk size in bytes |
 | `OBYTE_TIMEOUT` | Request timeout in seconds |

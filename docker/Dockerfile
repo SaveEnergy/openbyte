@@ -16,10 +16,11 @@ COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-# Copy Go source (exclude web assets for cache stability)
+# Copy source (web/ needed for //go:embed)
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 COPY pkg/ ./pkg/
+COPY web/ ./web/
 
 # Build openbyte binary
 FROM builder-base AS builder-openbyte
@@ -28,21 +29,21 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /openbyte ./cmd/openbyte
 
 # Server image
-FROM alpine:3.19 AS server
+FROM alpine:3.21 AS server
 
 RUN apk add --no-cache ca-certificates tzdata curl
 
 WORKDIR /app
 
-# Copy openbyte binary
+# Copy openbyte binary (web assets are embedded)
 COPY --from=builder-openbyte /openbyte /app/openbyte
 
-# Copy web assets
-COPY web/ /app/web/
-
-# Create non-root user
-RUN adduser -D -H -s /sbin/nologin openbyte
+# Create non-root user and data directory
+RUN adduser -D -H -s /sbin/nologin openbyte && \
+    mkdir -p /app/data && chown openbyte:openbyte /app/data
 USER openbyte
+
+VOLUME /app/data
 
 # Expose ports: API (8080), TCP test (8081), UDP test (8082)
 EXPOSE 8080 8081 8082/tcp 8082/udp
@@ -58,7 +59,8 @@ ENV PORT=8080 \
     SERVER_REGION="" \
     PUBLIC_HOST="" \
     CAPACITY_GBPS=25 \
-    RATE_LIMIT_PER_IP=100
+    RATE_LIMIT_PER_IP=100 \
+    DATA_DIR=/app/data
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
@@ -67,7 +69,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
 ENTRYPOINT ["/app/openbyte", "server"]
 
 # Client image
-FROM alpine:3.19 AS client
+FROM alpine:3.21 AS client
 
 RUN apk add --no-cache ca-certificates tzdata
 

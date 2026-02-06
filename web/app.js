@@ -24,7 +24,8 @@ const state = {
   networkInfo: {
     ipv4: null,
     ipv6: null
-  }
+  },
+  resultId: null
 };
 
 const elements = {
@@ -59,7 +60,8 @@ const elements = {
   customServerUrl: document.getElementById('customServerUrl'),
   serverStatus: document.getElementById('serverStatus'),
   errorToast: document.getElementById('errorToast'),
-  errorMessage: document.getElementById('errorMessage')
+  errorMessage: document.getElementById('errorMessage'),
+  shareBtn: document.getElementById('shareBtn')
 };
 
 const RING_CIRCUMFERENCE = 2 * Math.PI * 90;
@@ -88,6 +90,9 @@ function bindEvents() {
   elements.restartBtn.addEventListener('click', resetToIdle);
   if (elements.cancelBtn) {
     elements.cancelBtn.addEventListener('click', resetToIdle);
+  }
+  if (elements.shareBtn) {
+    elements.shareBtn.addEventListener('click', handleShare);
   }
   initSettingsModal();
   elements.duration.addEventListener('change', saveSettings);
@@ -736,6 +741,17 @@ async function measureLatency() {
   return median;
 }
 
+function computeBufferbloatGrade(idleLatency, loadedLatency) {
+  if (idleLatency <= 0 || loadedLatency <= 0) return null;
+  const increase = loadedLatency - idleLatency;
+  if (increase < 5) return 'A+';
+  if (increase < 15) return 'A';
+  if (increase < 30) return 'B';
+  if (increase < 60) return 'C';
+  if (increase < 150) return 'D';
+  return 'F';
+}
+
 function filterOutliersIQR(samples) {
   if (samples.length < 4) return samples.slice();
   const sorted = samples.slice().sort((a, b) => a - b);
@@ -1179,22 +1195,67 @@ function showResults() {
   }
   
   // Bufferbloat grade based on latency increase under load
-  if (elements.bufferbloatResult && state.latencyResult > 0 && loadedLatency > 0) {
-    const increase = loadedLatency - state.latencyResult;
-    let grade;
-    if (increase < 5) grade = 'A+';
-    else if (increase < 15) grade = 'A';
-    else if (increase < 30) grade = 'B';
-    else if (increase < 60) grade = 'C';
-    else if (increase < 150) grade = 'D';
-    else grade = 'F';
-    elements.bufferbloatResult.textContent = grade;
-  } else if (elements.bufferbloatResult) {
-    elements.bufferbloatResult.textContent = '-';
+  if (elements.bufferbloatResult) {
+    const grade = computeBufferbloatGrade(state.latencyResult, loadedLatency);
+    elements.bufferbloatResult.textContent = grade || '-';
   }
   
   updateNetworkDisplay();
   
+  saveAndEnableShare();
+}
+
+async function saveAndEnableShare() {
+  const loadedLat = Math.max(state.downloadLatency, state.uploadLatency);
+  const bbGrade = computeBufferbloatGrade(state.latencyResult, loadedLat) || '';
+
+  try {
+    const res = await fetch(`${apiBase}/results`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        download_mbps: state.downloadResult,
+        upload_mbps: state.uploadResult,
+        latency_ms: state.latencyResult,
+        jitter_ms: state.jitterResult,
+        loaded_latency_ms: loadedLat,
+        bufferbloat_grade: bbGrade,
+        ipv4: state.networkInfo.ipv4 || '',
+        ipv6: state.networkInfo.ipv6 || '',
+        server_name: resolveServerName()
+      })
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    state.resultId = data.id;
+    if (elements.shareBtn) {
+      elements.shareBtn.classList.remove('hidden');
+    }
+  } catch (_) {
+    // Non-critical; share just won't be available
+  }
+}
+
+function handleShare() {
+  if (!state.resultId) return;
+  const url = window.location.origin + '/results/' + state.resultId;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      showError('Link copied to clipboard', false);
+    }).catch(() => {
+      promptShareUrl(url);
+    });
+  } else {
+    promptShareUrl(url);
+  }
+}
+
+function promptShareUrl(url) {
+  if (navigator.share) {
+    navigator.share({ title: 'openByte Speed Test Result', url }).catch(() => {});
+  } else {
+    window.prompt('Copy this link:', url);
+  }
 }
 
 function cancelTest() {
@@ -1224,6 +1285,8 @@ function resetToIdle() {
   state.jitterResult = 0;
   state.downloadLatency = 0;
   state.uploadLatency = 0;
+  state.resultId = null;
+  if (elements.shareBtn) elements.shareBtn.classList.add('hidden');
   
   resetProgress();
   showState('idle');

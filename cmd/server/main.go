@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +12,7 @@ import (
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/logging"
 	"github.com/saveenergy/openbyte/internal/registry"
+	"github.com/saveenergy/openbyte/internal/results"
 	"github.com/saveenergy/openbyte/internal/stream"
 	"github.com/saveenergy/openbyte/internal/websocket"
 	"github.com/saveenergy/openbyte/pkg/types"
@@ -41,7 +41,7 @@ func Run(version string) int {
 	}
 
 	pprofServer := startPprofServer(cfg)
-	startRuntimeStatsLogger(cfg)
+	stopStats := startRuntimeStatsLogger(cfg)
 
 	streamServer, err := stream.NewServer(cfg)
 	if err != nil {
@@ -64,11 +64,26 @@ func Run(version string) int {
 	wsServer.SetAllowedOrigins(cfg.AllowedOrigins)
 	wsServer.SetPingInterval(cfg.WebSocketPingInterval)
 
+	// Ensure data directory exists for SQLite
+	if err := os.MkdirAll(cfg.DataDir, 0755); err != nil {
+		logging.Error("Failed to create data directory", logging.Field{Key: "error", Value: err})
+		return exitFailure
+	}
+	resultsStore, err := results.New(cfg.DataDir+"/results.db", cfg.MaxStoredResults)
+	if err != nil {
+		logging.Error("Failed to open results store", logging.Field{Key: "error", Value: err})
+		return exitFailure
+	}
+	logging.Info("Results store opened",
+		logging.Field{Key: "path", Value: cfg.DataDir + "/results.db"},
+		logging.Field{Key: "max_results", Value: cfg.MaxStoredResults})
+
 	router := api.NewRouter(apiHandler, cfg)
 	router.SetRateLimiter(cfg)
 	router.SetClientIPResolver(api.NewClientIPResolver(cfg))
 	router.SetAllowedOrigins(cfg.AllowedOrigins)
 	router.SetWebSocketHandler(wsServer.HandleStream)
+	router.SetResultsHandler(results.NewHandler(resultsStore))
 	router.SetWebRoot(cfg.WebRoot)
 	muxRouter := router.SetupRoutes()
 
@@ -132,10 +147,10 @@ func Run(version string) int {
 
 	if err := srv.Shutdown(ctx); err != nil {
 		logging.Error("Server shutdown error", logging.Field{Key: "error", Value: err})
-		log.Printf("Server shutdown error: %v", err)
 	}
 
 	shutdownPprofServer(pprofServer, 5*time.Second)
+	stopStats()
 
 	if registryClient != nil {
 		registryClient.Stop()
@@ -144,6 +159,7 @@ func Run(version string) int {
 		registryService.Stop()
 	}
 
+	resultsStore.Close()
 	wsServer.Close()
 	manager.Stop()
 	streamServer.Close()

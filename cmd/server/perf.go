@@ -43,31 +43,38 @@ func shutdownPprofServer(srv *http.Server, timeout time.Duration) {
 	}
 }
 
-func startRuntimeStatsLogger(cfg *config.Config) {
+func startRuntimeStatsLogger(cfg *config.Config) func() {
 	if cfg == nil || cfg.PerfStatsInterval <= 0 {
-		return
+		return func() {}
 	}
 
 	interval := cfg.PerfStatsInterval
+	stopCh := make(chan struct{})
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 
 		var mem runtime.MemStats
-		for range ticker.C {
-			runtime.ReadMemStats(&mem)
-			gcStats := debug.GCStats{}
-			debug.ReadGCStats(&gcStats)
+		for {
+			select {
+			case <-stopCh:
+				return
+			case <-ticker.C:
+				runtime.ReadMemStats(&mem)
+				gcStats := debug.GCStats{}
+				debug.ReadGCStats(&gcStats)
 
-			logging.Info("runtime stats",
-				logging.Field{Key: "goroutines", Value: runtime.NumGoroutine()},
-				logging.Field{Key: "heap_alloc_bytes", Value: mem.HeapAlloc},
-				logging.Field{Key: "heap_inuse_bytes", Value: mem.HeapInuse},
-				logging.Field{Key: "stack_inuse_bytes", Value: mem.StackInuse},
-				logging.Field{Key: "gc_count", Value: mem.NumGC},
-				logging.Field{Key: "gc_pause_total_ns", Value: mem.PauseTotalNs},
-				logging.Field{Key: "last_gc", Value: gcStats.LastGC},
-			)
+				logging.Info("runtime stats",
+					logging.Field{Key: "goroutines", Value: runtime.NumGoroutine()},
+					logging.Field{Key: "heap_alloc_bytes", Value: mem.HeapAlloc},
+					logging.Field{Key: "heap_inuse_bytes", Value: mem.HeapInuse},
+					logging.Field{Key: "stack_inuse_bytes", Value: mem.StackInuse},
+					logging.Field{Key: "gc_count", Value: mem.NumGC},
+					logging.Field{Key: "gc_pause_total_ns", Value: mem.PauseTotalNs},
+					logging.Field{Key: "last_gc", Value: gcStats.LastGC},
+				)
+			}
 		}
 	}()
+	return func() { close(stopCh) }
 }

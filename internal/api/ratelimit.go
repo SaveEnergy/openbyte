@@ -143,11 +143,9 @@ func (rl *RateLimiter) allowIP(ip string) bool {
 // skipRateLimitPaths are endpoints that should not be rate limited
 // These are high-frequency speedtest endpoints
 var skipRateLimitPaths = map[string]bool{
-	"/api/v1/download":  true,
-	"/api/v1/upload":    true,
-	"/api/v1/ping":      true,
-	"/api/v1/rtc/offer": true,
-	"/api/v1/rtc/ice":   true,
+	"/api/v1/download": true,
+	"/api/v1/upload":   true,
+	"/api/v1/ping":     true,
 }
 
 func RateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Handler {

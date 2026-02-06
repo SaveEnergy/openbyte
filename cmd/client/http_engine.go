@@ -116,7 +116,10 @@ func (e *HTTPTestEngine) runDownload(ctx context.Context) error {
 				return
 			}
 
-			buf := e.bufferPool.Get().([]byte)
+			buf, ok := e.bufferPool.Get().([]byte)
+			if !ok {
+				buf = make([]byte, 64*1024)
+			}
 			defer e.bufferPool.Put(buf)
 
 			for {

@@ -95,29 +95,6 @@ func loadConfigFile() (*ConfigFile, error) {
 	return &config, nil
 }
 
-func saveConfigFile(config *ConfigFile) error {
-	configPath := getConfigPath()
-	if configPath == "" {
-		return fmt.Errorf("cannot determine config path")
-	}
-
-	configDir := filepath.Dir(configPath)
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("create config directory: %w", err)
-	}
-
-	data, err := yaml.Marshal(config)
-	if err != nil {
-		return fmt.Errorf("marshal config: %w", err)
-	}
-
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
-		return fmt.Errorf("write config file: %w", err)
-	}
-
-	return nil
-}
-
 func resolveServerURL(configFile *ConfigFile, serverAlias string) (string, string) {
 	if configFile == nil {
 		return "", ""
@@ -331,8 +308,8 @@ func validateConfigFile(config *ConfigFile) error {
 	if config.Duration != 0 && (config.Duration < 1 || config.Duration > 300) {
 		return fmt.Errorf("invalid duration: %d (must be 1-300 seconds)", config.Duration)
 	}
-	if config.Streams != 0 && (config.Streams < 1 || config.Streams > 16) {
-		return fmt.Errorf("invalid streams: %d (must be 1-16)", config.Streams)
+	if config.Streams != 0 && (config.Streams < 1 || config.Streams > 64) {
+		return fmt.Errorf("invalid streams: %d (must be 1-64)", config.Streams)
 	}
 	if config.PacketSize < 0 || (config.PacketSize > 0 && (config.PacketSize < 64 || config.PacketSize > 9000)) {
 		return fmt.Errorf("invalid packet size: %d (must be 64-9000 bytes)", config.PacketSize)

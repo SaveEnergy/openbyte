@@ -52,12 +52,8 @@ func TestConfigLoadGlobalRateLimitEnvInvalid(t *testing.T) {
 	t.Setenv("GLOBAL_RATE_LIMIT", "not-a-number")
 
 	cfg := config.DefaultConfig()
-	if err := cfg.LoadFromEnv(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if cfg.GlobalRateLimit != 1000 {
-		t.Fatalf("expected default global rate limit to remain, got %d", cfg.GlobalRateLimit)
+	if err := cfg.LoadFromEnv(); err == nil {
+		t.Fatal("expected error for non-numeric GLOBAL_RATE_LIMIT")
 	}
 }
 
@@ -65,12 +61,8 @@ func TestConfigLoadGlobalRateLimitEnvNonPositive(t *testing.T) {
 	t.Setenv("GLOBAL_RATE_LIMIT", "-5")
 
 	cfg := config.DefaultConfig()
-	if err := cfg.LoadFromEnv(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if cfg.GlobalRateLimit != 1000 {
-		t.Fatalf("expected default global rate limit to remain, got %d", cfg.GlobalRateLimit)
+	if err := cfg.LoadFromEnv(); err == nil {
+		t.Fatal("expected error for negative GLOBAL_RATE_LIMIT")
 	}
 }
 
@@ -116,5 +108,33 @@ func TestMaxStreamsValidation(t *testing.T) {
 	cfg.MaxStreams = 65
 	if err := cfg.Validate(); err == nil {
 		t.Fatalf("MaxStreams=65 should be invalid")
+	}
+}
+
+func TestDataDirValidation(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.DataDir = ""
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("empty DataDir should be invalid")
+	}
+	cfg.DataDir = "/tmp/test"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("valid DataDir should pass: %v", err)
+	}
+}
+
+func TestMaxStoredResultsValidation(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.MaxStoredResults = 0
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("MaxStoredResults=0 should be invalid")
+	}
+	cfg.MaxStoredResults = -1
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("MaxStoredResults=-1 should be invalid")
+	}
+	cfg.MaxStoredResults = 100
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("MaxStoredResults=100 should be valid: %v", err)
 	}
 }

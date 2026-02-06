@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Open-source internet speed test. Measure download, upload, latency, jitter, and bufferbloat.">
+  <meta property="og:title" content="openByte — Speed Test">
+  <meta property="og:description" content="Open-source internet speed test. Measure download, upload, latency, jitter, and bufferbloat.">
+  <meta property="og:type" content="website">
   <title>openByte</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -101,6 +105,7 @@
         </div>
         <div class="results-actions">
           <button class="restart-btn" id="restartBtn">Test Again</button>
+          <button class="share-btn hidden" id="shareBtn">Share</button>
         </div>
       </section>
     </main>
@@ -112,12 +117,12 @@
         <span class="footer-divider">·</span>
         <a class="footer-link" href="/download.html">Download</a>
         <span class="footer-divider">·</span>
-        <a class="footer-link" href="https://github.com/saveenergy/openbyte" target="_blank">GitHub</a>
+        <a class="footer-link" href="https://github.com/saveenergy/openbyte" target="_blank" rel="noopener noreferrer">GitHub</a>
       </div>
     </footer>
 
     <!-- Settings Modal (hidden by default, opened via showModal()) -->
-    <dialog class="modal" id="settingsModal" aria-labelledby="settingsTitle" closed>
+    <dialog class="modal" id="settingsModal" aria-labelledby="settingsTitle">
       <div class="modal-content">
         <div class="modal-header">
           <h2 id="settingsTitle">Settings</h2>

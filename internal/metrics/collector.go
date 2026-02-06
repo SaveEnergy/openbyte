@@ -109,8 +109,8 @@ func (c *Collector) GetMetrics() types.Metrics {
 	var jitterMs float64
 	c.mu.RLock()
 	if c.latencyHistogram != nil && c.latencyCount > 0 {
-		buckets := c.bucketPool.Get().([]uint32)
-		if len(buckets) != c.latencyHistogram.BucketCount() {
+		buckets, ok := c.bucketPool.Get().([]uint32)
+		if !ok || len(buckets) != c.latencyHistogram.BucketCount() {
 			buckets = make([]uint32, c.latencyHistogram.BucketCount())
 		}
 		overflow := c.latencyHistogram.CopyTo(buckets)

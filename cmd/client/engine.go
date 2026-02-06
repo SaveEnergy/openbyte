@@ -219,7 +219,10 @@ func (e *TestEngine) runDownload(ctx context.Context, conn net.Conn) error {
 		return fmt.Errorf("send command: %w", err)
 	}
 
-	buf := e.bufferPool.Get().([]byte)
+	buf, ok := e.bufferPool.Get().([]byte)
+	if !ok {
+		buf = make([]byte, 64*1024)
+	}
 	defer e.bufferPool.Put(buf)
 
 	lastRTTSample := time.Now()
@@ -262,7 +265,10 @@ func (e *TestEngine) runUpload(ctx context.Context, conn net.Conn) error {
 		return fmt.Errorf("send command: %w", err)
 	}
 
-	buf := e.bufferPool.Get().([]byte)
+	buf, ok := e.bufferPool.Get().([]byte)
+	if !ok {
+		buf = make([]byte, 64*1024)
+	}
 	defer e.bufferPool.Put(buf)
 
 	lastRTTSample := time.Now()
@@ -307,7 +313,10 @@ func (e *TestEngine) runBidirectional(ctx context.Context, conn net.Conn) error 
 
 	go func() {
 		defer wg.Done()
-		buf := e.bufferPool.Get().([]byte)
+		buf, ok := e.bufferPool.Get().([]byte)
+		if !ok {
+			buf = make([]byte, 64*1024)
+		}
 		defer e.bufferPool.Put(buf)
 		for {
 			select {
@@ -332,7 +341,10 @@ func (e *TestEngine) runBidirectional(ctx context.Context, conn net.Conn) error 
 
 	go func() {
 		defer wg.Done()
-		buf := e.bufferPool.Get().([]byte)
+		buf, ok := e.bufferPool.Get().([]byte)
+		if !ok {
+			buf = make([]byte, 64*1024)
+		}
 		defer e.bufferPool.Put(buf)
 		for {
 			select {

@@ -12,17 +12,20 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/logging"
+	"github.com/saveenergy/openbyte/internal/results"
 	"github.com/saveenergy/openbyte/pkg/types"
+	"github.com/saveenergy/openbyte/web"
 )
 
 type Router struct {
 	handler          *Handler
 	speedtest        *SpeedTestHandler
+	resultsHandler   *results.Handler
 	limiter          *RateLimiter
 	wsServer         interface{}
 	allowedOrigins   []string
 	clientIPResolver *ClientIPResolver
-	webRoot          string
+	webFS            http.FileSystem
 }
 
 func (r *Router) GetLimiter() *RateLimiter {
@@ -51,8 +54,17 @@ func (r *Router) SetWebSocketHandler(handler func(http.ResponseWriter, *http.Req
 	r.wsServer = handler
 }
 
+func (r *Router) SetResultsHandler(h *results.Handler) {
+	r.resultsHandler = h
+}
+
+// SetWebRoot overrides the embedded web assets with a directory on disk.
+// Use this for development so you can edit HTML/CSS/JS without rebuilding.
+// If path is empty, the embedded assets are used.
 func (r *Router) SetWebRoot(path string) {
-	r.webRoot = path
+	if path != "" {
+		r.webFS = http.Dir(path)
+	}
 }
 
 func (r *Router) SetupRoutes() *mux.Router {
@@ -84,6 +96,12 @@ func (r *Router) SetupRoutes() *mux.Router {
 	v1.HandleFunc("/upload", r.speedtest.Upload).Methods("POST")
 	v1.HandleFunc("/ping", r.speedtest.Ping).Methods("GET")
 
+	// Saved results API
+	if r.resultsHandler != nil {
+		v1.HandleFunc("/results", r.resultsHandler.Save).Methods("POST")
+		v1.HandleFunc("/results/{id}", r.resultsHandler.Get).Methods("GET")
+	}
+
 	if r.wsServer != nil {
 		if wsHandler, ok := r.wsServer.(func(http.ResponseWriter, *http.Request, string)); ok {
 			v1.HandleFunc("/stream/{id}/stream", func(w http.ResponseWriter, req *http.Request) {
@@ -99,11 +117,28 @@ func (r *Router) SetupRoutes() *mux.Router {
 	}
 
 	router.HandleFunc("/health", r.HealthCheck).Methods("GET")
-	webRoot := r.webRoot
-	if webRoot == "" {
-		webRoot = "./web"
+
+	webFS := r.resolveWebFS()
+
+	// Serve results.html for /results/{id} browser requests
+	if r.resultsHandler != nil {
+		router.HandleFunc("/results/{id}", func(w http.ResponseWriter, req *http.Request) {
+			f, err := webFS.Open("results.html")
+			if err != nil {
+				http.NotFound(w, req)
+				return
+			}
+			defer f.Close()
+			stat, err := f.Stat()
+			if err != nil {
+				http.NotFound(w, req)
+				return
+			}
+			http.ServeContent(w, req, "results.html", stat.ModTime(), f)
+		}).Methods("GET")
 	}
-	router.PathPrefix("/").Handler(http.FileServer(http.Dir(webRoot)))
+
+	router.PathPrefix("/").Handler(http.FileServer(webFS))
 
 	return router
 }
@@ -127,7 +162,9 @@ func (r *Router) HandleWithID(fn func(http.ResponseWriter, *http.Request, string
 func (r *Router) HealthCheck(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"ok"}`))
+	if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
+		logging.Warn("health: write response", logging.Field{Key: "error", Value: err})
+	}
 }
 
 func (r *Router) SetAllowedOrigins(origins []string) {
@@ -254,6 +291,16 @@ func (r *Router) LoggingMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, req)
 		}
 	})
+}
+
+// resolveWebFS returns the web file system to use for static assets.
+// If a disk override is set (via SetWebRoot), it takes precedence.
+// Otherwise, the embedded assets from the web package are used.
+func (r *Router) resolveWebFS() http.FileSystem {
+	if r.webFS != nil {
+		return r.webFS
+	}
+	return http.FS(web.Assets)
 }
 
 func (r *Router) resolveClientIP(req *http.Request) string {

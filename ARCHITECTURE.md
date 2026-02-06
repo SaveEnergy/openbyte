@@ -295,7 +295,7 @@ var bufferPool = sync.Pool{
 ### Input Validation
 
 - Duration: 1-300 seconds
-- Streams: 1-16
+- Streams: 1-64
 - Packet size: 64-9000 bytes
 - Protocol: enum validation
 

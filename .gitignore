@@ -44,3 +44,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# SQLite data
+data/
+*.db

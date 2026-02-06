@@ -155,7 +155,7 @@ Environment="GLOBAL_RATE_LIMIT=1000"
 Environment="TRUST_PROXY_HEADERS=true"
 Environment="TRUSTED_PROXY_CIDRS=10.0.0.0/8,192.168.0.0/16"
 Environment="ALLOWED_ORIGINS=https://speedtest.example.com"
-Environment="WEB_ROOT=/opt/openbyte/web"
+Environment="DATA_DIR=/opt/openbyte/data"
 
 [Install]
 WantedBy=multi-user.target

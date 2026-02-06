@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Complete Traefik deployment
 # Usage: cd docker && docker compose -f docker-compose.yaml -f docker-compose.traefik.yaml up -d
 
@@ -69,7 +67,10 @@ services:
       - CAPACITY_GBPS=${CAPACITY_GBPS:-25}
       - RATE_LIMIT_PER_IP=${RATE_LIMIT_PER_IP:-100}
       - GLOBAL_RATE_LIMIT=${GLOBAL_RATE_LIMIT:-1000}
-      - WEB_ROOT=${WEB_ROOT:-/app/web}
+      - DATA_DIR=${DATA_DIR:-/app/data}
+      - MAX_STORED_RESULTS=${MAX_STORED_RESULTS:-10000}
+    volumes:
+      - openbyte-data:/app/data
     labels:
       - "traefik.enable=true"
       # HTTP router
@@ -108,3 +109,4 @@ networks:
 
 volumes:
   traefik-certs:
+  openbyte-data:

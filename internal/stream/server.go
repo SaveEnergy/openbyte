@@ -437,7 +437,11 @@ type udpClientState struct {
 
 func (s *Server) udpSender(client *udpClientState) {
 	packet := make([]byte, s.config.UDPBufferSize)
-	copy(packet, s.randomData[:len(packet)])
+	n := len(packet)
+	if n > len(s.randomData) {
+		n = len(s.randomData)
+	}
+	copy(packet, s.randomData[:n])
 
 	lastYield := time.Now()
 	for {

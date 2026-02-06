@@ -34,7 +34,7 @@ Initiate new speed test.
 - `protocol` (required): "tcp" or "udp"
 - `direction` (required): "download", "upload", or "bidirectional"
 - `duration` (optional): Test duration in seconds (default: 30, min: 1, max: 300)
-- `streams` (optional): Number of parallel connections (default: 4, min: 1, max: 16)
+- `streams` (optional): Number of parallel connections (default: 4, min: 1, max: 64)
 - `packet_size` (optional): Packet size in bytes (default: 1500, min: 64, max: 9000)
 - `mode` (optional): Testing mode (default: "proxy")
   - `"client"`: Client-side testing (CLI) - client connects to test server directly
@@ -522,6 +522,71 @@ Web Browser                             Server
     │◄════ Metrics (server measures)      │
     │◄════ Complete                       │
 ```
+
+## Saved Results
+
+### Save Result
+
+`POST /api/v1/results`
+
+Save a completed test result. Returns a short ID and URL for sharing.
+
+**Request:**
+```json
+{
+  "download_mbps": 500.5,
+  "upload_mbps": 100.2,
+  "latency_ms": 8.1,
+  "jitter_ms": 0.5,
+  "loaded_latency_ms": 15.3,
+  "bufferbloat_grade": "B",
+  "ipv4": "203.0.113.1",
+  "ipv6": "2001:db8::1",
+  "server_name": "Production Server"
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": "a3kf8x2b",
+  "url": "/results/a3kf8x2b"
+}
+```
+
+**Validation:**
+- All numeric fields must be >= 0
+- Speed values capped at 100,000 Mbps; latency values at 60,000 ms
+- String fields have length limits (server_name: 200, IPs: 45, grade: 5)
+
+### Get Result
+
+`GET /api/v1/results/{id}`
+
+Retrieve a saved test result by its 8-character alphanumeric ID.
+
+**Response (200):**
+```json
+{
+  "id": "a3kf8x2b",
+  "download_mbps": 500.5,
+  "upload_mbps": 100.2,
+  "latency_ms": 8.1,
+  "jitter_ms": 0.5,
+  "loaded_latency_ms": 15.3,
+  "bufferbloat_grade": "B",
+  "ipv4": "203.0.113.1",
+  "ipv6": "2001:db8::1",
+  "server_name": "Production Server",
+  "created_at": "2026-02-05T12:00:00Z"
+}
+```
+
+Returns 404 if the result is not found or has expired (90-day retention).
+
+### Result Page
+
+`GET /results/{id}` serves a standalone HTML page that fetches and renders the saved result.
 
 ## Rate Limiting
 
