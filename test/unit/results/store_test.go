@@ -202,6 +202,34 @@ func TestHandlerGetInvalidID(t *testing.T) {
 	}
 }
 
+func TestHandlerSaveRejectsWrongContentType(t *testing.T) {
+	store, cleanup := tempStore(t, 100)
+	defer cleanup()
+
+	handler := results.NewHandler(store)
+	router := mux.NewRouter()
+	router.HandleFunc("/api/v1/results", handler.Save).Methods("POST")
+
+	body := `{"download_mbps":100,"upload_mbps":50,"latency_ms":10,"jitter_ms":1}`
+	req := httptest.NewRequest("POST", "/api/v1/results", strings.NewReader(body))
+	req.Header.Set("Content-Type", "text/plain")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnsupportedMediaType {
+		t.Errorf("text/plain: status = %d, want %d", rec.Code, http.StatusUnsupportedMediaType)
+	}
+
+	// Verify the error response is JSON
+	var errResp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&errResp); err != nil {
+		t.Errorf("error response not JSON: %v", err)
+	}
+	if errResp["error"] == "" {
+		t.Error("expected error field in response")
+	}
+}
+
 func TestHandlerRoundTrip(t *testing.T) {
 	store, cleanup := tempStore(t, 100)
 	defer cleanup()

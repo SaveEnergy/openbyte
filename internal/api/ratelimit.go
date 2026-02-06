@@ -1,11 +1,13 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/config"
+	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 type RateLimiter struct {
@@ -161,7 +163,11 @@ func RateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Handler {
 
 			if !limiter.Allow(ip) {
 				w.Header().Set("Retry-After", "60")
-				http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusTooManyRequests)
+				if err := json.NewEncoder(w).Encode(map[string]string{"error": "rate limit exceeded"}); err != nil {
+					logging.Warn("ratelimit: encode error response", logging.Field{Key: "error", Value: err})
+				}
 				return
 			}
 

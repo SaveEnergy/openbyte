@@ -9,6 +9,8 @@ import (
 
 type RTTCollector struct {
 	samples    []float64
+	head       int
+	count      int
 	baseline   float64
 	mu         sync.RWMutex
 	maxSamples int
@@ -19,7 +21,7 @@ func NewRTTCollector(maxSamples int) *RTTCollector {
 		maxSamples = 100
 	}
 	return &RTTCollector{
-		samples:    make([]float64, 0, maxSamples),
+		samples:    make([]float64, maxSamples),
 		maxSamples: maxSamples,
 	}
 }
@@ -28,10 +30,27 @@ func (r *RTTCollector) AddSample(rttMs float64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if len(r.samples) >= r.maxSamples {
-		r.samples = r.samples[1:]
+	r.samples[r.head] = rttMs
+	r.head = (r.head + 1) % r.maxSamples
+	if r.count < r.maxSamples {
+		r.count++
 	}
-	r.samples = append(r.samples, rttMs)
+}
+
+// activeSamples returns a snapshot of current samples in insertion order.
+func (r *RTTCollector) activeSamples() []float64 {
+	if r.count == 0 {
+		return nil
+	}
+	out := make([]float64, r.count)
+	if r.count < r.maxSamples {
+		copy(out, r.samples[:r.count])
+	} else {
+		// Ring is full: oldest is at r.head, wrap around
+		n := copy(out, r.samples[r.head:])
+		copy(out[n:], r.samples[:r.head])
+	}
+	return out
 }
 
 func (r *RTTCollector) SetBaseline(rttMs float64) {
@@ -44,15 +63,17 @@ func (r *RTTCollector) GetMetrics() RTTMetrics {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	if len(r.samples) == 0 {
+	if r.count == 0 {
 		return RTTMetrics{BaselineMs: r.baseline}
 	}
 
-	var sum, minVal, maxVal float64
-	minVal = r.samples[0]
-	maxVal = r.samples[0]
+	active := r.activeSamples()
 
-	for _, v := range r.samples {
+	var sum, minVal, maxVal float64
+	minVal = active[0]
+	maxVal = active[0]
+
+	for _, v := range active {
 		sum += v
 		if v < minVal {
 			minVal = v
@@ -62,16 +83,16 @@ func (r *RTTCollector) GetMetrics() RTTMetrics {
 		}
 	}
 
-	avg := sum / float64(len(r.samples))
+	avg := sum / float64(len(active))
 
 	var varianceSum float64
-	for _, v := range r.samples {
+	for _, v := range active {
 		diff := v - avg
 		varianceSum += diff * diff
 	}
-	jitter := math.Sqrt(varianceSum / float64(len(r.samples)))
+	jitter := math.Sqrt(varianceSum / float64(len(active)))
 
-	current := r.samples[len(r.samples)-1]
+	current := active[len(active)-1]
 
 	return RTTMetrics{
 		BaselineMs: r.baseline,
@@ -80,7 +101,7 @@ func (r *RTTCollector) GetMetrics() RTTMetrics {
 		MaxMs:      maxVal,
 		AvgMs:      avg,
 		JitterMs:   jitter,
-		Samples:    len(r.samples),
+		Samples:    len(active),
 	}
 }
 

@@ -29,7 +29,7 @@ func (r *ClientIPResolver) FromRequest(req *http.Request) string {
 		return ipString(remoteIP)
 	}
 
-	if clientIP := firstClientIP(req.Header.Get("X-Forwarded-For")); clientIP != nil {
+	if clientIP := r.rightmostUntrustedIP(req.Header.Get("X-Forwarded-For")); clientIP != nil {
 		return ipString(clientIP)
 	}
 	if clientIP := parseHeaderIP(req.Header.Get("X-Real-IP")); clientIP != nil {
@@ -37,6 +37,27 @@ func (r *ClientIPResolver) FromRequest(req *http.Request) string {
 	}
 
 	return ipString(remoteIP)
+}
+
+// rightmostUntrustedIP walks X-Forwarded-For entries from right to left,
+// skipping trusted proxy IPs. The first non-trusted entry is the real client.
+// This prevents spoofing via attacker-prepended XFF values.
+func (r *ClientIPResolver) rightmostUntrustedIP(xff string) net.IP {
+	if xff == "" {
+		return nil
+	}
+	parts := strings.Split(xff, ",")
+	for i := len(parts) - 1; i >= 0; i-- {
+		ip := parseHeaderIP(parts[i])
+		if ip == nil {
+			continue
+		}
+		if r.isTrustedProxy(ip) {
+			continue
+		}
+		return ip
+	}
+	return nil
 }
 
 func (r *ClientIPResolver) isTrustedProxy(ip net.IP) bool {
@@ -60,27 +81,6 @@ func parseTrustedProxyCIDRs(cidrs []string) []*net.IPNet {
 		}
 	}
 	return networks
-}
-
-func firstClientIP(xff string) net.IP {
-	if xff == "" {
-		return nil
-	}
-	parts := strings.Split(xff, ",")
-	var firstValid net.IP
-	for _, part := range parts {
-		ip := parseHeaderIP(part)
-		if ip == nil {
-			continue
-		}
-		if firstValid == nil {
-			firstValid = ip
-		}
-		if isPublicIP(ip) {
-			return ip
-		}
-	}
-	return firstValid
 }
 
 func parseRemoteIP(remoteAddr string) net.IP {

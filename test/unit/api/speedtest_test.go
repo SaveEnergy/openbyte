@@ -15,7 +15,7 @@ import (
 )
 
 func TestSpeedTestDownloadWritesData(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10)
+	handler := api.NewSpeedTestHandler(10, 300)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	t.Cleanup(cancel)
@@ -41,7 +41,7 @@ func TestSpeedTestDownloadWritesData(t *testing.T) {
 }
 
 func TestSpeedTestUploadReportsBytes(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10)
+	handler := api.NewSpeedTestHandler(10, 300)
 
 	payload := bytes.Repeat([]byte("a"), 256*1024)
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/upload", bytes.NewReader(payload))
@@ -80,7 +80,7 @@ func (e *errReader) Read(p []byte) (int, error) {
 
 func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 	maxConcurrent := 2
-	handler := api.NewSpeedTestHandler(maxConcurrent)
+	handler := api.NewSpeedTestHandler(maxConcurrent, 300)
 
 	// Fill all slots with long-running downloads
 	cancels := make([]context.CancelFunc, maxConcurrent)
@@ -134,7 +134,7 @@ func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 }
 
 func TestSpeedTestUploadHandlesReadError(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10)
+	handler := api.NewSpeedTestHandler(10, 300)
 
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/upload", nil)
 	req.Body = io.NopCloser(&errReader{})
@@ -144,5 +144,94 @@ func TestSpeedTestUploadHandlesReadError(t *testing.T) {
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestUploadConcurrentLimitAndRelease(t *testing.T) {
+	maxConcurrent := 2
+	handler := api.NewSpeedTestHandler(maxConcurrent, 300)
+
+	// Fill all upload slots with long-running uploads
+	cancels := make([]context.CancelFunc, maxConcurrent)
+	done := make(chan struct{}, maxConcurrent)
+
+	for i := 0; i < maxConcurrent; i++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancels[i] = cancel
+
+		go func() {
+			defer func() { done <- struct{}{} }()
+			// Slow reader that blocks until context is cancelled
+			pr, pw := io.Pipe()
+			go func() {
+				<-ctx.Done()
+				pw.Close()
+			}()
+			req := httptest.NewRequest(http.MethodPost,
+				"http://example.com/api/v1/upload", pr)
+			rec := httptest.NewRecorder()
+			handler.Upload(rec, req)
+		}()
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	// New upload should get 503
+	reqOver := httptest.NewRequest(http.MethodPost,
+		"http://example.com/api/v1/upload",
+		bytes.NewReader([]byte("data")))
+	recOver := httptest.NewRecorder()
+	handler.Upload(recOver, reqOver)
+	if recOver.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503 when at limit, got %d", recOver.Code)
+	}
+
+	// Cancel all running uploads
+	for _, cancel := range cancels {
+		cancel()
+	}
+	for i := 0; i < maxConcurrent; i++ {
+		<-done
+	}
+
+	// After cancellation, new upload should succeed
+	reqAfter := httptest.NewRequest(http.MethodPost,
+		"http://example.com/api/v1/upload",
+		bytes.NewReader(bytes.Repeat([]byte("x"), 1024)))
+	recAfter := httptest.NewRecorder()
+	handler.Upload(recAfter, reqAfter)
+	if recAfter.Code != http.StatusOK {
+		t.Fatalf("expected 200 after cancel freed slots, got %d", recAfter.Code)
+	}
+}
+
+func TestDownloadRespectsMaxDuration(t *testing.T) {
+	// maxDurationSec=5: duration=5 should work, duration=10 should be clamped to default
+	handler := api.NewSpeedTestHandler(10, 5)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	t.Cleanup(cancel)
+
+	// duration=5 (within max) should be accepted
+	req := httptest.NewRequest(http.MethodGet,
+		"http://example.com/api/v1/download?duration=5&chunk=65536", nil)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	handler.Download(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("duration=5 with max=5: status = %d, want 200", rec.Code)
+	}
+
+	// duration=10 (above max) should be silently clamped to default (10s)
+	// — since default 10 > max 5, it also gets clamped; verify no crash
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	t.Cleanup(cancel2)
+	req2 := httptest.NewRequest(http.MethodGet,
+		"http://example.com/api/v1/download?duration=10&chunk=65536", nil)
+	req2 = req2.WithContext(ctx2)
+	rec2 := httptest.NewRecorder()
+	handler.Download(rec2, req2)
+	if rec2.Code != http.StatusOK {
+		t.Fatalf("duration=10 with max=5 (clamped): status = %d, want 200", rec2.Code)
 	}
 }

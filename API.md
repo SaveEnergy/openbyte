@@ -315,7 +315,7 @@ Server health status.
 Stream random data to client for download speed measurement.
 
 **Query Parameters:**
-- `duration` (optional): Test duration in seconds (default: 10, max: 60)
+- `duration` (optional): Test duration in seconds (default: 10, max: configurable via `MAX_TEST_DURATION`, default 300)
 - `chunk` (optional): Chunk size in bytes (default: 1048576, range: 65536-4194304)
 
 **Response:**

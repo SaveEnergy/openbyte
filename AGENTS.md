@@ -535,3 +535,246 @@
 - `startRuntimeStatsLogger` now returns a stop function; called during shutdown.
 - `LoadFromEnv` now returns errors for invalid TCP_TEST_PORT, UDP_TEST_PORT, CAPACITY_GBPS, MAX_CONCURRENT_TESTS, MAX_STREAMS, RATE_LIMIT_PER_IP, GLOBAL_RATE_LIMIT, MAX_CONCURRENT_PER_IP, PERF_STATS_INTERVAL, MAX_STORED_RESULTS.
 - Updated config tests to expect errors for invalid env values.
+
+## Improvement Round 6 — Analysis (2026-02-06)
+
+### Frontend Findings
+- `app.js:674-716`: Latency ping response bodies not consumed when `capturedIP` is true — delays HTTP/2 connection reuse.
+- `app.js:458-482`: `onCustomServerChange()` doesn't reset `apiBase` when input cleared — stale custom server stays active.
+- `app.js:1296-1313`: Success toast reuses `⚠` warning icon — should toggle to `✓`.
+- `style.css:919`: `border: none` immediately overridden by line 925 — dead CSS.
+- `download.html:146`: `navigator.platform` deprecated; may return empty in modern browsers.
+- `app.js:143-156`: `loadSettings` no validation — corrupted localStorage values pass through unchecked.
+- `style.css:1249-1253`: `prefers-reduced-motion` only disables modal animation; `fadeIn`/`slideUp`/`pulse` still run.
+
+### Test Quality Findings
+- `store_test.go:86-138`: `TestStoreTrimToMax` inserts 5 results with near-identical timestamps — `ORDER BY created_at DESC` tie-break depends on SQLite rowid behavior.
+- Missing upload 503 concurrency limit test (download has one).
+- `speedtest_test.go:103`: `time.Sleep(50ms)` for goroutine sync — flaky under CI load.
+- Missing tests: download duration/chunk clamping, results `Cache-Control` header.
+
+### API Consistency Findings
+- 12+ locations use `http.Error()` (plaintext) instead of JSON error format documented in `API.md` — results handler, speedtest 503s, registry auth errors.
+- Download handler hardcodes duration max to 60s, ignores `config.MaxTestDuration`.
+- Invalid download params silently clamped (stream API returns 400).
+
+### Build/CI Findings
+- Tag push triggers both `ci.yml` and `release.yml` Docker builds — duplicate work + potential race on image tags.
+- CI edge images are amd64-only; release builds both amd64+arm64.
+- Playwright browser installations not cached (~200MB per run).
+
+### Go Code Quality Findings
+- `config.go:261-272`: `REGISTRY_INTERVAL`/`REGISTRY_SERVER_TTL` silently ignore invalid env values (inconsistent with round 5 fail-fast pattern).
+- `manager.go`: Pending streams never cleaned up — accumulate indefinitely if `StartStream` not called.
+- `config.go`: `PORT` not validated as numeric — `PORT=banana` causes confusing runtime error.
+- `handlers.go:130,463`: Error matching uses type assertion instead of `errors.As` — breaks if errors are wrapped.
+- `logging.Init` uses `sync.Once` — prevents log level reconfiguration after first call.
+- `ratelimit.go:95-117`: `allowIP` holds write lock during periodic cleanup — blocks all API requests.
+
+### Documentation Findings
+- `DEPLOYMENT.md:19,185`: Quick deploy copies `web/` folder — unnecessary since embed refactor.
+- `API.md:386`: Unclosed code fence in Ping section breaks markdown.
+- `README.md:60`: "Pre-test warm-up phase (2s default)" outdated — web uses dynamic warm-up.
+
+### Performance Findings
+- `logging/logger.go:115-128`: `formatFields` uses string concatenation in loop — allocation per log line.
+- `manager.go:233-247`: `ActiveCount()` scans all streams on every `/servers` request.
+- `results/store.go:200-210`: `generateID` makes 8 syscalls per ID — could batch entropy.
+
+### Actions Taken
+- **A1**: Replaced all `http.Error` with JSON `{"error":"..."}` in `results/handler.go` (7 calls) and `speedtest.go` (4 calls).
+- **F2**: `onCustomServerChange` now resets `apiBase`/`selectedServer` when input is cleared.
+- **F3**: Toast icon toggles between `⚠` (error) and `✓` (success).
+- **G1**: `REGISTRY_INTERVAL`/`REGISTRY_SERVER_TTL` now fail-fast on invalid values (consistent with round 5 pattern).
+- **G3**: `PORT` env validated as numeric.
+- **C1**: Removed tag trigger from CI `build-push`/`deploy` — tags are handled exclusively by `release.yml`.
+- **D1**: Removed stale `web/` copy instructions from `DEPLOYMENT.md` (quick deploy + manual deploy sections).
+- **D3**: Fixed README warm-up description (now mentions dynamic warm-up).
+- **P1**: `formatFields` uses `strings.Builder` instead of `+` concatenation.
+
+### Deferred (carried forward)
+- `ServerInfo` dedup across `api` and `registry` packages.
+- CLI HTTP engine hardcoded overhead/grace.
+- Registry API documentation in `API.md`.
+- UDP single-threaded read loop.
+- Flaky concurrency test sleep (T3).
+- Latency ping response body drain (F1).
+- `navigator.platform` deprecation (F5).
+- `prefers-reduced-motion` coverage (F7).
+
+## Improvement Round 7 (2026-02-06)
+
+### Findings
+- `handlers.go:130,463`: `StreamError` type assertion used `err.(*errors.StreamError)` instead of `errors.As` — breaks if errors are wrapped.
+- `handlers.go:443-449`: `respondJSONBodyError` used `http.Error` (plaintext) — inconsistent with JSON API format established in R6.
+- `speedtest.go:47`: `respondSpeedtestError` ignored `json.Encode` return value.
+- `speedtest.go:60`: Download `MaxTestDuration` hardcoded to 60s — ignored `config.MaxTestDuration`.
+- `manager.go:283-299`: Pending streams never cleaned up — accumulate indefinitely if `StartStream` not called, consuming `maxStreams` slots.
+- `registry/handler.go`: All error responses (6 locations) used `http.Error` (plaintext) — inconsistent with JSON API format.
+- `registry/client.go:66,199`: Error log messages dropped actual error values — "Initial registration failed" with no context.
+- `registry/client.go:99,136`: `register`/`heartbeat` used `http.NewRequest` without context — no cancellation propagation.
+- `registry/client.go:163,178`: `deregister` error logs dropped error values.
+- `rtt.go:32`: `r.samples = r.samples[1:]` reslice didn't free backing array — slow memory leak in long-lived `RTTCollector`.
+- `config.go:119-124,295-297`: `PORT` validated as numeric but not range-checked — `PORT=99999` passed validation.
+- `router.go:250-265`: `responseWriter` wrapper implemented `Hijack` but not `http.Flusher` — broke flushing for any logging-middleware-wrapped response.
+- `app.js:143-156`: `loadSettings` didn't validate parsed values — corrupted `localStorage` could set `NaN` duration/streams.
+- `app.js:354-366`: `selectFastestServer` didn't consume health check response body on success — delayed HTTP/2 connection reuse.
+- `app.js:509`: `checkServer` skipped `!res.ok` responses without consuming body.
+
+### Actions
+- `handlers.go`: Replaced `err.(*errors.StreamError)` with `errors.As` in `CreateStream` error handler and `respondError`.
+- `handlers.go`: `respondJSONBodyError` now returns JSON `{"error":"..."}` via `respondJSON` instead of `http.Error`.
+- `speedtest.go`: `respondSpeedtestError` now logs `json.Encode` errors.
+- `speedtest.go`: `NewSpeedTestHandler` accepts `maxDurationSec` param; `Download` uses it instead of hardcoded 60.
+- `router.go`: `NewRouter` passes `MaxTestDuration` from config to `NewSpeedTestHandler`.
+- `router.go`: `responseWriter` now implements `http.Flusher` (delegates to underlying writer).
+- `manager.go`: `cleanup()` now handles `StreamStatusPending` — fails and removes pending streams older than 30s.
+- `registry/handler.go`: Added `respondRegistryError` helper; replaced all 6 `http.Error` calls with JSON responses.
+- `registry/client.go`: `register`, `heartbeat`, `deregister` error logs now include `logging.Field{Key: "error", Value: err}`.
+- `registry/client.go`: `register` and `heartbeat` now use `http.NewRequestWithContext` with 10s timeout.
+- `rtt.go`: Replaced slice reslice with proper ring buffer (`head`/`count` indices, fixed-size backing array).
+- `config.go`: `Validate()` now checks `PORT` is in range 1-65535.
+- `app.js`: `loadSettings` validates parsed `duration`, `streams`, `serverUrl` types before applying.
+- `app.js`: `selectFastestServer` consumes health response body via `res.text()` on both ok and unhealthy paths.
+- `app.js`: `checkServer` consumes response body on `!res.ok` before continuing.
+- Added tests: `TestUploadConcurrentLimitAndRelease`, `TestDownloadRespectsMaxDuration`, `TestHandlerSaveRejectsWrongContentType`, `TestPendingStreamCleanup`, `TestActiveCountMatchesActiveStreams`, `TestConfigValidatePortRange`.
+- Updated all `NewSpeedTestHandler` call sites (6 locations) with new `maxDurationSec` parameter.
+- Full test suite passes with race detection.
+
+### Deferred (carried forward)
+- `ServerInfo` dedup across `api` and `registry` packages.
+- CLI HTTP engine hardcoded overhead/grace.
+- Registry API documentation in `API.md`.
+- UDP single-threaded read loop.
+- Flaky concurrency test sleep (T3).
+- `navigator.platform` deprecation (F5).
+- `registry/client.go:222`: `buildServerInfo` hardcodes `http://` scheme — wrong behind TLS termination.
+- `websocket/server.go`: `sentStatus` map never cleaned for clientless streams.
+- `results/store.go`: `generateID` makes 8 syscalls per ID — could batch entropy.
+
+## Improvement Round 8 (2026-02-06)
+
+### Findings
+- `collector.go:125`: `startTime` read outside `c.mu.RUnlock` — data race with `Reset()`.
+- `collector.go:64-69`: `RecordLatency` holds `c.mu.Lock` around `c.latencyHistogram.Record()` — double-mutex contention (histogram has its own lock).
+- `ratelimit.go:164`: 429 response used `http.Error` (plaintext) — all other API errors are JSON.
+- `router.go:115,155,159`: `HandleWithID` and WS route returned `http.Error` plaintext on API paths.
+- `app.js:797-802`: Loaded latency probe never drained ping response body — HTTP/2 stream leak during test.
+- `app.js:1064-1069`: Upload `!res.ok` path continued without consuming response body.
+- `app.js:168-169`: `saveSettings` used `parseInt` without radix or NaN validation.
+- `style.css:1249-1253`: `prefers-reduced-motion` only suppressed modal animation — WCAG violation.
+- `style.css:919`: Dead `border: none` immediately overridden by `border: 1px solid`.
+- `manager.go:233-247`: `ActiveCount()` O(n) scan over all streams (including retained completed) on every `/servers` request.
+- `API.md:318`: Download max duration doc said 60, actual is config-driven (default 300).
+
+### Actions
+- `collector.go`: Read `startTime` inside `c.mu.RLock` section — eliminates race with `Reset()`.
+- `collector.go`: `RecordLatency` calls `c.latencyHistogram.Record()` *outside* `c.mu.Lock` — eliminates double-locking on hot path.
+- `ratelimit.go`: 429 response now returns JSON `{"error":"rate limit exceeded"}`.
+- `router.go`: `HandleWithID` and WS route errors now use `respondJSON` for JSON format.
+- `app.js`: Loaded latency probe now drains ping response body with `res.text()`.
+- `app.js`: Upload `!res.ok` path now drains response body before `continue`/`break`.
+- `app.js`: `saveSettings` uses `parseInt(..., 10)` with `Number.isFinite` + `> 0` validation.
+- `style.css`: `prefers-reduced-motion` now suppresses *all* animations and transitions.
+- `style.css`: Removed dead `border: none` from `.modal`.
+- `manager.go`: Added `activeCount int64` field; incremented atomically in `CreateStream`, decremented in `releaseActiveStreamLocked`. `ActiveCount()` is now O(1) via `atomic.LoadInt64`.
+- `API.md`: Updated download max duration from 60 to "configurable via MAX_TEST_DURATION, default 300".
+
+### Deferred (carried forward)
+- `ServerInfo` dedup across `api` and `registry` packages.
+- CLI HTTP engine hardcoded overhead/grace.
+- Registry API documentation in `API.md`.
+- UDP single-threaded read loop.
+- Flaky concurrency test sleep (T3).
+- `navigator.platform` deprecation (F5).
+- `registry/client.go:222`: `buildServerInfo` hardcodes `http://` scheme — wrong behind TLS termination.
+- `websocket/server.go`: `sentStatus` map never cleaned for clientless streams.
+- `results/store.go`: `generateID` makes 8 syscalls per ID — could batch entropy.
+
+## Improvement Round 9 — Analysis (2026-02-06)
+
+### HIGH Findings
+- **F1**: TCP stream server (`stream/server.go:138,166-352`) accepts unlimited connections — no auth, no concurrency limit, no duration cap. All TCP handlers loop until client disconnects. DoS vector for public deployments.
+- **F2**: WebSocket server (`websocket/server.go:67,94`) never calls `SetReadLimit()`. Default is unlimited. Malicious client can send multi-GB message, consuming server memory.
+- **F3**: Stream Manager (`manager.go:88`) capacity check uses `len(m.streams)` which includes completed/retained streams (1hr retention). Completed streams block new stream creation even though slots are free.
+
+### MEDIUM Findings
+- **F4**: `measureLatency` (`app.js:704-733`) — 22 of 24 pings never drain response body after first sets `capturedIP`. HTTP/2 stream leak during latency phase.
+- **F5**: `handlers.go:95,165,242,260` — 4 remaining plaintext `http.Error` on method-not-allowed. R6-R8 fixed all others; these remain inconsistent.
+- **F6**: `results.html:155-194` — `renderResult()` assumes API fields are numbers; throws `TypeError` on malformed response with no user feedback.
+- **F7**: `fetchWithTimeout` (`app.js:287-289`) — abort listener accumulates on shared signal; hundreds of listeners build up during long tests.
+- **F8**: `checkServer` (`app.js:512-536`) — sequential health probes with no per-URL timeout; custom server DNS failure can block UI for 2-3 minutes.
+- **F9**: CI (`ci.yml:92-94`) — Playwright browser installations (~200MB) not cached; downloads on every non-PR push.
+
+### LOW Findings
+- **F10**: CLI `selectFastestServer` (`cli.go:193`) — `resp.Body.Close()` without drain prevents HTTP connection reuse.
+- **F11**: `gorilla/mux v1.8.1` (`go.mod:8`) — archived since Dec 2022. Go 1.25 stdlib router supports path params and method matching natively.
+- **F12**: Makefile `perf-smoke` (line 103) — `go run ... &` PID capture gets `go run` PID, not child binary PID; `kill` may leave orphan.
+
+### Actions
+- **F1**: Added `activeTCPConns` atomic counter + `maxTCPConns` limit to stream server. TCP connections rejected when limit exceeded. Added `maxConnDur` hard duration cap per connection (MaxTestDuration + 30s grace); context-based deadline closes connection when exceeded.
+- **F2**: Added `conn.SetReadLimit(4096)` after WebSocket upgrade — server only reads for disconnect detection, 4KB is generous.
+- **F3**: Changed `CreateStream` capacity check from `len(m.streams)` to `atomic.LoadInt64(&m.activeCount)` — completed/retained streams no longer count against capacity.
+- **F4**: `measureLatency` now drains response body on all pings after first (added `else { await res.text() }` after IP capture branch).
+- **F5**: All 4 method-not-allowed handlers now use `respondJSON` instead of `http.Error` — completes JSON error format migration across entire API surface.
+- **F6**: `results.html` `renderResult` wrapped in try/catch with `showError()` fallback; added `safeFixed()` helper for numeric fields; type-checks `d` before rendering.
+- **F8**: `checkServer` now uses `fetchWithTimeout(url, {}, 5000)` instead of bare `fetch()` — prevents multi-minute hangs on custom server DNS failures.
+
+### Deferred (carried forward)
+- `ServerInfo` dedup across `api` and `registry` packages.
+- CLI HTTP engine hardcoded overhead/grace.
+- Registry API documentation in `API.md`.
+- UDP single-threaded read loop.
+- Flaky concurrency test sleep (T3).
+- `navigator.platform` deprecation.
+- `registry/client.go:222`: `buildServerInfo` hardcodes `http://` scheme.
+- `websocket/server.go`: `sentStatus` map never cleaned for clientless streams.
+- `results/store.go`: `generateID` makes 8 syscalls per ID.
+- `fetchWithTimeout` abort listener accumulation (F7).
+- CLI `selectFastestServer` body drain (F10).
+- `gorilla/mux` archived — consider stdlib migration (F11).
+- Makefile `perf-smoke` PID capture (F12).
+- Playwright browser cache in CI (F9).
+
+## Improvement Round 10 — Analysis (2026-02-06)
+
+### HIGH Findings
+- **F1**: CORS wildcard subdomain bypass (`router.go:223-228`, `websocket/server.go:318-323`) — `*.example.com` matches `evilexample.com` via bare `HasSuffix`. Missing leading dot check allows any domain ending with the suffix to pass CORS/WebSocket origin validation.
+- **F2**: UDP sender goroutine spawn without limit (`stream/server.go:429-438`) — each unique client address spawns an unbounded `udpSender` goroutine. TCP got limits in R9; UDP did not. DoS vector via spoofed/many source addresses.
+- **F3**: XFF leftmost-IP trust enables rate limit bypass (`clientip.go:65-84`) — `firstClientIP` returns first public IP from `X-Forwarded-For`. Behind trusted proxy, attacker prepends spoofed IP; function returns attacker-controlled value. Per-IP rate limiting bypassed.
+
+### MEDIUM Findings
+- **F4**: Upload handler has no duration cap or context check (`speedtest.go:144-158`) — `io.Copy(io.Discard, r.Body)` blocks until EOF. Download handler has `duration` param + `r.Context().Done()` + deadline. Slow-drip upload holds concurrency slot indefinitely.
+- **F5**: UDP client state TOCTOU (`stream/server.go:425-438`) — RLock/check-nil/RUnlock/Lock window allows two packets from same address to both see nil, both create state + spawn sender goroutine. Second overwrites map; first leaks.
+- **F6**: UDP sender goroutines not tracked by WaitGroup (`stream/server.go:438`) — `Close()` returns before senders finish; writes to closed `udpConn` possible.
+- **F7**: Client TCP/UDP warm-up is a no-op (`engine.go:199-215`) — reads from connections before direction command byte sent. Server blocks waiting for command; all reads time out. Warm-up period wasted.
+- **F8**: Client parent context timeout wraps entire lifecycle (`main.go:70`) — default 60s timeout starts before ping/RTT/warmup. HTTP mode consumes ~10s on pings; `-t 55` test gets killed at 60s mark.
+
+### LOW Findings
+- **F9**: CORS OPTIONS rejection uses plaintext `http.Error` (`router.go:198`) — R6-R9 migrated all API errors to JSON; this one missed. No functional impact (browser doesn't expose CORS preflight bodies).
+
+### Actions
+- **F1**: Fixed CORS wildcard subdomain bypass in `router.go` and `websocket/server.go` — added dot boundary check (`originHostValue == suffix || HasSuffix(originHostValue, "."+suffix)`).
+- **F2+F5+F6**: Added `activeUDPSenders`/`maxUDPSenders` atomic limiter. Fixed TOCTOU via double-checked locking after write lock. Added `s.wg.Add(1)` + `defer s.wg.Done()` + `defer atomic.AddInt64(&s.activeUDPSenders, -1)` to `udpSender`.
+- **F3**: Replaced `firstClientIP` (leftmost-first) with `rightmostUntrustedIP` — iterates XFF right-to-left, skips trusted proxy CIDRs. Prevents rate limit bypass via spoofed XFF. Removed dead `firstClientIP`.
+- **F4**: Upload handler now has duration cap (`maxDurationSec + 30s`), context cancellation check, and non-EOF error detection in read loop.
+- **F9**: CORS OPTIONS rejection now returns JSON.
+- Updated `TestClientIPResolver_TrustedProxy` for rightmost-untrusted behavior; added `TestClientIPResolver_RightmostUntrusted`.
+
+### Deferred (carried forward)
+- `ServerInfo` dedup across `api` and `registry` packages.
+- CLI HTTP engine hardcoded overhead/grace.
+- Registry API documentation in `API.md`.
+- UDP single-threaded read loop.
+- Flaky concurrency test sleep (T3).
+- `navigator.platform` deprecation.
+- `registry/client.go:222`: `buildServerInfo` hardcodes `http://` scheme.
+- `websocket/server.go`: `sentStatus` map never cleaned for clientless streams.
+- `results/store.go`: `generateID` makes 8 syscalls per ID.
+- `fetchWithTimeout` abort listener accumulation.
+- CLI `selectFastestServer` body drain.
+- `gorilla/mux` archived — stdlib migration candidate.
+- Makefile `perf-smoke` PID capture.
+- Playwright browser cache in CI.
+- Client TCP/UDP warm-up is a no-op (F7).
+- Client parent context timeout wraps entire lifecycle (F8).

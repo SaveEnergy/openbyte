@@ -11,7 +11,7 @@ import (
 )
 
 func TestHTTPTestEngineDownload(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10)
+	handler := api.NewSpeedTestHandler(10, 300)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/download", handler.Download)
 	mux.HandleFunc("/api/v1/ping", handler.Ping)
@@ -48,7 +48,7 @@ func TestHTTPTestEngineDownload(t *testing.T) {
 }
 
 func TestHTTPTestEngineUpload(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10)
+	handler := api.NewSpeedTestHandler(10, 300)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/upload", handler.Upload)
 	mux.HandleFunc("/api/v1/ping", handler.Ping)

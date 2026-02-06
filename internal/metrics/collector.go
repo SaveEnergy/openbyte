@@ -62,11 +62,13 @@ func (c *Collector) RecordBytes(bytes int64, direction string) {
 }
 
 func (c *Collector) RecordLatency(latency time.Duration) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	// Histogram has its own mutex — record outside c.mu to reduce contention.
 	if c.latencyHistogram != nil {
 		c.latencyHistogram.Record(latency)
 	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.latencySum += latency
 	c.latencyCount++
 	if !c.hasLastLatency {
@@ -107,7 +109,9 @@ func (c *Collector) GetMetrics() types.Metrics {
 
 	var latencyMetrics types.LatencyMetrics
 	var jitterMs float64
+	var startTime time.Time
 	c.mu.RLock()
+	startTime = c.startTime
 	if c.latencyHistogram != nil && c.latencyCount > 0 {
 		buckets, ok := c.bucketPool.Get().([]uint32)
 		if !ok || len(buckets) != c.latencyHistogram.BucketCount() {
@@ -122,7 +126,7 @@ func (c *Collector) GetMetrics() types.Metrics {
 	}
 	c.mu.RUnlock()
 
-	elapsed := time.Since(c.startTime)
+	elapsed := time.Since(startTime)
 	totalBytes := bytesSent + bytesRecv
 
 	throughputMbps := float64(0)

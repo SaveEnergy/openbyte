@@ -72,13 +72,21 @@ func (h *Handler) ListServers(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func respondRegistryError(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
+		logging.Warn("registry: encode error response", logging.Field{Key: "error", Value: err})
+	}
+}
+
 func (h *Handler) GetServer(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
 
 	server, exists := h.service.Get(id)
 	if !exists {
-		http.Error(w, "Server not found", http.StatusNotFound)
+		respondRegistryError(w, "server not found", http.StatusNotFound)
 		return
 	}
 
@@ -90,19 +98,19 @@ func (h *Handler) GetServer(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
 	if !h.authenticate(r) {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		respondRegistryError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxRegistryBodySize)
 	var info ServerInfo
 	if err := json.NewDecoder(r.Body).Decode(&info); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondRegistryError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if info.ID == "" {
-		http.Error(w, "Server ID is required", http.StatusBadRequest)
+		respondRegistryError(w, "server ID is required", http.StatusBadRequest)
 		return
 	}
 
@@ -123,7 +131,7 @@ func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 	if !h.authenticate(r) {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		respondRegistryError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -133,14 +141,14 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRegistryBodySize)
 	var info ServerInfo
 	if err := json.NewDecoder(r.Body).Decode(&info); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		respondRegistryError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	info.ID = id
 
 	if !h.service.Update(id, info) {
-		http.Error(w, "Server not found", http.StatusNotFound)
+		respondRegistryError(w, "server not found", http.StatusNotFound)
 		return
 	}
 
@@ -155,7 +163,7 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) DeregisterServer(w http.ResponseWriter, r *http.Request) {
 	if !h.authenticate(r) {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		respondRegistryError(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -163,7 +171,7 @@ func (h *Handler) DeregisterServer(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 
 	if !h.service.Deregister(id) {
-		http.Error(w, "Server not found", http.StatusNotFound)
+		respondRegistryError(w, "server not found", http.StatusNotFound)
 		return
 	}
 

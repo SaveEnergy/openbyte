@@ -63,7 +63,8 @@ func (c *Client) Start(getActiveTests func() int) error {
 	c.logger.Info("Starting registry client")
 
 	if err := c.register(getActiveTests()); err != nil {
-		c.logger.Error("Initial registration failed")
+		c.logger.Error("Initial registration failed",
+			logging.Field{Key: "error", Value: err})
 	}
 
 	c.wg.Add(1)
@@ -96,7 +97,10 @@ func (c *Client) register(activeTests int) error {
 		return fmt.Errorf("marshal server info: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, c.config.RegistryURL+"/api/v1/registry/servers", bytes.NewReader(payload))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.config.RegistryURL+"/api/v1/registry/servers", bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -133,7 +137,10 @@ func (c *Client) heartbeat(activeTests int) error {
 	}
 
 	url := fmt.Sprintf("%s/api/v1/registry/servers/%s", c.config.RegistryURL, c.config.ServerID)
-	req, err := http.NewRequest(http.MethodPut, url, bytes.NewReader(payload))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -167,7 +174,8 @@ func (c *Client) deregister() {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
-		c.logger.Error("Create deregister request")
+		c.logger.Error("Create deregister request",
+			logging.Field{Key: "error", Value: err})
 		return
 	}
 
@@ -177,7 +185,8 @@ func (c *Client) deregister() {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		c.logger.Error("Deregister from registry")
+		c.logger.Error("Deregister from registry",
+			logging.Field{Key: "error", Value: err})
 		return
 	}
 	drainAndClose(resp, c.logger)
@@ -197,7 +206,8 @@ func (c *Client) heartbeatLoop(getActiveTests func() int) {
 			return
 		case <-ticker.C:
 			if err := c.heartbeat(getActiveTests()); err != nil {
-				c.logger.Error("Registry heartbeat failed")
+				c.logger.Error("Registry heartbeat failed",
+					logging.Field{Key: "error", Value: err})
 			}
 		}
 	}

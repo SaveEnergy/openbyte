@@ -33,9 +33,13 @@ func (r *Router) GetLimiter() *RateLimiter {
 }
 
 func NewRouter(handler *Handler, cfg *config.Config) *Router {
+	maxDur := 300
+	if cfg.MaxTestDuration > 0 {
+		maxDur = int(cfg.MaxTestDuration.Seconds())
+	}
 	return &Router{
 		handler:   handler,
-		speedtest: NewSpeedTestHandler(cfg.MaxConcurrentHTTP()),
+		speedtest: NewSpeedTestHandler(cfg.MaxConcurrentHTTP(), maxDur),
 	}
 }
 
@@ -108,7 +112,7 @@ func (r *Router) SetupRoutes() *mux.Router {
 				vars := mux.Vars(req)
 				streamID := vars["id"]
 				if streamID == "" {
-					http.Error(w, "stream ID required", http.StatusBadRequest)
+					respondJSON(w, map[string]string{"error": "stream ID required"}, http.StatusBadRequest)
 					return
 				}
 				wsHandler(w, req, streamID)
@@ -148,11 +152,11 @@ func (r *Router) HandleWithID(fn func(http.ResponseWriter, *http.Request, string
 		vars := mux.Vars(req)
 		streamID := vars["id"]
 		if streamID == "" {
-			http.Error(w, "stream ID required", http.StatusBadRequest)
+			respondJSON(w, map[string]string{"error": "stream ID required"}, http.StatusBadRequest)
 			return
 		}
 		if !isValidStreamID(streamID) {
-			http.Error(w, "invalid stream ID", http.StatusBadRequest)
+			respondJSON(w, map[string]string{"error": "invalid stream ID"}, http.StatusBadRequest)
 			return
 		}
 		fn(w, req, streamID)
@@ -190,7 +194,7 @@ func (r *Router) CORSMiddleware(next http.Handler) http.Handler {
 		}
 		if req.Method == http.MethodOptions {
 			if origin != "" && !originAllowed {
-				http.Error(w, "Origin not allowed", http.StatusForbidden)
+				respondJSON(w, map[string]string{"error": "origin not allowed"}, http.StatusForbidden)
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)
@@ -218,7 +222,7 @@ func (r *Router) isAllowedOrigin(origin string) bool {
 		}
 		if strings.HasPrefix(allowed, "*.") {
 			suffix := strings.TrimPrefix(allowed, "*.")
-			if originHostValue != "" && strings.HasSuffix(originHostValue, suffix) {
+			if originHostValue != "" && (originHostValue == suffix || strings.HasSuffix(originHostValue, "."+suffix)) {
 				return true
 			}
 		}
@@ -262,6 +266,12 @@ func (rw *responseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 		return hijacker.Hijack()
 	}
 	return nil, nil, fmt.Errorf("response writer does not implement http.Hijacker")
+}
+
+func (rw *responseWriter) Flush() {
+	if flusher, ok := rw.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
 }
 
 func (r *Router) LoggingMiddleware(next http.Handler) http.Handler {

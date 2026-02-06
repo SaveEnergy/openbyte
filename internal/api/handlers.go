@@ -92,7 +92,7 @@ type ServersResponse struct {
 
 func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -127,7 +127,8 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 
 	state, err := h.manager.CreateStream(config)
 	if err != nil {
-		if streamErr, ok := err.(*errors.StreamError); ok && streamErr.Code == errors.ErrCodeStreamAlreadyExists {
+		var streamErr *errors.StreamError
+		if stdErrors.As(err, &streamErr) && streamErr.Code == errors.ErrCodeStreamAlreadyExists {
 			respondError(w, err, http.StatusConflict)
 			return
 		}
@@ -161,7 +162,7 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetServers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -238,7 +239,7 @@ func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ReportMetrics(w http.ResponseWriter, r *http.Request, streamID string) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -257,7 +258,7 @@ func (h *Handler) ReportMetrics(w http.ResponseWriter, r *http.Request, streamID
 
 func (h *Handler) CompleteStream(w http.ResponseWriter, r *http.Request, streamID string) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -443,10 +444,10 @@ func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}, lim
 func respondJSONBodyError(w http.ResponseWriter, err error) {
 	var maxErr *http.MaxBytesError
 	if stdErrors.As(err, &maxErr) {
-		http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+		respondJSON(w, map[string]string{"error": "request body too large"}, http.StatusRequestEntityTooLarge)
 		return
 	}
-	http.Error(w, "invalid request body", http.StatusBadRequest)
+	respondJSON(w, map[string]string{"error": "invalid request body"}, http.StatusBadRequest)
 }
 
 func respondJSON(w http.ResponseWriter, data interface{}, statusCode int) {
@@ -460,7 +461,8 @@ func respondJSON(w http.ResponseWriter, data interface{}, statusCode int) {
 
 func respondError(w http.ResponseWriter, err error, statusCode int) {
 	var msg string
-	if streamErr, ok := err.(*errors.StreamError); ok {
+	var streamErr *errors.StreamError
+	if stdErrors.As(err, &streamErr) {
 		msg = streamErr.Message
 	} else {
 		msg = err.Error()

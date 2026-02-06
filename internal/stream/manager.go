@@ -2,6 +2,7 @@ package stream
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,6 +19,7 @@ type Manager struct {
 	stopCh                chan struct{}
 	wg                    sync.WaitGroup
 	mu                    sync.RWMutex
+	activeCount           int64
 	maxStreams            int
 	maxStreamsPerIP       int
 	retentionPeriod       time.Duration
@@ -83,11 +85,12 @@ func (m *Manager) CreateStream(config types.StreamConfig) (*types.StreamState, e
 	}
 
 	m.mu.Lock()
-	if len(m.streams) >= m.maxStreams {
+	currentActive := int(atomic.LoadInt64(&m.activeCount))
+	if currentActive >= m.maxStreams {
 		m.mu.Unlock()
 		logging.Warn("Max concurrent streams reached",
 			logging.Field{Key: "max", Value: m.maxStreams},
-			logging.Field{Key: "active", Value: len(m.streams)})
+			logging.Field{Key: "active", Value: currentActive})
 		return nil, errors.ErrResourceExhausted("max concurrent streams reached")
 	}
 	if _, exists := m.streams[config.ID]; exists {
@@ -112,6 +115,7 @@ func (m *Manager) CreateStream(config types.StreamConfig) (*types.StreamState, e
 	m.streams[config.ID] = state
 	m.activeStreams[config.ID] = clientIP
 	m.activeByIP[clientIP]++
+	atomic.AddInt64(&m.activeCount, 1)
 	activeCount := len(m.streams)
 	m.mu.Unlock()
 
@@ -231,19 +235,7 @@ func (m *Manager) GetActiveStreams() []string {
 }
 
 func (m *Manager) ActiveCount() int {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	count := 0
-	for _, state := range m.streams {
-		snapshot := state.GetState()
-		if snapshot.Status == types.StreamStatusRunning ||
-			snapshot.Status == types.StreamStatusStarting ||
-			snapshot.Status == types.StreamStatusPending {
-			count++
-		}
-	}
-	return count
+	return int(atomic.LoadInt64(&m.activeCount))
 }
 
 func (m *Manager) cleanupExpiredStreams() {
@@ -282,16 +274,18 @@ func (m *Manager) cleanup() {
 
 	for i, state := range streamStates {
 		snapshot := state.GetState()
-		if snapshot.Status == types.StreamStatusRunning || snapshot.Status == types.StreamStatusStarting {
+		switch snapshot.Status {
+		case types.StreamStatusRunning, types.StreamStatusStarting:
 			maxDuration := snapshot.Config.Duration + 30*time.Second
 			if now.Sub(snapshot.StartTime) > maxDuration {
 				actions = append(actions, cleanupAction{streamID: streamIDs[i], fail: true, remove: true})
 			}
-			continue
-		}
-		if snapshot.Status == types.StreamStatusCompleted ||
-			snapshot.Status == types.StreamStatusFailed ||
-			snapshot.Status == types.StreamStatusCancelled {
+		case types.StreamStatusPending:
+			// Pending streams that were never started — clean up after 30s
+			if now.Sub(snapshot.Config.StartTime) > 30*time.Second {
+				actions = append(actions, cleanupAction{streamID: streamIDs[i], fail: true, remove: true})
+			}
+		case types.StreamStatusCompleted, types.StreamStatusFailed, types.StreamStatusCancelled:
 			if !snapshot.EndTime.IsZero() && now.Sub(snapshot.EndTime) > retentionPeriod {
 				actions = append(actions, cleanupAction{streamID: streamIDs[i], remove: true})
 			}
@@ -312,9 +306,16 @@ func (m *Manager) cleanup() {
 		}
 		snapshot := state.GetState()
 		if action.fail {
-			if snapshot.Status == types.StreamStatusRunning || snapshot.Status == types.StreamStatusStarting {
+			switch snapshot.Status {
+			case types.StreamStatusRunning, types.StreamStatusStarting:
 				maxDuration := snapshot.Config.Duration + 30*time.Second
 				if now.Sub(snapshot.StartTime) > maxDuration {
+					state.UpdateStatus(types.StreamStatusFailed)
+					m.releaseActiveStreamLocked(action.streamID)
+					delete(m.streams, action.streamID)
+				}
+			case types.StreamStatusPending:
+				if now.Sub(snapshot.Config.StartTime) > 30*time.Second {
 					state.UpdateStatus(types.StreamStatusFailed)
 					m.releaseActiveStreamLocked(action.streamID)
 					delete(m.streams, action.streamID)
@@ -348,6 +349,7 @@ func (m *Manager) releaseActiveStreamLocked(streamID string) {
 		return
 	}
 	delete(m.activeStreams, streamID)
+	atomic.AddInt64(&m.activeCount, -1)
 
 	if clientIP == "" {
 		clientIP = "unknown"

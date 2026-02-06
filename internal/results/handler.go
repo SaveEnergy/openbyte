@@ -39,10 +39,18 @@ type saveResponse struct {
 	URL string `json:"url"`
 }
 
+func respondJSONError(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
+		logging.Warn("results: encode error response", logging.Field{Key: "error", Value: err})
+	}
+}
+
 func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 	ct := r.Header.Get("Content-Type")
 	if ct != "" && !strings.HasPrefix(ct, "application/json") {
-		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+		respondJSONError(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 		return
 	}
 
@@ -50,23 +58,23 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 
 	var req saveRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		respondJSONError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if req.DownloadMbps < 0 || req.UploadMbps < 0 || req.LatencyMs < 0 ||
 		req.JitterMs < 0 || req.LoadedLatencyMs < 0 {
-		http.Error(w, "numeric fields must be >= 0", http.StatusBadRequest)
+		respondJSONError(w, "numeric fields must be >= 0", http.StatusBadRequest)
 		return
 	}
 	if req.DownloadMbps > 100000 || req.UploadMbps > 100000 ||
 		req.LatencyMs > 60000 || req.JitterMs > 60000 || req.LoadedLatencyMs > 60000 {
-		http.Error(w, "values out of reasonable range", http.StatusBadRequest)
+		respondJSONError(w, "values out of reasonable range", http.StatusBadRequest)
 		return
 	}
 	if len(req.ServerName) > 200 || len(req.IPv4) > 45 || len(req.IPv6) > 45 ||
 		len(req.BufferbloatGrade) > 5 {
-		http.Error(w, "field too long", http.StatusBadRequest)
+		respondJSONError(w, "field too long", http.StatusBadRequest)
 		return
 	}
 
@@ -84,7 +92,7 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 
 	id, err := h.store.Save(result)
 	if err != nil {
-		http.Error(w, "failed to save result", http.StatusInternalServerError)
+		respondJSONError(w, "failed to save result", http.StatusInternalServerError)
 		return
 	}
 
@@ -101,17 +109,17 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	if !validID.MatchString(id) {
-		http.Error(w, "invalid result ID", http.StatusBadRequest)
+		respondJSONError(w, "invalid result ID", http.StatusBadRequest)
 		return
 	}
 
 	result, err := h.store.Get(id)
 	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		respondJSONError(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	if result == nil {
-		http.Error(w, "result not found", http.StatusNotFound)
+		respondJSONError(w, "result not found", http.StatusNotFound)
 		return
 	}
 

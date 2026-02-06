@@ -17,17 +17,22 @@ import (
 )
 
 type Server struct {
-	config        *config.Config
-	tcpListener   *net.TCPListener
-	udpConn       *net.UDPConn
-	activeStreams map[string]*StreamSession
-	mu            sync.RWMutex
-	wg            sync.WaitGroup
-	ctx           context.Context
-	cancel        context.CancelFunc
-	randomData    []byte
-	sendPool      sync.Pool
-	recvPool      sync.Pool
+	config           *config.Config
+	tcpListener      *net.TCPListener
+	udpConn          *net.UDPConn
+	activeStreams    map[string]*StreamSession
+	activeTCPConns   int64
+	maxTCPConns      int64
+	activeUDPSenders int64
+	maxUDPSenders    int64
+	maxConnDur       time.Duration
+	mu               sync.RWMutex
+	wg               sync.WaitGroup
+	ctx              context.Context
+	cancel           context.CancelFunc
+	randomData       []byte
+	sendPool         sync.Pool
+	recvPool         sync.Pool
 }
 
 type StreamSession struct {
@@ -47,9 +52,21 @@ const (
 func NewServer(cfg *config.Config) (*Server, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	maxTCP := int64(cfg.MaxConcurrentHTTP())
+	if maxTCP <= 0 {
+		maxTCP = 64
+	}
+	maxDur := cfg.MaxTestDuration + 30*time.Second
+	if maxDur <= 30*time.Second {
+		maxDur = 330 * time.Second // 300s test + 30s grace
+	}
+
 	s := &Server{
 		config:        cfg,
 		activeStreams: make(map[string]*StreamSession),
+		maxTCPConns:   maxTCP,
+		maxUDPSenders: maxTCP,
+		maxConnDur:    maxDur,
 		ctx:           ctx,
 		cancel:        cancel,
 		randomData:    make([]byte, randomDataSize),
@@ -134,6 +151,12 @@ func (s *Server) acceptTCP() {
 			conn.SetReadBuffer(recvBufferSize)
 			conn.SetWriteBuffer(sendBufferSize)
 
+			if v := atomic.AddInt64(&s.activeTCPConns, 1); v > s.maxTCPConns {
+				atomic.AddInt64(&s.activeTCPConns, -1)
+				conn.Close()
+				continue
+			}
+
 			s.wg.Add(1)
 			go s.handleTCPConnection(conn)
 		}
@@ -143,6 +166,15 @@ func (s *Server) acceptTCP() {
 func (s *Server) handleTCPConnection(conn *net.TCPConn) {
 	defer s.wg.Done()
 	defer conn.Close()
+	defer atomic.AddInt64(&s.activeTCPConns, -1)
+
+	// Hard duration cap — prevents indefinitely held connections.
+	connCtx, connCancel := context.WithTimeout(s.ctx, s.maxConnDur)
+	defer connCancel()
+	go func() {
+		<-connCtx.Done()
+		conn.SetDeadline(time.Now())
+	}()
 
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	cmd := make([]byte, 1)
@@ -399,14 +431,23 @@ func (s *Server) handleUDP() {
 
 			if client == nil {
 				clientsMu.Lock()
-				client = &udpClientState{
-					addr:         addr,
-					lastSeenUnix: time.Now().UnixNano(),
+				// Double-check after acquiring write lock to prevent duplicate senders.
+				if existing := clients[clientKey]; existing != nil {
+					client = existing
+				} else if v := atomic.AddInt64(&s.activeUDPSenders, 1); v > s.maxUDPSenders {
+					atomic.AddInt64(&s.activeUDPSenders, -1)
+					clientsMu.Unlock()
+					continue
+				} else {
+					client = &udpClientState{
+						addr:         addr,
+						lastSeenUnix: time.Now().UnixNano(),
+					}
+					clients[clientKey] = client
+					s.wg.Add(1)
+					go s.udpSender(client)
 				}
-				clients[clientKey] = client
 				clientsMu.Unlock()
-
-				go s.udpSender(client)
 			}
 
 			atomic.StoreInt64(&client.lastSeenUnix, time.Now().UnixNano())
@@ -436,6 +477,9 @@ type udpClientState struct {
 }
 
 func (s *Server) udpSender(client *udpClientState) {
+	defer s.wg.Done()
+	defer atomic.AddInt64(&s.activeUDPSenders, -1)
+
 	packet := make([]byte, s.config.UDPBufferSize)
 	n := len(packet)
 	if n > len(s.randomData) {

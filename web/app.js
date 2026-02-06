@@ -145,7 +145,16 @@ function loadSettings() {
   if (saved) {
     try {
       const s = JSON.parse(saved);
-      state.settings = { ...state.settings, ...s };
+      // Validate parsed values before applying
+      if (typeof s.duration === 'number' && Number.isFinite(s.duration) && s.duration > 0) {
+        state.settings.duration = s.duration;
+      }
+      if (typeof s.streams === 'number' && Number.isFinite(s.streams) && s.streams > 0) {
+        state.settings.streams = s.streams;
+      }
+      if (typeof s.serverUrl === 'string') {
+        state.settings.serverUrl = s.serverUrl;
+      }
       elements.duration.value = state.settings.duration;
       elements.streams.value = state.settings.streams;
       if (state.settings.serverUrl && elements.customServerUrl) {
@@ -156,8 +165,10 @@ function loadSettings() {
 }
 
 function saveSettings() {
-  state.settings.duration = parseInt(elements.duration.value);
-  state.settings.streams = parseInt(elements.streams.value);
+  const d = parseInt(elements.duration.value, 10);
+  const s = parseInt(elements.streams.value, 10);
+  if (Number.isFinite(d) && d > 0) state.settings.duration = d;
+  if (Number.isFinite(s) && s > 0) state.settings.streams = s;
   localStorage.setItem('obyte-settings', JSON.stringify(state.settings));
   notifySettingsSaved();
 }
@@ -359,8 +370,11 @@ async function selectFastestServer() {
       const latency = performance.now() - start;
       
       if (res.ok) {
+        // Consume body to free connection for reuse
+        await res.text().catch(() => {});
         return { server, latency, error: null };
       }
+      await res.text().catch(() => {});
       return { server, latency: Infinity, error: 'unhealthy' };
     } catch (e) {
       return { server, latency: Infinity, error: e.message };
@@ -457,28 +471,35 @@ function onServerChange() {
 
 function onCustomServerChange() {
   const url = elements.customServerUrl.value.trim();
-  if (url) {
-    let serverUrl = url;
-    if (!/^https?:\/\//i.test(serverUrl)) {
-      const preferred = window.location.protocol === 'https:' ? 'https://' : 'http://';
-      serverUrl = preferred + serverUrl;
-    }
-    serverUrl = serverUrl.replace(/\/+$/, '');
-
-    const apiSuffix = '/api/v1';
-    let baseUrl = serverUrl;
-    if (baseUrl.toLowerCase().endsWith(apiSuffix)) {
-      baseUrl = baseUrl.slice(0, -apiSuffix.length);
-    }
-    baseUrl = baseUrl.replace(/\/+$/, '');
-    
-    apiBase = `${baseUrl}/api/v1`;
-    state.settings.serverUrl = baseUrl;
-    state.selectedServer = { id: 'custom', name: 'Custom', location: url, api_endpoint: baseUrl };
+  if (!url) {
+    apiBase = '/api/v1';
+    state.settings.serverUrl = '';
+    state.selectedServer = null;
     updateServerName();
     saveSettings();
     checkServer();
+    return;
   }
+  let serverUrl = url;
+  if (!/^https?:\/\//i.test(serverUrl)) {
+    const preferred = window.location.protocol === 'https:' ? 'https://' : 'http://';
+    serverUrl = preferred + serverUrl;
+  }
+  serverUrl = serverUrl.replace(/\/+$/, '');
+
+  const apiSuffix = '/api/v1';
+  let baseUrl = serverUrl;
+  if (baseUrl.toLowerCase().endsWith(apiSuffix)) {
+    baseUrl = baseUrl.slice(0, -apiSuffix.length);
+  }
+  baseUrl = baseUrl.replace(/\/+$/, '');
+  
+  apiBase = `${baseUrl}/api/v1`;
+  state.settings.serverUrl = baseUrl;
+  state.selectedServer = { id: 'custom', name: 'Custom', location: url, api_endpoint: baseUrl };
+  updateServerName();
+  saveSettings();
+  checkServer();
 }
 
 function showCustomServerInput(show) {
@@ -498,8 +519,11 @@ async function checkServer() {
     let ok = false;
     for (const url of candidates) {
       try {
-        const res = await fetch(url);
-        if (!res.ok) continue;
+        const res = await fetchWithTimeout(url, {}, 5000);
+        if (!res.ok) {
+          await res.text().catch(() => {});
+          continue;
+        }
         
         const data = await res.json();
         if (data.status === 'ok' || data.status === 'healthy' || data.pong === true) {
@@ -704,6 +728,8 @@ async function measureLatency() {
         } catch (_) {
           // JSON parse failed; skip
         }
+      } else {
+        await res.text().catch(() => {});
       }
       
       rawSamples.push(rtt);
@@ -772,12 +798,13 @@ function startLoadedLatencyProbe(signal) {
     while (running && state.isRunning) {
       const start = performance.now();
       try {
-        await fetch(`${apiBase}/ping`, {
+        const res = await fetch(`${apiBase}/ping`, {
           method: 'GET',
           cache: 'no-store',
           signal
         });
         samples.push(performance.now() - start);
+        await res.text().catch(() => {});
       } catch (_) {
         if (!running) break;
       }
@@ -1040,6 +1067,7 @@ async function runUploadTest(duration, onProgress) {
         }, (duration * 1000) + 10000);
         
         if (!res.ok) {
+          await res.text().catch(() => {});
           if (res.status === 503) {
             await sleep(500);
             break;
@@ -1295,15 +1323,18 @@ function resetToIdle() {
 
 function showError(message, isError = true) {
   elements.errorMessage.textContent = message;
+  const icon = elements.errorToast.querySelector('.toast-icon');
   if (toastTimer) {
     clearTimeout(toastTimer);
     toastTimer = null;
   }
   if (isError) {
+    if (icon) icon.textContent = '⚠';
     elements.errorToast.classList.remove('hidden');
     elements.errorToast.style.background = '';
     toastTimer = setTimeout(hideError, 5000);
   } else {
+    if (icon) icon.textContent = '✓';
     elements.errorToast.classList.remove('hidden');
     elements.errorToast.style.background = 'var(--accent-primary)';
     toastTimer = setTimeout(() => {

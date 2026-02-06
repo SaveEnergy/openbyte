@@ -75,6 +75,34 @@ func TestConfigValidateMaxTestDurationPositive(t *testing.T) {
 	}
 }
 
+func TestConfigValidatePortRange(t *testing.T) {
+	cfg := config.DefaultConfig()
+
+	// Valid port
+	cfg.Port = "8080"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("port 8080 should be valid: %v", err)
+	}
+
+	// Port 0 — invalid
+	cfg.Port = "0"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("port 0 should be invalid")
+	}
+
+	// Port too high
+	cfg.Port = "99999"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("port 99999 should be invalid")
+	}
+
+	// Non-numeric port (already caught by LoadFromEnv, but Validate should also catch)
+	cfg.Port = "abc"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("port 'abc' should be invalid")
+	}
+}
+
 func TestMaxConcurrentHTTPScalesWithCapacity(t *testing.T) {
 	tests := []struct {
 		capacity int

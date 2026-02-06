@@ -15,9 +15,8 @@ Production deployment guide for openByte speed test server.
 # Build binaries
 make build
 
-# Copy to server
+# Copy to server (web assets are embedded in the binary)
 scp bin/openbyte user@server:/opt/openbyte/
-scp -r web/ user@server:/opt/openbyte/
 
 # SSH to server
 ssh user@server
@@ -79,7 +78,7 @@ mkdir -p /opt/openbyte
 cd /opt/openbyte
 ```
 
-Copy `docker/docker-compose.ghcr.yaml` (and optionally `docker/docker-compose.ghcr.web.yaml` if you want direct HTTP on port 8080) and create a `.env` with runtime values:
+Copy `docker/docker-compose.ghcr.yaml` and create a `.env` with runtime values:
 
 ```bash
 SERVER_ID=openbyte-1
@@ -181,7 +180,7 @@ sudo chown openbyte:openbyte /var/log/openbyte
 ```bash
 # Local machine
 make build
-tar czf openbyte.tar.gz bin/openbyte web/
+tar czf openbyte.tar.gz bin/openbyte
 
 # Transfer
 scp openbyte.tar.gz user@server:/tmp/

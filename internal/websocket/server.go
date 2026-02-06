@@ -73,6 +73,9 @@ func (s *Server) HandleStream(w http.ResponseWriter, r *http.Request, streamID s
 	}
 	defer conn.Close()
 
+	// Server only reads for disconnect detection — limit frame size to prevent memory abuse.
+	conn.SetReadLimit(4096)
+
 	s.mu.Lock()
 	if s.clients[streamID] == nil {
 		s.clients[streamID] = make(map[*websocket.Conn]*clientConn)
@@ -314,7 +317,7 @@ func (s *Server) isAllowedOrigin(origin string, host string) bool {
 		}
 		if strings.HasPrefix(allowed, "*.") {
 			suffix := strings.TrimPrefix(allowed, "*.")
-			if originHostValue != "" && strings.HasSuffix(originHostValue, suffix) {
+			if originHostValue != "" && (originHostValue == suffix || strings.HasSuffix(originHostValue, "."+suffix)) {
 				return true
 			}
 		}

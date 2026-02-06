@@ -117,6 +117,9 @@ func DefaultConfig() *Config {
 
 func (c *Config) LoadFromEnv() error {
 	if port := os.Getenv("PORT"); port != "" {
+		if _, err := strconv.Atoi(port); err != nil {
+			return fmt.Errorf("invalid PORT %q: must be a number", port)
+		}
 		c.Port = port
 	}
 	if addr := os.Getenv("BIND_ADDRESS"); addr != "" {
@@ -258,18 +261,22 @@ func (c *Config) LoadFromEnv() error {
 		c.RegistryAPIKey = key
 	}
 	if interval := os.Getenv("REGISTRY_INTERVAL"); interval != "" {
-		if d, err := time.ParseDuration(interval); err == nil && d > 0 {
-			c.RegistryInterval = d
+		d, err := time.ParseDuration(interval)
+		if err != nil || d <= 0 {
+			return fmt.Errorf("invalid REGISTRY_INTERVAL %q: must be a positive duration (e.g. 30s)", interval)
 		}
+		c.RegistryInterval = d
 	}
 
 	if mode := os.Getenv("REGISTRY_MODE"); mode == "true" || mode == "1" {
 		c.RegistryMode = true
 	}
 	if ttl := os.Getenv("REGISTRY_SERVER_TTL"); ttl != "" {
-		if d, err := time.ParseDuration(ttl); err == nil && d > 0 {
-			c.RegistryServerTTL = d
+		d, err := time.ParseDuration(ttl)
+		if err != nil || d <= 0 {
+			return fmt.Errorf("invalid REGISTRY_SERVER_TTL %q: must be a positive duration (e.g. 60s)", ttl)
 		}
+		c.RegistryServerTTL = d
 	}
 
 	if cert := os.Getenv("TLS_CERT_FILE"); cert != "" {
@@ -288,6 +295,9 @@ func (c *Config) LoadFromEnv() error {
 func (c *Config) Validate() error {
 	if c.Port == "" {
 		return fmt.Errorf("port cannot be empty")
+	}
+	if p, err := strconv.Atoi(c.Port); err != nil || p < 1 || p > 65535 {
+		return fmt.Errorf("invalid port %q: must be 1-65535", c.Port)
 	}
 	if c.TCPTestPort <= 0 || c.TCPTestPort > 65535 {
 		return fmt.Errorf("invalid TCP test port: %d", c.TCPTestPort)

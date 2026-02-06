@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -117,14 +118,16 @@ func formatFields(fields []Field) string {
 		return ""
 	}
 
-	result := ""
+	var b strings.Builder
 	for i, f := range fields {
 		if i > 0 {
-			result += " "
+			b.WriteByte(' ')
 		}
-		result += f.Key + "=" + FormatValue(f.Value)
+		b.WriteString(f.Key)
+		b.WriteByte('=')
+		b.WriteString(FormatValue(f.Value))
 	}
-	return result
+	return b.String()
 }
 
 func FormatValue(v interface{}) string {

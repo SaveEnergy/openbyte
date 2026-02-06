@@ -152,9 +152,15 @@
         return { value: speed.toFixed(1), unit: 'Mbps' };
       }
 
+      function safeFixed(v, digits) {
+        return typeof v === 'number' && isFinite(v) ? v.toFixed(digits) : '-';
+      }
+
       function renderResult(d) {
-        var dl = formatSpeed(d.download_mbps);
-        var ul = formatSpeed(d.upload_mbps);
+        if (!d || typeof d !== 'object') { showError(); return; }
+        try {
+        var dl = formatSpeed(typeof d.download_mbps === 'number' ? d.download_mbps : 0);
+        var ul = formatSpeed(typeof d.upload_mbps === 'number' ? d.upload_mbps : 0);
 
         document.getElementById('downloadResult').textContent = dl.value;
         document.getElementById('uploadResult').textContent = ul.value;
@@ -165,11 +171,11 @@
         if (ulUnit) ulUnit.textContent = ul.unit;
 
         document.getElementById('latencyResult').textContent =
-          d.latency_ms > 0 ? d.latency_ms.toFixed(1) + ' ms' : '-';
+          d.latency_ms > 0 ? safeFixed(d.latency_ms, 1) + ' ms' : '-';
         document.getElementById('jitterResult').textContent =
-          d.jitter_ms > 0 ? d.jitter_ms.toFixed(1) + ' ms' : '-';
+          d.jitter_ms > 0 ? safeFixed(d.jitter_ms, 1) + ' ms' : '-';
         document.getElementById('loadedLatencyResult').textContent =
-          d.loaded_latency_ms > 0 ? d.loaded_latency_ms.toFixed(1) + ' ms' : '-';
+          d.loaded_latency_ms > 0 ? safeFixed(d.loaded_latency_ms, 1) + ' ms' : '-';
         document.getElementById('bufferbloatResult').textContent =
           d.bufferbloat_grade || '-';
 
@@ -191,6 +197,7 @@
 
         document.title = 'openByte — ' + dl.value + ' ' + dl.unit + ' / ' +
           ul.value + ' ' + ul.unit;
+        } catch (_) { showError(); }
       }
     })();
   </script>

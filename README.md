@@ -57,7 +57,7 @@ Open `http://localhost:8080` — minimal fast.com-inspired UI with real-time spe
 
 Uses BEREC-compliant measurement practices:
 
-- Pre-test warm-up phase (2s default, configurable via `--warmup`)
+- Dynamic warm-up with throughput stabilization detection (web UI); fixed warm-up via `--warmup` (CLI)
 - Baseline RTT measurement (10 samples before test)
 - Metrics reset after warm-up for accurate results
 - Statistical reporting with P50, P95, P99 percentiles

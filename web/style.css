@@ -916,7 +916,6 @@ body::before {
 }
 
 .modal {
-  border: none;
   padding: 0;
   width: min(92vw, 460px);
   margin: auto;
@@ -1247,8 +1246,10 @@ select.setting-input {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .modal[open] {
-    animation: none;
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 

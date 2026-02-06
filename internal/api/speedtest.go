@@ -17,16 +17,21 @@ type SpeedTestHandler struct {
 	activeDownloads  int64
 	activeUploads    int64
 	maxConcurrent    int64
+	maxDurationSec   int
 	clientIPResolver *ClientIPResolver
 	randomData       []byte
 }
 
 const speedtestRandomSize = 4 * 1024 * 1024
 
-func NewSpeedTestHandler(maxConcurrent int) *SpeedTestHandler {
+func NewSpeedTestHandler(maxConcurrent int, maxDurationSec int) *SpeedTestHandler {
+	if maxDurationSec <= 0 {
+		maxDurationSec = 300
+	}
 	handler := &SpeedTestHandler{
-		maxConcurrent: int64(maxConcurrent),
-		randomData:    make([]byte, speedtestRandomSize),
+		maxConcurrent:  int64(maxConcurrent),
+		maxDurationSec: maxDurationSec,
+		randomData:     make([]byte, speedtestRandomSize),
 	}
 	if _, err := rand.Read(handler.randomData); err != nil {
 		logging.Warn("speedtest: random data init failed, using per-request random",
@@ -40,10 +45,18 @@ func (h *SpeedTestHandler) SetClientIPResolver(resolver *ClientIPResolver) {
 	h.clientIPResolver = resolver
 }
 
+func respondSpeedtestError(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
+		logging.Warn("speedtest: encode error response", logging.Field{Key: "error", Value: err})
+	}
+}
+
 func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 	if v := atomic.AddInt64(&h.activeDownloads, 1); v > h.maxConcurrent {
 		atomic.AddInt64(&h.activeDownloads, -1)
-		http.Error(w, "too many concurrent downloads", http.StatusServiceUnavailable)
+		respondSpeedtestError(w, "too many concurrent downloads", http.StatusServiceUnavailable)
 		return
 	}
 	defer atomic.AddInt64(&h.activeDownloads, -1)
@@ -51,7 +64,7 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 	durationStr := r.URL.Query().Get("duration")
 	duration := 10 * time.Second
 	if durationStr != "" {
-		if d, err := strconv.Atoi(durationStr); err == nil && d > 0 && d <= 60 {
+		if d, err := strconv.Atoi(durationStr); err == nil && d > 0 && d <= h.maxDurationSec {
 			duration = time.Duration(d) * time.Second
 		}
 	}
@@ -73,7 +86,7 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 	if len(h.randomData) < chunkSize {
 		chunk = make([]byte, chunkSize)
 		if _, err := rand.Read(chunk); err != nil {
-			http.Error(w, "failed to generate random data", http.StatusInternalServerError)
+			respondSpeedtestError(w, "failed to generate random data", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -131,16 +144,35 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	if v := atomic.AddInt64(&h.activeUploads, 1); v > h.maxConcurrent {
 		atomic.AddInt64(&h.activeUploads, -1)
-		http.Error(w, "too many concurrent uploads", http.StatusServiceUnavailable)
+		respondSpeedtestError(w, "too many concurrent uploads", http.StatusServiceUnavailable)
 		return
 	}
 	defer atomic.AddInt64(&h.activeUploads, -1)
 
 	startTime := time.Now()
+	deadline := startTime.Add(time.Duration(h.maxDurationSec+30) * time.Second)
 
-	totalBytes, err := io.Copy(io.Discard, r.Body)
-	if err != nil {
-		http.Error(w, "upload failed", http.StatusInternalServerError)
+	buf := make([]byte, 256*1024)
+	var totalBytes int64
+	var readFailed bool
+	for time.Now().Before(deadline) {
+		select {
+		case <-r.Context().Done():
+			goto done
+		default:
+		}
+		n, err := r.Body.Read(buf)
+		totalBytes += int64(n)
+		if err != nil {
+			if err != io.EOF {
+				readFailed = true
+			}
+			break
+		}
+	}
+done:
+	if readFailed {
+		respondSpeedtestError(w, "upload failed", http.StatusInternalServerError)
 		return
 	}
 
