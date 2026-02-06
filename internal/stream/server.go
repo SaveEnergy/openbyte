@@ -3,6 +3,7 @@ package stream
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -13,14 +14,12 @@ import (
 
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/logging"
-	"github.com/saveenergy/openbyte/pkg/types"
 )
 
 type Server struct {
 	config           *config.Config
 	tcpListener      *net.TCPListener
 	udpConn          *net.UDPConn
-	activeStreams    map[string]*StreamSession
 	activeTCPConns   int64
 	maxTCPConns      int64
 	activeUDPSenders int64
@@ -33,14 +32,6 @@ type Server struct {
 	randomData       []byte
 	sendPool         sync.Pool
 	recvPool         sync.Pool
-}
-
-type StreamSession struct {
-	StreamID    string
-	Config      types.StreamConfig
-	Connections []net.Conn
-	StartTime   time.Time
-	mu          sync.RWMutex
 }
 
 const (
@@ -63,7 +54,6 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 	s := &Server{
 		config:        cfg,
-		activeStreams: make(map[string]*StreamSession),
 		maxTCPConns:   maxTCP,
 		maxUDPSenders: maxTCP,
 		maxConnDur:    maxDur,
@@ -137,7 +127,8 @@ func (s *Server) acceptTCP() {
 			s.tcpListener.SetDeadline(time.Now().Add(100 * time.Millisecond))
 			conn, err := s.tcpListener.AcceptTCP()
 			if err != nil {
-				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				var netErr net.Error
+				if errors.As(err, &netErr) && netErr.Timeout() {
 					continue
 				}
 				if s.ctx.Err() != nil {
@@ -259,10 +250,11 @@ func (s *Server) handleUpload(conn *net.TCPConn) {
 			}
 			_, err := conn.Read(buf)
 			if err != nil {
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					return
 				}
-				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				var netErr net.Error
+				if errors.As(err, &netErr) && netErr.Timeout() {
 					continue
 				}
 				return
@@ -277,9 +269,11 @@ func (s *Server) handleBidirectional(conn *net.TCPConn) {
 
 	go func() {
 		defer wg.Done()
-		buf := s.getSendBuffer()
-		defer s.sendPool.Put(buf)
 		dataLen := len(s.randomData)
+		chunkSize := sendBufferSize
+		if chunkSize > dataLen {
+			chunkSize = dataLen
+		}
 		offset := 0
 		nextDeadline := time.Now().Add(1 * time.Second)
 		conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
@@ -293,11 +287,11 @@ func (s *Server) handleBidirectional(conn *net.TCPConn) {
 					conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 					nextDeadline = time.Now().Add(1 * time.Second)
 				}
-				if offset+len(buf) <= dataLen {
-					if _, err := conn.Write(s.randomData[offset : offset+len(buf)]); err != nil {
+				if offset+chunkSize <= dataLen {
+					if _, err := conn.Write(s.randomData[offset : offset+chunkSize]); err != nil {
 						return
 					}
-					offset += len(buf)
+					offset += chunkSize
 					if offset == dataLen {
 						offset = 0
 					}
@@ -307,7 +301,7 @@ func (s *Server) handleBidirectional(conn *net.TCPConn) {
 				if _, err := conn.Write(first); err != nil {
 					return
 				}
-				remaining := len(buf) - len(first)
+				remaining := chunkSize - len(first)
 				if remaining > 0 {
 					if _, err := conn.Write(s.randomData[:remaining]); err != nil {
 						return
@@ -339,6 +333,13 @@ func (s *Server) handleBidirectional(conn *net.TCPConn) {
 				}
 				_, err := conn.Read(buf)
 				if err != nil {
+					if errors.Is(err, io.EOF) {
+						return
+					}
+					var netErr net.Error
+					if errors.As(err, &netErr) && netErr.Timeout() {
+						continue
+					}
 					return
 				}
 			}
@@ -365,10 +366,11 @@ func (s *Server) handleEcho(conn *net.TCPConn) {
 			}
 			n, err := conn.Read(buf)
 			if err != nil {
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					return
 				}
-				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				var netErr net.Error
+				if errors.As(err, &netErr) && netErr.Timeout() {
 					continue
 				}
 				return
@@ -411,7 +413,8 @@ func (s *Server) handleUDP() {
 			s.udpConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 			n, addr, err := s.udpConn.ReadFromUDP(buf)
 			if err != nil {
-				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				var netErr net.Error
+				if errors.As(err, &netErr) && netErr.Timeout() {
 					continue
 				}
 				if s.ctx.Err() != nil {

@@ -5,8 +5,8 @@ const state = {
   isRunning: false,
   downloadResult: 0,
   uploadResult: 0,
-  latencyResult: 0,
-  jitterResult: 0,
+  latencyResult: null,
+  jitterResult: null,
   downloadLatency: 0,
   uploadLatency: 0,
   currentSpeed: 0,
@@ -679,13 +679,15 @@ async function runTest(direction) {
   const latencyProbe = startLoadedLatencyProbe(state.abortController?.signal);
   
   let result;
-  if (direction === 'download') {
-    result = await runDownloadTest(duration, onProgress);
-  } else {
-    result = await runUploadTest(duration, onProgress);
+  try {
+    if (direction === 'download') {
+      result = await runDownloadTest(duration, onProgress);
+    } else {
+      result = await runUploadTest(duration, onProgress);
+    }
+  } finally {
+    await latencyProbe.stop();
   }
-  
-  await latencyProbe.stop();
   const loadedLatency = latencyProbe.getMedian();
   if (direction === 'download') {
     state.downloadLatency = loadedLatency;
@@ -746,7 +748,7 @@ async function measureLatency() {
     }
   }
   
-  if (rawSamples.length === 0) return 0;
+  if (rawSamples.length === 0) return null;
   
   // Discard warm-up pings (DNS/TLS overhead)
   const samples = rawSamples.length > warmUpPings
@@ -1216,8 +1218,8 @@ function showResults() {
   if (downloadUnit) downloadUnit.textContent = download.unit;
   if (uploadUnit) uploadUnit.textContent = upload.unit;
   
-  elements.latencyResult.textContent = `${state.latencyResult.toFixed(1)} ms`;
-  elements.jitterResult.textContent = `${state.jitterResult.toFixed(1)} ms`;
+  elements.latencyResult.textContent = state.latencyResult != null ? `${state.latencyResult.toFixed(1)} ms` : '-';
+  elements.jitterResult.textContent = state.jitterResult != null ? `${state.jitterResult.toFixed(1)} ms` : '-';
   
   // Loaded latency: use the worse of download/upload loaded latency
   const loadedLatency = Math.max(state.downloadLatency, state.uploadLatency);
@@ -1249,8 +1251,8 @@ async function saveAndEnableShare() {
       body: JSON.stringify({
         download_mbps: state.downloadResult,
         upload_mbps: state.uploadResult,
-        latency_ms: state.latencyResult,
-        jitter_ms: state.jitterResult,
+        latency_ms: state.latencyResult || 0,
+        jitter_ms: state.jitterResult || 0,
         loaded_latency_ms: loadedLat,
         bufferbloat_grade: bbGrade,
         ipv4: state.networkInfo.ipv4 || '',
@@ -1306,8 +1308,8 @@ function resetToIdle() {
   state.progress = 0;
   state.downloadResult = 0;
   state.uploadResult = 0;
-  state.latencyResult = 0;
-  state.jitterResult = 0;
+  state.latencyResult = null;
+  state.jitterResult = null;
   state.downloadLatency = 0;
   state.uploadLatency = 0;
   state.resultId = null;

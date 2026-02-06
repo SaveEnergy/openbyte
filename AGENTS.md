@@ -875,3 +875,29 @@
 - `listServers` collects aliases, sorts, then iterates in stable order.
 - Removed `strings.HasPrefix(args[0], "-")` server fallback; unknown args now error with usage hint.
 - `srv.ListenAndServe` uses `errors.Is(err, http.ErrServerClosed)`.
+
+## Improvement Round 15 (2026-02-06)
+
+### Findings
+- Bidirectional read goroutine in `stream/server.go` exited on any error including timeouts → premature test termination.
+- `stream/server.go` had 6 bare `== io.EOF` / `.(net.Error)` type assertions (acceptTCP, handleUpload, handleEcho, handleUDP, handleBidirectional).
+- Dead `activeStreams` map and `StreamSession` struct in `Server` — never read or written by any handler.
+- `registry.Service.Stop()` and `Manager.Stop()` panic on double-call (bare `close(ch)` without idempotency guard).
+- `broadcastMetrics` goroutine untracked; race between `manager.Stop()` and `wsServer.Close()`.
+- Bidirectional write goroutine allocated pool buffer solely for its length constant — wasted allocation.
+- Frontend displayed "0.0 ms" for latency when all pings failed instead of indicating unmeasured.
+- Loaded latency probe leaked if download/upload test threw (no try/finally).
+- Negative packet loss possible when `packetsReceived > packetsSent` (atomic timing).
+- HTTP engine tests leaked idle connections (missing `engine.Close()`).
+
+### Actions
+- Bidirectional read goroutine now checks `io.EOF` (return), timeout (continue), other (return).
+- Replaced all 6 bare `== io.EOF` / `.(net.Error)` with `errors.Is` / `errors.As` in `stream/server.go`.
+- Removed dead `activeStreams` map, `StreamSession` struct, and unused `types` import.
+- Added `stopOnce sync.Once` to both `Service.Stop()` and `Manager.Stop()`.
+- `broadcastMetrics` tracked with `sync.WaitGroup`; shutdown waits for goroutine exit before closing wsServer.
+- Bidirectional write goroutine uses `chunkSize := sendBufferSize` constant instead of pool allocation.
+- `measureLatency` returns `null` when all pings fail; display shows "-" instead of "0.0 ms".
+- Loaded latency probe wrapped in try/finally to ensure `stop()` on test error.
+- Negative packet loss prevented by adding `totalPacketsSent > totalPacketsRecv` guard.
+- Added `defer engine.Close()` to both HTTP engine tests.

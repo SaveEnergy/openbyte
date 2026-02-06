@@ -128,7 +128,7 @@ func (m *MultiStreamAggregator) GetAggregatedMetrics() types.Metrics {
 	}
 
 	packetLoss := float64(0)
-	if totalPacketsSent > 0 {
+	if totalPacketsSent > 0 && totalPacketsSent > totalPacketsRecv {
 		packetLoss = float64(totalPacketsSent-totalPacketsRecv) / float64(totalPacketsSent) * 100
 	}
 

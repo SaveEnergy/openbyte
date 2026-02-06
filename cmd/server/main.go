@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -99,7 +100,12 @@ func Run(version string) int {
 		registryHandler.RegisterRoutes(muxRouter)
 	}
 
-	go broadcastMetrics(manager, wsServer)
+	var broadcastWg sync.WaitGroup
+	broadcastWg.Add(1)
+	go func() {
+		defer broadcastWg.Done()
+		broadcastMetrics(manager, wsServer)
+	}()
 
 	var registryClient *registry.Client
 	if cfg.RegistryEnabled && !cfg.RegistryMode {
@@ -162,6 +168,7 @@ func Run(version string) int {
 
 	resultsStore.Close()
 	manager.Stop()
+	broadcastWg.Wait()
 	wsServer.Close()
 	streamServer.Close()
 

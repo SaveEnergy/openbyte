@@ -12,6 +12,7 @@ type Service struct {
 	cleanupInt time.Duration
 	stopCh     chan struct{}
 	wg         sync.WaitGroup
+	stopOnce   sync.Once
 }
 
 type RegisteredServer struct {
@@ -42,7 +43,9 @@ func (s *Service) Start() {
 }
 
 func (s *Service) Stop() {
-	close(s.stopCh)
+	s.stopOnce.Do(func() {
+		close(s.stopCh)
+	})
 	s.wg.Wait()
 }
 

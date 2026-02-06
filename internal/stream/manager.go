@@ -24,6 +24,7 @@ type Manager struct {
 	maxStreamsPerIP       int
 	retentionPeriod       time.Duration
 	metricsUpdateInterval time.Duration
+	stopOnce              sync.Once
 }
 
 type MetricsUpdate struct {
@@ -71,7 +72,9 @@ func (m *Manager) Start() {
 }
 
 func (m *Manager) Stop() {
-	close(m.stopCh)
+	m.stopOnce.Do(func() {
+		close(m.stopCh)
+	})
 	m.wg.Wait()
 	close(m.metricsUpdateCh)
 }

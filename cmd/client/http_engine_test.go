@@ -31,6 +31,7 @@ func TestHTTPTestEngineDownload(t *testing.T) {
 	}
 
 	engine := NewHTTPTestEngine(cfg)
+	defer engine.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	t.Cleanup(cancel)
 
@@ -68,6 +69,7 @@ func TestHTTPTestEngineUpload(t *testing.T) {
 	}
 
 	engine := NewHTTPTestEngine(cfg)
+	defer engine.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	t.Cleanup(cancel)
 
