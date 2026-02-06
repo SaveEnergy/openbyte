@@ -652,6 +652,11 @@ async function runTest(direction) {
     const intervalMs = now - lastUpdate;
     
     if (intervalMs >= 200) {
+      // Reset tracking on warmup-to-measurement transition (bytes counter resets)
+      if (bytes < lastBytes) {
+        lastBytes = bytes;
+        ewmaSpeed = 0;
+      }
       const intervalBytes = bytes - lastBytes;
       
       if (intervalBytes > 0 && intervalMs > 0) {
@@ -1253,7 +1258,7 @@ async function saveAndEnableShare() {
         server_name: resolveServerName()
       })
     });
-    if (!res.ok) return;
+    if (!res.ok) { await res.text().catch(() => {}); return; }
     const data = await res.json();
     state.resultId = data.id;
     if (elements.shareBtn) {
@@ -1290,15 +1295,7 @@ function cancelTest() {
   if (state.abortController) {
     state.abortController.abort();
   }
-  if (state.ws) {
-    state.ws.close();
-    state.ws = null;
-  }
-  if (state.streamId) {
-    fetch(`${apiBase}/stream/${state.streamId}/cancel`, { method: 'POST' }).catch(() => {});
-  }
   state.isRunning = false;
-  state.streamId = null;
 }
 
 function resetToIdle() {

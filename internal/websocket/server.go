@@ -90,7 +90,6 @@ func (s *Server) HandleStream(w http.ResponseWriter, r *http.Request, streamID s
 		"time":      time.Now().Unix(),
 	}); err != nil {
 		s.removeClient(streamID, conn)
-		conn.Close()
 		return
 	}
 

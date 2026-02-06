@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -160,39 +161,44 @@ func streamMetrics(ctx context.Context, wsURL string, formatter OutputFormatter,
 		readTimeout = time.Duration(config.Timeout) * time.Second
 	}
 
+	// Close connection on context cancellation to unblock ReadJSON immediately.
+	go func() {
+		<-ctx.Done()
+		conn.Close()
+	}()
+
 	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			conn.SetReadDeadline(time.Now().Add(readTimeout))
+		conn.SetReadDeadline(time.Now().Add(readTimeout))
 
-			var msg WebSocketMessage
-			if err := conn.ReadJSON(&msg); err != nil {
-				if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-					return nil
-				}
-				if netErr, ok := err.(interface{ Timeout() bool }); ok && netErr.Timeout() {
-					return fmt.Errorf("websocket read timeout: %w", err)
-				}
-				return fmt.Errorf("read message: %w", err)
+		var msg WebSocketMessage
+		if err := conn.ReadJSON(&msg); err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
 			}
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+				return nil
+			}
+			var netErr interface{ Timeout() bool }
+			if errors.As(err, &netErr) && netErr.Timeout() {
+				return fmt.Errorf("websocket read timeout: %w", err)
+			}
+			return fmt.Errorf("read message: %w", err)
+		}
 
-			switch msg.Type {
-			case "progress":
-				formatter.FormatProgress(msg.Progress, msg.ElapsedSeconds, msg.RemainingSeconds)
-			case "metrics":
-				if msg.Metrics != nil {
-					formatter.FormatMetrics(msg.Metrics)
-				}
-			case "complete":
-				if msg.Results != nil {
-					formatter.FormatComplete(msg.Results)
-					return nil
-				}
-			case "error":
-				return fmt.Errorf("test failed: %s", msg.Message)
+		switch msg.Type {
+		case "progress":
+			formatter.FormatProgress(msg.Progress, msg.ElapsedSeconds, msg.RemainingSeconds)
+		case "metrics":
+			if msg.Metrics != nil {
+				formatter.FormatMetrics(msg.Metrics)
 			}
+		case "complete":
+			if msg.Results != nil {
+				formatter.FormatComplete(msg.Results)
+				return nil
+			}
+		case "error":
+			return fmt.Errorf("test failed: %s", msg.Message)
 		}
 	}
 }

@@ -3,6 +3,7 @@ package api
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -64,21 +65,26 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 	durationStr := r.URL.Query().Get("duration")
 	duration := 10 * time.Second
 	if durationStr != "" {
-		if d, err := strconv.Atoi(durationStr); err == nil && d > 0 && d <= h.maxDurationSec {
-			duration = time.Duration(d) * time.Second
+		d, err := strconv.Atoi(durationStr)
+		if err != nil || d < 1 || d > h.maxDurationSec {
+			respondSpeedtestError(w, "duration must be 1-"+strconv.Itoa(h.maxDurationSec), http.StatusBadRequest)
+			return
 		}
+		duration = time.Duration(d) * time.Second
 	}
 
 	chunkSize := 1048576
 	if cs := r.URL.Query().Get("chunk"); cs != "" {
-		if c, err := strconv.Atoi(cs); err == nil && c >= 65536 && c <= 4194304 {
-			chunkSize = c
+		c, err := strconv.Atoi(cs)
+		if err != nil || c < 65536 || c > 4194304 {
+			respondSpeedtestError(w, "chunk must be 65536-4194304", http.StatusBadRequest)
+			return
 		}
+		chunkSize = c
 	}
 
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	flusher, canFlush := w.(http.Flusher)
 
@@ -164,7 +170,7 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		n, err := r.Body.Read(buf)
 		totalBytes += int64(n)
 		if err != nil {
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				readFailed = true
 			}
 			break

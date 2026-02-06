@@ -24,8 +24,8 @@ type PlainFormatter struct {
 	noProgress bool
 }
 
-func NewPlainFormatter(w io.Writer, verbose, noColor bool) *PlainFormatter {
-	return &PlainFormatter{writer: w, verbose: verbose, noColor: noColor}
+func NewPlainFormatter(w io.Writer, verbose, noColor, noProgress bool) *PlainFormatter {
+	return &PlainFormatter{writer: w, verbose: verbose, noColor: noColor, noProgress: noProgress}
 }
 
 type InteractiveFormatter struct {
@@ -35,8 +35,8 @@ type InteractiveFormatter struct {
 	noProgress bool
 }
 
-func NewInteractiveFormatter(w io.Writer, verbose, noColor bool) *InteractiveFormatter {
-	return &InteractiveFormatter{writer: w, verbose: verbose, noColor: noColor}
+func NewInteractiveFormatter(w io.Writer, verbose, noColor, noProgress bool) *InteractiveFormatter {
+	return &InteractiveFormatter{writer: w, verbose: verbose, noColor: noColor, noProgress: noProgress}
 }
 
 type Config struct {

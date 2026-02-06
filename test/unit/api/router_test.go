@@ -51,6 +51,24 @@ func TestRouterAllowedOriginHostMatch(t *testing.T) {
 	}
 }
 
+func TestRouterRejectsWildcardBypassOrigin(t *testing.T) {
+	router := &api.Router{}
+	router.SetAllowedOrigins([]string{"*.example.com"})
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	req.Header.Set("Origin", "https://evilexample.com")
+	rec := httptest.NewRecorder()
+
+	handler := router.CORSMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	handler.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("evilexample.com should be rejected, got Allow-Origin = %q", got)
+	}
+}
+
 func TestRouterRejectsInvalidStreamID(t *testing.T) {
 	router := &api.Router{}
 	called := false

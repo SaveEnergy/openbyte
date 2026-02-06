@@ -8,7 +8,7 @@
   <meta property="og:description" content="Open-source internet speed test. Measure download, upload, latency, jitter, and bufferbloat.">
   <meta property="og:type" content="website">
   <title>openByte</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230a0a0f'/><text x='2' y='24' font-family='system-ui,-apple-system,sans-serif' font-weight='700' font-size='22' fill='%23ffffff'>o</text><text x='14' y='24' font-family='system-ui,-apple-system,sans-serif' font-weight='700' font-size='22' fill='%2300d4aa'>B</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -167,7 +167,7 @@
     </dialog>
 
     <!-- Error Toast -->
-    <div class="toast hidden" id="errorToast">
+    <div class="toast hidden" id="errorToast" role="alert" aria-live="assertive">
       <span class="toast-icon">⚠</span>
       <span class="toast-message" id="errorMessage">Error</span>
     </div>

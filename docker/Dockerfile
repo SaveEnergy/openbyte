@@ -31,7 +31,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # Server image
 FROM alpine:3.21 AS server
 
-RUN apk add --no-cache ca-certificates tzdata curl
+RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 
@@ -64,7 +64,7 @@ ENV PORT=8080 \
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD wget -q --spider http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["/app/openbyte", "server"]
 

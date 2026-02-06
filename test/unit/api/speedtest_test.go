@@ -222,16 +222,21 @@ func TestDownloadRespectsMaxDuration(t *testing.T) {
 		t.Fatalf("duration=5 with max=5: status = %d, want 200", rec.Code)
 	}
 
-	// duration=10 (above max) should be silently clamped to default (10s)
-	// — since default 10 > max 5, it also gets clamped; verify no crash
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 200*time.Millisecond)
-	t.Cleanup(cancel2)
+	// duration=10 (above max=5) should be rejected with 400
 	req2 := httptest.NewRequest(http.MethodGet,
 		"http://example.com/api/v1/download?duration=10&chunk=65536", nil)
-	req2 = req2.WithContext(ctx2)
 	rec2 := httptest.NewRecorder()
 	handler.Download(rec2, req2)
-	if rec2.Code != http.StatusOK {
-		t.Fatalf("duration=10 with max=5 (clamped): status = %d, want 200", rec2.Code)
+	if rec2.Code != http.StatusBadRequest {
+		t.Fatalf("duration=10 with max=5: status = %d, want 400", rec2.Code)
+	}
+
+	// invalid chunk should be rejected with 400
+	req3 := httptest.NewRequest(http.MethodGet,
+		"http://example.com/api/v1/download?chunk=abc", nil)
+	rec3 := httptest.NewRecorder()
+	handler.Download(rec3, req3)
+	if rec3.Code != http.StatusBadRequest {
+		t.Fatalf("chunk=abc: status = %d, want 400", rec3.Code)
 	}
 }

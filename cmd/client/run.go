@@ -2,14 +2,16 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
-func runStream(ctx context.Context, config *Config, formatter OutputFormatter, streamID *string) error {
+func runStream(ctx context.Context, config *Config, formatter OutputFormatter, streamID *atomic.Value) error {
 	if config.Protocol == "http" {
 		return runHTTPStream(ctx, config, formatter)
 	}
@@ -22,7 +24,7 @@ func runStream(ctx context.Context, config *Config, formatter OutputFormatter, s
 			"  - Check network connectivity", err, config.ServerURL, config.ServerURL)
 	}
 
-	*streamID = streamResp.StreamID
+	streamID.Store(streamResp.StreamID)
 
 	if streamResp.Mode == "client" {
 		return runClientSideTest(ctx, config, formatter, streamResp)
@@ -83,7 +85,7 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 
 			completeStream(config, streamResp.StreamID, lastMetrics)
 
-			if err != nil && err != context.DeadlineExceeded && err != context.Canceled {
+			if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 				return err
 			}
 			return nil
@@ -154,9 +156,10 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 	}
 
 	engine := NewHTTPTestEngine(httpCfg)
+	defer engine.Close()
 
 	startTime := time.Now()
-	testCtx, cancel := context.WithTimeout(ctx, httpCfg.Duration)
+	testCtx, cancel := context.WithTimeout(ctx, httpCfg.Duration+10*time.Second)
 	defer cancel()
 
 	doneCh := make(chan error, 1)
@@ -191,7 +194,7 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 			results := buildResults("http", &httpConfig, metrics, startTime)
 			formatter.FormatComplete(results)
 
-			if err != nil && err != context.DeadlineExceeded && err != context.Canceled {
+			if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 				return err
 			}
 			return nil
@@ -278,7 +281,7 @@ func createFormatter(config *Config) OutputFormatter {
 		return &JSONFormatter{writer: os.Stdout}
 	}
 	if config.Plain {
-		return NewPlainFormatter(os.Stdout, config.Verbose, config.NoColor)
+		return NewPlainFormatter(os.Stdout, config.Verbose, config.NoColor, config.NoProgress)
 	}
-	return NewInteractiveFormatter(os.Stdout, config.Verbose, config.NoColor)
+	return NewInteractiveFormatter(os.Stdout, config.Verbose, config.NoColor, config.NoProgress)
 }

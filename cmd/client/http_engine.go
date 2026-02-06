@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -129,7 +130,7 @@ func (e *HTTPTestEngine) runDownload(ctx context.Context) error {
 					e.addBytes(int64(n), time.Since(e.startTime))
 				}
 				if err != nil {
-					if err == io.EOF || ctx.Err() != nil {
+					if errors.Is(err, io.EOF) || ctx.Err() != nil {
 						return
 					}
 					errCh <- err
@@ -216,7 +217,10 @@ func (e *HTTPTestEngine) addBytes(n int64, elapsed time.Duration) {
 
 func (e *HTTPTestEngine) buildDownloadURL() string {
 	base := stringsTrimSuffix(e.config.ServerURL)
-	u, _ := url.Parse(base + "/api/v1/download")
+	u, err := url.Parse(base + "/api/v1/download")
+	if err != nil {
+		return base + "/api/v1/download"
+	}
 	q := u.Query()
 	q.Set("duration", fmt.Sprintf("%d", int(e.config.Duration.Seconds())))
 	q.Set("chunk", fmt.Sprintf("%d", e.config.ChunkSize))
@@ -245,6 +249,10 @@ func (e *HTTPTestEngine) GetMetrics() EngineMetrics {
 		Elapsed:          elapsed,
 		Running:          atomic.LoadInt32(&e.running) == 1,
 	}
+}
+
+func (e *HTTPTestEngine) Close() {
+	e.client.CloseIdleConnections()
 }
 
 func (e *HTTPTestEngine) IsRunning() bool {

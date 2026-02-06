@@ -74,6 +74,7 @@ func (r *Router) SetWebRoot(path string) {
 func (r *Router) SetupRoutes() *mux.Router {
 	router := mux.NewRouter()
 	router.Use(r.LoggingMiddleware)
+	router.Use(SecurityHeadersMiddleware)
 	router.Use(r.CORSMiddleware)
 
 	v1 := router.PathPrefix("/api/v1").Subrouter()
@@ -81,10 +82,6 @@ func (r *Router) SetupRoutes() *mux.Router {
 	if r.limiter != nil {
 		v1.Use(RateLimitMiddleware(r.limiter))
 	}
-
-	v1.Methods("OPTIONS").HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
 
 	v1.HandleFunc("/stream/start", r.handler.StartStream).Methods("POST")
 	v1.HandleFunc("/stream/{id}/status", r.HandleWithID(r.handler.GetStreamStatus)).Methods("GET")
@@ -300,6 +297,15 @@ func (r *Router) LoggingMiddleware(next http.Handler) http.Handler {
 		} else {
 			next.ServeHTTP(w, req)
 		}
+	})
+}
+
+func SecurityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		next.ServeHTTP(w, r)
 	})
 }
 

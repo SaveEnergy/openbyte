@@ -159,9 +159,15 @@ func formatBytes(bytes int64) string {
 
 func formatNumber(n int64) string {
 	s := strconv.FormatInt(n, 10)
+	start := 0
 	var result strings.Builder
-	for i, r := range s {
-		if i > 0 && (len(s)-i)%3 == 0 {
+	if len(s) > 0 && s[0] == '-' {
+		result.WriteByte('-')
+		start = 1
+	}
+	digits := s[start:]
+	for i, r := range digits {
+		if i > 0 && (len(digits)-i)%3 == 0 {
 			result.WriteString(",")
 		}
 		result.WriteRune(r)

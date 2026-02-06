@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"os/signal"
@@ -128,7 +129,7 @@ func Run(version string) int {
 			{Key: "udp_test", Value: cfg.GetUDPTestAddress()},
 		}
 		logging.Info("Server starting", fields...)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			srvErrCh <- err
 		}
 	}()
@@ -160,8 +161,8 @@ func Run(version string) int {
 	}
 
 	resultsStore.Close()
-	wsServer.Close()
 	manager.Stop()
+	wsServer.Close()
 	streamServer.Close()
 
 	logging.Info("Server stopped")

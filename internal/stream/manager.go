@@ -116,7 +116,6 @@ func (m *Manager) CreateStream(config types.StreamConfig) (*types.StreamState, e
 	m.activeStreams[config.ID] = clientIP
 	m.activeByIP[clientIP]++
 	atomic.AddInt64(&m.activeCount, 1)
-	activeCount := len(m.streams)
 	m.mu.Unlock()
 
 	logging.Info("Stream created",
@@ -124,7 +123,7 @@ func (m *Manager) CreateStream(config types.StreamConfig) (*types.StreamState, e
 		logging.Field{Key: "direction", Value: string(config.Direction)},
 		logging.Field{Key: "duration", Value: config.Duration.Seconds()},
 		logging.Field{Key: "streams", Value: config.Streams},
-		logging.Field{Key: "active", Value: activeCount})
+		logging.Field{Key: "active", Value: atomic.LoadInt64(&m.activeCount)})
 
 	return state, nil
 }

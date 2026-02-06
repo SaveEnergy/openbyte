@@ -124,6 +124,7 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 	result.PacketSize = defaultPacketSize
 	result.ChunkSize = defaultChunkSize
 	result.Timeout = defaultTimeout
+	result.WarmUp = defaultWarmUp
 
 	if configFile != nil {
 		serverURL, apiKey := resolveServerURL(configFile, flagConfig.Server)

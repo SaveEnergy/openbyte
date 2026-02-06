@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	client "github.com/saveenergy/openbyte/cmd/client"
 	server "github.com/saveenergy/openbyte/cmd/server"
@@ -29,9 +28,6 @@ func main() {
 		fmt.Printf("openbyte %s\n", version)
 		return
 	default:
-		if strings.HasPrefix(args[0], "-") {
-			os.Exit(server.Run(version))
-		}
 		fmt.Fprintf(os.Stderr, "openbyte: unknown command %q\n\n", args[0])
 		printUsage()
 		os.Exit(2)

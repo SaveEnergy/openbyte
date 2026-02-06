@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -136,7 +137,13 @@ func listServers() {
 
 	fmt.Printf("  %-12s %-20s %s\n", "ALIAS", "NAME", "URL")
 	fmt.Printf("  %-12s %-20s %s\n", "-----", "----", "---")
-	for alias, server := range configFile.Servers {
+	aliases := make([]string, 0, len(configFile.Servers))
+	for alias := range configFile.Servers {
+		aliases = append(aliases, alias)
+	}
+	sort.Strings(aliases)
+	for _, alias := range aliases {
+		server := configFile.Servers[alias]
 		defaultMark := ""
 		if alias == configFile.DefaultServer {
 			defaultMark = " *"

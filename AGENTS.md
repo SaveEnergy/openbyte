@@ -778,3 +778,100 @@
 - Playwright browser cache in CI.
 - Client TCP/UDP warm-up is a no-op (F7).
 - Client parent context timeout wraps entire lifecycle (F8).
+
+## Improvement Round 11 (2026-02-06)
+
+### Findings
+- CLI context error checks used bare `!=` instead of `errors.Is`; wrapped errors from net package bypassed the check.
+- WebSocket metrics read loop blocked on `ReadJSON` inside `select default`; context cancellation delayed up to `readTimeout`.
+- No security headers middleware — missing `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` on all responses.
+- CORS wildcard dot-boundary fix (R10) had zero negative test coverage.
+- Download endpoint silently clamped invalid `duration`/`chunk` params; inconsistent with stream API returning 400.
+- Frontend warmup-to-measurement transition caused EWMA speed display freeze (bytes counter reset without tracking reset).
+- `saveAndEnableShare` did not drain response body on `!res.ok` (HTTP/2 stream leak).
+- Manager log field "active" used `len(m.streams)` (includes retained) instead of atomic `activeCount`.
+- Dead OPTIONS handler on v1 subrouter (unreachable behind CORSMiddleware).
+- `X-Content-Type-Options: nosniff` duplicated in speedtest handler (now set by global middleware).
+- HTTP engine test context had zero grace period — expired before server-side timer.
+
+### Actions
+- Replaced `err != context.DeadlineExceeded` with `errors.Is` (2 call sites in `run.go`).
+- WebSocket read loop: spawn goroutine that closes conn on context cancel; removed blocking select.
+- Added `SecurityHeadersMiddleware` (nosniff, DENY, strict-origin-when-cross-origin) to router.
+- Added `TestRouterRejectsWildcardBypassOrigin` negative test.
+- Download handler returns 400 for invalid duration/chunk params; updated test.
+- Frontend `onProgress` resets `lastBytes`/`ewmaSpeed` when bytes counter decreases.
+- Added response body drain in `saveAndEnableShare`.
+- Manager log "active" field now uses `atomic.LoadInt64(&m.activeCount)`.
+- Removed dead OPTIONS handler on v1 subrouter.
+- Removed duplicate `X-Content-Type-Options` from speedtest download handler.
+- Added 10s grace to HTTP engine test context timeout.
+
+## Improvement Round 12 (2026-02-06)
+
+### Findings
+- `buildDownloadURL` ignored `url.Parse` error → nil dereference panic on malformed server URL.
+- SQLite WAL mode never applied: `modernc.org/sqlite` ignores query-string params; needs explicit PRAGMAs.
+- `sql.ErrNoRows` checked with `==` instead of `errors.Is`; wrapped errors cause 500 instead of 404.
+- HTTP engine had no `Close()` method; idle connections leaked until GC.
+- `io.EOF` compared with `==` in download read loop and upload handler (2 sites).
+- Error toast missing `role="alert"` / `aria-live` for screen reader announcement.
+- `cancelTest()` contained dead WebSocket/stream code from old TCP/WS path.
+- Dockerfile installed `curl` (~3MB) solely for healthcheck; Alpine has `wget` built-in.
+
+### Actions
+- `buildDownloadURL` now checks `url.Parse` error; falls back to plain concatenation.
+- SQLite `New()` uses explicit `PRAGMA journal_mode=WAL` and `PRAGMA busy_timeout=5000` after open.
+- `Store.Get` uses `errors.Is(err, sql.ErrNoRows)`.
+- Added `HTTPTestEngine.Close()` calling `CloseIdleConnections()`; called from `runHTTPStream` via defer.
+- Replaced `err == io.EOF` / `err != io.EOF` with `errors.Is` in `http_engine.go` and `speedtest.go`.
+- Toast div now has `role="alert" aria-live="assertive"`.
+- Removed dead `state.ws` / `state.streamId` blocks from `cancelTest()`.
+- Dockerfile healthcheck uses `wget -q --spider`; dropped `curl` dependency.
+
+## Improvement Round 13 (2026-02-06)
+
+### Findings
+- `engine.go:137` — bare `!=` for context errors; wrapped net errors bypass the check.
+- `engine.go` — 5 bare `== io.EOF` / `.(net.Error)` type assertions missed by R11/R12.
+- Shutdown order: `wsServer.Close()` before `manager.Stop()` causes writes to closed WS connections during shutdown.
+- `mergeConfig` has no `WarmUp` default; flag default of 2 only applies when flag explicitly passed → silent 0s warmup.
+- Bidirectional mode records zero latency/jitter metrics (no `recordLatency` or RTT sampling calls).
+- `formatNumber` corrupts negative numbers (comma between minus sign and first digit).
+- `parseHeaderIP` bracket stripping breaks bracketed IPv6 with port (`[::1]:8080` → mangled string).
+- `--text-muted` CSS variable (#555566) fails WCAG AA contrast on dark backgrounds.
+
+### Actions
+- `engine.go`: replaced bare `!=` context checks with `errors.Is`; replaced `== io.EOF` with `errors.Is`; replaced `.(net.Error)` with `errors.As` (5 sites).
+- Bidirectional read goroutine now records latency and samples RTT.
+- Shutdown reordered: `manager.Stop()` before `wsServer.Close()` (channel closes first, goroutine exits, then WS server).
+- Added `defaultWarmUp = 2` constant; `mergeConfig` now initializes `result.WarmUp = defaultWarmUp`.
+- `formatNumber` handles leading minus sign before comma insertion.
+- `parseHeaderIP` tries `SplitHostPort` first (handles `[::1]:8080`); bracket stripping only for bare `[::1]`.
+- Bumped `--text-muted` from `#555566` to `#8888a0` for WCAG AA compliance.
+
+## Improvement Round 14 (2026-02-06)
+
+### Findings
+- `parseFlags` returned `exitSuccess=0` for `--help`/`--version`/`--servers`; `Run()` check `exitCode != 0` fell through → nil deref panic or silent test start.
+- `streamID` string read without synchronization in signal handler goroutine → data race.
+- `--no-progress` flag parsed but never wired to formatter constructors → progress bars always shown.
+- `StartStream` used `r.Host` for TCP/UDP addresses, ignoring `PublicHost` config → wrong addresses behind proxy.
+- WebSocket `HandleStream` double-closed connection on initial write failure (explicit + defer).
+- `decodeJSONBody` used bare `!= io.EOF` instead of `errors.Is`.
+- `api.go` WS timeout detection used type assertion instead of `errors.As`.
+- `listServers` iterated map → non-deterministic output order.
+- Unknown flags (`openbyte -v`) silently started server instead of showing error.
+- `srv.ListenAndServe` error check used bare `!=` for `http.ErrServerClosed`.
+
+### Actions
+- `Run()` now checks `flagConfig == nil` to handle early-exit flags (covers exitSuccess=0).
+- `streamID` changed from `string` to `atomic.Value` with `.Store()`/`.Load()` for race-safe access.
+- `--no-progress` wired: added `noProgress` param to both formatter constructors; `createFormatter` passes `config.NoProgress`.
+- `StartStream` now checks `PublicHost` before falling back to `r.Host`, matching `GetServers` behavior.
+- Removed explicit `conn.Close()` in WS initial-write error path; defer handles it.
+- `decodeJSONBody` uses `stdErrors.Is(err, io.EOF)`.
+- `api.go` timeout check uses `errors.As(err, &netErr)`.
+- `listServers` collects aliases, sorts, then iterates in stable order.
+- Removed `strings.HasPrefix(args[0], "-")` server fallback; unknown args now error with usage hint.
+- `srv.ListenAndServe` uses `errors.Is(err, http.ErrServerClosed)`.

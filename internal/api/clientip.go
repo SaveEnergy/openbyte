@@ -99,17 +99,15 @@ func parseHeaderIP(value string) net.IP {
 	if clean == "" {
 		return nil
 	}
-	if strings.HasPrefix(clean, "[") && strings.Contains(clean, "]") {
-		clean = strings.TrimPrefix(clean, "[")
-		clean = strings.TrimSuffix(clean, "]")
-	}
-	if ip := net.ParseIP(clean); ip != nil {
-		return ip
-	}
+	// Try SplitHostPort first — handles [::1]:8080 and 1.2.3.4:80
 	if host, _, err := net.SplitHostPort(clean); err == nil {
 		return net.ParseIP(host)
 	}
-	return nil
+	// Strip brackets for bare [::1] (no port)
+	if strings.HasPrefix(clean, "[") && strings.HasSuffix(clean, "]") {
+		clean = clean[1 : len(clean)-1]
+	}
+	return net.ParseIP(clean)
 }
 
 func isPublicIP(ip net.IP) bool {

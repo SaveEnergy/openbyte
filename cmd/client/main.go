@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -27,6 +28,7 @@ const (
 	defaultPacketSize = 1500
 	defaultChunkSize  = 1024 * 1024
 	defaultTimeout    = 60
+	defaultWarmUp     = 2
 )
 
 func Run(args []string, version string) int {
@@ -40,7 +42,7 @@ func Run(args []string, version string) int {
 		fmt.Fprintf(os.Stderr, "openbyte client: error: %v\n", err)
 		return exitUsage
 	}
-	if exitCode != 0 {
+	if flagConfig == nil {
 		return exitCode
 	}
 
@@ -78,14 +80,14 @@ func Run(args []string, version string) int {
 
 	formatter := createFormatter(config)
 
-	var streamID string
+	var streamID atomic.Value
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-sigCh
-		if streamID != "" {
-			cancelStream(config.ServerURL, streamID, config.APIKey)
+		if id, ok := streamID.Load().(string); ok && id != "" {
+			cancelStream(config.ServerURL, id, config.APIKey)
 		}
 		cancel()
 		os.Exit(exitInterrupt)

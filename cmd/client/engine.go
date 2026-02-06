@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -134,7 +135,7 @@ func (e *TestEngine) Run(ctx context.Context) error {
 			case "bidirectional":
 				err = e.runBidirectional(testCtx, e.connections[idx])
 			}
-			if err != nil && err != context.DeadlineExceeded && err != context.Canceled {
+			if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 				select {
 				case errCh <- err:
 				default:
@@ -238,10 +239,11 @@ func (e *TestEngine) runDownload(ctx context.Context, conn net.Conn) error {
 			n, err := conn.Read(buf)
 			readDuration := time.Since(readStart)
 			if err != nil {
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					return nil
 				}
-				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				var netErr net.Error
+				if errors.As(err, &netErr) && netErr.Timeout() {
 					continue
 				}
 				return err
@@ -284,7 +286,8 @@ func (e *TestEngine) runUpload(ctx context.Context, conn net.Conn) error {
 			n, err := conn.Write(buf)
 			writeDuration := time.Since(writeStart)
 			if err != nil {
-				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				var netErr net.Error
+				if errors.As(err, &netErr) && netErr.Timeout() {
 					continue
 				}
 				return err
@@ -318,15 +321,19 @@ func (e *TestEngine) runBidirectional(ctx context.Context, conn net.Conn) error 
 			buf = make([]byte, 64*1024)
 		}
 		defer e.bufferPool.Put(buf)
+		lastRTTSample := time.Now()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			default:
 				conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+				readStart := time.Now()
 				n, err := conn.Read(buf)
+				readDuration := time.Since(readStart)
 				if err != nil {
-					if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					var netErr net.Error
+					if errors.As(err, &netErr) && netErr.Timeout() {
 						continue
 					}
 					return
@@ -334,6 +341,11 @@ func (e *TestEngine) runBidirectional(ctx context.Context, conn net.Conn) error 
 				if n > 0 {
 					atomic.AddInt64(&e.metrics.BytesReceived, int64(n))
 					atomic.AddInt64(&e.totalBytes, int64(n))
+					e.recordLatency(readDuration)
+					if time.Since(lastRTTSample) > 500*time.Millisecond {
+						e.rttCollector.AddSample(readDuration.Seconds() * 1000)
+						lastRTTSample = time.Now()
+					}
 				}
 			}
 		}
@@ -354,7 +366,8 @@ func (e *TestEngine) runBidirectional(ctx context.Context, conn net.Conn) error 
 				conn.SetWriteDeadline(time.Now().Add(500 * time.Millisecond))
 				n, err := conn.Write(buf)
 				if err != nil {
-					if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					var netErr net.Error
+					if errors.As(err, &netErr) && netErr.Timeout() {
 						continue
 					}
 					return

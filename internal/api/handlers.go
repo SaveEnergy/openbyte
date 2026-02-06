@@ -153,6 +153,9 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 
 	if mode == "client" && h.config != nil {
 		host := normalizeHost(r.Host)
+		if h.config.PublicHost != "" {
+			host = h.config.PublicHost
+		}
 		resp.TestServerTCP = host + ":" + strconv.Itoa(h.config.TCPTestPort)
 		resp.TestServerUDP = host + ":" + strconv.Itoa(h.config.UDPTestPort)
 	}
@@ -435,7 +438,7 @@ func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}, lim
 	if err := decoder.Decode(dst); err != nil {
 		return err
 	}
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+	if err := decoder.Decode(&struct{}{}); !stdErrors.Is(err, io.EOF) {
 		return stdErrors.New("request body must contain a single JSON object")
 	}
 	return nil
