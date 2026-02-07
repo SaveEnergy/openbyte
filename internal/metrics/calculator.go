@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"math"
 	"sort"
 	"time"
 
@@ -71,7 +72,7 @@ func percentileFromHistogram(bucketCounts []uint32, overflow uint32, bucketWidth
 		return 0
 	}
 
-	target := int64(float64(count)*ratio) + 1
+	target := int64(math.Ceil(float64(count) * ratio))
 	if target < 1 {
 		target = 1
 	}

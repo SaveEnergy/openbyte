@@ -901,3 +901,64 @@
 - Loaded latency probe wrapped in try/finally to ensure `stop()` on test error.
 - Negative packet loss prevented by adding `totalPacketsSent > totalPacketsRecv` guard.
 - Added `defer engine.Close()` to both HTTP engine tests.
+
+## Improvement Round 16 — Analysis (2026-02-07)
+
+### HIGH Findings
+- **F1**: `app.js:578-634` — After cancel+restart, old `startTest()` async continuation sees `state.isRunning === true` (set by new test) and proceeds into download/upload phase. Two concurrent tests share `state.abortController`, corrupt `totalBytes`, and fight over UI.
+
+### MEDIUM Findings
+- **F2**: `ratelimit.go:79,127` — Token refill `int()` truncation permanently loses fractional tokens. Default `RateLimitPerIP=100` → effective 60 RPM (40% loss). Any rate not divisible by 60 is under-served. Both global and per-IP affected.
+- **F3**: `calculator.go:74` — `percentileFromHistogram` target formula `int64(count*ratio)+1` is off-by-one. For count=100, p99 returns max (100th element) instead of 99th percentile. Should use `math.Ceil(count*ratio)`.
+- **F4**: `collector.go:139-142` — Server-side `packetLoss` can go negative when `packetsRecv > packetsSent` due to non-atomic read pair. R15 fixed frontend; server collector still lacks guard.
+- **F5**: `index.html` + `router.go:303-310` — `SecurityHeadersMiddleware` has no Content-Security-Policy. Page loads external fonts without CSP; any XSS vector has unrestricted script execution.
+- **F6**: `rtt.go:88-93` — `RTTCollector` jitter uses population stddev; server `collector.go` and `calculator.go` use RFC 3550 mean consecutive difference. CLI reports different jitter metric than server for same data.
+- **F7**: `app.js:1076-1083` — Upload loop `continue`s on non-503 HTTP errors without incrementing `consecutiveErrors` or backoff. Retries full 4MB uploads for entire test duration on persistent 400/500 errors.
+
+### LOW Findings
+- **F8**: `app.js:195` — IPv6 literal hostname (`[::1]`) not excluded from subdomain probing; causes failed fetches to `v4.[::1]` and `v6.[::1]`.
+- **F9**: `style.css:1291-1298` — Dead `.counting` class and `@keyframes countUp` (never referenced).
+- **F10**: `style.css` — No responsive breakpoint between 600-1024px; result cards and extra stats cramp on tablets.
+
+### Deferred (carried forward)
+- `ServerInfo` dedup across `api` and `registry` packages.
+- CLI HTTP engine hardcoded overhead/grace.
+- Registry API documentation in `API.md`.
+- UDP single-threaded read loop.
+- Flaky concurrency test sleep (T3).
+- `navigator.platform` deprecation.
+- `registry/client.go:222`: `buildServerInfo` hardcodes `http://` scheme.
+- `websocket/server.go`: `sentStatus` map never cleaned for clientless streams.
+- `results/store.go`: `generateID` makes 8 syscalls per ID.
+- `fetchWithTimeout` abort listener accumulation.
+- CLI `selectFastestServer` body drain.
+- `gorilla/mux` archived — stdlib migration candidate.
+- Makefile `perf-smoke` PID capture.
+- Playwright browser cache in CI.
+- Client TCP/UDP warm-up is a no-op.
+- Client parent context timeout wraps entire lifecycle.
+- `download.html` innerHTML pattern.
+
+## Improvement Round 16 (2026-02-06)
+
+### Findings
+- Cancel+restart race: stale `isRunning` check allowed two concurrent tests to corrupt shared state.
+- Token refill truncation: `int()` discarded fractional tokens; 100 RPM rate effectively delivered 60 RPM (40% loss).
+- `percentileFromHistogram` off-by-one: `+1` overcounted, returning max instead of p99 when count*ratio was whole.
+- Collector packet loss went negative when `packetsRecv > packetsSent` (atomic timing).
+- No `Content-Security-Policy` header — inline script injection unrestricted.
+- RTT jitter used stddev; server used RFC 3550 consecutive difference — inconsistent metrics.
+- Upload loop retried indefinitely on non-503 HTTP errors (no error tracking, no backoff).
+- IPv6 literal hostname (`[::1]`) passed subdomain probe guard → invalid `v4.[::1]` requests.
+- Dead `.counting` class and `countUp` keyframe in CSS.
+
+### Actions
+- `startTest()` captures local `signal` from abort controller; phase gates check `signal.aborted` instead of shared `isRunning`.
+- Token refill advances `lastRefill` only by time consumed (preserves fractional remainder for next refill).
+- Percentile uses `math.Ceil(count * ratio)` instead of `int(count * ratio) + 1`.
+- Collector packet loss adds `packetsSent > packetsRecv` guard (matching R15 aggregator fix).
+- Added `Content-Security-Policy` to `SecurityHeadersMiddleware`: `script-src 'self'`, `connect-src *` (permissive for custom servers).
+- RTT jitter switched from stddev to mean consecutive difference (RFC 3550), matching server-side.
+- Upload non-503 errors now increment `consecutiveErrors` with backoff and break after threshold.
+- IPv6 literal hostnames excluded from subdomain probing via `!hostname.startsWith('[')`.
+- Removed dead `@keyframes countUp` and `.counting` CSS.

@@ -1,7 +1,6 @@
 package types
 
 import (
-	"math"
 	"net"
 	"sync"
 	"time"
@@ -85,12 +84,19 @@ func (r *RTTCollector) GetMetrics() RTTMetrics {
 
 	avg := sum / float64(len(active))
 
-	var varianceSum float64
-	for _, v := range active {
-		diff := v - avg
-		varianceSum += diff * diff
+	// Mean consecutive difference (RFC 3550) — consistent with server-side jitter calculation
+	jitter := float64(0)
+	if len(active) >= 2 {
+		var jitterSum float64
+		for i := 1; i < len(active); i++ {
+			d := active[i] - active[i-1]
+			if d < 0 {
+				d = -d
+			}
+			jitterSum += d
+		}
+		jitter = jitterSum / float64(len(active)-1)
 	}
-	jitter := math.Sqrt(varianceSum / float64(len(active)))
 
 	current := active[len(active)-1]
 

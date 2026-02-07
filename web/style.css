@@ -1287,12 +1287,3 @@ select.setting-input {
   text-align: center;
   display: inline-block;
 }
-
-@keyframes countUp {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.counting {
-  animation: countUp 0.1s ease-out;
-}

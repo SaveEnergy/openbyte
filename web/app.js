@@ -192,6 +192,7 @@ function detectNetworkInfo() {
   const hostname = window.location.hostname;
   const canProbe = hostname && hostname !== 'localhost' &&
     !hostname.startsWith('v4.') && !hostname.startsWith('v6.') &&
+    !hostname.startsWith('[') &&
     !hostname.match(/^\d/);
 
   const probeOpts = { cache: 'no-store', credentials: 'omit', mode: 'cors' };
@@ -583,6 +584,7 @@ async function startTest() {
   
   state.isRunning = true;
   state.abortController = new AbortController();
+  const signal = state.abortController.signal;
   
   try {
     state.phase = 'latency';
@@ -592,7 +594,7 @@ async function startTest() {
     const latency = await measureLatency();
     state.latencyResult = latency;
     
-    if (!state.isRunning) return;
+    if (signal.aborted) return;
     
     state.phase = 'download';
     resetProgress();
@@ -604,7 +606,7 @@ async function startTest() {
     const downloadSpeed = await runTest('download');
     state.downloadResult = downloadSpeed;
     
-    if (!state.isRunning) return;
+    if (signal.aborted) return;
     
     state.phase = 'upload';
     resetProgress();
@@ -1079,6 +1081,9 @@ async function runUploadTest(duration, onProgress) {
             await sleep(500);
             break;
           }
+          consecutiveErrors += 1;
+          if (consecutiveErrors > maxNetworkRetries) break;
+          await sleep(retryDelayMs);
           continue;
         }
         consecutiveErrors = 0;

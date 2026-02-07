@@ -137,7 +137,7 @@ func (c *Collector) GetMetrics() types.Metrics {
 	}
 
 	packetLoss := float64(0)
-	if packetsSent > 0 {
+	if packetsSent > 0 && packetsSent > packetsRecv {
 		packetLoss = float64(packetsSent-packetsRecv) / float64(packetsSent) * 100
 	}
 

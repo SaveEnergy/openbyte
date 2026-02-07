@@ -82,7 +82,9 @@ func (rl *RateLimiter) allowGlobal() bool {
 			if rl.globalTokens > rl.config.GlobalRateLimit {
 				rl.globalTokens = rl.config.GlobalRateLimit
 			}
-			rl.globalLastRefill = now
+			// Advance only by time consumed to preserve fractional remainder
+			consumed := time.Duration(float64(tokensToAdd) / float64(rl.config.GlobalRateLimit) * 60.0 * float64(time.Second))
+			rl.globalLastRefill = rl.globalLastRefill.Add(consumed)
 		}
 	}
 
@@ -130,7 +132,8 @@ func (rl *RateLimiter) allowIP(ip string) bool {
 			if limit.tokens > rl.config.RateLimitPerIP {
 				limit.tokens = rl.config.RateLimitPerIP
 			}
-			limit.lastRefill = now
+			consumed := time.Duration(float64(tokensToAdd) / float64(rl.config.RateLimitPerIP) * 60.0 * float64(time.Second))
+			limit.lastRefill = limit.lastRefill.Add(consumed)
 		}
 	}
 
