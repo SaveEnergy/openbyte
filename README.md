@@ -74,6 +74,7 @@ Uses BEREC-compliant measurement practices:
 | `SERVER_ID` | hostname | Unique server identifier |
 | `SERVER_NAME` | OpenByte Server | Human-readable name |
 | `SERVER_LOCATION` | — | Geographic location |
+| `SERVER_REGION` | — | Cloud region (optional) |
 | `PUBLIC_HOST` | — | Public hostname/IP |
 | `CAPACITY_GBPS` | 25 | Server link capacity; HTTP concurrency limits auto-scale from this |
 | `RATE_LIMIT_PER_IP` | 100 | Rate limit per IP per minute |
@@ -82,8 +83,15 @@ Uses BEREC-compliant measurement practices:
 | `TRUSTED_PROXY_CIDRS` | — | Comma-separated trusted proxy CIDRs |
 | `ALLOWED_ORIGINS` | `*` | Comma-separated CORS/WS allowed origins |
 | `WEB_ROOT` | *(embedded)* | Override path to static web assets (for development) |
+| `MAX_CONCURRENT_TESTS` | 10 | Maximum simultaneous tests |
+| `MAX_STREAMS` | 32 | Maximum parallel streams per test (1-64) |
+| `MAX_TEST_DURATION` | `300s` | Maximum test duration (Go duration format) |
 | `DATA_DIR` | `./data` | Path to SQLite database directory |
 | `MAX_STORED_RESULTS` | 10000 | Maximum stored test results (older results auto-purged) |
+| `BIND_ADDRESS` | `0.0.0.0` | Address to bind listeners |
+| `PPROF_ENABLED` | false | Enable pprof profiling server |
+| `PPROF_ADDR` | `127.0.0.1:6060` | pprof server listen address |
+| `PERF_STATS_INTERVAL` | — | Log runtime stats at this interval (e.g. `10s`) |
 
 Notes:
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
@@ -163,18 +171,20 @@ cmd/
   server/     # Server implementation
   loadtest/   # Load generator
 internal/
-  api/        # REST API handlers
+  api/        # REST API + HTTP speed test handlers
   config/     # Configuration
-  metrics/    # Metrics collection
+  metrics/    # Metrics collection + latency histogram
   registry/   # Server registry
-  stream/     # Test engine
-  websocket/  # Real-time streaming
+  results/    # SQLite results store
+  stream/     # TCP/UDP test engine
+  websocket/  # Real-time metrics streaming
 pkg/
   types/      # Shared types
   errors/     # Error definitions
-docker/       # Docker configurations
-web/          # Web UI
-test/         # Tests
+docker/       # Docker + Compose configurations
+web/          # Web UI (embedded in binary)
+  fonts/      # Self-hosted font files
+test/         # Unit, integration, E2E tests
 ```
 
 ## License

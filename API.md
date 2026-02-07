@@ -294,7 +294,7 @@ Get available test servers with full metadata.
 
 ### 8. Health Check
 
-**GET** `/health`
+**GET** `/health` *(root path, not under `/api/v1`)*
 
 Server health status.
 
@@ -354,7 +354,7 @@ Receive data from client for upload speed measurement.
 
 **GET** `/ping`
 
-Latency measurement and network detection endpoint. Used for latency sampling (20 pings per test) and client IP / IPv6 detection.
+Latency measurement and network detection endpoint. Used for latency sampling (24 pings, 2 warm-up discarded) and client IP / IPv6 detection.
 
 **Response:**
 ```json
@@ -382,8 +382,7 @@ The web UI uses this endpoint in two ways:
 1. **Main connection probe** — calls `/ping` on page load and during latency measurement. Reports the address family of the actual browser connection.
 2. **IPv6 capability probe** — calls `/ping` on the `v6.` subdomain (AAAA-only DNS). If the response has `ipv6: true`, the client has IPv6 connectivity even if the browser chose IPv4 for the main connection.
 
-See [Deployment Guide](DEPLOYMENT.md#ipv6-support) for DNS setup.
-```
+See [Deployment Guide](DEPLOYMENT.md#ipv4ipv6-detection) for DNS setup.
 
 ### 12. Version
 
@@ -401,7 +400,7 @@ Build/version information.
 **Status Codes:**
 - `200 OK`: Version returned
 
-### 13. WebSocket Stream (Legacy)
+### 13. WebSocket Stream
 
 **WS** `/stream/{stream_id}/stream`
 
@@ -473,15 +472,40 @@ ws://localhost:8080/api/v1/stream/{stream_id}/stream
 
 ## Testing Modes
 
-### Client Mode (CLI)
+### HTTP Streaming (Web UI)
 
-For accurate network measurement, the CLI uses client mode:
+The web UI uses standard HTTP endpoints for speed tests:
 
-1. Client requests test with `mode: "client"`
+1. Latency: 24 pings to `/ping` (2 warm-up discarded)
+2. Download: Concurrent `GET /download` streams with dynamic warm-up detection
+3. Upload: Concurrent `POST /upload` requests
+4. Results saved via `POST /results`
+
+```
+Web Browser                              Server
+    │                                     │
+    │  GET /ping (×24)                    │
+    ├────────────────────────────────────►│  Latency
+    │                                     │
+    │  GET /download (×N streams)         │
+    │◄════════════════════════════════════│  Download
+    │                                     │
+    │  POST /upload (×N streams)          │
+    │════════════════════════════════════►│  Upload
+    │                                     │
+    │  POST /results                      │
+    ├────────────────────────────────────►│  Save
+```
+
+### TCP/UDP Client Mode (CLI)
+
+The CLI can use TCP/UDP for direct data-plane measurement:
+
+1. Client requests test via `POST /stream/start` with `mode: "client"`
 2. Server returns test server addresses (`test_server_tcp`, `test_server_udp`)
-3. Client connects directly to test server
+3. Client connects directly to test port
 4. Client performs data transfer and measures throughput locally
-5. Client reports results via `/complete` endpoint
+5. Client reports results via `POST /stream/{id}/complete`
 
 ```
 CLI Client                              Server
@@ -490,37 +514,29 @@ CLI Client                              Server
     ├────────────────────────────────────►│
     │◄── {test_server_tcp: "1.2.3.4:8081"}│
     │                                     │
-    │ TCP Connect to 1.2.3.4:8081         │
+    │ TCP/UDP Connect to test port        │
     │═════════════════════════════════════│
-    │                                     │
-    │ Data transfer (actual network)      │
-    │◄════════════════════════════════════│
+    │ Data transfer (measured locally)    │
     │                                     │
     │ POST /stream/{id}/complete          │
     ├────────────────────────────────────►│
 ```
 
-### Proxy Mode (Web)
+### HTTP Client Mode (CLI)
 
-For browser compatibility, the web UI uses proxy mode:
-
-1. Client requests test with `mode: "proxy"` (or omit)
-2. Server performs test internally
-3. Server streams metrics via WebSocket
-4. Client displays results
+The CLI also supports HTTP streaming (same endpoints as the web UI):
 
 ```
-Web Browser                             Server
+CLI Client                              Server
     │                                     │
-    │ POST /stream/start (mode: proxy)    │
-    ├────────────────────────────────────►│
-    │◄──── {websocket_url: "..."}         │
+    │ GET /download                       │
+    │◄════════════════════════════════════│  HTTP streaming
     │                                     │
-    │ WebSocket connect                   │
-    │═════════════════════════════════════│
+    │ POST /upload                        │
+    │════════════════════════════════════►│  Upload
     │                                     │
-    │◄════ Metrics (server measures)      │
-    │◄════ Complete                       │
+    │ GET /ping (×N)                      │
+    ├────────────────────────────────────►│  Latency
 ```
 
 ## Saved Results

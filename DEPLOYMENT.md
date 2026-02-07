@@ -25,22 +25,6 @@ ssh user@server
 sudo nano /etc/systemd/system/openbyte.service
 ```
 
-## Production Deploy Script (Docker + Traefik)
-
-Use `deploy-openbyte-prod.sh` to rsync code and run `docker compose` on the host.
-
-```bash
-ACME_EMAIL="you@example.com" \
-TRUSTED_PROXY_CIDRS="172.20.0.0/16" \
-./deploy-openbyte-prod.sh
-```
-
-Optional overrides:
-
-```bash
-HOST=49.12.213.184 USER=oezmen DOMAIN=openbyte.sqrtops.de REMOTE_DIR=/opt/openbyte ./deploy-openbyte-prod.sh
-```
-
 ## CI Deploy (GHCR + SSH)
 
 Publish Docker image to GitHub Container Registry (GHCR) and deploy via SSH.
@@ -155,6 +139,8 @@ Environment="TRUST_PROXY_HEADERS=true"
 Environment="TRUSTED_PROXY_CIDRS=10.0.0.0/8,192.168.0.0/16"
 Environment="ALLOWED_ORIGINS=https://speedtest.example.com"
 Environment="DATA_DIR=/opt/openbyte/data"
+Environment="MAX_CONCURRENT_TESTS=10"
+Environment="MAX_TEST_DURATION=300s"
 
 [Install]
 WantedBy=multi-user.target

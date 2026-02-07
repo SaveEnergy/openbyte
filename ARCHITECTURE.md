@@ -1,6 +1,6 @@
 # Architecture
 
-High-performance network speed test server. Target: 25 Gbit/s sustained throughput. Multi-protocol (TCP/UDP), real-time metrics, concurrent tests.
+High-performance network speed test server. Target: 25 Gbit/s sustained throughput. Multi-protocol (TCP/UDP/HTTP streaming), real-time metrics, concurrent tests.
 
 ## System Overview
 
@@ -12,7 +12,7 @@ High-performance network speed test server. Target: 25 Gbit/s sustained throughp
        ▼
 ┌─────────────────────────────────────┐
 │         API Gateway                 │
-│  (REST + WebSocket Handler)         │
+│  (REST + WebSocket + HTTP Streams)  │
 └──────┬──────────────────┬───────────┘
        │                  │
        ▼                  ▼
@@ -24,21 +24,16 @@ High-performance network speed test server. Target: 25 Gbit/s sustained throughp
        ▼                  │
 ┌─────────────────────────┴──────────┐
 │      Test Engine (Core)            │
-│  ┌──────────┐  ┌──────────┐        │
-│  │ TCP Test │  │ UDP Test │        │
-│  │ Handler  │  │ Handler  │        │
-│  └────┬─────┘  └─────┬────┘        │
-│       │              │             │
-│  ┌────┴──────────────┴─────┐       │
-│  │  Connection Pool        │       │
-│  │  (Multi-stream support) │       │
-│  └─────────────────────────┘       │
+│  ┌──────────┐  ┌──────────┐       │
+│  │ TCP Test │  │ UDP Test │       │
+│  │ Handler  │  │ Handler  │       │
+│  └──────────┘  └──────────┘       │
 └────────────────────────────────────┘
        │
        ▼
 ┌─────────────────────┐
 │    Network Stack    │
-│  (Standard/io_uring)│
+│   (Go stdlib net)   │
 └─────────────────────┘
 ```
 
@@ -46,24 +41,34 @@ High-performance network speed test server. Target: 25 Gbit/s sustained throughp
 
 ### API Gateway
 
-HTTP REST API and WebSocket server for real-time metrics streaming.
+HTTP REST API, WebSocket server for real-time metrics, and HTTP streaming endpoints for browser-based speed tests.
 
 **Endpoints:**
 ```
-POST   /api/v1/stream/start           # Start test
+POST   /api/v1/stream/start           # Start TCP/UDP test
 GET    /api/v1/stream/{id}/status     # Test status
 GET    /api/v1/stream/{id}/results    # Final results
 POST   /api/v1/stream/{id}/cancel     # Cancel test
+POST   /api/v1/stream/{id}/metrics    # Client reports metrics
+POST   /api/v1/stream/{id}/complete   # Client reports completion
 WS     /api/v1/stream/{id}/stream     # Real-time metrics
 GET    /api/v1/servers                # List servers
-GET    /api/v1/health                 # Health check
+GET    /api/v1/version                # Build version
+GET    /api/v1/download               # HTTP streaming download
+POST   /api/v1/upload                 # HTTP streaming upload
+GET    /api/v1/ping                   # Latency + IP detection
+POST   /api/v1/results                # Save test result
+GET    /api/v1/results/{id}           # Get saved result
+GET    /health                        # Health check
 ```
 
 **Implementation:**
 - `gorilla/mux` for routing
 - `gorilla/websocket` for real-time streaming
-- Rate limiting middleware (token bucket)
-- CORS support for cross-origin requests
+- Token bucket rate limiting (per-IP + global)
+- CORS middleware with wildcard pattern support
+- Security headers (CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy)
+- Self-hosted fonts (embedded in binary via `//go:embed`)
 
 ### Test Manager
 
@@ -71,204 +76,137 @@ Orchestrates test lifecycle: create, start, monitor, complete, cleanup.
 
 **State Machine:**
 ```
-pending → starting → running → completed
-                    ↓
-                  failed
+pending → running → completed
+              ↓
+            failed
 ```
 
 **Responsibilities:**
-- Test state tracking (in-memory map)
-- Resource allocation
-- Timeout enforcement
-- Cleanup of stale tests
+- Test state tracking (in-memory map, atomic active count)
+- Resource allocation and concurrency limits
+- Duration cap enforcement
+- Periodic cleanup of stale/expired tests
+- Metrics broadcast to WebSocket clients
 
 ### Test Engine
 
-Core data plane handling network I/O and metric collection.
+Core data plane handling TCP/UDP network I/O.
 
 **Architecture:**
-- Worker pool per test (goroutines per stream)
-- Lock-free metrics (atomic operations)
-- Buffer pooling (sync.Pool)
-- Zero-copy where possible
+- Goroutine per stream (bounded by `MaxConcurrentTests`)
+- Atomic counters for bytes/packets
+- Buffer pooling (`sync.Pool` for receive buffers)
+- Fixed-bucket latency histogram (1ms buckets, `sync.RWMutex` protected)
 
 **TCP Handler:**
-```go
-type TCPHandler struct {
-    conn      net.Conn
-    config    StreamConfig
-    metrics   *MetricsCollector
-    buffer    []byte  // pre-allocated
-}
-```
+- Download: writes pre-generated random data in chunks
+- Upload: reads into pooled buffers, tracks bytes
+- Bidirectional: concurrent read/write goroutines with latency recording
+- Connection limits and duration caps enforced
 
 **UDP Handler:**
-```go
-type UDPHandler struct {
-    conn        *net.UDPConn
-    config      StreamConfig
-    seqNum      uint64  // sequence for loss detection
-    sentPackets int64   // atomic
-    recvPackets int64   // atomic
-}
-```
+- Sequence numbers for packet loss detection
+- Sender concurrency limits with WaitGroup tracking
+- Per-packet timestamps for jitter measurement
+
+### HTTP Streaming (Web UI)
+
+Browser-based speed tests using standard HTTP:
+
+- **Download** (`GET /api/v1/download`): Streams random data as `application/octet-stream` for configurable duration
+- **Upload** (`POST /api/v1/upload`): Accepts binary body, returns bytes/duration/throughput
+- **Ping** (`GET /api/v1/ping`): Returns server timestamp, client IP, IPv6 flag
+
+The web UI runs multiple concurrent fetch streams with dynamic warm-up detection and EWMA-smoothed live speed display.
 
 ### Metrics Collector
 
-Real-time metric calculation and aggregation.
+Per-stream metric collection using atomic operations and fixed-bucket histograms.
 
 **Metrics:**
-```go
-type Metrics struct {
-    ThroughputMbps    float64
-    LatencyMinMs      float64
-    LatencyMaxMs      float64
-    LatencyAvgMs      float64
-    LatencyP50Ms      float64
-    LatencyP95Ms      float64
-    LatencyP99Ms      float64
-    JitterMs          float64
-    PacketLossPercent float64
-    BytesTransferred  int64
-}
-```
+- Throughput: `(bytes × 8) / seconds / 1,000,000` Mbps
+- Latency: Fixed-bucket histogram (1ms resolution, O(1) percentile calculation)
+- Jitter: Mean consecutive difference (RFC 3550)
+- Packet loss: `(sent - received) / sent × 100` (clamped ≥ 0)
 
-**Calculations:**
-- Throughput: `(bytes * 8) / seconds / 1_000_000` Mbps
-- Latency: RTT measurement via TCP ACK or UDP echo
-- Jitter: Variance of latency samples
-- Packet loss: `(sent - received) / sent * 100`
+### Results Store
 
-### Connection Pool
+SQLite-backed persistent storage for shareable test results.
 
-Multi-stream connection management for parallel testing.
-
-```go
-type ConnectionPool struct {
-    connections []net.Conn
-    config      StreamConfig
-    metrics     *MetricsAggregator
-    wg          sync.WaitGroup
-}
-```
+- WAL mode with busy timeout for concurrent access
+- 8-character alphanumeric IDs
+- Configurable retention and max stored results
+- Background cleanup goroutine
 
 ## Data Flow
 
-### Test Initiation
+### Web UI Speed Test
 
 ```
-1. Client: POST /api/v1/stream/start
-   Body: { protocol: "tcp", direction: "download", duration: 30, streams: 4 }
-
-2. API Gateway:
-   - Validate request
-   - Check rate limits
-   - Generate stream_id (UUID)
-
-3. Test Manager:
-   - Create StreamState
-   - Allocate resources
-   - Start test goroutine
-
-4. Test Engine:
-   - Create ConnectionPool
-   - Establish connections
-   - Begin data transfer
-
-5. Response:
-   { stream_id: "uuid", websocket_url: "ws://...", test_server_tcp: "..." }
+Browser                                Server
+   │                                     │
+   │  GET /api/v1/ping (×24)             │
+   ├────────────────────────────────────►│  Latency measurement
+   │                                     │
+   │  GET /api/v1/download (×N streams)  │
+   ├────────────────────────────────────►│  Download test
+   │◄════════════════════════════════════│  (streaming response)
+   │                                     │
+   │  POST /api/v1/upload (×N streams)   │
+   ├════════════════════════════════════►│  Upload test
+   │                                     │
+   │  POST /api/v1/results               │
+   ├────────────────────────────────────►│  Save & share result
 ```
 
-### Real-Time Metrics
+### CLI Speed Test (TCP/UDP)
 
 ```
-1. Test Engine (per second):
-   - Calculate metrics from all streams
-   - Update StreamState.Metrics
-
-2. Metrics Collector:
-   - Aggregate stream metrics
-   - Calculate percentiles
-
-3. WebSocket Server:
-   - Push metrics to connected clients
-   - Format: { type: "metrics", data: {...} }
+CLI Client                              Server
+    │                                     │
+    │ POST /api/v1/stream/start           │
+    ├────────────────────────────────────►│
+    │◄── {test_server_tcp: "1.2.3.4:8081"}│
+    │                                     │
+    │ TCP/UDP connect to test port        │
+    │═════════════════════════════════════│
+    │ Data transfer (measured locally)    │
+    │                                     │
+    │ POST /api/v1/stream/{id}/complete   │
+    ├────────────────────────────────────►│
 ```
 
-## Testing Modes
-
-### Client Mode (CLI)
-
-Client performs data transfer directly:
+### CLI Speed Test (HTTP)
 
 ```
-CLI                                Server
- │ POST /stream/start (mode:client) │
- ├─────────────────────────────────►│
- │◄── {test_server_tcp: "1.2.3.4"}  │
- │                                  │
- │ TCP connect to test server       │
- │══════════════════════════════════│
- │ Data transfer (measured locally) │
- │                                  │
- │ POST /stream/{id}/complete       │
- ├─────────────────────────────────►│
-```
-
-### Proxy Mode (Web)
-
-Server performs test, streams metrics to browser:
-
-```
-Browser                            Server
- │ POST /stream/start (mode:proxy)  │
- ├─────────────────────────────────►│
- │◄── {websocket_url: "..."}        │
- │                                  │
- │ WebSocket connect                │
- │══════════════════════════════════│
- │◄══ Metrics stream                │
- │◄══ Complete                      │
+CLI Client                              Server
+    │                                     │
+    │ GET /api/v1/download                │
+    │◄════════════════════════════════════│  HTTP streaming
+    │                                     │
+    │ POST /api/v1/upload                 │
+    │════════════════════════════════════►│  HTTP upload
+    │                                     │
+    │ GET /api/v1/ping (×N)               │
+    ├────────────────────────────────────►│  Latency
 ```
 
 ## Performance
 
 ### Memory Management
 
-**Buffer Pooling:**
-```go
-var bufferPool = sync.Pool{
-    New: func() interface{} {
-        return make([]byte, 64*1024)
-    },
-}
-```
-
-**Optimizations:**
-- Reuse buffers (avoid allocations in hot path)
-- `io.CopyBuffer` with pre-allocated buffers
-- Direct socket reads without copying
+- Receive buffer pooling (`sync.Pool`, 256KB buffers)
+- Pre-generated 1MB random data block (shared across downloads)
+- Fixed-bucket histogram avoids per-sample allocation
 
 ### Concurrency
 
 - Goroutine per stream
-- Lock-free metrics (atomic operations)
-- WaitGroup for coordination
-- Context for cancellation
-
-### Network Stack
-
-**Standard Sockets:**
-- Go stdlib `net` package
-- Good for up to ~10 Gbps
-
-**Future: io_uring:**
-- Linux async I/O
-- Lower overhead than standard sockets
-
-**Future: DPDK:**
-- Kernel bypass for 25+ Gbps
-- User-space packet processing
+- Atomic counters for hot-path metrics (bytes, packets)
+- `sync.RWMutex` for histogram (writers exclusive, readers concurrent)
+- `sync.Once` for idempotent Stop() on manager/registry
+- `sync.WaitGroup` for graceful shutdown of background goroutines
+- Context-based cancellation throughout
 
 ## Scalability
 
@@ -276,42 +214,56 @@ var bufferPool = sync.Pool{
 
 - Load balancer distributes tests
 - Each server handles subset of tests
-- Registry service for discovery
+- Optional registry service for automatic discovery
 
 ### Vertical
 
 - `MAX_CONCURRENT_TESTS` limit
-- Per-test resource caps
-- Timeout enforcement
+- `MAX_STREAMS` per test (1-64)
+- `MAX_TEST_DURATION` cap
+- HTTP concurrency auto-scales with `CAPACITY_GBPS`
+- Per-IP and global rate limiting
 
 ## Security
 
 ### Rate Limiting
 
-- Per-IP: configurable tests per minute
+Token bucket with fractional remainder preservation:
+- Per-IP: configurable requests per minute (default 100)
 - Per-IP: concurrent test limit
-- Global: server-wide concurrent limit
+- Global: server-wide rate limit (default 1000/min)
+
+### Headers
+
+- `Content-Security-Policy`: `script-src 'self'`, `font-src 'self'`, `connect-src *`
+- `X-Content-Type-Options`: `nosniff`
+- `X-Frame-Options`: `DENY`
+- `Referrer-Policy`: `strict-origin-when-cross-origin`
 
 ### Input Validation
 
 - Duration: 1-300 seconds
 - Streams: 1-64
 - Packet size: 64-9000 bytes
-- Protocol: enum validation
+- Chunk size: 65536-4194304 bytes
+- Stream IDs: UUID format enforced at routing layer
+- JSON body size limits on all POST endpoints
+- Port collision detection (HTTP vs TCP/UDP)
+
+### CORS
+
+- Wildcard pattern support (`*.example.com`) with dot-boundary enforcement
+- WebSocket origins validated against same allowlist
+- Configurable via `ALLOWED_ORIGINS`
 
 ## Deployment
 
 ### Container
 
-```dockerfile
-FROM golang:1.25-alpine AS builder
-COPY . .
-RUN go build -o openbyte ./cmd/openbyte
+See `docker/Dockerfile` for the multi-stage build. The binary embeds all web assets (HTML, CSS, JS, fonts) via `//go:embed`.
 
-FROM alpine:3.19
-COPY --from=builder /app/openbyte /app/
+```
 EXPOSE 8080 8081 8082/tcp 8082/udp
-CMD ["/app/openbyte", "server"]
 ```
 
 ### Systemd
@@ -331,19 +283,28 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
+See [Deployment Guide](DEPLOYMENT.md) for full production setup.
+
 ## Monitoring
 
 ### Health Check
 
-`GET /api/v1/health` returns server status.
+`GET /health` returns `{"status": "ok"}`.
 
-### Metrics
+### Runtime Stats
 
-- Active test count
-- Server-wide throughput
-- Error rate
-- API response times
+Optional periodic logging of goroutine count, heap usage, GC stats:
+
+```
+PERF_STATS_INTERVAL=5s ./bin/openbyte server
+```
+
+### pprof
+
+```
+PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6060 ./bin/openbyte server
+```
 
 ### Logging
 
-Structured JSON logging with levels: DEBUG, INFO, WARN, ERROR.
+Structured JSON logging with levels: INFO, WARN, ERROR.
