@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/saveenergy/openbyte/pkg/diagnostic"
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
@@ -238,9 +239,31 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 
 func buildResults(streamID string, config *Config, metrics EngineMetrics, startTime time.Time) *StreamResults {
 	endTime := time.Now()
+
+	throughput := metrics.ThroughputMbps
+	var downMbps, upMbps float64
+	switch config.Direction {
+	case "download":
+		downMbps = throughput
+	case "upload":
+		upMbps = throughput
+	case "bidirectional":
+		downMbps = throughput / 2
+		upMbps = throughput / 2
+	}
+
+	interp := diagnostic.Interpret(diagnostic.Params{
+		DownloadMbps: downMbps,
+		UploadMbps:   upMbps,
+		LatencyMs:    metrics.Latency.AvgMs,
+		JitterMs:     metrics.JitterMs,
+		PacketLoss:   0,
+	})
+
 	return &StreamResults{
-		StreamID: streamID,
-		Status:   "completed",
+		SchemaVersion: SchemaVersion,
+		StreamID:      streamID,
+		Status:        "completed",
 		Config: &StreamConfig{
 			Protocol:   config.Protocol,
 			Direction:  config.Direction,
@@ -268,6 +291,7 @@ func buildResults(streamID string, config *Config, metrics EngineMetrics, startT
 			PacketsReceived:   0,
 			Network:           metrics.Network,
 		},
+		Interpretation:  interp,
 		StartTime:       startTime.Format(time.RFC3339),
 		EndTime:         endTime.Format(time.RFC3339),
 		DurationSeconds: endTime.Sub(startTime).Seconds(),
@@ -276,7 +300,10 @@ func buildResults(streamID string, config *Config, metrics EngineMetrics, startT
 
 func createFormatter(config *Config) OutputFormatter {
 	if config.JSON {
-		return &JSONFormatter{writer: os.Stdout}
+		return &JSONFormatter{Writer: os.Stdout}
+	}
+	if config.NDJSON {
+		return &NDJSONFormatter{Writer: os.Stdout}
 	}
 	if config.Plain {
 		return NewPlainFormatter(os.Stdout, config.Verbose, config.NoColor, config.NoProgress)

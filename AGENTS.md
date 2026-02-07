@@ -61,8 +61,20 @@
 - 8-char base62 IDs via `crypto/rand`; single `rand.Read(8)` call per ID (not 8 individual syscalls).
 - 90-day retention + configurable max count with hourly cleanup.
 
+### Agent Integration
+- MCP server (`openbyte mcp`) over stdio transport; 3 tools: `connectivity_check`, `speed_test`, `diagnose`. Uses `github.com/mark3labs/mcp-go`.
+- Go SDK in `pkg/client/`: `New()`, `Check()`, `SpeedTest()`, `Healthy()` — wraps HTTP engine; no shell needed.
+- Quick check (`openbyte check`): 3-5s latency + burst download + burst upload; returns grade A-F + interpretation. Exit code 0 = healthy, 1 = degraded.
+- Diagnostic interpretation in `pkg/diagnostic/`: grades (A-F), ratings (latency/speed/stability), suitability list, concerns. Shared by CLI, MCP, SDK.
+- Structured JSON errors: `--json` emits `{"error":true,"code":"...","message":"..."}` to stdout (not unstructured stderr). Error codes: `connection_refused`, `timeout`, `rate_limited`, `server_unavailable`, `invalid_config`, `cancelled`, `network_error`.
+- Schema versioning: `schema_version: "1.0"` on all JSON output (results + errors). Semver independent of binary version.
+- NDJSON streaming: `--ndjson` flag emits `{"type":"progress",...}` per tick + `{"type":"result","data":{...}}` final line.
+- OpenAPI 3.1 spec at `api/openapi.yaml` covering all `/api/v1/*` + `/health` endpoints.
+- Install script: `scripts/install.sh` (curl|sh, detects OS/arch, downloads from GitHub Releases).
+- `go install github.com/saveenergy/openbyte/cmd/openbyte@latest` works (entry point at `cmd/openbyte/`).
+
 ### Build & Deploy
-- Single `openbyte` binary with `server`/`client` subcommands.
+- Single `openbyte` binary with `server`/`client`/`check`/`mcp` subcommands.
 - Web assets embedded via `//go:embed` (HTML, CSS, JS, fonts).
 - Self-hosted fonts (DM Sans, JetBrains Mono) — no external CDN dependencies.
 - `WEB_ROOT` env overrides embedded FS for development.
@@ -102,9 +114,22 @@
 
 ## Open / Deferred
 
-(none)
+- Public test servers (infrastructure cost; defer until adoption justifies).
+- Python/TypeScript SDKs (auto-generate from OpenAPI spec).
+- WebSocket MCP transport (stdio is standard for local tools).
+- Homebrew formula / apt repo (distribution polish).
 
 ## Changelog Summary
+
+### Unreleased (agent-friendly)
+- Agent integration layer: MCP server (`openbyte mcp`), Go SDK (`pkg/client/`), quick check (`openbyte check`), diagnostic interpretation (`pkg/diagnostic/`).
+- Structured JSON errors with machine-readable error codes when `--json` active.
+- Schema versioning (`schema_version: "1.0"`) on all JSON output.
+- NDJSON streaming formatter (`--ndjson`) for real-time progress.
+- OpenAPI 3.1 spec (`api/openapi.yaml`).
+- Install script (`scripts/install.sh`) for one-liner installation.
+- Interpretation layer in all results: grade, ratings, suitability, concerns.
+- New dependency: `github.com/mark3labs/mcp-go` (MCP protocol).
 
 ### v0.4.2 (2026-02-08)
 - Migrated `gorilla/mux` → Go stdlib `net/http.ServeMux`; `"METHOD /path/{param}"` patterns + `r.PathValue()`. Removed `RateLimitMiddleware`. `RegistryRegistrar` interface for external route registration.
@@ -116,7 +141,7 @@
 - Client context timeout separated from test duration; HTTP engine overhead/grace wired from config.
 - Makefile `perf-smoke` uses built binary; Playwright CI caching.
 - Flaky concurrency tests replaced with signal-based sync; Registry API documented in `API.md`.
-- Test coverage expansion: registry service + handler (15 tests), stream manager (16 tests), latency histogram (12 tests), RTT collector (10 tests), network helpers (7 tests), API handlers expanded (19 new tests covering GetVersion, GetServers, ReportMetrics, CompleteStream, CancelStream, GetStreamResults, validation edge cases).
+- Test coverage expansion: registry service + handler (15 tests), stream manager (16 tests), latency histogram (12 tests), RTT collector (10 tests), network helpers (7 tests), API handlers expanded (19 new tests covering GetVersion, GetServers, ReportMetrics, CompleteStream, CancelStream, GetStreamResults, validation edge cases). Agent-friendly layer tests: diagnostic interpretation (42 tests: latency/speed/stability rating boundaries, grade computation A-F, suitability workloads, concerns, summary formatting, nil-safety), formatter (16 tests: JSON structured errors with all error codes, schema versioning, NDJSON progress/metrics/complete/error streaming, multiline output), SDK (11 tests: health check OK/unreachable/unhealthy, speed test download/upload/default/invalid/clamped/unreachable, API key option, Check interpretation), MCP integration (6 tests: connectivity check/speed test/diagnose via SDK, error readability, grade table-driven, JSON schema validation).
 - HTTP download error path now drains response body before close (HTTP/2 connection reuse).
 - Negative `PacketSize` defaults to 1400 instead of passing validation.
 - Registry `UpdateServer` rejects body ID conflicting with URL path param.
@@ -128,6 +153,7 @@
 - Results handler: added `math.IsNaN`/`math.IsInf` defense-in-depth validation on all float64 fields.
 - `completeStream` now logs errors to stderr instead of silently swallowing.
 - `download.js`: modernized `var` → `const`/`let` throughout.
+- `diagnostic.suitability()`/`concerns()` return `[]string{}` (not nil) — prevents JSON `null` in agent output.
 
 ### v0.4.1 (2026-02-07)
 18 improvement rounds covering: error handling (`errors.Is`/`errors.As` throughout), cancel+restart race fixes (signal threading), rate limiter token refill fix (40% throughput recovery), CSP headers + inline script extraction, `ReadHeaderTimeout` replacing `ReadTimeout`, self-hosted fonts, client env var removal, latency histogram mutex upgrade, dead code cleanup, documentation overhaul.

@@ -3,6 +3,7 @@ package client
 import (
 	"io"
 
+	"github.com/saveenergy/openbyte/pkg/diagnostic"
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
@@ -14,7 +15,7 @@ type OutputFormatter interface {
 }
 
 type JSONFormatter struct {
-	writer io.Writer
+	Writer io.Writer
 }
 
 type PlainFormatter struct {
@@ -39,6 +40,12 @@ func NewInteractiveFormatter(w io.Writer, verbose, noColor, noProgress bool) *In
 	return &InteractiveFormatter{writer: w, verbose: verbose, noColor: noColor, noProgress: noProgress}
 }
 
+// NDJSONFormatter emits newline-delimited JSON: one line per progress tick,
+// one final line with the complete result. Machine-readable streaming output.
+type NDJSONFormatter struct {
+	Writer io.Writer
+}
+
 type Config struct {
 	Protocol   string
 	Direction  string
@@ -51,6 +58,7 @@ type Config struct {
 	APIKey     string
 	Timeout    int
 	JSON       bool
+	NDJSON     bool
 	Plain      bool
 	Verbose    bool
 	Quiet      bool
@@ -90,14 +98,20 @@ type WebSocketMessage struct {
 	Message          string         `json:"message,omitempty"`
 }
 
+// SchemaVersion is the semantic version of the JSON output schema.
+// Bump major on breaking changes; minor on additive changes.
+const SchemaVersion = "1.0"
+
 type StreamResults struct {
-	StreamID        string         `json:"stream_id"`
-	Status          string         `json:"status"`
-	Config          *StreamConfig  `json:"config,omitempty"`
-	Results         *ResultMetrics `json:"results,omitempty"`
-	StartTime       string         `json:"start_time,omitempty"`
-	EndTime         string         `json:"end_time,omitempty"`
-	DurationSeconds float64        `json:"duration_seconds,omitempty"`
+	SchemaVersion  string                   `json:"schema_version"`
+	StreamID       string                   `json:"stream_id"`
+	Status         string                   `json:"status"`
+	Config         *StreamConfig            `json:"config,omitempty"`
+	Results        *ResultMetrics           `json:"results,omitempty"`
+	Interpretation *diagnostic.Interpretation `json:"interpretation,omitempty"`
+	StartTime      string                   `json:"start_time,omitempty"`
+	EndTime        string                   `json:"end_time,omitempty"`
+	DurationSeconds float64                 `json:"duration_seconds,omitempty"`
 }
 
 type StreamConfig struct {
@@ -107,6 +121,14 @@ type StreamConfig struct {
 	Streams    int    `json:"streams"`
 	PacketSize int    `json:"packet_size"`
 	Server     string `json:"server,omitempty"`
+}
+
+// JSONErrorResponse is the structured error emitted when --json is active.
+type JSONErrorResponse struct {
+	SchemaVersion string `json:"schema_version"`
+	Error         bool   `json:"error"`
+	Code          string `json:"code"`
+	Message       string `json:"message"`
 }
 
 type ResultMetrics struct {

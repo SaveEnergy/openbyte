@@ -1,0 +1,876 @@
+openapi: "3.1.0"
+info:
+  title: openByte Speed Test API
+  version: "1.0"
+  description: |
+    REST API for the openByte network speed test server.
+    All API endpoints are under `/api/v1/` except `/health`.
+    All error responses return `{"error": "message"}`.
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      tags: [Health]
+      responses:
+        "200":
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/v1/ping:
+    get:
+      summary: Latency ping + client IP detection
+      operationId: ping
+      tags: [SpeedTest]
+      responses:
+        "200":
+          description: Pong response with client IP info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PingResponse"
+
+  /api/v1/download:
+    get:
+      summary: Download speed test (streams binary data)
+      operationId: download
+      tags: [SpeedTest]
+      parameters:
+        - name: duration
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 300
+            default: 10
+          description: Duration in seconds
+        - name: chunk
+          in: query
+          schema:
+            type: integer
+            minimum: 65536
+            maximum: 4194304
+            default: 1048576
+          description: Chunk size in bytes
+      responses:
+        "200":
+          description: Binary data stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          $ref: "#/components/responses/ServerBusy"
+
+  /api/v1/upload:
+    post:
+      summary: Upload speed test
+      operationId: upload
+      tags: [SpeedTest]
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Upload result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResponse"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "503":
+          $ref: "#/components/responses/ServerBusy"
+
+  /api/v1/version:
+    get:
+      summary: Server version
+      operationId: getVersion
+      tags: [Server]
+      responses:
+        "200":
+          description: Version info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionResponse"
+
+  /api/v1/servers:
+    get:
+      summary: List available servers
+      operationId: getServers
+      tags: [Server]
+      responses:
+        "200":
+          description: Server list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServersResponse"
+
+  /api/v1/stream/start:
+    post:
+      summary: Start a new test stream
+      operationId: startStream
+      tags: [Stream]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartStreamRequest"
+      responses:
+        "201":
+          description: Stream created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartStreamResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/stream/{id}/status:
+    get:
+      summary: Get stream status
+      operationId: getStreamStatus
+      tags: [Stream]
+      parameters:
+        - $ref: "#/components/parameters/StreamID"
+      responses:
+        "200":
+          description: Stream snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreamSnapshot"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/stream/{id}/results:
+    get:
+      summary: Get stream results
+      operationId: getStreamResults
+      tags: [Stream]
+      parameters:
+        - $ref: "#/components/parameters/StreamID"
+      responses:
+        "200":
+          description: Completed stream results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreamSnapshot"
+        "202":
+          description: Stream not yet completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: stream not completed
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/stream/{id}/cancel:
+    post:
+      summary: Cancel a stream
+      operationId: cancelStream
+      tags: [Stream]
+      parameters:
+        - $ref: "#/components/parameters/StreamID"
+      responses:
+        "200":
+          description: Stream cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: cancelled
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/stream/{id}/metrics:
+    post:
+      summary: Report metrics (client mode)
+      operationId: reportMetrics
+      tags: [Stream]
+      parameters:
+        - $ref: "#/components/parameters/StreamID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Metrics"
+      responses:
+        "202":
+          description: Metrics accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: accepted
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/stream/{id}/complete:
+    post:
+      summary: Complete a stream (client mode)
+      operationId: completeStream
+      tags: [Stream]
+      parameters:
+        - $ref: "#/components/parameters/StreamID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status, metrics]
+              properties:
+                status:
+                  type: string
+                  enum: [completed, failed]
+                metrics:
+                  $ref: "#/components/schemas/Metrics"
+      responses:
+        "200":
+          description: Stream completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/stream/{id}/stream:
+    get:
+      summary: WebSocket stream for real-time metrics
+      operationId: streamMetrics
+      tags: [Stream]
+      parameters:
+        - $ref: "#/components/parameters/StreamID"
+      responses:
+        "101":
+          description: WebSocket upgrade
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/results:
+    post:
+      summary: Save a test result
+      operationId: saveResult
+      tags: [Results]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveResultRequest"
+      responses:
+        "201":
+          description: Result saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveResultResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/v1/results/{id}:
+    get:
+      summary: Get a saved result
+      operationId: getResult
+      tags: [Results]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-zA-Z]{8}$"
+      responses:
+        "200":
+          description: Saved result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedResult"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/registry/servers:
+    get:
+      summary: List registered servers
+      operationId: listRegistryServers
+      tags: [Registry]
+      parameters:
+        - name: healthy
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+          description: Filter to healthy servers only
+      responses:
+        "200":
+          description: Server list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  servers:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RegisteredServer"
+                  count:
+                    type: integer
+    post:
+      summary: Register a server
+      operationId: registerServer
+      tags: [Registry]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServerInfo"
+      responses:
+        "201":
+          description: Server registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: registered
+                  server_id:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/registry/servers/{id}:
+    get:
+      summary: Get registered server
+      operationId: getRegistryServer
+      tags: [Registry]
+      parameters:
+        - $ref: "#/components/parameters/ServerID"
+      responses:
+        "200":
+          description: Server details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisteredServer"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      summary: Update registered server
+      operationId: updateRegistryServer
+      tags: [Registry]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ServerID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServerInfo"
+      responses:
+        "200":
+          description: Server updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: updated
+                  server_id:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      summary: Deregister a server
+      operationId: deregisterServer
+      tags: [Registry]
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ServerID"
+      responses:
+        "200":
+          description: Server deregistered
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/registry/health:
+    get:
+      summary: Registry health check
+      operationId: registryHealth
+      tags: [Registry]
+      responses:
+        "200":
+          description: Registry health
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  servers:
+                    type: integer
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+  parameters:
+    StreamID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Stream UUID
+    ServerID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Server ID
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ServerBusy:
+      description: Server at capacity
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    PingResponse:
+      type: object
+      properties:
+        pong:
+          type: boolean
+          example: true
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix milliseconds
+        client_ip:
+          type: string
+        ipv6:
+          type: boolean
+
+    UploadResponse:
+      type: object
+      properties:
+        bytes:
+          type: integer
+          format: int64
+        duration_ms:
+          type: integer
+          format: int64
+        throughput_mbps:
+          type: number
+          format: double
+
+    VersionResponse:
+      type: object
+      properties:
+        version:
+          type: string
+
+    ServerInfo:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        location:
+          type: string
+        region:
+          type: string
+        host:
+          type: string
+        tcp_port:
+          type: integer
+        udp_port:
+          type: integer
+        api_endpoint:
+          type: string
+        health:
+          type: string
+        capacity_gbps:
+          type: integer
+        active_tests:
+          type: integer
+        max_tests:
+          type: integer
+
+    ServersResponse:
+      type: object
+      properties:
+        servers:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServerInfo"
+
+    RegisteredServer:
+      allOf:
+        - $ref: "#/components/schemas/ServerInfo"
+        - type: object
+          properties:
+            last_seen:
+              type: string
+              format: date-time
+            expires_at:
+              type: string
+              format: date-time
+
+    StartStreamRequest:
+      type: object
+      required: [protocol, direction]
+      properties:
+        protocol:
+          type: string
+          enum: [tcp, udp]
+        direction:
+          type: string
+          enum: [download, upload, bidirectional]
+        duration:
+          type: integer
+          minimum: 1
+          maximum: 300
+          default: 30
+        streams:
+          type: integer
+          minimum: 1
+          maximum: 64
+          default: 4
+        packet_size:
+          type: integer
+          minimum: 64
+          maximum: 9000
+          default: 1400
+        mode:
+          type: string
+          enum: [client, proxy]
+          default: proxy
+
+    StartStreamResponse:
+      type: object
+      properties:
+        stream_id:
+          type: string
+          format: uuid
+        websocket_url:
+          type: string
+        test_server_tcp:
+          type: string
+        test_server_udp:
+          type: string
+        status:
+          type: string
+        mode:
+          type: string
+          enum: [client, proxy]
+
+    LatencyMetrics:
+      type: object
+      properties:
+        min_ms:
+          type: number
+          format: double
+        max_ms:
+          type: number
+          format: double
+        avg_ms:
+          type: number
+          format: double
+        p50_ms:
+          type: number
+          format: double
+        p95_ms:
+          type: number
+          format: double
+        p99_ms:
+          type: number
+          format: double
+        count:
+          type: integer
+
+    RTTMetrics:
+      type: object
+      properties:
+        baseline_ms:
+          type: number
+          format: double
+        current_ms:
+          type: number
+          format: double
+        min_ms:
+          type: number
+          format: double
+        max_ms:
+          type: number
+          format: double
+        avg_ms:
+          type: number
+          format: double
+        jitter_ms:
+          type: number
+          format: double
+        samples:
+          type: integer
+
+    Metrics:
+      type: object
+      properties:
+        throughput_mbps:
+          type: number
+          format: double
+        throughput_avg_mbps:
+          type: number
+          format: double
+        latency_ms:
+          $ref: "#/components/schemas/LatencyMetrics"
+        rtt:
+          $ref: "#/components/schemas/RTTMetrics"
+        jitter_ms:
+          type: number
+          format: double
+        packet_loss_percent:
+          type: number
+          format: double
+        bytes_transferred:
+          type: integer
+          format: int64
+        packets_sent:
+          type: integer
+          format: int64
+        packets_received:
+          type: integer
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        stream_count:
+          type: integer
+
+    NetworkInfo:
+      type: object
+      properties:
+        client_ip:
+          type: string
+        server_ip:
+          type: string
+        isp:
+          type: string
+        asn:
+          type: integer
+        ipv6:
+          type: boolean
+        nat_detected:
+          type: boolean
+        mtu:
+          type: integer
+        hostname:
+          type: string
+
+    StreamSnapshot:
+      type: object
+      properties:
+        config:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            protocol:
+              type: string
+            direction:
+              type: string
+            duration:
+              type: integer
+            streams:
+              type: integer
+            packet_size:
+              type: integer
+            client_ip:
+              type: string
+        status:
+          type: string
+          enum: [pending, starting, running, completed, failed, cancelled]
+        progress:
+          type: number
+          format: double
+        metrics:
+          $ref: "#/components/schemas/Metrics"
+        network:
+          $ref: "#/components/schemas/NetworkInfo"
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+
+    SaveResultRequest:
+      type: object
+      properties:
+        download_mbps:
+          type: number
+          format: double
+        upload_mbps:
+          type: number
+          format: double
+        latency_ms:
+          type: number
+          format: double
+        jitter_ms:
+          type: number
+          format: double
+        loaded_latency_ms:
+          type: number
+          format: double
+        bufferbloat_grade:
+          type: string
+        ipv4:
+          type: string
+        ipv6:
+          type: string
+        server_name:
+          type: string
+
+    SaveResultResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        url:
+          type: string
+
+    SavedResult:
+      type: object
+      properties:
+        id:
+          type: string
+        download_mbps:
+          type: number
+          format: double
+        upload_mbps:
+          type: number
+          format: double
+        latency_ms:
+          type: number
+          format: double
+        jitter_ms:
+          type: number
+          format: double
+        loaded_latency_ms:
+          type: number
+          format: double
+        bufferbloat_grade:
+          type: string
+        ipv4:
+          type: string
+        ipv6:
+          type: string
+        server_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time

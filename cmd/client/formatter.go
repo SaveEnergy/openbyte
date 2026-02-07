@@ -1,8 +1,11 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -10,18 +13,69 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+// classifyErrorCode maps an error to a machine-readable error code for JSON output.
+func classifyErrorCode(err error) string {
+	if err == nil {
+		return "unknown"
+	}
+
+	if errors.Is(err, context.Canceled) {
+		return "cancelled"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "timeout"
+	}
+
+	var netErr *net.OpError
+	if errors.As(err, &netErr) {
+		if netErr.Op == "dial" {
+			return "connection_refused"
+		}
+		if netErr.Timeout() {
+			return "timeout"
+		}
+		return "network_error"
+	}
+
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "connection refused"):
+		return "connection_refused"
+	case strings.Contains(msg, "no such host"):
+		return "server_unavailable"
+	case strings.Contains(msg, "429") || strings.Contains(msg, "rate limit"):
+		return "rate_limited"
+	case strings.Contains(msg, "503") || strings.Contains(msg, "server at capacity"):
+		return "server_unavailable"
+	case strings.Contains(msg, "invalid") || strings.Contains(msg, "must be"):
+		return "invalid_config"
+	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline"):
+		return "timeout"
+	default:
+		return "unknown"
+	}
+}
+
 func (f *JSONFormatter) FormatProgress(progress, elapsed, remaining float64) {}
 
 func (f *JSONFormatter) FormatMetrics(metrics *types.Metrics) {}
 
 func (f *JSONFormatter) FormatComplete(results *StreamResults) {
-	if err := json.NewEncoder(f.writer).Encode(results); err != nil {
+	if err := json.NewEncoder(f.Writer).Encode(results); err != nil {
 		fmt.Fprintf(os.Stderr, "openbyte client: error encoding JSON: %v\n", err)
 	}
 }
 
 func (f *JSONFormatter) FormatError(err error) {
-	fmt.Fprintf(os.Stderr, "openbyte client: error: %v\n", err)
+	errResp := JSONErrorResponse{
+		SchemaVersion: SchemaVersion,
+		Error:         true,
+		Code:          classifyErrorCode(err),
+		Message:       err.Error(),
+	}
+	if encErr := json.NewEncoder(f.Writer).Encode(errResp); encErr != nil {
+		fmt.Fprintf(os.Stderr, "openbyte client: error encoding JSON: %v\n", encErr)
+	}
 }
 
 func (f *PlainFormatter) FormatProgress(progress, elapsed, remaining float64) {}
@@ -135,6 +189,47 @@ func (f *InteractiveFormatter) FormatComplete(results *StreamResults) {
 
 func (f *InteractiveFormatter) FormatError(err error) {
 	fmt.Fprintf(os.Stderr, "openbyte client: error: %v\n", err)
+}
+
+// NDJSON formatter — newline-delimited JSON for streaming progress.
+
+func (f *NDJSONFormatter) FormatProgress(progress, elapsed, remaining float64) {
+	msg := map[string]interface{}{
+		"type":        "progress",
+		"percent":     progress,
+		"elapsed_s":   elapsed,
+		"remaining_s": remaining,
+	}
+	json.NewEncoder(f.Writer).Encode(msg)
+}
+
+func (f *NDJSONFormatter) FormatMetrics(metrics *types.Metrics) {
+	msg := map[string]interface{}{
+		"type":            "metrics",
+		"throughput_mbps": metrics.ThroughputMbps,
+		"bytes":           metrics.BytesTransferred,
+		"latency_avg_ms":  metrics.Latency.AvgMs,
+		"jitter_ms":       metrics.JitterMs,
+	}
+	json.NewEncoder(f.Writer).Encode(msg)
+}
+
+func (f *NDJSONFormatter) FormatComplete(results *StreamResults) {
+	msg := map[string]interface{}{
+		"type": "result",
+		"data": results,
+	}
+	json.NewEncoder(f.Writer).Encode(msg)
+}
+
+func (f *NDJSONFormatter) FormatError(err error) {
+	msg := JSONErrorResponse{
+		SchemaVersion: SchemaVersion,
+		Error:         true,
+		Code:          classifyErrorCode(err),
+		Message:       err.Error(),
+	}
+	json.NewEncoder(f.Writer).Encode(msg)
 }
 
 func formatBytes(bytes int64) string {

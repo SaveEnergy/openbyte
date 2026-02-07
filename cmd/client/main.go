@@ -48,10 +48,18 @@ func Run(args []string, version string) int {
 
 	config := mergeConfig(flagConfig, configFile, flagsSet)
 
+	// Create formatter early so pre-test errors are structured when --json is set.
+	if !config.JSON && !config.NDJSON && !config.Plain {
+		if !term.IsTerminal(int(os.Stdout.Fd())) {
+			config.Plain = true
+		}
+	}
+	formatter := createFormatter(config)
+
 	if config.Auto {
-		fastest, err := selectFastestServer(configFile, config.Verbose)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "openbyte client: error: %v\n", err)
+		fastest, selectErr := selectFastestServer(configFile, config.Verbose)
+		if selectErr != nil {
+			formatter.FormatError(selectErr)
 			return exitFailure
 		}
 		config.ServerURL = fastest.URL
@@ -65,7 +73,7 @@ func Run(args []string, version string) int {
 	}
 
 	if err := validateConfig(config); err != nil {
-		fmt.Fprintf(os.Stderr, "openbyte client: error: %v\n", err)
+		formatter.FormatError(err)
 		return exitUsage
 	}
 
@@ -74,14 +82,6 @@ func Run(args []string, version string) int {
 	totalTimeout := time.Duration(config.Timeout)*time.Second + time.Duration(config.Duration)*time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), totalTimeout)
 	defer cancel()
-
-	if !config.JSON && !config.Plain {
-		if !term.IsTerminal(int(os.Stdout.Fd())) {
-			config.Plain = true
-		}
-	}
-
-	formatter := createFormatter(config)
 
 	var streamID atomic.Value
 

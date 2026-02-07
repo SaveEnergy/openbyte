@@ -29,6 +29,7 @@ func parseFlags(args []string, version string) (*Config, map[string]bool, int, e
 	flagSet.IntVar(&config.PacketSize, "packet-size", 0, "Packet size in bytes (64-9000)")
 	flagSet.IntVar(&config.ChunkSize, "chunk-size", 0, "HTTP chunk size in bytes (65536-4194304)")
 	flagSet.BoolVar(&config.JSON, "json", false, "Output results as JSON")
+	flagSet.BoolVar(&config.NDJSON, "ndjson", false, "Streaming newline-delimited JSON output")
 	flagSet.BoolVar(&config.Plain, "plain", false, "Plain text output")
 	flagSet.BoolVar(&config.Verbose, "verbose", false, "Verbose output")
 	flagSet.BoolVar(&config.Verbose, "v", false, "Verbose output (short)")
@@ -330,6 +331,7 @@ Flags:
   --packet-size int       Packet size in bytes (64-9000) (default: 1400)
   --chunk-size int        HTTP chunk size in bytes (65536-4194304) (default: 1048576)
   --json                  Output results as JSON
+  --ndjson                Streaming newline-delimited JSON (progress + result)
   --plain                 Plain text output
   -v, --verbose           Verbose output
   -q, --quiet             Quiet mode (errors only)
