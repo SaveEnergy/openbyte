@@ -63,7 +63,7 @@
 
 ### Agent Integration
 - MCP server (`openbyte mcp`) over stdio transport; 3 tools: `connectivity_check`, `speed_test`, `diagnose`. Uses `github.com/mark3labs/mcp-go`.
-- Go SDK in `pkg/client/`: `New()`, `Check()`, `SpeedTest()`, `Healthy()` — wraps HTTP engine; no shell needed.
+- Go SDK in `pkg/client/`: `New()`, `Check()`, `SpeedTest()`, `Diagnose()`, `Healthy()` — wraps HTTP engine; no shell needed.
 - Quick check (`openbyte check`): 3-5s latency + burst download + burst upload; returns grade A-F + interpretation. Exit code 0 = healthy, 1 = degraded.
 - Diagnostic interpretation in `pkg/diagnostic/`: grades (A-F), ratings (latency/speed/stability), suitability list, concerns. Shared by CLI, MCP, SDK.
 - Structured JSON errors: `--json` emits `{"error":true,"code":"...","message":"..."}` to stdout (not unstructured stderr). Error codes: `connection_refused`, `timeout`, `rate_limited`, `server_unavailable`, `invalid_config`, `cancelled`, `network_error`.
@@ -121,7 +121,7 @@
 
 ## Changelog Summary
 
-### Unreleased (agent-friendly)
+### v0.5.0 (2026-02-05)
 - Agent integration layer: MCP server (`openbyte mcp`), Go SDK (`pkg/client/`), quick check (`openbyte check`), diagnostic interpretation (`pkg/diagnostic/`).
 - Structured JSON errors with machine-readable error codes when `--json` active.
 - Schema versioning (`schema_version: "1.0"`) on all JSON output.
@@ -130,6 +130,9 @@
 - Install script (`scripts/install.sh`) for one-liner installation.
 - Interpretation layer in all results: grade, ratings, suitability, concerns.
 - New dependency: `github.com/mark3labs/mcp-go` (MCP protocol).
+- `cmd/check` and `cmd/mcp` deduplicated: now use `pkg/client` SDK instead of reimplementing HTTP helpers (net -348 lines).
+- `bytes.NewReader(payload)` replaces `strings.NewReader(string(payload))` — avoids 1MB unnecessary copy in upload bursts.
+- `json.Encode`/`MarshalIndent` errors now handled in NDJSON formatter, check command, and MCP handlers (no silent failures).
 
 ### v0.4.2 (2026-02-08)
 - Migrated `gorilla/mux` → Go stdlib `net/http.ServeMux`; `"METHOD /path/{param}"` patterns + `r.PathValue()`. Removed `RateLimitMiddleware`. `RegistryRegistrar` interface for external route registration.

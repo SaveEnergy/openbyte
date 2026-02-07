@@ -200,7 +200,9 @@ func (f *NDJSONFormatter) FormatProgress(progress, elapsed, remaining float64) {
 		"elapsed_s":   elapsed,
 		"remaining_s": remaining,
 	}
-	json.NewEncoder(f.Writer).Encode(msg)
+	if err := json.NewEncoder(f.Writer).Encode(msg); err != nil {
+		fmt.Fprintf(os.Stderr, "ndjson encode error: %v\n", err)
+	}
 }
 
 func (f *NDJSONFormatter) FormatMetrics(metrics *types.Metrics) {
@@ -211,7 +213,9 @@ func (f *NDJSONFormatter) FormatMetrics(metrics *types.Metrics) {
 		"latency_avg_ms":  metrics.Latency.AvgMs,
 		"jitter_ms":       metrics.JitterMs,
 	}
-	json.NewEncoder(f.Writer).Encode(msg)
+	if err := json.NewEncoder(f.Writer).Encode(msg); err != nil {
+		fmt.Fprintf(os.Stderr, "ndjson encode error: %v\n", err)
+	}
 }
 
 func (f *NDJSONFormatter) FormatComplete(results *StreamResults) {
@@ -219,7 +223,9 @@ func (f *NDJSONFormatter) FormatComplete(results *StreamResults) {
 		"type": "result",
 		"data": results,
 	}
-	json.NewEncoder(f.Writer).Encode(msg)
+	if err := json.NewEncoder(f.Writer).Encode(msg); err != nil {
+		fmt.Fprintf(os.Stderr, "ndjson encode error: %v\n", err)
+	}
 }
 
 func (f *NDJSONFormatter) FormatError(err error) {
@@ -229,7 +235,9 @@ func (f *NDJSONFormatter) FormatError(err error) {
 		Code:          classifyErrorCode(err),
 		Message:       err.Error(),
 	}
-	json.NewEncoder(f.Writer).Encode(msg)
+	if encErr := json.NewEncoder(f.Writer).Encode(msg); encErr != nil {
+		fmt.Fprintf(os.Stderr, "ndjson encode error: %v\n", encErr)
+	}
 }
 
 func formatBytes(bytes int64) string {

@@ -7,12 +7,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/saveenergy/openbyte/pkg/client"
 	"github.com/saveenergy/openbyte/pkg/diagnostic"
 )
 
@@ -86,7 +85,9 @@ func Run(args []string, version string) int {
 				"code":           "check_failed",
 				"message":        err.Error(),
 			}
-			json.NewEncoder(os.Stdout).Encode(errResp)
+			if encErr := json.NewEncoder(os.Stdout).Encode(errResp); encErr != nil {
+				fmt.Fprintf(os.Stderr, "openbyte check: json encode error: %v\n", encErr)
+			}
 		} else {
 			fmt.Fprintf(os.Stderr, "openbyte check: error: %v\n", err)
 		}
@@ -94,7 +95,10 @@ func Run(args []string, version string) int {
 	}
 
 	if jsonOut {
-		json.NewEncoder(os.Stdout).Encode(result)
+		if encErr := json.NewEncoder(os.Stdout).Encode(result); encErr != nil {
+			fmt.Fprintf(os.Stderr, "openbyte check: json encode error: %v\n", encErr)
+			return exitFailure
+		}
 	} else {
 		printHuman(result)
 	}
@@ -107,169 +111,26 @@ func Run(args []string, version string) int {
 }
 
 func runCheck(ctx context.Context, serverURL, apiKey string) (*CheckResult, error) {
-	base := strings.TrimRight(serverURL, "/")
-	client := &http.Client{Timeout: 5 * time.Second}
-
-	// Phase 1: Health check
-	healthURL := base + "/health"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL, nil)
+	var opts []client.Option
+	if apiKey != "" {
+		opts = append(opts, client.WithAPIKey(apiKey))
+	}
+	c := client.New(serverURL, opts...)
+	r, err := c.Check(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("server unreachable: %w", err)
+		return nil, err
 	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("server unreachable: %w", err)
-	}
-	io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("server unhealthy: status %d", resp.StatusCode)
-	}
-
-	// Phase 2: Latency (5 pings)
-	pingURL := base + "/api/v1/ping"
-	var latencies []time.Duration
-	for i := 0; i < 5; i++ {
-		if ctx.Err() != nil {
-			break
-		}
-		pStart := time.Now()
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, pingURL, nil)
-		if err != nil {
-			continue
-		}
-		if apiKey != "" {
-			req.Header.Set("Authorization", "Bearer "+apiKey)
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			continue
-		}
-		io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
-		latencies = append(latencies, time.Since(pStart))
-	}
-
-	var avgLatencyMs float64
-	var jitterMs float64
-	if len(latencies) > 0 {
-		var total time.Duration
-		for _, l := range latencies {
-			total += l
-		}
-		avgLatencyMs = float64(total) / float64(len(latencies)) / float64(time.Millisecond)
-
-		if len(latencies) >= 2 {
-			var jitterSum float64
-			for i := 1; i < len(latencies); i++ {
-				diff := latencies[i] - latencies[i-1]
-				if diff < 0 {
-					diff = -diff
-				}
-				jitterSum += float64(diff) / float64(time.Millisecond)
-			}
-			jitterMs = jitterSum / float64(len(latencies)-1)
-		}
-	}
-
-	// Phase 3: Quick download burst (1s)
-	downMbps := quickDownload(ctx, base, apiKey, client)
-
-	// Phase 4: Quick upload burst (1s)
-	upMbps := quickUpload(ctx, base, apiKey, client)
-
-	interp := diagnostic.Interpret(diagnostic.Params{
-		DownloadMbps: downMbps,
-		UploadMbps:   upMbps,
-		LatencyMs:    avgLatencyMs,
-		JitterMs:     jitterMs,
-		PacketLoss:   0,
-	})
-
 	return &CheckResult{
 		SchemaVersion:  "1.0",
-		Status:         "ok",
-		ServerURL:      serverURL,
-		LatencyMs:      avgLatencyMs,
-		DownloadMbps:   downMbps,
-		UploadMbps:     upMbps,
-		JitterMs:       jitterMs,
-		Interpretation: interp,
+		Status:         r.Status,
+		ServerURL:      r.ServerURL,
+		LatencyMs:      r.LatencyMs,
+		DownloadMbps:   r.DownloadMbps,
+		UploadMbps:     r.UploadMbps,
+		JitterMs:       r.JitterMs,
+		Interpretation: r.Interpretation,
+		DurationMs:     r.DurationMs,
 	}, nil
-}
-
-func quickDownload(ctx context.Context, base, apiKey string, client *http.Client) float64 {
-	dlCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	reqURL := base + "/api/v1/download?duration=2&chunk=1048576"
-	req, err := http.NewRequestWithContext(dlCtx, http.MethodGet, reqURL, nil)
-	if err != nil {
-		return 0
-	}
-	req.Header.Set("Accept-Encoding", "identity")
-	if apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+apiKey)
-	}
-
-	start := time.Now()
-	resp, err := client.Do(req)
-	if err != nil {
-		return 0
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		io.Copy(io.Discard, resp.Body)
-		return 0
-	}
-
-	buf := make([]byte, 64*1024)
-	var totalBytes int64
-	for {
-		n, readErr := resp.Body.Read(buf)
-		totalBytes += int64(n)
-		if readErr != nil {
-			break
-		}
-	}
-
-	elapsed := time.Since(start)
-	if elapsed <= 0 {
-		return 0
-	}
-	return float64(totalBytes*8) / elapsed.Seconds() / 1_000_000
-}
-
-func quickUpload(ctx context.Context, base, apiKey string, client *http.Client) float64 {
-	upCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	// Upload 1MB payload
-	payload := make([]byte, 1024*1024)
-	reqURL := base + "/api/v1/upload"
-	req, err := http.NewRequestWithContext(upCtx, http.MethodPost, reqURL, strings.NewReader(string(payload)))
-	if err != nil {
-		return 0
-	}
-	req.Header.Set("Content-Type", "application/octet-stream")
-	if apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+apiKey)
-	}
-
-	start := time.Now()
-	resp, err := client.Do(req)
-	if err != nil {
-		return 0
-	}
-	io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
-
-	elapsed := time.Since(start)
-	if elapsed <= 0 || resp.StatusCode != http.StatusOK {
-		return 0
-	}
-	return float64(len(payload)*8) / elapsed.Seconds() / 1_000_000
 }
 
 func printHuman(r *CheckResult) {
