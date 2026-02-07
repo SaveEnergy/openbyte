@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/saveenergy/openbyte/internal/logging"
@@ -102,6 +103,11 @@ func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if ct := r.Header.Get("Content-Type"); ct != "" && !strings.HasPrefix(ct, "application/json") {
+		respondRegistryError(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+		return
+	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, maxRegistryBodySize)
 	var info ServerInfo
 	if err := json.NewDecoder(r.Body).Decode(&info); err != nil {
@@ -132,6 +138,11 @@ func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 	if !h.authenticate(r) {
 		respondRegistryError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if ct := r.Header.Get("Content-Type"); ct != "" && !strings.HasPrefix(ct, "application/json") {
+		respondRegistryError(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 		return
 	}
 

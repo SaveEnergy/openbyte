@@ -603,7 +603,7 @@ async function startTest() {
     // Yield to render UI before starting test
     await new Promise(r => requestAnimationFrame(r));
     
-    const downloadSpeed = await runTest('download');
+    const downloadSpeed = await runTest('download', signal);
     state.downloadResult = downloadSpeed;
     
     if (signal.aborted) return;
@@ -615,7 +615,7 @@ async function startTest() {
     // Yield to render UI before starting test
     await new Promise(r => requestAnimationFrame(r));
     
-    const uploadSpeed = await runTest('upload');
+    const uploadSpeed = await runTest('upload', signal);
     state.uploadResult = uploadSpeed;
     
     state.phase = 'results';
@@ -637,8 +637,8 @@ async function startTest() {
   }
 }
 
-async function runTest(direction) {
-  if (!state.isRunning) {
+async function runTest(direction, signal) {
+  if (signal.aborted) {
     throw new Error('Test cancelled');
   }
   
@@ -678,14 +678,14 @@ async function runTest(direction) {
   };
   
   // Run loaded latency probe in background during the test
-  const latencyProbe = startLoadedLatencyProbe(state.abortController?.signal);
+  const latencyProbe = startLoadedLatencyProbe(signal);
   
   let result;
   try {
     if (direction === 'download') {
-      result = await runDownloadTest(duration, onProgress);
+      result = await runDownloadTest(duration, onProgress, signal);
     } else {
-      result = await runUploadTest(duration, onProgress);
+      result = await runUploadTest(duration, onProgress, signal);
     }
   } finally {
     await latencyProbe.stop();
@@ -870,6 +870,11 @@ function createWarmUpDetector(durationMs) {
         if (recentSpeeds.length >= requiredStableWindows) {
           const recent = recentSpeeds.slice(-requiredStableWindows);
           const avg = recent.reduce((a, b) => a + b) / recent.length;
+          if (avg === 0) {
+            // All windows zero — stalled but stable
+            settled = true;
+            return;
+          }
           const maxDev = Math.max(...recent.map(s => Math.abs(s - avg) / avg));
           if (maxDev < stabilityThreshold) {
             settled = true;
@@ -887,7 +892,7 @@ function createWarmUpDetector(durationMs) {
 }
 
 // HTTP-based download test
-async function runDownloadTest(duration, onProgress) {
+async function runDownloadTest(duration, onProgress, signal) {
   const startTime = performance.now();
   const numStreams = resolveStreams();
   const chunkSize = resolveChunkSize();
@@ -909,7 +914,7 @@ async function runDownloadTest(duration, onProgress) {
       method: 'GET',
       cache: 'no-store',
       credentials: 'omit',
-      signal: state.abortController?.signal
+      signal: signal
     }, (duration * 1000) + 10000);
     
     if (!res.ok || !res.body) {
@@ -924,7 +929,7 @@ async function runDownloadTest(duration, onProgress) {
     const reader = res.body.getReader();
     try {
       while (true) {
-        if (!state.isRunning) break;
+        if (signal.aborted) break;
 
         const now = performance.now();
         if (now >= endTime) {
@@ -1035,7 +1040,7 @@ async function runDownloadTest(duration, onProgress) {
   return avgSpeed > 0 ? avgSpeed : 0;
 }
 
-async function runUploadTest(duration, onProgress) {
+async function runUploadTest(duration, onProgress, signal) {
   const startTime = performance.now();
   const numStreams = resolveStreams();
   const chunkSize = resolveChunkSize();
@@ -1064,7 +1069,7 @@ async function runUploadTest(duration, onProgress) {
     await new Promise(r => setTimeout(r, delay));
     
     let consecutiveErrors = 0;
-    while (performance.now() < endTime && state.isRunning) {
+    while (performance.now() < endTime && !signal.aborted) {
       try {
         const res = await fetchWithTimeout(`${apiBase}/upload`, {
           method: 'POST',
@@ -1072,7 +1077,7 @@ async function runUploadTest(duration, onProgress) {
           headers: { 'Content-Type': 'application/octet-stream' },
           cache: 'no-store',
           credentials: 'omit',
-          signal: state.abortController?.signal
+          signal: signal
         }, (duration * 1000) + 10000);
         
         if (!res.ok) {

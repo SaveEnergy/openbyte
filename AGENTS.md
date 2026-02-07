@@ -962,3 +962,29 @@
 - Upload non-503 errors now increment `consecutiveErrors` with backoff and break after threshold.
 - IPv6 literal hostnames excluded from subdomain probing via `!hostname.startsWith('[')`.
 - Removed dead `@keyframes countUp` and `.counting` CSS.
+
+## Improvement Round 17 (2026-02-07)
+
+### Findings
+- CSP `script-src 'self'` blocked inline scripts in `results.html` and `download.html` — both pages non-functional.
+- `ReadTimeout: 15s` killed upload request body reads on slow connections (<2.7 Mbps for 4MB chunks).
+- `startTest()` fixed signal capture (R16) but `runDownloadTest`/`runUploadTest`/`startLoadedLatencyProbe` still used shared `state.abortController?.signal`.
+- `MAX_TEST_DURATION` documented in `API.md` but not loadable from environment.
+- `Validate()` didn't detect HTTP/TCP/UDP port collisions — confusing bind errors at runtime.
+- Rate limiter test coverage minimal; no tests for independent IPs, cleanup, or concurrent access.
+- Registry `RegisterServer`/`UpdateServer` missing Content-Type validation (inconsistent with other handlers).
+- `Store.Close()` silently ignored `db.Close()` errors — masks WAL/data issues.
+- Warmup detector division by zero when all throughput windows are zero.
+- `download.html` GitHub API fetch didn't check `res.ok` before parsing JSON — rate limit errors silently ignored.
+
+### Actions
+- Extracted inline scripts to `web/results.js` and `web/download.js`; HTML now uses `<script src=...>` — CSP compliant.
+- Switched `ReadTimeout` to 0, added `ReadHeaderTimeout: 15s` to protect against slowloris while allowing unlimited body reads.
+- Threaded captured `signal` from `startTest()` through `runTest()`, `runDownloadTest()`, `runUploadTest()`, and `startLoadedLatencyProbe()`.
+- Added `MAX_TEST_DURATION` env parsing in `LoadFromEnv` with positive-duration validation.
+- Added HTTP/TCP and HTTP/UDP port collision checks in `Validate()`.
+- Added 3 ratelimit tests: independent IPs, cleanup expiration, concurrent access (race-safe).
+- Added Content-Type validation to `RegisterServer` and `UpdateServer` (415 on non-JSON).
+- `Store.Close()` now logs `db.Close()` errors.
+- Warmup detector returns settled early when average throughput is zero (stalled but stable).
+- `download.js` now checks `res.ok` before parsing — surfaces "GitHub API rate limited" in UI.

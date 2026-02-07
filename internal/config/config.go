@@ -30,9 +30,10 @@ type Config struct {
 	TCPBufferSize int
 	UDPBufferSize int
 
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
-	IdleTimeout  time.Duration
+	ReadTimeout       time.Duration
+	ReadHeaderTimeout time.Duration
+	WriteTimeout      time.Duration
+	IdleTimeout       time.Duration
 
 	PprofEnabled      bool
 	PprofAddress      string
@@ -85,8 +86,9 @@ func DefaultConfig() *Config {
 		MaxStreams:            32,
 		TCPBufferSize:         64 * 1024,
 		UDPBufferSize:         1500,
-		ReadTimeout:           15 * time.Second,
-		WriteTimeout:          0, // disabled; streaming endpoints manage own duration
+		ReadTimeout:           0,                // disabled; upload handlers manage own body deadline
+		ReadHeaderTimeout:     15 * time.Second, // protects against slowloris
+		WriteTimeout:          0,                // disabled; streaming endpoints manage own duration
 		IdleTimeout:           60 * time.Second,
 		PprofEnabled:          false,
 		PprofAddress:          "127.0.0.1:6060",
@@ -177,6 +179,13 @@ func (c *Config) LoadFromEnv() error {
 			return fmt.Errorf("invalid MAX_STREAMS %q: must be 1-64", max)
 		}
 		c.MaxStreams = m
+	}
+	if dur := os.Getenv("MAX_TEST_DURATION"); dur != "" {
+		d, err := time.ParseDuration(dur)
+		if err != nil || d <= 0 {
+			return fmt.Errorf("invalid MAX_TEST_DURATION %q: must be a positive duration (e.g. 300s)", dur)
+		}
+		c.MaxTestDuration = d
 	}
 
 	if enabled := os.Getenv("PPROF_ENABLED"); enabled == "true" || enabled == "1" {
@@ -307,6 +316,13 @@ func (c *Config) Validate() error {
 	}
 	if c.TCPTestPort == c.UDPTestPort {
 		return fmt.Errorf("TCP and UDP test ports cannot be the same")
+	}
+	httpPort, _ := strconv.Atoi(c.Port)
+	if httpPort == c.TCPTestPort {
+		return fmt.Errorf("HTTP port (%s) and TCP test port (%d) cannot be the same", c.Port, c.TCPTestPort)
+	}
+	if httpPort == c.UDPTestPort {
+		return fmt.Errorf("HTTP port (%s) and UDP test port (%d) cannot be the same", c.Port, c.UDPTestPort)
 	}
 	if c.MaxConcurrentTests <= 0 {
 		return fmt.Errorf("max concurrent tests must be > 0")

@@ -1,6 +1,8 @@
 package api_test
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -67,4 +69,68 @@ func TestRateLimiterIPRefillLowRate(t *testing.T) {
 	if !rl.Allow(ip) {
 		t.Fatalf("expected per-ip refill to allow request at low rate")
 	}
+}
+
+func TestRateLimiterIndependentIPs(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.GlobalRateLimit = 1000
+	cfg.RateLimitPerIP = 5
+	rl := api.NewRateLimiter(cfg)
+
+	// Drain IP-A
+	for i := 0; i < cfg.RateLimitPerIP; i++ {
+		if !rl.Allow("10.0.0.1") {
+			t.Fatalf("IP-A token %d not allowed", i)
+		}
+	}
+	// IP-A exhausted
+	if rl.Allow("10.0.0.1") {
+		t.Fatal("IP-A should be exhausted")
+	}
+	// IP-B should still have full bucket
+	if !rl.Allow("10.0.0.2") {
+		t.Fatal("IP-B should be independent and allowed")
+	}
+}
+
+func TestRateLimiterCleanupRemovesExpired(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.GlobalRateLimit = 1000
+	cfg.RateLimitPerIP = 100
+	rl := api.NewRateLimiter(cfg)
+	rl.SetCleanupPolicy(10*time.Millisecond, 50*time.Millisecond)
+
+	// Create entry
+	rl.Allow("10.0.0.99")
+
+	// Wait past TTL + cleanup interval
+	time.Sleep(100 * time.Millisecond)
+
+	// Trigger cleanup by calling Allow (different IP)
+	rl.Allow("10.0.0.1")
+
+	// Original IP should have full bucket (entry cleaned, fresh on next access)
+	for i := 0; i < cfg.RateLimitPerIP; i++ {
+		if !rl.Allow("10.0.0.99") {
+			t.Fatalf("token %d not allowed after cleanup", i)
+		}
+	}
+}
+
+func TestRateLimiterConcurrentAccess(t *testing.T) {
+	cfg := config.DefaultConfig()
+	rl := api.NewRateLimiter(cfg)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func(ip string) {
+			defer wg.Done()
+			for j := 0; j < 100; j++ {
+				rl.Allow(ip)
+			}
+		}(fmt.Sprintf("10.0.0.%d", i))
+	}
+	wg.Wait()
+	// No panic or race detected = pass (run with -race)
 }

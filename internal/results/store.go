@@ -91,7 +91,9 @@ func (s *Store) Close() {
 	s.closeOnce.Do(func() {
 		close(s.stopCh)
 		s.wg.Wait()
-		s.db.Close()
+		if err := s.db.Close(); err != nil {
+			logging.Warn("results store: close failed", logging.Field{Key: "error", Value: err})
+		}
 	})
 }
 

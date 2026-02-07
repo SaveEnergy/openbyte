@@ -117,11 +117,12 @@ func Run(version string) int {
 	}
 
 	srv := &http.Server{
-		Addr:         cfg.BindAddress + ":" + cfg.Port,
-		Handler:      muxRouter,
-		ReadTimeout:  cfg.ReadTimeout,
-		WriteTimeout: cfg.WriteTimeout,
-		IdleTimeout:  cfg.IdleTimeout,
+		Addr:              cfg.BindAddress + ":" + cfg.Port,
+		Handler:           muxRouter,
+		ReadTimeout:       cfg.ReadTimeout,
+		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+		WriteTimeout:      cfg.WriteTimeout,
+		IdleTimeout:       cfg.IdleTimeout,
 	}
 
 	quit := make(chan os.Signal, 1)
