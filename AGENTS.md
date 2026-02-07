@@ -106,7 +106,7 @@
 
 ## Changelog Summary
 
-### Unreleased (since v0.4.1)
+### v0.4.2 (2026-02-08)
 - Migrated `gorilla/mux` → Go stdlib `net/http.ServeMux`; `"METHOD /path/{param}"` patterns + `r.PathValue()`. Removed `RateLimitMiddleware`. `RegistryRegistrar` interface for external route registration.
 - UDP multi-reader: N goroutines (`min(GOMAXPROCS, 4)`, floor 2) call `ReadFromUDP` concurrently on same `UDPConn`. Client state extracted to `udpClients` struct; cleanup on `time.Ticker` instead of inline in hot path. No more `SetReadDeadline` polling — readers block until packet or connection close.
 - `ServerInfo` dedup to `pkg/types`; `generateID` batched entropy; `buildServerInfo` TLS-aware scheme.
