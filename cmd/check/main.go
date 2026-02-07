@@ -24,15 +24,15 @@ var (
 
 // CheckResult is the structured output of openbyte check.
 type CheckResult struct {
-	SchemaVersion string                     `json:"schema_version"`
-	Status        string                     `json:"status"`
-	ServerURL     string                     `json:"server_url"`
-	LatencyMs     float64                    `json:"latency_ms"`
-	DownloadMbps  float64                    `json:"download_mbps"`
-	UploadMbps    float64                    `json:"upload_mbps"`
-	JitterMs      float64                    `json:"jitter_ms"`
+	SchemaVersion  string                     `json:"schema_version"`
+	Status         string                     `json:"status"`
+	ServerURL      string                     `json:"server_url"`
+	LatencyMs      float64                    `json:"latency_ms"`
+	DownloadMbps   float64                    `json:"download_mbps"`
+	UploadMbps     float64                    `json:"upload_mbps"`
+	JitterMs       float64                    `json:"jitter_ms"`
 	Interpretation *diagnostic.Interpretation `json:"interpretation"`
-	DurationMs    int64                      `json:"duration_ms"`
+	DurationMs     int64                      `json:"duration_ms"`
 }
 
 func Run(args []string, version string) int {

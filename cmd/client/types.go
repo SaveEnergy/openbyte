@@ -103,15 +103,15 @@ type WebSocketMessage struct {
 const SchemaVersion = "1.0"
 
 type StreamResults struct {
-	SchemaVersion  string                   `json:"schema_version"`
-	StreamID       string                   `json:"stream_id"`
-	Status         string                   `json:"status"`
-	Config         *StreamConfig            `json:"config,omitempty"`
-	Results        *ResultMetrics           `json:"results,omitempty"`
-	Interpretation *diagnostic.Interpretation `json:"interpretation,omitempty"`
-	StartTime      string                   `json:"start_time,omitempty"`
-	EndTime        string                   `json:"end_time,omitempty"`
-	DurationSeconds float64                 `json:"duration_seconds,omitempty"`
+	SchemaVersion   string                     `json:"schema_version"`
+	StreamID        string                     `json:"stream_id"`
+	Status          string                     `json:"status"`
+	Config          *StreamConfig              `json:"config,omitempty"`
+	Results         *ResultMetrics             `json:"results,omitempty"`
+	Interpretation  *diagnostic.Interpretation `json:"interpretation,omitempty"`
+	StartTime       string                     `json:"start_time,omitempty"`
+	EndTime         string                     `json:"end_time,omitempty"`
+	DurationSeconds float64                    `json:"duration_seconds,omitempty"`
 }
 
 type StreamConfig struct {
