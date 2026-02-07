@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	_ "net/http/pprof"
 	"runtime"
@@ -24,7 +25,7 @@ func startPprofServer(cfg *config.Config) *http.Server {
 
 	go func() {
 		logging.Info("pprof server starting", logging.Field{Key: "address", Value: cfg.PprofAddress})
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logging.Error("pprof server failed", logging.Field{Key: "error", Value: err})
 		}
 	}()

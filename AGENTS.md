@@ -988,3 +988,62 @@
 - `Store.Close()` now logs `db.Close()` errors.
 - Warmup detector returns settled early when average throughput is zero (stalled but stable).
 - `download.js` now checks `res.ok` before parsing — surfaces "GitHub API rate limited" in UI.
+
+## Improvement Round 18 — Analysis (2026-02-07)
+
+### HIGH Findings
+- **F1**: `app.js:634-637` — `startTest()` finally block unconditionally sets `state.isRunning = false` and `state.abortController = null`. On cancel+immediate restart, the old async unwind's finally runs after the new test starts, clobbering `isRunning` and nulling the new controller. New test's `measureLatency` sees `!state.isRunning` and breaks early. R16 fixed phase gates but not the finally block.
+- **F2**: `app.js:707-777` — `measureLatency()` not included in R16/R17 signal-threading. Reads `state.isRunning` (line 714) and `state.abortController?.signal` (line 720) directly. On cancel+restart, reads new controller's signal (not aborted) and `isRunning=true` — old pings continue undiscoverable.
+
+### MEDIUM Findings
+- **F3**: `app.js:1083-1111` — Upload success response body never consumed. R8 fixed `!res.ok` path; success path missed. ~150 unconsumed HTTP/2 stream slots accumulate per 30s test, exceeding Chrome's 100-stream default.
+- **F4**: `app.js:807` — `startLoadedLatencyProbe` while condition uses `state.isRunning` instead of `!signal.aborted`. On cancel+restart, old probe loops (AbortError → catch → sleep 500ms → repeat) until `stop()` called.
+- **F5**: `app.js:986,990` — Download retry guards use `state.isRunning` instead of `signal.aborted`. Not critical (inner fetch uses captured signal) but inconsistent with R16/R17 intent.
+- **F6**: `perf.go:27` — Bare `!=` for `http.ErrServerClosed`. R14 fixed `main.go` but missed `perf.go`.
+
+### LOW Findings
+- **F7**: `stream/server.go:63-66,519-525` — Dead `getSendBuffer` + `sendPool`. Pool allocates 256KB buffers never used; download/bidir handlers write from `randomData` directly.
+- **F8**: `latency_histogram.go:59-64` — `CopyTo` uses `Lock` for read-only `copy()` + read of `overflow`. `RLock` semantically correct.
+- **F9**: `download.js:231-234` — Clipboard write has no `.catch()`. Silent failure on non-HTTPS or permission denial.
+
+### Deferred (carried forward)
+- `ServerInfo` dedup across `api` and `registry` packages.
+- CLI HTTP engine hardcoded overhead/grace.
+- Registry API documentation in `API.md`.
+- UDP single-threaded read loop.
+- Flaky concurrency test sleep (T3).
+- `navigator.platform` deprecation.
+- `registry/client.go:222`: `buildServerInfo` hardcodes `http://` scheme.
+- `results/store.go`: `generateID` makes 8 syscalls per ID.
+- `fetchWithTimeout` abort listener accumulation.
+- CLI `selectFastestServer` body drain.
+- `gorilla/mux` archived — stdlib migration candidate.
+- Makefile `perf-smoke` PID capture.
+- Playwright browser cache in CI.
+- Client TCP/UDP warm-up is a no-op.
+- Client parent context timeout wraps entire lifecycle.
+- `download.html` innerHTML pattern.
+
+## Improvement Round 18 (2026-02-07)
+
+### Findings
+- `startTest()` finally block unconditionally clobbered `isRunning`/`abortController` on cancel+restart — killed new test.
+- `measureLatency()` missed from R16/R17 signal-threading — used shared `state.isRunning` and `state.abortController?.signal`.
+- Upload success response body never consumed — leaked ~150 HTTP/2 stream slots per test.
+- `startLoadedLatencyProbe` loop guard used `state.isRunning` instead of `signal.aborted` — looped indefinitely on cancel.
+- Download retry loop guards (3 sites) used `state.isRunning` instead of `signal.aborted`.
+- `perf.go` bare `err != http.ErrServerClosed` (missed by R14 sweep of `main.go`).
+- Dead `sendPool` field + `getSendBuffer()` method in stream server — never called.
+- `LatencyHistogram.CopyTo()` took write lock for read-only operation.
+- `download.js` clipboard copy had no `.catch()` — unhandled rejection on permission denial.
+
+### Actions
+- `finally` block checks `state.abortController?.signal === signal` before cleanup — only resets if still active test.
+- `measureLatency()` accepts `signal` param; loop guard and fetch use captured signal.
+- Upload success path drains response body (`await res.text()`) for HTTP/2 stream reuse.
+- `startLoadedLatencyProbe` loop guard changed to `!signal.aborted`.
+- Download retry loop: 3 `state.isRunning` references replaced with `signal.aborted`.
+- `perf.go` uses `errors.Is(err, http.ErrServerClosed)`.
+- Removed dead `sendPool` field and `getSendBuffer()` from stream server.
+- Upgraded `LatencyHistogram.mu` to `sync.RWMutex`; `CopyTo()` uses `RLock`.
+- Clipboard copy `.catch()` shows "Failed" feedback on permission denial.

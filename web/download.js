@@ -231,6 +231,9 @@
         navigator.clipboard.writeText(text).then(function() {
           btn.textContent = 'Copied!';
           setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+        }).catch(function() {
+          btn.textContent = 'Failed';
+          setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
         });
       }
     });

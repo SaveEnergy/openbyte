@@ -30,7 +30,6 @@ type Server struct {
 	ctx              context.Context
 	cancel           context.CancelFunc
 	randomData       []byte
-	sendPool         sync.Pool
 	recvPool         sync.Pool
 }
 
@@ -60,11 +59,6 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		ctx:           ctx,
 		cancel:        cancel,
 		randomData:    make([]byte, randomDataSize),
-		sendPool: sync.Pool{
-			New: func() interface{} {
-				return make([]byte, sendBufferSize)
-			},
-		},
 		recvPool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, recvBufferSize)
@@ -514,14 +508,6 @@ func (s *Server) udpSender(client *udpClientState) {
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
-}
-
-func (s *Server) getSendBuffer() []byte {
-	buf, ok := s.sendPool.Get().([]byte)
-	if !ok || len(buf) != sendBufferSize {
-		return make([]byte, sendBufferSize)
-	}
-	return buf
 }
 
 func (s *Server) getRecvBuffer() []byte {

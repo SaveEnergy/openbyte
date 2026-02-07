@@ -591,7 +591,7 @@ async function startTest() {
     showState('testing');
     updateTestType('◎ Latency', 'measuring');
     
-    const latency = await measureLatency();
+    const latency = await measureLatency(signal);
     state.latencyResult = latency;
     
     if (signal.aborted) return;
@@ -632,8 +632,11 @@ async function startTest() {
     }
     resetToIdle();
   } finally {
-    state.isRunning = false;
-    state.abortController = null;
+    // Only clean up if this is still the active test
+    if (state.abortController?.signal === signal) {
+      state.isRunning = false;
+      state.abortController = null;
+    }
   }
 }
 
@@ -704,20 +707,20 @@ async function runTest(direction, signal) {
   return result;
 }
 
-async function measureLatency() {
+async function measureLatency(signal) {
   const rawSamples = [];
   const numSamples = 24;
   const warmUpPings = 2; // First pings include DNS/TLS overhead
   let capturedIP = false;
   
   for (let i = 0; i < numSamples; i++) {
-    if (!state.isRunning) break;
+    if (signal.aborted) break;
     
     const start = performance.now();
     try {
       const res = await fetch(`${apiBase}/ping`, { 
         method: 'GET',
-        signal: state.abortController?.signal 
+        signal
       });
       const rtt = performance.now() - start;
       
@@ -804,7 +807,7 @@ function startLoadedLatencyProbe(signal) {
   let running = true;
   
   const loop = async () => {
-    while (running && state.isRunning) {
+    while (running && !signal.aborted) {
       const start = performance.now();
       try {
         const res = await fetch(`${apiBase}/ping`, {
@@ -983,18 +986,18 @@ async function runDownloadTest(duration, onProgress, signal) {
       
       const attempts = buildChunkAttempts();
       for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
-        if (!state.isRunning) return;
+        if (signal.aborted) return;
         const attemptChunk = attempts[attemptIndex];
         let success = false;
         for (let retry = 0; retry <= maxNetworkRetries; retry++) {
-          if (!state.isRunning) return;
+          if (signal.aborted) return;
           try {
             if (await downloadStream(attemptChunk)) {
               success = true;
               break;
             }
           } catch (e) {
-            if (e.name === 'AbortError' || !state.isRunning) {
+            if (e.name === 'AbortError' || signal.aborted) {
               return;
             }
             if (e.status === 503) {
@@ -1092,6 +1095,7 @@ async function runUploadTest(duration, onProgress, signal) {
           continue;
         }
         consecutiveErrors = 0;
+        await res.text().catch(() => {}); // drain body for HTTP/2 stream reuse
         
         const now = performance.now();
         allBytes += blobSize;

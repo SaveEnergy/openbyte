@@ -9,7 +9,7 @@ type LatencyHistogram struct {
 	bucketWidth time.Duration
 	buckets     []uint32
 	overflow    uint32
-	mu          sync.Mutex
+	mu          sync.RWMutex
 }
 
 func NewLatencyHistogram(bucketWidth time.Duration, bucketCount int) *LatencyHistogram {
@@ -57,8 +57,8 @@ func (h *LatencyHistogram) Reset() {
 }
 
 func (h *LatencyHistogram) CopyTo(dst []uint32) uint32 {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 	copy(dst, h.buckets)
 	return h.overflow
 }
