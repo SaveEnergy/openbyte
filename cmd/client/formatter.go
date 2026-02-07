@@ -103,41 +103,34 @@ func (f *InteractiveFormatter) FormatMetrics(metrics *types.Metrics) {
 
 func (f *InteractiveFormatter) FormatComplete(results *StreamResults) {
 	fmt.Fprintln(f.writer, "\nResults:")
-	if results.Results != nil {
-		if !f.noColor {
-			fmt.Fprintf(f.writer, " \033[36mThroughput:\033[0m %.1f Mbps (peak)\n", results.Results.ThroughputMbps)
-			fmt.Fprintf(f.writer, "  %.1f Mbps (average)\n", results.Results.ThroughputAvgMbps)
-			fmt.Fprintf(f.writer, " \033[33mLatency:\033[0m %.3f ms (avg)\n", results.Results.LatencyMs.AvgMs)
-			fmt.Fprintf(f.writer, "  %.3f ms (min)\n", results.Results.LatencyMs.MinMs)
-			fmt.Fprintf(f.writer, "  %.3f ms (max)\n", results.Results.LatencyMs.MaxMs)
-			fmt.Fprintf(f.writer, "  %.3f ms (p50)\n", results.Results.LatencyMs.P50Ms)
-			fmt.Fprintf(f.writer, "  %.3f ms (p95)\n", results.Results.LatencyMs.P95Ms)
-			fmt.Fprintf(f.writer, "  %.3f ms (p99)\n", results.Results.LatencyMs.P99Ms)
-			fmt.Fprintf(f.writer, " \033[35mJitter:\033[0m %.3f ms\n", results.Results.JitterMs)
-			if results.Results.PacketLossPercent > 1.0 {
-				fmt.Fprintf(f.writer, " \033[31mPacket Loss:\033[0m %.2f%%\n", results.Results.PacketLossPercent)
-			} else {
-				fmt.Fprintf(f.writer, " \033[32mPacket Loss:\033[0m %.2f%%\n", results.Results.PacketLossPercent)
-			}
-			fmt.Fprintf(f.writer, " \033[37mBytes:\033[0m %s transferred\n", formatBytes(results.Results.BytesTransferred))
-			fmt.Fprintf(f.writer, " \033[37mPackets:\033[0m %s sent\n", formatNumber(results.Results.PacketsSent))
-			fmt.Fprintf(f.writer, "  %s received\n", formatNumber(results.Results.PacketsReceived))
-		} else {
-			fmt.Fprintf(f.writer, " Throughput: %.1f Mbps (peak)\n", results.Results.ThroughputMbps)
-			fmt.Fprintf(f.writer, "  %.1f Mbps (average)\n", results.Results.ThroughputAvgMbps)
-			fmt.Fprintf(f.writer, " Latency: %.3f ms (avg)\n", results.Results.LatencyMs.AvgMs)
-			fmt.Fprintf(f.writer, "  %.3f ms (min)\n", results.Results.LatencyMs.MinMs)
-			fmt.Fprintf(f.writer, "  %.3f ms (max)\n", results.Results.LatencyMs.MaxMs)
-			fmt.Fprintf(f.writer, "  %.3f ms (p50)\n", results.Results.LatencyMs.P50Ms)
-			fmt.Fprintf(f.writer, "  %.3f ms (p95)\n", results.Results.LatencyMs.P95Ms)
-			fmt.Fprintf(f.writer, "  %.3f ms (p99)\n", results.Results.LatencyMs.P99Ms)
-			fmt.Fprintf(f.writer, " Jitter: %.3f ms\n", results.Results.JitterMs)
-			fmt.Fprintf(f.writer, " Packet Loss: %.2f%%\n", results.Results.PacketLossPercent)
-			fmt.Fprintf(f.writer, " Bytes: %s transferred\n", formatBytes(results.Results.BytesTransferred))
-			fmt.Fprintf(f.writer, " Packets: %s sent\n", formatNumber(results.Results.PacketsSent))
-			fmt.Fprintf(f.writer, "  %s received\n", formatNumber(results.Results.PacketsReceived))
-		}
+	if results.Results == nil {
+		return
 	}
+	r := results.Results
+	c := func(code, label string) string {
+		if f.noColor {
+			return label
+		}
+		return fmt.Sprintf("\033[%sm%s\033[0m", code, label)
+	}
+
+	fmt.Fprintf(f.writer, " %s %.1f Mbps (peak)\n", c("36", "Throughput:"), r.ThroughputMbps)
+	fmt.Fprintf(f.writer, "  %.1f Mbps (average)\n", r.ThroughputAvgMbps)
+	fmt.Fprintf(f.writer, " %s %.3f ms (avg)\n", c("33", "Latency:"), r.LatencyMs.AvgMs)
+	fmt.Fprintf(f.writer, "  %.3f ms (min)\n", r.LatencyMs.MinMs)
+	fmt.Fprintf(f.writer, "  %.3f ms (max)\n", r.LatencyMs.MaxMs)
+	fmt.Fprintf(f.writer, "  %.3f ms (p50)\n", r.LatencyMs.P50Ms)
+	fmt.Fprintf(f.writer, "  %.3f ms (p95)\n", r.LatencyMs.P95Ms)
+	fmt.Fprintf(f.writer, "  %.3f ms (p99)\n", r.LatencyMs.P99Ms)
+	fmt.Fprintf(f.writer, " %s %.3f ms\n", c("35", "Jitter:"), r.JitterMs)
+	lossColor := "32"
+	if r.PacketLossPercent > 1.0 {
+		lossColor = "31"
+	}
+	fmt.Fprintf(f.writer, " %s %.2f%%\n", c(lossColor, "Packet Loss:"), r.PacketLossPercent)
+	fmt.Fprintf(f.writer, " %s %s transferred\n", c("37", "Bytes:"), formatBytes(r.BytesTransferred))
+	fmt.Fprintf(f.writer, " %s %s sent\n", c("37", "Packets:"), formatNumber(r.PacketsSent))
+	fmt.Fprintf(f.writer, "  %s received\n", formatNumber(r.PacketsReceived))
 }
 
 func (f *InteractiveFormatter) FormatError(err error) {

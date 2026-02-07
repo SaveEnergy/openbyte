@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math/big"
 	"strings"
 	"sync"
 	"time"
@@ -211,14 +210,13 @@ func (s *Store) cleanupLoop() {
 }
 
 func generateID() (string, error) {
+	var entropy [idLength]byte
+	if _, err := rand.Read(entropy[:]); err != nil {
+		return "", err
+	}
 	b := make([]byte, idLength)
-	max := big.NewInt(int64(len(idCharset)))
-	for i := range b {
-		n, err := rand.Int(rand.Reader, max)
-		if err != nil {
-			return "", err
-		}
-		b[i] = idCharset[n.Int64()]
+	for i, v := range entropy {
+		b[i] = idCharset[int(v)%len(idCharset)]
 	}
 	return string(b), nil
 }

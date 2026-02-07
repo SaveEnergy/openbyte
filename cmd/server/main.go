@@ -87,9 +87,9 @@ func Run(version string) int {
 	router.SetWebSocketHandler(wsServer.HandleStream)
 	router.SetResultsHandler(results.NewHandler(resultsStore))
 	router.SetWebRoot(cfg.WebRoot)
-	muxRouter := router.SetupRoutes()
 
 	var registryService *registry.Service
+	var registrars []api.RegistryRegistrar
 	if cfg.RegistryMode {
 		logging.Info("Starting in registry mode")
 		registryService = registry.NewService(cfg.RegistryServerTTL, 30*time.Second)
@@ -97,8 +97,10 @@ func Run(version string) int {
 
 		registryLogger := logging.NewLogger("registry")
 		registryHandler := registry.NewHandler(registryService, registryLogger, cfg.RegistryAPIKey)
-		registryHandler.RegisterRoutes(muxRouter)
+		registrars = append(registrars, registryHandler)
 	}
+
+	muxRouter := router.SetupRoutes(registrars...)
 
 	var broadcastWg sync.WaitGroup
 	broadcastWg.Add(1)

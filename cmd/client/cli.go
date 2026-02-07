@@ -3,6 +3,7 @@ package client
 import (
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"sort"
@@ -198,6 +199,7 @@ func selectFastestServer(configFile *ConfigFile, verbose bool) (*ServerLatency, 
 			if err != nil {
 				result.Error = err
 			} else {
+				io.Copy(io.Discard, resp.Body)
 				resp.Body.Close()
 				if resp.StatusCode != http.StatusOK {
 					result.Error = fmt.Errorf("health check failed: %d", resp.StatusCode)
@@ -288,7 +290,7 @@ func validateConfig(config *Config) error {
 		if config.PacketSize < 64 || config.PacketSize > 9000 {
 			return fmt.Errorf("invalid packet size: %d\n\n"+
 				"Packet size must be between 64 and 9000 bytes.\n"+
-				"Use: openbyte client --packet-size 1500  (for standard MTU)\n"+
+				"Use: openbyte client --packet-size 1400  (WAN-safe default)\n"+
 				"See: openbyte client --help", config.PacketSize)
 		}
 	}
@@ -325,7 +327,7 @@ Flags:
   -d, --direction string  Direction: download, upload, bidirectional (default: download)
   -t, --duration int      Test duration in seconds (1-300) (default: 30)
   -s, --streams int       Parallel streams (1-64) (default: 4)
-  --packet-size int       Packet size in bytes (64-9000) (default: 1500)
+  --packet-size int       Packet size in bytes (64-9000) (default: 1400)
   --chunk-size int        HTTP chunk size in bytes (65536-4194304) (default: 1048576)
   --json                  Output results as JSON
   --plain                 Plain text output

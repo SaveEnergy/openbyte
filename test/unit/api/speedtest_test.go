@@ -8,11 +8,42 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/api"
 )
+
+// signalWriter wraps httptest.ResponseRecorder and signals a channel on first Write,
+// indicating the handler has started (and incremented its concurrency counter).
+type signalWriter struct {
+	*httptest.ResponseRecorder
+	started chan struct{}
+	once    sync.Once
+}
+
+func (sw *signalWriter) Write(b []byte) (int, error) {
+	sw.once.Do(func() { close(sw.started) })
+	return sw.ResponseRecorder.Write(b)
+}
+
+func (sw *signalWriter) WriteHeader(code int) {
+	sw.once.Do(func() { close(sw.started) })
+	sw.ResponseRecorder.WriteHeader(code)
+}
+
+// signalReader wraps a Reader and signals on the first Read call.
+type signalReader struct {
+	io.ReadCloser
+	started chan struct{}
+	once    sync.Once
+}
+
+func (sr *signalReader) Read(p []byte) (int, error) {
+	sr.once.Do(func() { close(sr.started) })
+	return sr.ReadCloser.Read(p)
+}
 
 func TestSpeedTestDownloadWritesData(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
@@ -82,26 +113,34 @@ func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 	maxConcurrent := 2
 	handler := api.NewSpeedTestHandler(maxConcurrent, 300)
 
-	// Fill all slots with long-running downloads
+	// Fill all slots with long-running downloads using signal writers
 	cancels := make([]context.CancelFunc, maxConcurrent)
 	done := make(chan struct{}, maxConcurrent)
+	started := make([]chan struct{}, maxConcurrent)
 
 	for i := 0; i < maxConcurrent; i++ {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancels[i] = cancel
+		started[i] = make(chan struct{})
 
-		go func() {
+		go func(ch chan struct{}) {
 			defer func() { done <- struct{}{} }()
 			req := httptest.NewRequest(http.MethodGet,
 				"http://example.com/api/v1/download?duration=60&chunk=65536", nil)
 			req = req.WithContext(ctx)
-			rec := httptest.NewRecorder()
-			handler.Download(rec, req)
-		}()
+			sw := &signalWriter{ResponseRecorder: httptest.NewRecorder(), started: ch}
+			handler.Download(sw, req)
+		}(started[i])
 	}
 
-	// Give goroutines time to start and increment activeDownloads
-	time.Sleep(50 * time.Millisecond)
+	// Wait for all goroutines to actually enter the handler
+	for _, ch := range started {
+		select {
+		case <-ch:
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for download goroutine to start")
+		}
+	}
 
 	// New download should get 503
 	reqOver := httptest.NewRequest(http.MethodGet,
@@ -151,15 +190,17 @@ func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 	maxConcurrent := 2
 	handler := api.NewSpeedTestHandler(maxConcurrent, 300)
 
-	// Fill all upload slots with long-running uploads
+	// Fill all upload slots with long-running uploads using signal readers
 	cancels := make([]context.CancelFunc, maxConcurrent)
 	done := make(chan struct{}, maxConcurrent)
+	started := make([]chan struct{}, maxConcurrent)
 
 	for i := 0; i < maxConcurrent; i++ {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancels[i] = cancel
+		started[i] = make(chan struct{})
 
-		go func() {
+		go func(ch chan struct{}) {
 			defer func() { done <- struct{}{} }()
 			// Slow reader that blocks until context is cancelled
 			pr, pw := io.Pipe()
@@ -167,14 +208,22 @@ func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 				<-ctx.Done()
 				pw.Close()
 			}()
+			body := &signalReader{ReadCloser: io.NopCloser(pr), started: ch}
 			req := httptest.NewRequest(http.MethodPost,
-				"http://example.com/api/v1/upload", pr)
+				"http://example.com/api/v1/upload", body)
 			rec := httptest.NewRecorder()
 			handler.Upload(rec, req)
-		}()
+		}(started[i])
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	// Wait for all goroutines to actually enter the handler
+	for _, ch := range started {
+		select {
+		case <-ch:
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for upload goroutine to start")
+		}
+	}
 
 	// New upload should get 503
 	reqOver := httptest.NewRequest(http.MethodPost,

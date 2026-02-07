@@ -282,16 +282,23 @@ function fetchWithTimeout(url, options, timeoutMs) {
 
   // Chain: if caller supplied an abort signal, propagate it
   const externalSignal = options?.signal;
+  let onAbort = null;
   if (externalSignal) {
     if (externalSignal.aborted) {
       controller.abort();
     } else {
-      externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
+      onAbort = () => controller.abort();
+      externalSignal.addEventListener('abort', onAbort, { once: true });
     }
   }
 
   const opts = { ...options, signal: controller.signal };
-  return fetch(url, opts).finally(() => clearTimeout(timer));
+  return fetch(url, opts).finally(() => {
+    clearTimeout(timer);
+    if (onAbort && externalSignal) {
+      externalSignal.removeEventListener('abort', onAbort);
+    }
+  });
 }
 
 function resolveServerName() {
@@ -409,7 +416,7 @@ async function selectFastestServer() {
 function populateServerSelect() {
   if (!elements.serverSelect) return;
   
-  elements.serverSelect.innerHTML = '';
+  while (elements.serverSelect.firstChild) elements.serverSelect.removeChild(elements.serverSelect.firstChild);
   
   const currentOpt = document.createElement('option');
   currentOpt.value = 'current';

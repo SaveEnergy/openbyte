@@ -1,14 +1,14 @@
 (function() {
-  var releaseUrl = 'https://api.github.com/repos/saveenergy/openbyte/releases/latest';
-  var releasePage = 'https://github.com/saveenergy/openbyte/releases/latest';
+  const releaseUrl = 'https://api.github.com/repos/saveenergy/openbyte/releases/latest';
+  const releasePage = 'https://github.com/saveenergy/openbyte/releases/latest';
 
-  var platforms = {
+  const platforms = {
     linux:   { suffixes: ['linux_amd64.tar.gz', 'linux_arm64.tar.gz'], icon: '🐧', name: 'Linux' },
     macos:   { suffixes: ['darwin_amd64.tar.gz', 'darwin_arm64.tar.gz'], icon: '🍎', name: 'macOS' },
     windows: { suffixes: ['windows_amd64.zip'], icon: '🪟', name: 'Windows' }
   };
 
-  var archLabels = {
+  const archLabels = {
     'linux_amd64.tar.gz':   { arch: 'x86_64',       short: 'amd64' },
     'linux_arm64.tar.gz':   { arch: 'ARM64',         short: 'arm64' },
     'darwin_amd64.tar.gz':  { arch: 'Intel',         short: 'amd64' },
@@ -17,9 +17,15 @@
   };
 
   function detectPlatform() {
-    var ua = navigator.userAgent || '';
-    var platform = navigator.platform || '';
-    var os = 'linux', arch = 'amd64';
+    const ua = navigator.userAgent || '';
+    // navigator.userAgentData is preferred (navigator.platform is deprecated)
+    let platform = '';
+    if (navigator.userAgentData && navigator.userAgentData.platform) {
+      platform = navigator.userAgentData.platform;
+    } else {
+      platform = navigator.platform || '';
+    }
+    let os = 'linux', arch = 'amd64';
 
     if (/Mac/i.test(platform) || /Mac/i.test(ua)) {
       os = 'macos';
@@ -28,12 +34,12 @@
           /Mac/.test(platform) && !(/Intel/.test(ua)))) {
         // Modern Macs — check via GL renderer if available
         try {
-          var canvas = document.createElement('canvas');
-          var gl = canvas.getContext('webgl');
+          const canvas = document.createElement('canvas');
+          const gl = canvas.getContext('webgl');
           if (gl) {
-            var dbg = gl.getExtension('WEBGL_debug_renderer_info');
+            const dbg = gl.getExtension('WEBGL_debug_renderer_info');
             if (dbg) {
-              var renderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+              const renderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
               if (/Apple/.test(renderer) && !/Intel/.test(renderer)) arch = 'arm64';
             }
           }
@@ -45,12 +51,12 @@
       // Linux/other — check ARM
       if (/aarch64|arm64/i.test(ua)) arch = 'arm64';
     }
-    return { os: os, arch: arch };
+    return { os, arch };
   }
 
   function formatBytes(bytes) {
     if (!bytes) return '';
-    var mb = bytes / (1024 * 1024);
+    const mb = bytes / (1024 * 1024);
     return mb.toFixed(1) + ' MB';
   }
 
@@ -62,27 +68,27 @@
 
   function suffixForDetected(detected) {
     if (detected.os === 'windows') return 'windows_amd64.zip';
-    var osKey = detected.os === 'macos' ? 'darwin' : 'linux';
+    const osKey = detected.os === 'macos' ? 'darwin' : 'linux';
     return osKey + '_' + detected.arch + (detected.os === 'windows' ? '.zip' : '.tar.gz');
   }
 
   function altSuffix(detected) {
     if (detected.os === 'windows') return null;
-    var osKey = detected.os === 'macos' ? 'darwin' : 'linux';
-    var other = detected.arch === 'arm64' ? 'amd64' : 'arm64';
+    const osKey = detected.os === 'macos' ? 'darwin' : 'linux';
+    const other = detected.arch === 'arm64' ? 'amd64' : 'arm64';
     return osKey + '_' + other + '.tar.gz';
   }
 
   function renderRecommended(assets, detected, version) {
-    var suffix = suffixForDetected(detected);
-    var asset = findAsset(assets, suffix);
-    var info = archLabels[suffix] || { arch: detected.arch, short: detected.arch };
-    var platName = platforms[detected.os] ? platforms[detected.os].name : detected.os;
+    const suffix = suffixForDetected(detected);
+    const asset = findAsset(assets, suffix);
+    const info = archLabels[suffix] || { arch: detected.arch, short: detected.arch };
+    const platName = platforms[detected.os] ? platforms[detected.os].name : detected.os;
 
-    var platformEl = document.getElementById('recommendedPlatform');
-    var btn = document.getElementById('recommendedBtn');
-    var label = document.getElementById('recommendedLabel');
-    var meta = document.getElementById('recommendedMeta');
+    const platformEl = document.getElementById('recommendedPlatform');
+    const btn = document.getElementById('recommendedBtn');
+    const label = document.getElementById('recommendedLabel');
+    const meta = document.getElementById('recommendedMeta');
 
     platformEl.textContent = platName + ' · ' + info.arch;
 
@@ -103,13 +109,13 @@
     }
 
     // Alt architecture link
-    var alt = altSuffix(detected);
-    var altEl = document.getElementById('altArch');
+    const alt = altSuffix(detected);
+    const altEl = document.getElementById('altArch');
     if (alt) {
-      var altAsset = findAsset(assets, alt);
-      var altInfo = archLabels[alt];
+      const altAsset = findAsset(assets, alt);
+      const altInfo = archLabels[alt];
       if (altAsset && altInfo) {
-        var a = document.createElement('a');
+        const a = document.createElement('a');
         a.className = 'dl-alt-link';
         a.href = altAsset.browser_download_url;
         a.rel = 'noopener noreferrer';
@@ -121,28 +127,28 @@
 
   function renderAllPlatforms(assets) {
     Object.keys(platforms).forEach(function(osKey) {
-      var container = document.querySelector('[data-os="' + osKey + '"]');
+      const container = document.querySelector('[data-os="' + osKey + '"]');
       if (!container) return;
-      container.innerHTML = '';
-      var plat = platforms[osKey];
-      var found = false;
+      while (container.firstChild) container.removeChild(container.firstChild);
+      const plat = platforms[osKey];
+      let found = false;
 
       plat.suffixes.forEach(function(suffix) {
-        var asset = findAsset(assets, suffix);
+        const asset = findAsset(assets, suffix);
         if (!asset) return;
         found = true;
-        var info = archLabels[suffix] || { arch: suffix, short: suffix };
+        const info = archLabels[suffix] || { arch: suffix, short: suffix };
 
-        var row = document.createElement('a');
+        const row = document.createElement('a');
         row.className = 'dl-asset-row';
         row.href = asset.browser_download_url;
         row.rel = 'noopener noreferrer';
 
-        var nameSpan = document.createElement('span');
+        const nameSpan = document.createElement('span');
         nameSpan.className = 'dl-asset-name';
         nameSpan.textContent = info.arch;
 
-        var sizeSpan = document.createElement('span');
+        const sizeSpan = document.createElement('span');
         sizeSpan.className = 'dl-asset-size';
         sizeSpan.textContent = formatBytes(asset.size);
 
@@ -152,7 +158,7 @@
       });
 
       if (!found) {
-        var fallback = document.createElement('a');
+        const fallback = document.createElement('a');
         fallback.className = 'download-link';
         fallback.href = releasePage;
         fallback.target = '_blank';
@@ -164,12 +170,12 @@
   }
 
   function renderInstall(detected, version) {
-    var section = document.getElementById('installSection');
-    var tabs = document.getElementById('installTabs');
-    var cmd = document.getElementById('installCmd');
+    const section = document.getElementById('installSection');
+    const tabs = document.getElementById('installTabs');
+    const cmd = document.getElementById('installCmd');
 
-    var commands = {};
-    var vTag = version || 'latest';
+    let commands = {};
+    const vTag = version || 'latest';
 
     commands['curl'] = 'curl -fsSL https://github.com/saveenergy/openbyte/releases/' +
       (version ? 'download/' + version : 'latest/download') +
@@ -188,16 +194,16 @@
         (version ? version.replace(/^v/, '') : 'latest') + ' server';
     }
 
-    var keys = Object.keys(commands);
+    const keys = Object.keys(commands);
     if (keys.length === 0) return;
     section.style.display = '';
 
-    var activeTab = keys[0];
+    let activeTab = keys[0];
 
     function renderTabs() {
-      tabs.innerHTML = '';
+      while (tabs.firstChild) tabs.removeChild(tabs.firstChild);
       keys.forEach(function(key) {
-        var btn = document.createElement('button');
+        const btn = document.createElement('button');
         btn.className = 'dl-install-tab' + (key === activeTab ? ' active' : '');
         btn.textContent = key;
         btn.onclick = function() {
@@ -212,10 +218,10 @@
   }
 
   function renderVersion(data) {
-    var tag = data.tag_name || '';
-    var date = data.published_at ? new Date(data.published_at) : null;
-    var el = document.getElementById('versionTag');
-    var parts = [];
+    const tag = data.tag_name || '';
+    const date = data.published_at ? new Date(data.published_at) : null;
+    const el = document.getElementById('versionTag');
+    const parts = [];
     if (tag) parts.push(tag);
     if (date) parts.push(date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }));
     if (parts.length) el.textContent = ' · ' + parts.join(' · ');
@@ -223,10 +229,10 @@
 
   // Setup copy buttons
   function setupCopy(btnId, getTextFn) {
-    var btn = document.getElementById(btnId);
+    const btn = document.getElementById(btnId);
     if (!btn) return;
     btn.addEventListener('click', function() {
-      var text = getTextFn();
+      const text = getTextFn();
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(function() {
           btn.textContent = 'Copied!';
@@ -246,18 +252,18 @@
     return document.querySelector('#copyDockerBtn').closest('.dl-code-block').querySelector('code').textContent;
   });
 
-  var detected = detectPlatform();
+  const detected = detectPlatform();
 
   fetch(releaseUrl)
     .then(function(res) {
       if (!res.ok) {
-        var reason = res.status === 403 ? 'GitHub API rate limited' : 'GitHub API error ' + res.status;
+        const reason = res.status === 403 ? 'GitHub API rate limited' : 'GitHub API error ' + res.status;
         throw new Error(reason);
       }
       return res.json();
     })
     .then(function(data) {
-      var assets = Array.isArray(data.assets) ? data.assets : [];
+      const assets = Array.isArray(data.assets) ? data.assets : [];
       renderVersion(data);
       renderRecommended(assets, detected, data.tag_name);
       renderAllPlatforms(assets);
@@ -265,7 +271,7 @@
     })
     .catch(function(err) {
       console.warn('Release fetch failed:', err);
-      var btn = document.getElementById('recommendedBtn');
+      const btn = document.getElementById('recommendedBtn');
       btn.href = releasePage;
       btn.style.pointerEvents = '';
       btn.style.opacity = '';
@@ -273,8 +279,14 @@
       document.getElementById('recommendedPlatform').textContent =
         err && err.message ? err.message : 'Could not load release data';
       document.querySelectorAll('.download-links').forEach(function(c) {
-        c.innerHTML = '<a class="download-link" href="' + releasePage +
-          '" target="_blank" rel="noopener noreferrer">View release</a>';
+        while (c.firstChild) c.removeChild(c.firstChild);
+        const link = document.createElement('a');
+        link.className = 'download-link';
+        link.href = releasePage;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = 'View release';
+        c.appendChild(link);
       });
     });
 })();

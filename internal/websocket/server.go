@@ -108,6 +108,12 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 	clients := s.clients[streamID]
 	if clients == nil {
 		s.mu.RUnlock()
+		// Clean up sentStatus for streams with no clients on terminal status
+		if state.Status == types.StreamStatusCompleted || state.Status == types.StreamStatusFailed {
+			s.mu.Lock()
+			delete(s.sentStatus, streamID)
+			s.mu.Unlock()
+		}
 		return
 	}
 

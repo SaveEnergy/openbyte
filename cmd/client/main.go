@@ -25,7 +25,7 @@ const (
 	defaultDirection  = "download"
 	defaultDuration   = 30
 	defaultStreams    = 4
-	defaultPacketSize = 1500
+	defaultPacketSize = 1400
 	defaultChunkSize  = 1024 * 1024
 	defaultTimeout    = 60
 	defaultWarmUp     = 2
@@ -69,7 +69,10 @@ func Run(args []string, version string) int {
 		return exitUsage
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
+	// Timeout covers the entire lifecycle: ping/RTT + test duration + overhead.
+	// Add test duration to the base timeout so the timeout doesn't cut the test short.
+	totalTimeout := time.Duration(config.Timeout)*time.Second + time.Duration(config.Duration)*time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), totalTimeout)
 	defer cancel()
 
 	if !config.JSON && !config.Plain {

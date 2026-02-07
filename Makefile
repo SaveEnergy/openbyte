@@ -98,9 +98,9 @@ clean:
 	@rm -rf bin/
 	@echo "✓ Cleaned"
 
-perf-smoke: loadtest
+perf-smoke: build loadtest
 	@echo "Starting server with pprof..."
-	@PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6060 PORT=8080 TCP_TEST_PORT=8081 UDP_TEST_PORT=8082 go run -ldflags "$(LDFLAGS)" ./cmd/openbyte server & echo $$! > /tmp/openbyte-perf.pid
+	@PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6060 PORT=8080 TCP_TEST_PORT=8081 UDP_TEST_PORT=8082 ./bin/openbyte server & echo $$! > /tmp/openbyte-perf.pid
 	@sleep 2
 	@$(MAKE) perf-bench
 	@./bin/openbyte-load --mode tcp-download --host 127.0.0.1 --tcp-port 8081 --duration 5s --concurrency 4

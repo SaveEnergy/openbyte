@@ -89,9 +89,26 @@ jobs:
         if: github.event_name != 'pull_request'
         run: bun install --no-save
 
-      - name: Install Playwright browsers
+      - name: Get Playwright version
         if: github.event_name != 'pull_request'
+        id: pw-version
+        run: echo "version=$(bunx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        if: github.event_name != 'pull_request'
+        uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: github.event_name != 'pull_request' && steps.pw-cache.outputs.cache-hit != 'true'
         run: bunx playwright install --with-deps
+
+      - name: Install Playwright system deps
+        if: github.event_name != 'pull_request' && steps.pw-cache.outputs.cache-hit == 'true'
+        run: bunx playwright install-deps
 
       - name: Playwright e2e
         if: github.event_name != 'pull_request'

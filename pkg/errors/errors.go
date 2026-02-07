@@ -24,8 +24,6 @@ const (
 	ErrCodeRateLimitExceeded   = "RATE_LIMIT_EXCEEDED"
 	ErrCodeInvalidConfig       = "INVALID_CONFIG"
 	ErrCodeResourceExhausted   = "RESOURCE_EXHAUSTED"
-	ErrCodeTimeout             = "TIMEOUT"
-	ErrCodeCancelled           = "CANCELLED"
 )
 
 func ErrStreamNotFound(streamID string) *StreamError {

@@ -12,22 +12,8 @@ import (
 
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/logging"
+	"github.com/saveenergy/openbyte/pkg/types"
 )
-
-type ServerInfo struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Location     string `json:"location"`
-	Region       string `json:"region,omitempty"`
-	Host         string `json:"host"`
-	TCPPort      int    `json:"tcp_port"`
-	UDPPort      int    `json:"udp_port"`
-	APIEndpoint  string `json:"api_endpoint"`
-	Health       string `json:"health"`
-	CapacityGbps int    `json:"capacity_gbps"`
-	ActiveTests  int    `json:"active_tests"`
-	MaxTests     int    `json:"max_tests"`
-}
 
 type Client struct {
 	config     *config.Config
@@ -220,7 +206,7 @@ func drainAndClose(resp *http.Response, logger *logging.Logger) {
 	}
 }
 
-func (c *Client) buildServerInfo(activeTests int) ServerInfo {
+func (c *Client) buildServerInfo(activeTests int) types.ServerInfo {
 	host := c.config.PublicHost
 	if host == "" {
 		host = c.config.BindAddress
@@ -229,9 +215,13 @@ func (c *Client) buildServerInfo(activeTests int) ServerInfo {
 		}
 	}
 
-	apiEndpoint := fmt.Sprintf("http://%s:%s", host, c.config.Port)
+	scheme := "http"
+	if c.config.TrustProxyHeaders {
+		scheme = "https"
+	}
+	apiEndpoint := fmt.Sprintf("%s://%s:%s", scheme, host, c.config.Port)
 
-	return ServerInfo{
+	return types.ServerInfo{
 		ID:           c.config.ServerID,
 		Name:         c.config.ServerName,
 		Location:     c.config.ServerLocation,

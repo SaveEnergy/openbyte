@@ -40,16 +40,6 @@ func NewMultiStreamAggregator(streamCount int) *MultiStreamAggregator {
 	return aggregator
 }
 
-func (m *MultiStreamAggregator) GetCollector(streamID int) *Collector {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	if streamID < 0 || streamID >= len(m.collectors) {
-		return nil
-	}
-	return m.collectors[streamID]
-}
-
 func (m *MultiStreamAggregator) GetAggregatedMetrics() types.Metrics {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

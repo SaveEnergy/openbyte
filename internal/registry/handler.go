@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/saveenergy/openbyte/internal/logging"
+	"github.com/saveenergy/openbyte/pkg/types"
 )
 
 type Handler struct {
@@ -24,15 +24,13 @@ func NewHandler(service *Service, logger *logging.Logger, apiKey string) *Handle
 	}
 }
 
-func (h *Handler) RegisterRoutes(r *mux.Router) {
-	registry := r.PathPrefix("/api/v1/registry").Subrouter()
-
-	registry.HandleFunc("/servers", h.ListServers).Methods(http.MethodGet)
-	registry.HandleFunc("/servers", h.RegisterServer).Methods(http.MethodPost)
-	registry.HandleFunc("/servers/{id}", h.GetServer).Methods(http.MethodGet)
-	registry.HandleFunc("/servers/{id}", h.UpdateServer).Methods(http.MethodPut)
-	registry.HandleFunc("/servers/{id}", h.DeregisterServer).Methods(http.MethodDelete)
-	registry.HandleFunc("/health", h.Health).Methods(http.MethodGet)
+func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/registry/servers", h.ListServers)
+	mux.HandleFunc("POST /api/v1/registry/servers", h.RegisterServer)
+	mux.HandleFunc("GET /api/v1/registry/servers/{id}", h.GetServer)
+	mux.HandleFunc("PUT /api/v1/registry/servers/{id}", h.UpdateServer)
+	mux.HandleFunc("DELETE /api/v1/registry/servers/{id}", h.DeregisterServer)
+	mux.HandleFunc("GET /api/v1/registry/health", h.Health)
 }
 
 func (h *Handler) authenticate(r *http.Request) bool {
@@ -82,8 +80,7 @@ func respondRegistryError(w http.ResponseWriter, msg string, code int) {
 }
 
 func (h *Handler) GetServer(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := r.PathValue("id")
 
 	server, exists := h.service.Get(id)
 	if !exists {
@@ -109,7 +106,7 @@ func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxRegistryBodySize)
-	var info ServerInfo
+	var info types.ServerInfo
 	if err := json.NewDecoder(r.Body).Decode(&info); err != nil {
 		respondRegistryError(w, "invalid request body", http.StatusBadRequest)
 		return
@@ -146,16 +143,19 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := r.PathValue("id")
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxRegistryBodySize)
-	var info ServerInfo
+	var info types.ServerInfo
 	if err := json.NewDecoder(r.Body).Decode(&info); err != nil {
 		respondRegistryError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
+	if info.ID != "" && info.ID != id {
+		respondRegistryError(w, "body ID conflicts with URL path", http.StatusBadRequest)
+		return
+	}
 	info.ID = id
 
 	if !h.service.Update(id, info) {
@@ -178,8 +178,7 @@ func (h *Handler) DeregisterServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vars := mux.Vars(r)
-	id := vars["id"]
+	id := r.PathValue("id")
 
 	if !h.service.Deregister(id) {
 		respondRegistryError(w, "server not found", http.StatusNotFound)

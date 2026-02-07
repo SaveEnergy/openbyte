@@ -5,7 +5,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gorilla/mux"
 	"github.com/saveenergy/openbyte/internal/api"
 )
 
@@ -79,7 +78,7 @@ func TestRouterRejectsInvalidStreamID(t *testing.T) {
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/stream/bad/status", nil)
-	req = mux.SetURLVars(req, map[string]string{"id": "bad"})
+	req.SetPathValue("id", "bad")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)

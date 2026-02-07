@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/internal/config"
@@ -63,29 +62,7 @@ func NewTestServerWithOrigins(t *testing.T, allowedOrigins []string) *TestServer
 
 	wsServer := ws.NewServer()
 	wsServer.SetAllowedOrigins(allowedOrigins)
-
-	muxRouter := mux.NewRouter()
-
-	v1 := muxRouter.PathPrefix("/api/v1").Subrouter()
-	if limiter := router.GetLimiter(); limiter != nil {
-		v1.Use(api.RateLimitMiddleware(limiter))
-	}
-	v1.HandleFunc("/stream/start", handler.StartStream).Methods("POST")
-	v1.HandleFunc("/stream/{id}/status", router.HandleWithID(handler.GetStreamStatus)).Methods("GET")
-	v1.HandleFunc("/stream/{id}/results", router.HandleWithID(handler.GetStreamResults)).Methods("GET")
-	v1.HandleFunc("/stream/{id}/cancel", router.HandleWithID(handler.CancelStream)).Methods("POST")
-
-	muxRouter.HandleFunc("/api/v1/stream/{id}/stream", func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		streamID := vars["id"]
-		if streamID == "" {
-			http.Error(w, "stream ID required", http.StatusBadRequest)
-			return
-		}
-		wsServer.HandleStream(w, r, streamID)
-	})
-
-	muxRouter.HandleFunc("/health", router.HealthCheck).Methods("GET")
+	router.SetWebSocketHandler(wsServer.HandleStream)
 
 	webDir := "./web"
 	if _, err := os.Stat(webDir); os.IsNotExist(err) {
@@ -95,8 +72,9 @@ func NewTestServerWithOrigins(t *testing.T, allowedOrigins []string) *TestServer
 	if err != nil {
 		t.Fatalf("Failed to get absolute path: %v", err)
 	}
+	router.SetWebRoot(absWebDir)
 
-	muxRouter.PathPrefix("/").Handler(http.FileServer(http.Dir(absWebDir)))
+	httpHandler := router.SetupRoutes()
 
 	listener, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -104,7 +82,7 @@ func NewTestServerWithOrigins(t *testing.T, allowedOrigins []string) *TestServer
 	}
 
 	srv := &http.Server{
-		Handler: muxRouter,
+		Handler: httpHandler,
 	}
 
 	go srv.Serve(listener)
@@ -289,7 +267,7 @@ func TestAPIStartTest(t *testing.T) {
 		"direction":   "download",
 		"duration":    5,
 		"streams":     2,
-		"packet_size": 1500,
+		"packet_size": 1400,
 	}
 	body, _ := json.Marshal(reqBody)
 

@@ -1,13 +1,11 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/config"
-	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 type RateLimiter struct {
@@ -151,30 +149,4 @@ var skipRateLimitPaths = map[string]bool{
 	"/api/v1/download": true,
 	"/api/v1/upload":   true,
 	"/api/v1/ping":     true,
-}
-
-func RateLimitMiddleware(limiter *RateLimiter) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Skip rate limiting for speedtest endpoints
-			if skipRateLimitPaths[r.URL.Path] {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			ip := limiter.ClientIP(r)
-
-			if !limiter.Allow(ip) {
-				w.Header().Set("Retry-After", "60")
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusTooManyRequests)
-				if err := json.NewEncoder(w).Encode(map[string]string{"error": "rate limit exceeded"}); err != nil {
-					logging.Warn("ratelimit: encode error response", logging.Field{Key: "error", Value: err})
-				}
-				return
-			}
-
-			next.ServeHTTP(w, r)
-		})
-	}
 }

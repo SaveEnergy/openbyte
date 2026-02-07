@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/mux"
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/logging"
 	"github.com/saveenergy/openbyte/internal/results"
@@ -71,59 +70,64 @@ func (r *Router) SetWebRoot(path string) {
 	}
 }
 
-func (r *Router) SetupRoutes() *mux.Router {
-	router := mux.NewRouter()
-	router.Use(r.LoggingMiddleware)
-	router.Use(SecurityHeadersMiddleware)
-	router.Use(r.CORSMiddleware)
+// RegistryRegistrar allows external packages to register routes on the
+// ServeMux before middleware wrapping, without importing gorilla/mux.
+type RegistryRegistrar interface {
+	RegisterRoutes(mux *http.ServeMux)
+}
 
-	v1 := router.PathPrefix("/api/v1").Subrouter()
+func (r *Router) SetupRoutes(registrars ...RegistryRegistrar) http.Handler {
+	mux := http.NewServeMux()
 
-	if r.limiter != nil {
-		v1.Use(RateLimitMiddleware(r.limiter))
+	// API v1 routes (rate-limited)
+	v1 := func(method, path string, handler http.HandlerFunc) {
+		h := handler
+		if r.limiter != nil {
+			h = applyRateLimit(r.limiter, h)
+		}
+		mux.HandleFunc(method+" /api/v1"+path, h)
 	}
 
-	v1.HandleFunc("/stream/start", r.handler.StartStream).Methods("POST")
-	v1.HandleFunc("/stream/{id}/status", r.HandleWithID(r.handler.GetStreamStatus)).Methods("GET")
-	v1.HandleFunc("/stream/{id}/results", r.HandleWithID(r.handler.GetStreamResults)).Methods("GET")
-	v1.HandleFunc("/stream/{id}/cancel", r.HandleWithID(r.handler.CancelStream)).Methods("POST")
-	v1.HandleFunc("/stream/{id}/metrics", r.HandleWithID(r.handler.ReportMetrics)).Methods("POST")
-	v1.HandleFunc("/stream/{id}/complete", r.HandleWithID(r.handler.CompleteStream)).Methods("POST")
-	v1.HandleFunc("/servers", r.handler.GetServers).Methods("GET")
-	v1.HandleFunc("/version", r.handler.GetVersion).Methods("GET")
+	v1("POST", "/stream/start", r.handler.StartStream)
+	v1("GET", "/stream/{id}/status", r.HandleWithID(r.handler.GetStreamStatus))
+	v1("GET", "/stream/{id}/results", r.HandleWithID(r.handler.GetStreamResults))
+	v1("POST", "/stream/{id}/cancel", r.HandleWithID(r.handler.CancelStream))
+	v1("POST", "/stream/{id}/metrics", r.HandleWithID(r.handler.ReportMetrics))
+	v1("POST", "/stream/{id}/complete", r.HandleWithID(r.handler.CompleteStream))
+	v1("GET", "/servers", r.handler.GetServers)
+	v1("GET", "/version", r.handler.GetVersion)
 
-	// Speedtest routes (use same subrouter but skip rate limiting internally via handler)
-	v1.HandleFunc("/download", r.speedtest.Download).Methods("GET")
-	v1.HandleFunc("/upload", r.speedtest.Upload).Methods("POST")
-	v1.HandleFunc("/ping", r.speedtest.Ping).Methods("GET")
+	// Speedtest routes
+	v1("GET", "/download", r.speedtest.Download)
+	v1("POST", "/upload", r.speedtest.Upload)
+	v1("GET", "/ping", r.speedtest.Ping)
 
 	// Saved results API
 	if r.resultsHandler != nil {
-		v1.HandleFunc("/results", r.resultsHandler.Save).Methods("POST")
-		v1.HandleFunc("/results/{id}", r.resultsHandler.Get).Methods("GET")
+		v1("POST", "/results", r.resultsHandler.Save)
+		v1("GET", "/results/{id}", r.resultsHandler.Get)
 	}
 
 	if r.wsServer != nil {
 		if wsHandler, ok := r.wsServer.(func(http.ResponseWriter, *http.Request, string)); ok {
-			v1.HandleFunc("/stream/{id}/stream", func(w http.ResponseWriter, req *http.Request) {
-				vars := mux.Vars(req)
-				streamID := vars["id"]
+			v1("GET", "/stream/{id}/stream", func(w http.ResponseWriter, req *http.Request) {
+				streamID := req.PathValue("id")
 				if streamID == "" {
 					respondJSON(w, map[string]string{"error": "stream ID required"}, http.StatusBadRequest)
 					return
 				}
 				wsHandler(w, req, streamID)
-			}).Methods("GET")
+			})
 		}
 	}
 
-	router.HandleFunc("/health", r.HealthCheck).Methods("GET")
+	mux.HandleFunc("GET /health", r.HealthCheck)
 
 	webFS := r.resolveWebFS()
 
 	// Serve results.html for /results/{id} browser requests
 	if r.resultsHandler != nil {
-		router.HandleFunc("/results/{id}", func(w http.ResponseWriter, req *http.Request) {
+		mux.HandleFunc("GET /results/{id}", func(w http.ResponseWriter, req *http.Request) {
 			f, err := webFS.Open("results.html")
 			if err != nil {
 				http.NotFound(w, req)
@@ -136,18 +140,45 @@ func (r *Router) SetupRoutes() *mux.Router {
 				return
 			}
 			http.ServeContent(w, req, "results.html", stat.ModTime(), f)
-		}).Methods("GET")
+		})
 	}
 
-	router.PathPrefix("/").Handler(http.FileServer(webFS))
+	mux.Handle("/", http.FileServer(webFS))
 
-	return router
+	// Let external registrars add routes before middleware wrapping
+	for _, reg := range registrars {
+		reg.RegisterRoutes(mux)
+	}
+
+	// Wrap with middleware (outermost runs first)
+	var handler http.Handler = mux
+	handler = r.CORSMiddleware(handler)
+	handler = SecurityHeadersMiddleware(handler)
+	handler = r.LoggingMiddleware(handler)
+
+	return handler
+}
+
+// applyRateLimit wraps a handler with rate limit checking.
+func applyRateLimit(limiter *RateLimiter, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if skipRateLimitPaths[r.URL.Path] {
+			next(w, r)
+			return
+		}
+		ip := limiter.ClientIP(r)
+		if !limiter.Allow(ip) {
+			w.Header().Set("Retry-After", "60")
+			respondJSON(w, map[string]string{"error": "rate limit exceeded"}, http.StatusTooManyRequests)
+			return
+		}
+		next(w, r)
+	}
 }
 
 func (r *Router) HandleWithID(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		vars := mux.Vars(req)
-		streamID := vars["id"]
+		streamID := req.PathValue("id")
 		if streamID == "" {
 			respondJSON(w, map[string]string{"error": "stream ID required"}, http.StatusBadRequest)
 			return

@@ -3,6 +3,8 @@ package registry
 import (
 	"sync"
 	"time"
+
+	"github.com/saveenergy/openbyte/pkg/types"
 )
 
 type Service struct {
@@ -16,7 +18,7 @@ type Service struct {
 }
 
 type RegisteredServer struct {
-	ServerInfo
+	types.ServerInfo
 	LastSeen  time.Time `json:"last_seen"`
 	ExpiresAt time.Time `json:"expires_at"`
 }
@@ -49,7 +51,7 @@ func (s *Service) Stop() {
 	s.wg.Wait()
 }
 
-func (s *Service) Register(info ServerInfo) {
+func (s *Service) Register(info types.ServerInfo) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -61,7 +63,7 @@ func (s *Service) Register(info ServerInfo) {
 	}
 }
 
-func (s *Service) Update(id string, info ServerInfo) bool {
+func (s *Service) Update(id string, info types.ServerInfo) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -99,8 +101,8 @@ func (s *Service) Get(id string) (*RegisteredServer, bool) {
 		return nil, false
 	}
 
-	copy := *server
-	return &copy, true
+	dup := *server
+	return &dup, true
 }
 
 func (s *Service) List() []RegisteredServer {

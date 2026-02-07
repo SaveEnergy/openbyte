@@ -2,11 +2,11 @@ package results
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"regexp"
 	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/saveenergy/openbyte/internal/logging"
 )
 
@@ -67,6 +67,10 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 		respondJSONError(w, "numeric fields must be >= 0", http.StatusBadRequest)
 		return
 	}
+	if hasNonFinite(req.DownloadMbps, req.UploadMbps, req.LatencyMs, req.JitterMs, req.LoadedLatencyMs) {
+		respondJSONError(w, "numeric fields must be finite", http.StatusBadRequest)
+		return
+	}
 	if req.DownloadMbps > 100000 || req.UploadMbps > 100000 ||
 		req.LatencyMs > 60000 || req.JitterMs > 60000 || req.LoadedLatencyMs > 60000 {
 		respondJSONError(w, "values out of reasonable range", http.StatusBadRequest)
@@ -107,7 +111,7 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	id := mux.Vars(r)["id"]
+	id := r.PathValue("id")
 	if !validID.MatchString(id) {
 		respondJSONError(w, "invalid result ID", http.StatusBadRequest)
 		return
@@ -128,4 +132,13 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		logging.Warn("results: encode get response", logging.Field{Key: "error", Value: err})
 	}
+}
+
+func hasNonFinite(vals ...float64) bool {
+	for _, v := range vals {
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return true
+		}
+	}
+	return false
 }

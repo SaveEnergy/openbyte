@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -102,10 +103,12 @@ func completeStream(config *Config, streamID string, metrics EngineMetrics) {
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "openbyte: complete stream marshal: %v\n", err)
 		return
 	}
 	req, err := http.NewRequest("POST", config.ServerURL+"/api/v1/stream/"+streamID+"/complete", bytes.NewReader(jsonData))
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "openbyte: complete stream request: %v\n", err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -116,6 +119,7 @@ func completeStream(config *Config, streamID string, metrics EngineMetrics) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "openbyte: complete stream: %v\n", err)
 		return
 	}
 	io.Copy(io.Discard, resp.Body)

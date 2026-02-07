@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/saveenergy/openbyte/internal/config"
+	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 type ClientIPResolver struct {
@@ -75,8 +76,16 @@ func (r *ClientIPResolver) isTrustedProxy(ip net.IP) bool {
 func parseTrustedProxyCIDRs(cidrs []string) []*net.IPNet {
 	networks := make([]*net.IPNet, 0, len(cidrs))
 	for _, entry := range cidrs {
-		_, network, err := net.ParseCIDR(strings.TrimSpace(entry))
-		if err == nil && network != nil {
+		trimmed := strings.TrimSpace(entry)
+		if trimmed == "" {
+			continue
+		}
+		_, network, err := net.ParseCIDR(trimmed)
+		if err != nil {
+			logging.Warn("invalid trusted proxy CIDR", logging.Field{Key: "cidr", Value: trimmed}, logging.Field{Key: "error", Value: err})
+			continue
+		}
+		if network != nil {
 			networks = append(networks, network)
 		}
 	}
@@ -108,19 +117,6 @@ func parseHeaderIP(value string) net.IP {
 		clean = clean[1 : len(clean)-1]
 	}
 	return net.ParseIP(clean)
-}
-
-func isPublicIP(ip net.IP) bool {
-	if ip == nil {
-		return false
-	}
-	if !ip.IsGlobalUnicast() {
-		return false
-	}
-	if ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
-		return false
-	}
-	return true
 }
 
 func ipString(ip net.IP) string {

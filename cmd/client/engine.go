@@ -23,7 +23,10 @@ type TestEngine struct {
 	mu           sync.RWMutex
 	running      int32
 	startTime    time.Time
+	measureStart time.Time // set after warm-up; throughput computed from here
 	totalBytes   int64
+	graceBytes   int64 // bytes received/sent during warm-up (discarded)
+	graceDone    int32 // CAS flag: 0 = in warm-up, 1 = measuring
 	bufferPool   sync.Pool
 }
 
@@ -90,19 +93,10 @@ func (e *TestEngine) Run(ctx context.Context) error {
 	}
 	defer e.closeConnections()
 
-	if e.config.WarmUp > 0 {
-		warmUpCtx, warmUpCancel := context.WithTimeout(ctx, e.config.WarmUp)
-		e.runWarmUp(warmUpCtx)
-		warmUpCancel()
-		atomic.StoreInt64(&e.totalBytes, 0)
-		atomic.StoreInt64(&e.metrics.BytesSent, 0)
-		atomic.StoreInt64(&e.metrics.BytesReceived, 0)
-		e.metrics.mu.Lock()
-		e.metrics.LatencySamples = e.metrics.LatencySamples[:0]
-		e.metrics.mu.Unlock()
-		e.startTime = time.Now()
-		e.metrics.StartTime = e.startTime
-	}
+	// Warm-up: data flows during the first WarmUp seconds but is not recorded.
+	// After warm-up, counters are reset and measurement begins.
+	// measureStart is set immediately; it is updated when warm-up ends.
+	e.measureStart = e.startTime
 
 	if len(e.connections) > 0 {
 		if tcpConn, ok := e.connections[0].(*net.TCPConn); ok {
@@ -119,7 +113,7 @@ func (e *TestEngine) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 	errCh := make(chan error, e.config.Streams)
 
-	testCtx, cancel := context.WithTimeout(ctx, e.config.Duration)
+	testCtx, cancel := context.WithTimeout(ctx, e.config.WarmUp+e.config.Duration)
 	defer cancel()
 
 	for i := 0; i < len(e.connections); i++ {
@@ -197,24 +191,6 @@ func (e *TestEngine) closeConnections() {
 	e.connections = nil
 }
 
-func (e *TestEngine) runWarmUp(ctx context.Context) {
-	for _, conn := range e.connections {
-		go func(c net.Conn) {
-			buf := make([]byte, 64*1024)
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					c.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-					c.Read(buf)
-				}
-			}
-		}(conn)
-	}
-	<-ctx.Done()
-}
-
 func (e *TestEngine) runDownload(ctx context.Context, conn net.Conn) error {
 	if _, err := conn.Write([]byte("D")); err != nil {
 		return fmt.Errorf("send command: %w", err)
@@ -250,12 +226,14 @@ func (e *TestEngine) runDownload(ctx context.Context, conn net.Conn) error {
 			}
 			if n > 0 {
 				atomic.AddInt64(&e.metrics.BytesReceived, int64(n))
-				atomic.AddInt64(&e.totalBytes, int64(n))
-				e.recordLatency(readDuration)
+				e.addBytes(int64(n))
 
-				if time.Since(lastRTTSample) > rttSampleInterval {
-					e.rttCollector.AddSample(readDuration.Seconds() * 1000)
-					lastRTTSample = time.Now()
+				if e.pastWarmUp() {
+					e.recordLatency(readDuration)
+					if time.Since(lastRTTSample) > rttSampleInterval {
+						e.rttCollector.AddSample(readDuration.Seconds() * 1000)
+						lastRTTSample = time.Now()
+					}
 				}
 			}
 		}
@@ -294,12 +272,14 @@ func (e *TestEngine) runUpload(ctx context.Context, conn net.Conn) error {
 			}
 			if n > 0 {
 				atomic.AddInt64(&e.metrics.BytesSent, int64(n))
-				atomic.AddInt64(&e.totalBytes, int64(n))
-				e.recordLatency(writeDuration)
+				e.addBytes(int64(n))
 
-				if time.Since(lastRTTSample) > rttSampleInterval {
-					e.rttCollector.AddSample(writeDuration.Seconds() * 1000)
-					lastRTTSample = time.Now()
+				if e.pastWarmUp() {
+					e.recordLatency(writeDuration)
+					if time.Since(lastRTTSample) > rttSampleInterval {
+						e.rttCollector.AddSample(writeDuration.Seconds() * 1000)
+						lastRTTSample = time.Now()
+					}
 				}
 			}
 		}
@@ -340,11 +320,13 @@ func (e *TestEngine) runBidirectional(ctx context.Context, conn net.Conn) error 
 				}
 				if n > 0 {
 					atomic.AddInt64(&e.metrics.BytesReceived, int64(n))
-					atomic.AddInt64(&e.totalBytes, int64(n))
-					e.recordLatency(readDuration)
-					if time.Since(lastRTTSample) > 500*time.Millisecond {
-						e.rttCollector.AddSample(readDuration.Seconds() * 1000)
-						lastRTTSample = time.Now()
+					e.addBytes(int64(n))
+					if e.pastWarmUp() {
+						e.recordLatency(readDuration)
+						if time.Since(lastRTTSample) > 500*time.Millisecond {
+							e.rttCollector.AddSample(readDuration.Seconds() * 1000)
+							lastRTTSample = time.Now()
+						}
 					}
 				}
 			}
@@ -374,7 +356,7 @@ func (e *TestEngine) runBidirectional(ctx context.Context, conn net.Conn) error 
 				}
 				if n > 0 {
 					atomic.AddInt64(&e.metrics.BytesSent, int64(n))
-					atomic.AddInt64(&e.totalBytes, int64(n))
+					e.addBytes(int64(n))
 				}
 			}
 		}
@@ -382,6 +364,33 @@ func (e *TestEngine) runBidirectional(ctx context.Context, conn net.Conn) error 
 
 	wg.Wait()
 	return nil
+}
+
+// addBytes gates byte recording on warm-up. During the first WarmUp seconds,
+// bytes go to graceBytes (discarded). After warm-up, a one-time reset sets
+// measureStart and all subsequent bytes go to totalBytes.
+func (e *TestEngine) addBytes(n int64) {
+	elapsed := time.Since(e.startTime)
+	if elapsed < e.config.WarmUp {
+		atomic.AddInt64(&e.graceBytes, n)
+		return
+	}
+	if atomic.CompareAndSwapInt32(&e.graceDone, 0, 1) {
+		// Transition: warm-up just ended. Reset counters and mark measurement start.
+		atomic.StoreInt64(&e.totalBytes, 0)
+		atomic.StoreInt64(&e.metrics.BytesSent, 0)
+		atomic.StoreInt64(&e.metrics.BytesReceived, 0)
+		e.metrics.mu.Lock()
+		e.metrics.LatencySamples = e.metrics.LatencySamples[:0]
+		e.metrics.mu.Unlock()
+		e.measureStart = time.Now()
+	}
+	atomic.AddInt64(&e.totalBytes, n)
+}
+
+// pastWarmUp returns true once the warm-up period has elapsed.
+func (e *TestEngine) pastWarmUp() bool {
+	return atomic.LoadInt32(&e.graceDone) == 1 || time.Since(e.startTime) >= e.config.WarmUp
 }
 
 func (e *TestEngine) recordLatency(d time.Duration) {
@@ -393,14 +402,15 @@ func (e *TestEngine) recordLatency(d time.Duration) {
 }
 
 func (e *TestEngine) GetMetrics() EngineMetrics {
-	elapsed := time.Since(e.startTime)
+	// Throughput is computed from measureStart (after warm-up), not startTime.
+	measureElapsed := time.Since(e.measureStart)
 	totalBytes := atomic.LoadInt64(&e.totalBytes)
 	bytesSent := atomic.LoadInt64(&e.metrics.BytesSent)
 	bytesRecv := atomic.LoadInt64(&e.metrics.BytesReceived)
 
 	throughputMbps := float64(0)
-	if elapsed.Seconds() > 0 {
-		throughputMbps = float64(totalBytes*8) / elapsed.Seconds() / 1_000_000
+	if measureElapsed.Seconds() > 0 {
+		throughputMbps = float64(totalBytes*8) / measureElapsed.Seconds() / 1_000_000
 	}
 
 	e.metrics.mu.RLock()
@@ -422,7 +432,7 @@ func (e *TestEngine) GetMetrics() EngineMetrics {
 		RTT:              rttMetrics,
 		Network:          e.networkInfo,
 		JitterMs:         jitter,
-		Elapsed:          elapsed,
+		Elapsed:          measureElapsed,
 		Running:          atomic.LoadInt32(&e.running) == 1,
 	}
 }

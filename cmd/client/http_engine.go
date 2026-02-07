@@ -113,6 +113,7 @@ func (e *HTTPTestEngine) runDownload(ctx context.Context) error {
 			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
+				io.Copy(io.Discard, resp.Body)
 				errCh <- fmt.Errorf("download failed: %s", resp.Status)
 				return
 			}
@@ -216,7 +217,7 @@ func (e *HTTPTestEngine) addBytes(n int64, elapsed time.Duration) {
 }
 
 func (e *HTTPTestEngine) buildDownloadURL() string {
-	base := stringsTrimSuffix(e.config.ServerURL)
+	base := strings.TrimRight(e.config.ServerURL, "/")
 	u, err := url.Parse(base + "/api/v1/download")
 	if err != nil {
 		return base + "/api/v1/download"
@@ -229,7 +230,7 @@ func (e *HTTPTestEngine) buildDownloadURL() string {
 }
 
 func (e *HTTPTestEngine) buildUploadURL() string {
-	return stringsTrimSuffix(e.config.ServerURL) + "/api/v1/upload"
+	return strings.TrimRight(e.config.ServerURL, "/") + "/api/v1/upload"
 }
 
 func (e *HTTPTestEngine) GetMetrics() EngineMetrics {
@@ -263,7 +264,7 @@ func measureHTTPPing(ctx context.Context, serverURL string, samples int) ([]time
 	if samples <= 0 {
 		return nil, nil
 	}
-	pingURL := stringsTrimSuffix(serverURL) + "/api/v1/ping"
+	pingURL := strings.TrimRight(serverURL, "/") + "/api/v1/ping"
 	client := &http.Client{Timeout: 10 * time.Second}
 	results := make([]time.Duration, 0, samples)
 
@@ -282,8 +283,4 @@ func measureHTTPPing(ctx context.Context, serverURL string, samples int) ([]time
 		results = append(results, time.Since(start))
 	}
 	return results, nil
-}
-
-func stringsTrimSuffix(input string) string {
-	return strings.TrimRight(input, "/")
 }

@@ -10,7 +10,6 @@ import (
 
 	"encoding/json"
 
-	"github.com/gorilla/mux"
 	"github.com/saveenergy/openbyte/internal/results"
 )
 
@@ -142,9 +141,9 @@ func TestHandlerSaveValidation(t *testing.T) {
 	defer cleanup()
 
 	handler := results.NewHandler(store)
-	router := mux.NewRouter()
-	router.HandleFunc("/api/v1/results", handler.Save).Methods("POST")
-	router.HandleFunc("/api/v1/results/{id}", handler.Get).Methods("GET")
+	router := http.NewServeMux()
+	router.HandleFunc("POST /api/v1/results", handler.Save)
+	router.HandleFunc("GET /api/v1/results/{id}", handler.Get)
 
 	tests := []struct {
 		name   string
@@ -176,8 +175,8 @@ func TestHandlerGetInvalidID(t *testing.T) {
 	defer cleanup()
 
 	handler := results.NewHandler(store)
-	router := mux.NewRouter()
-	router.HandleFunc("/api/v1/results/{id}", handler.Get).Methods("GET")
+	router := http.NewServeMux()
+	router.HandleFunc("GET /api/v1/results/{id}", handler.Get)
 
 	tests := []struct {
 		name   string
@@ -207,8 +206,8 @@ func TestHandlerSaveRejectsWrongContentType(t *testing.T) {
 	defer cleanup()
 
 	handler := results.NewHandler(store)
-	router := mux.NewRouter()
-	router.HandleFunc("/api/v1/results", handler.Save).Methods("POST")
+	router := http.NewServeMux()
+	router.HandleFunc("POST /api/v1/results", handler.Save)
 
 	body := `{"download_mbps":100,"upload_mbps":50,"latency_ms":10,"jitter_ms":1}`
 	req := httptest.NewRequest("POST", "/api/v1/results", strings.NewReader(body))
@@ -235,9 +234,9 @@ func TestHandlerRoundTrip(t *testing.T) {
 	defer cleanup()
 
 	handler := results.NewHandler(store)
-	router := mux.NewRouter()
-	router.HandleFunc("/api/v1/results", handler.Save).Methods("POST")
-	router.HandleFunc("/api/v1/results/{id}", handler.Get).Methods("GET")
+	router := http.NewServeMux()
+	router.HandleFunc("POST /api/v1/results", handler.Save)
+	router.HandleFunc("GET /api/v1/results/{id}", handler.Get)
 
 	// Save
 	body := `{"download_mbps":500.5,"upload_mbps":100.2,"latency_ms":8.1,"jitter_ms":0.5,"loaded_latency_ms":15.3,"bufferbloat_grade":"B","ipv4":"203.0.113.1","ipv6":"2001:db8::1","server_name":"Test"}`

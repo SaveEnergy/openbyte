@@ -62,6 +62,7 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 
 	engine := NewTestEngine(engineCfg)
 
+	totalRunTime := float64(config.WarmUp + config.Duration)
 	startTime := time.Now()
 	testCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -93,11 +94,11 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 		case <-metricsTicker.C:
 			lastMetrics = engine.GetMetrics()
 			elapsed := time.Since(startTime)
-			progress := (elapsed.Seconds() / float64(config.Duration)) * 100
+			progress := (elapsed.Seconds() / totalRunTime) * 100
 			if progress > 100 {
 				progress = 100
 			}
-			remaining := float64(config.Duration) - elapsed.Seconds()
+			remaining := totalRunTime - elapsed.Seconds()
 			if remaining < 0 {
 				remaining = 0
 			}
@@ -137,10 +138,7 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 	latencyStats := calculateClientLatency(pingSamples)
 	jitter := calculateClientJitter(pingSamples)
 
-	graceTime := 1500 * time.Millisecond
-	if config.Direction == "upload" {
-		graceTime = 3000 * time.Millisecond
-	}
+	graceTime := time.Duration(config.WarmUp) * time.Second
 
 	httpCfg := &HTTPTestConfig{
 		ServerURL:      config.ServerURL,
@@ -150,7 +148,7 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 		Direction:      config.Direction,
 		GraceTime:      graceTime,
 		StreamDelay:    200 * time.Millisecond,
-		OverheadFactor: 1.06,
+		OverheadFactor: 1.0,
 		APIKey:         config.APIKey,
 		Timeout:        time.Duration(config.Timeout) * time.Second,
 	}

@@ -379,88 +379,134 @@ func (s *Server) handleEcho(conn *net.TCPConn) {
 	}
 }
 
+// udpClients tracks active UDP client state, safe for concurrent access.
+type udpClients struct {
+	mu sync.RWMutex
+	m  map[string]*udpClientState
+}
+
+func (c *udpClients) get(key string) *udpClientState {
+	c.mu.RLock()
+	client := c.m[key]
+	c.mu.RUnlock()
+	return client
+}
+
+// getOrCreate returns an existing client or creates a new one.
+// Returns (nil, false) if the sender limit is reached.
+// Returns (client, true) if a new client was created (caller must start sender).
+func (c *udpClients) getOrCreate(key string, addr *net.UDPAddr, s *Server) (*udpClientState, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if existing := c.m[key]; existing != nil {
+		return existing, false
+	}
+	if v := atomic.AddInt64(&s.activeUDPSenders, 1); v > s.maxUDPSenders {
+		atomic.AddInt64(&s.activeUDPSenders, -1)
+		return nil, false
+	}
+	client := &udpClientState{
+		addr:         addr,
+		lastSeenUnix: time.Now().UnixNano(),
+	}
+	c.m[key] = client
+	return client, true
+}
+
+func (c *udpClients) cleanup() {
+	now := time.Now()
+	c.mu.Lock()
+	for key, client := range c.m {
+		lastSeen := time.Unix(0, atomic.LoadInt64(&client.lastSeenUnix))
+		if now.Sub(lastSeen) > 30*time.Second {
+			delete(c.m, key)
+		}
+	}
+	c.mu.Unlock()
+}
+
 func (s *Server) handleUDP() {
 	defer s.wg.Done()
 
-	buf := make([]byte, s.config.UDPBufferSize)
-	clients := make(map[string]*udpClientState)
-	var clientsMu sync.RWMutex
-	lastCleanup := time.Now()
+	clients := &udpClients{m: make(map[string]*udpClientState)}
 
+	numReaders := runtime.GOMAXPROCS(0)
+	if numReaders < 2 {
+		numReaders = 2
+	}
+	if numReaders > 4 {
+		numReaders = 4
+	}
+
+	var readersWg sync.WaitGroup
+	for i := 0; i < numReaders; i++ {
+		readersWg.Add(1)
+		go s.udpReader(clients, &readersWg)
+	}
+
+	logging.Info("UDP readers started", logging.Field{Key: "count", Value: numReaders})
+
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-s.ctx.Done():
+			readersWg.Wait()
 			return
-		default:
-			if time.Since(lastCleanup) > 10*time.Second {
-				now := time.Now()
-				clientsMu.Lock()
-				for key, client := range clients {
-					lastSeen := time.Unix(0, atomic.LoadInt64(&client.lastSeenUnix))
-					if now.Sub(lastSeen) > 30*time.Second {
-						delete(clients, key)
-					}
-				}
-				clientsMu.Unlock()
-				lastCleanup = now
+		case <-ticker.C:
+			clients.cleanup()
+		}
+	}
+}
+
+func (s *Server) udpReader(clients *udpClients, wg *sync.WaitGroup) {
+	defer wg.Done()
+	buf := make([]byte, s.config.UDPBufferSize)
+
+	for {
+		n, addr, err := s.udpConn.ReadFromUDP(buf)
+		if err != nil {
+			if s.ctx.Err() != nil {
+				return
 			}
-			s.udpConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-			n, addr, err := s.udpConn.ReadFromUDP(buf)
-			if err != nil {
-				var netErr net.Error
-				if errors.As(err, &netErr) && netErr.Timeout() {
-					continue
-				}
-				if s.ctx.Err() != nil {
-					return
-				}
+			var netErr net.Error
+			if errors.As(err, &netErr) && netErr.Timeout() {
 				continue
 			}
+			return
+		}
 
-			if n == 0 {
-				continue
-			}
+		if n == 0 {
+			continue
+		}
 
-			clientKey := addr.String()
-			clientsMu.RLock()
-			client := clients[clientKey]
-			clientsMu.RUnlock()
+		clientKey := addr.String()
+		client := clients.get(clientKey)
 
+		if client == nil {
+			var created bool
+			client, created = clients.getOrCreate(clientKey, addr, s)
 			if client == nil {
-				clientsMu.Lock()
-				// Double-check after acquiring write lock to prevent duplicate senders.
-				if existing := clients[clientKey]; existing != nil {
-					client = existing
-				} else if v := atomic.AddInt64(&s.activeUDPSenders, 1); v > s.maxUDPSenders {
-					atomic.AddInt64(&s.activeUDPSenders, -1)
-					clientsMu.Unlock()
-					continue
-				} else {
-					client = &udpClientState{
-						addr:         addr,
-						lastSeenUnix: time.Now().UnixNano(),
-					}
-					clients[clientKey] = client
-					s.wg.Add(1)
-					go s.udpSender(client)
-				}
-				clientsMu.Unlock()
+				continue
 			}
+			if created {
+				s.wg.Add(1)
+				go s.udpSender(client)
+			}
+		}
 
-			atomic.StoreInt64(&client.lastSeenUnix, time.Now().UnixNano())
+		atomic.StoreInt64(&client.lastSeenUnix, time.Now().UnixNano())
 
-			cmd := buf[0]
-			switch cmd {
-			case 'D':
-				atomic.StoreInt32(&client.downloading, 1)
-			case 'U':
-				atomic.AddInt64(&client.bytesRecv, int64(n))
-			case 'S':
-				atomic.StoreInt32(&client.downloading, 0)
-			default:
-				if _, err := s.udpConn.WriteToUDP(buf[:n], addr); err != nil {
-					logging.Warn("UDP echo error", logging.Field{Key: "error", Value: err})
-				}
+		switch buf[0] {
+		case 'D':
+			atomic.StoreInt32(&client.downloading, 1)
+		case 'U':
+			atomic.AddInt64(&client.bytesRecv, int64(n))
+		case 'S':
+			atomic.StoreInt32(&client.downloading, 0)
+		default:
+			if _, err := s.udpConn.WriteToUDP(buf[:n], addr); err != nil {
+				logging.Warn("UDP echo error", logging.Field{Key: "error", Value: err})
 			}
 		}
 	}

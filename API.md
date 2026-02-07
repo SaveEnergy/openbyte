@@ -25,7 +25,7 @@ Initiate new speed test.
   "direction": "download" | "upload" | "bidirectional",
   "duration": 30,
   "streams": 4,
-  "packet_size": 1500,
+  "packet_size": 1400,
   "mode": "client" | "proxy"
 }
 ```
@@ -35,7 +35,7 @@ Initiate new speed test.
 - `direction` (required): "download", "upload", or "bidirectional"
 - `duration` (optional): Test duration in seconds (default: 30, min: 1, max: 300)
 - `streams` (optional): Number of parallel connections (default: 4, min: 1, max: 64)
-- `packet_size` (optional): Packet size in bytes (default: 1500, min: 64, max: 9000)
+- `packet_size` (optional): Packet size in bytes (default: 1400, min: 64, max: 9000). Default avoids IP fragmentation on standard 1500-byte MTU links (1400 + 28 IPv4/UDP headers = 1428 < 1500).
 - `mode` (optional): Testing mode (default: "proxy")
   - `"client"`: Client-side testing (CLI) - client connects to test server directly
   - `"proxy"`: Server-side testing (Web) - server performs test on behalf of client
@@ -131,7 +131,7 @@ Get final test results (after completion).
     "direction": "download",
     "duration": 30,
     "streams": 4,
-    "packet_size": 1500
+    "packet_size": 1400
   },
   "results": {
     "throughput_mbps": 25000.0,
@@ -603,6 +603,111 @@ Returns 404 if the result is not found or has expired (90-day retention).
 ### Result Page
 
 `GET /results/{id}` serves a standalone HTML page that fetches and renders the saved result.
+
+## Registry API (Optional)
+
+Server registry for multi-server deployments. Enable with `REGISTRY_MODE=true`. Protected endpoints require `Authorization: Bearer <REGISTRY_API_KEY>` when `REGISTRY_API_KEY` is set.
+
+### List Servers
+
+**GET** `/api/v1/registry/servers`
+
+**Query Parameters:**
+- `healthy` (optional): `"true"` to return only healthy servers
+
+**Response (200):**
+```json
+{
+  "servers": [
+    {
+      "id": "nyc-1",
+      "name": "New York",
+      "location": "US-East",
+      "host": "speedtest-nyc.example.com",
+      "tcp_port": 8081,
+      "udp_port": 8082,
+      "api_endpoint": "https://speedtest-nyc.example.com:8080",
+      "health": "healthy",
+      "capacity_gbps": 25,
+      "active_tests": 3,
+      "max_tests": 10,
+      "last_heartbeat": "2026-02-07T12:00:00Z"
+    }
+  ],
+  "count": 1
+}
+```
+
+### Register Server
+
+**POST** `/api/v1/registry/servers` *(auth required)*
+
+**Request Body:**
+```json
+{
+  "id": "nyc-1",
+  "name": "New York",
+  "location": "US-East",
+  "host": "speedtest-nyc.example.com",
+  "tcp_port": 8081,
+  "udp_port": 8082,
+  "capacity_gbps": 25
+}
+```
+
+**Response (201):**
+```json
+{
+  "status": "registered",
+  "server_id": "nyc-1"
+}
+```
+
+### Get Server
+
+**GET** `/api/v1/registry/servers/{id}`
+
+**Response (200):** Same as individual entry from list endpoint.
+
+**Status Codes:** `200` OK, `404` Not Found.
+
+### Update Server (Heartbeat)
+
+**PUT** `/api/v1/registry/servers/{id}` *(auth required)*
+
+Same body as register. Used for periodic heartbeats with updated `active_tests`.
+
+**Response (200):**
+```json
+{
+  "status": "updated",
+  "server_id": "nyc-1"
+}
+```
+
+### Deregister Server
+
+**DELETE** `/api/v1/registry/servers/{id}` *(auth required)*
+
+**Response (200):**
+```json
+{
+  "status": "deregistered",
+  "server_id": "nyc-1"
+}
+```
+
+### Registry Health
+
+**GET** `/api/v1/registry/health`
+
+**Response (200):**
+```json
+{
+  "status": "healthy",
+  "servers": 5
+}
+```
 
 ## Rate Limiting
 

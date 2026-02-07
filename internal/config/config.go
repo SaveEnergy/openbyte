@@ -85,7 +85,7 @@ func DefaultConfig() *Config {
 		MaxTestDuration:       300 * time.Second,
 		MaxStreams:            32,
 		TCPBufferSize:         64 * 1024,
-		UDPBufferSize:         1500,
+		UDPBufferSize:         1400,
 		ReadTimeout:           0,                // disabled; upload handlers manage own body deadline
 		ReadHeaderTimeout:     15 * time.Second, // protects against slowloris
 		WriteTimeout:          0,                // disabled; streaming endpoints manage own duration

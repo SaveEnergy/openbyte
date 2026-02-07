@@ -71,23 +71,8 @@ type StartStreamResponse struct {
 	Mode          string `json:"mode"`
 }
 
-type ServerInfo struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Location     string `json:"location"`
-	Region       string `json:"region,omitempty"`
-	Host         string `json:"host"`
-	TCPPort      int    `json:"tcp_port"`
-	UDPPort      int    `json:"udp_port"`
-	APIEndpoint  string `json:"api_endpoint"`
-	Health       string `json:"health"`
-	CapacityGbps int    `json:"capacity_gbps"`
-	ActiveTests  int    `json:"active_tests"`
-	MaxTests     int    `json:"max_tests"`
-}
-
 type ServersResponse struct {
-	Servers []ServerInfo `json:"servers"`
+	Servers []types.ServerInfo `json:"servers"`
 }
 
 func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
@@ -211,7 +196,7 @@ func (h *Handler) GetServers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := ServersResponse{
-		Servers: []ServerInfo{
+		Servers: []types.ServerInfo{
 			{
 				ID:           serverID,
 				Name:         serverName,
@@ -373,8 +358,8 @@ func (h *Handler) validateConfig(req StartStreamRequest, clientIP string) (types
 	}
 
 	packetSize := req.PacketSize
-	if packetSize == 0 {
-		packetSize = 1500
+	if packetSize <= 0 {
+		packetSize = 1400
 	}
 	if packetSize < 64 || packetSize > 9000 {
 		return types.StreamConfig{}, errors.ErrInvalidConfig("packet_size must be 64-9000 bytes", nil)
