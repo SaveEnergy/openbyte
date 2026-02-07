@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -168,60 +167,6 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 		result.NoProgress = configFile.NoProgress
 	}
 
-	if val := os.Getenv("OBYTE_SERVER_URL"); val != "" {
-		result.ServerURL = val
-	}
-	if val := os.Getenv("OBYTE_API_KEY"); val != "" {
-		result.APIKey = val
-	}
-	if val := os.Getenv("OBYTE_PROTOCOL"); val != "" {
-		result.Protocol = val
-	}
-	if val := os.Getenv("OBYTE_DIRECTION"); val != "" {
-		result.Direction = val
-	}
-	if val := os.Getenv("OBYTE_DURATION"); val != "" {
-		if d, err := strconv.Atoi(val); err == nil {
-			result.Duration = d
-		} else {
-			fmt.Fprintf(os.Stderr, "openbyte client: warning: invalid OBYTE_DURATION value '%s' (must be integer), ignoring\n", val)
-		}
-	}
-	if val := os.Getenv("OBYTE_STREAMS"); val != "" {
-		if s, err := strconv.Atoi(val); err == nil {
-			result.Streams = s
-		} else {
-			fmt.Fprintf(os.Stderr, "openbyte client: warning: invalid OBYTE_STREAMS value '%s' (must be integer), ignoring\n", val)
-		}
-	}
-	if val := os.Getenv("OBYTE_PACKET_SIZE"); val != "" {
-		if p, err := strconv.Atoi(val); err == nil {
-			result.PacketSize = p
-		} else {
-			fmt.Fprintf(os.Stderr, "openbyte client: warning: invalid OBYTE_PACKET_SIZE value '%s' (must be integer), ignoring\n", val)
-		}
-	}
-	if val := os.Getenv("OBYTE_CHUNK_SIZE"); val != "" {
-		if c, err := strconv.Atoi(val); err == nil {
-			result.ChunkSize = c
-		} else {
-			fmt.Fprintf(os.Stderr, "openbyte client: warning: invalid OBYTE_CHUNK_SIZE value '%s' (must be integer), ignoring\n", val)
-		}
-	}
-	if val := os.Getenv("OBYTE_TIMEOUT"); val != "" {
-		if t, err := strconv.Atoi(val); err == nil {
-			result.Timeout = t
-		} else {
-			fmt.Fprintf(os.Stderr, "openbyte client: warning: invalid OBYTE_TIMEOUT value '%s' (must be integer), ignoring\n", val)
-		}
-	}
-	if val := os.Getenv("OBYTE_WARMUP"); val != "" {
-		if w, err := strconv.Atoi(val); err == nil {
-			result.WarmUp = w
-		} else {
-			fmt.Fprintf(os.Stderr, "openbyte client: warning: invalid OBYTE_WARMUP value '%s' (must be integer), ignoring\n", val)
-		}
-	}
 	if os.Getenv("NO_COLOR") != "" {
 		result.NoColor = true
 	}

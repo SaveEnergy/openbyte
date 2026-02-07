@@ -342,18 +342,8 @@ Measurement:
 
 Configuration file: ~/.config/openbyte/config.yaml
 
-Environment variables:
-  OBYTE_SERVER_URL        Server URL (default: http://localhost:8080)
-  OBYTE_API_KEY           API key
-  OBYTE_PROTOCOL          Protocol (tcp, udp, http)
-  OBYTE_DIRECTION         Direction (download, upload, bidirectional)
-  OBYTE_DURATION          Test duration in seconds
-  OBYTE_STREAMS           Parallel streams (1-64)
-  OBYTE_PACKET_SIZE       Packet size in bytes
-  OBYTE_CHUNK_SIZE        HTTP chunk size in bytes
-  OBYTE_TIMEOUT           Request timeout in seconds
-  OBYTE_WARMUP            Warm-up seconds before measurement
-  NO_COLOR                Disable colors
+Environment:
+  NO_COLOR                Disable colors (standard convention)
 
 Examples:
   openbyte client                          # Default test
