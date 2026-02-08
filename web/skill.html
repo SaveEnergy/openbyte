@@ -47,7 +47,7 @@
           <div class="dl-install-block">
             <div class="dl-code-block">
               <code>openbyte mcp</code>
-              <button class="dl-copy-btn" onclick="copyText('openbyte mcp', this)" aria-label="Copy command">Copy</button>
+              <button class="dl-copy-btn" id="copyMcpBtn" aria-label="Copy command">Copy</button>
             </div>
           </div>
           <table class="skill-table">
@@ -102,7 +102,7 @@
           <div class="dl-install-block">
             <div class="dl-code-block">
               <code>go get github.com/saveenergy/openbyte/pkg/client</code>
-              <button class="dl-copy-btn" onclick="copyText('go get github.com/saveenergy/openbyte/pkg/client', this)" aria-label="Copy command">Copy</button>
+              <button class="dl-copy-btn" id="copySdkBtn" aria-label="Copy command">Copy</button>
             </div>
           </div>
           <div class="skill-code-examples">
@@ -171,20 +171,20 @@ openbyte client -S https://speed.example.com -d upload --json</code></pre>
           <div class="dl-install-block">
             <div class="dl-code-block">
               <code>curl -fsSL https://raw.githubusercontent.com/SaveEnergy/openbyte/main/scripts/install.sh | sh</code>
-              <button class="dl-copy-btn" onclick="copyText('curl -fsSL https://raw.githubusercontent.com/SaveEnergy/openbyte/main/scripts/install.sh | sh', this)" aria-label="Copy command">Copy</button>
+              <button class="dl-copy-btn" id="copyCurlBtn" aria-label="Copy command">Copy</button>
             </div>
           </div>
           <div class="skill-alt-installs">
             <div class="dl-install-block">
               <div class="dl-code-block">
                 <code>go install github.com/saveenergy/openbyte/cmd/openbyte@latest</code>
-                <button class="dl-copy-btn" onclick="copyText('go install github.com/saveenergy/openbyte/cmd/openbyte@latest', this)" aria-label="Copy command">Copy</button>
+                <button class="dl-copy-btn" id="copyGoInstallBtn" aria-label="Copy command">Copy</button>
               </div>
             </div>
             <div class="dl-install-block" style="margin-top: var(--space-sm)">
               <div class="dl-code-block">
                 <code>docker run -p 8080:8080 ghcr.io/saveenergy/openbyte:latest server</code>
-                <button class="dl-copy-btn" onclick="copyText('docker run -p 8080:8080 ghcr.io/saveenergy/openbyte:latest server', this)" aria-label="Copy command">Copy</button>
+                <button class="dl-copy-btn" id="copyDockerBtn" aria-label="Copy command">Copy</button>
               </div>
             </div>
           </div>
@@ -208,20 +208,6 @@ openbyte client -S https://speed.example.com -d upload --json</code></pre>
     </footer>
   </div>
 
-  <script>
-    document.getElementById('copySkillBtn').addEventListener('click', function() {
-      copyText(document.getElementById('skillCmd').textContent, this);
-    });
-
-    function copyText(text, btn) {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(function() {
-          var orig = btn.textContent;
-          btn.textContent = 'Copied';
-          setTimeout(function() { btn.textContent = orig; }, 1500);
-        });
-      }
-    }
-  </script>
+  <script src="skill.js"></script>
 </body>
 </html>
