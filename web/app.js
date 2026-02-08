@@ -659,7 +659,15 @@ async function runTest(direction, signal) {
   let ewmaSpeed = 0;
   const ewmaAlpha = 0.3; // ~1s effective smoothing window
   
+  // Smooth ring animation: advance based on wall clock time, independent of data callbacks
+  const progressTick = setInterval(() => {
+    if (signal.aborted) return;
+    const elapsed = (performance.now() - startTime) / 1000;
+    updateProgress(Math.min(100, (elapsed / duration) * 100));
+  }, 100);
+
   const onProgress = (bytes, elapsed) => {
+    if (elapsed > duration) return; // Past end time — freeze display
     const now = performance.now();
     const intervalMs = now - lastUpdate;
     
@@ -698,6 +706,7 @@ async function runTest(direction, signal) {
       result = await runUploadTest(duration, onProgress, signal);
     }
   } finally {
+    clearInterval(progressTick);
     await latencyProbe.stop();
   }
   const loadedLatency = latencyProbe.getMedian();
@@ -1055,7 +1064,7 @@ async function runUploadTest(duration, onProgress, signal) {
   const numStreams = resolveStreams();
   const chunkSize = resolveChunkSize();
   const streamDelay = 200;
-  const blobSize = Math.max(chunkSize, 4 * 1024 * 1024);
+  const blobSize = chunkSize; // 1MB — balances HTTP overhead vs progress granularity
   const maxNetworkRetries = 2;
   const retryDelayMs = 250;
   let totalBytes = 0;
