@@ -27,7 +27,9 @@ jobs:
       - name: Build release assets
         run: |
           set -euo pipefail
-          VERSION="${GITHUB_REF_NAME#v}"
+          SEMVER="${GITHUB_REF_NAME#v}"
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          VERSION="${SEMVER}+${SHORT_SHA}"
           mkdir -p dist
 
           build_release() {
@@ -38,15 +40,15 @@ jobs:
               ext=".exe"
             fi
 
-            local out="dist/openbyte_${VERSION}_${os}_${arch}"
+            local out="dist/openbyte_${SEMVER}_${os}_${arch}"
             mkdir -p "$out"
 
             GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "$out/openbyte${ext}" ./cmd/openbyte
 
             if [ "$os" = "windows" ]; then
-              (cd "$out" && zip -r "../openbyte_${VERSION}_${os}_${arch}.zip" .)
+              (cd "$out" && zip -r "../openbyte_${SEMVER}_${os}_${arch}.zip" .)
             else
-              (cd "$out" && tar -czf "../openbyte_${VERSION}_${os}_${arch}.tar.gz" .)
+              (cd "$out" && tar -czf "../openbyte_${SEMVER}_${os}_${arch}.tar.gz" .)
             fi
             rm -rf "$out"
           }
@@ -66,7 +68,7 @@ jobs:
         run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/openbyte" >> "$GITHUB_ENV"
 
       - name: Set version env
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+        run: echo "VERSION=${GITHUB_REF_NAME#v}+${GITHUB_SHA:0:7}" >> "$GITHUB_ENV"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
