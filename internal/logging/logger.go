@@ -39,9 +39,7 @@ func Init(level Level) {
 }
 
 func GetLogger() *Logger {
-	if defaultLogger == nil {
-		Init(LevelInfo)
-	}
+	Init(LevelInfo) // once.Do is a no-op if already initialized; provides memory barrier
 	return defaultLogger
 }
 
