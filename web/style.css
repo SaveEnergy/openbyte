@@ -1324,3 +1324,147 @@ select.setting-input {
   text-align: center;
   display: inline-block;
 }
+
+/* ── Skill page ── */
+
+.skill-panel {
+  max-width: 820px;
+}
+
+.skill-desc {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: var(--space-md);
+}
+
+.skill-desc code {
+  font-family: var(--font-display);
+  font-size: 0.85em;
+  background: var(--bg-hover);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+}
+
+.skill-note {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: var(--space-sm);
+}
+
+.skill-link {
+  color: var(--accent-primary);
+  text-decoration: none;
+}
+
+.skill-link:hover {
+  text-decoration: underline;
+}
+
+/* Skill tables */
+.skill-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--space-md);
+  font-size: 0.85rem;
+}
+
+.skill-table th {
+  text-align: left;
+  padding: var(--space-sm) var(--space-md);
+  color: var(--text-secondary);
+  font-weight: 600;
+  border-bottom: 1px solid var(--bg-hover);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.skill-table td {
+  padding: var(--space-sm) var(--space-md);
+  color: var(--text-primary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.skill-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.skill-table code {
+  font-family: var(--font-display);
+  font-size: 0.8em;
+  background: var(--bg-hover);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.skill-table-compact td,
+.skill-table-compact th {
+  padding: var(--space-xs) var(--space-md);
+}
+
+/* Code examples */
+.skill-code-examples {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.skill-example {
+  background: var(--bg-secondary);
+  border: 1px solid var(--bg-hover);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.skill-example-title {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--bg-hover);
+}
+
+.skill-pre {
+  margin: 0;
+  padding: var(--space-md);
+  overflow-x: auto;
+}
+
+.skill-pre code {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  line-height: 1.6;
+}
+
+.skill-alt-installs {
+  margin-top: var(--space-sm);
+}
+
+/* Download meta link reuse */
+.download-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.download-link {
+  color: var(--accent-primary);
+  text-decoration: none;
+}
+
+.download-link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .skill-table {
+    font-size: 0.78rem;
+  }
+  .skill-table th,
+  .skill-table td {
+    padding: var(--space-xs) var(--space-sm);
+  }
+}

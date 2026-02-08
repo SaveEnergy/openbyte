@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="openByte agent skill — API, MCP server, Go SDK, and CLI reference for AI agents and developers.">
+  <meta property="og:title" content="openByte — Skill">
+  <meta property="og:description" content="Agent skill for network speed testing: REST API, MCP tools, Go SDK, CLI.">
+  <meta property="og:type" content="website">
+  <title>openByte Skill</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="brand">
+        <a href="/" style="text-decoration:none"><div class="logo">open<span class="logo-accent">Byte</span></div></a>
+      </div>
+      <a class="footer-link" href="/">Speed Test</a>
+    </header>
+
+    <main class="download-main">
+      <section class="download-panel skill-panel">
+        <h1 class="download-title">Agent Skill</h1>
+        <p class="download-subtitle">
+          Integrate openByte into AI agents, scripts, and applications.
+          REST API, MCP server, Go SDK, and CLI — all in one binary.
+        </p>
+
+        <!-- Install -->
+        <div class="dl-section">
+          <h2 class="dl-section-title">Install Skill</h2>
+          <div class="dl-install-block">
+            <div class="dl-code-block">
+              <code id="skillCmd">npx skills add https://github.com/SaveEnergy/openbyte</code>
+              <button class="dl-copy-btn" id="copySkillBtn" aria-label="Copy command">Copy</button>
+            </div>
+          </div>
+          <p class="skill-note">Or read <a class="skill-link" href="https://github.com/SaveEnergy/openbyte/blob/main/SKILL.md" target="_blank" rel="noopener noreferrer">SKILL.md</a> directly.</p>
+        </div>
+
+        <!-- MCP Server -->
+        <div class="dl-section">
+          <h2 class="dl-section-title">MCP Server</h2>
+          <p class="skill-desc">Start the MCP server over stdio — agents can call tools directly.</p>
+          <div class="dl-install-block">
+            <div class="dl-code-block">
+              <code>openbyte mcp</code>
+              <button class="dl-copy-btn" onclick="copyText('openbyte mcp', this)" aria-label="Copy command">Copy</button>
+            </div>
+          </div>
+          <table class="skill-table">
+            <thead>
+              <tr><th>Tool</th><th>Duration</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>connectivity_check</code></td>
+                <td>~3-5s</td>
+                <td>Quick latency + burst download/upload. Returns grade A-F.</td>
+              </tr>
+              <tr>
+                <td><code>speed_test</code></td>
+                <td>configurable</td>
+                <td>Full speed test with direction and duration params.</td>
+              </tr>
+              <tr>
+                <td><code>diagnose</code></td>
+                <td>~15-20s</td>
+                <td>Comprehensive: 10 latency samples, 5s download, 5s upload.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- API Endpoints -->
+        <div class="dl-section">
+          <h2 class="dl-section-title">API Endpoints</h2>
+          <table class="skill-table">
+            <thead>
+              <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>GET</code></td><td><code>/health</code></td><td>Server health check</td></tr>
+              <tr><td><code>GET</code></td><td><code>/api/v1/ping</code></td><td>Latency + client IP detection</td></tr>
+              <tr><td><code>GET</code></td><td><code>/api/v1/download</code></td><td>Download speed test (binary stream)</td></tr>
+              <tr><td><code>POST</code></td><td><code>/api/v1/upload</code></td><td>Upload speed test (binary body)</td></tr>
+              <tr><td><code>POST</code></td><td><code>/api/v1/stream/start</code></td><td>Start managed test session</td></tr>
+              <tr><td><code>GET</code></td><td><code>/api/v1/stream/{id}/status</code></td><td>Poll test status + live metrics</td></tr>
+              <tr><td><code>GET</code></td><td><code>/api/v1/stream/{id}/results</code></td><td>Final test results</td></tr>
+              <tr><td><code>POST</code></td><td><code>/api/v1/results</code></td><td>Save test results</td></tr>
+              <tr><td><code>GET</code></td><td><code>/api/v1/results/{id}</code></td><td>Retrieve saved results</td></tr>
+            </tbody>
+          </table>
+          <p class="skill-note">Public API — no auth required. Full spec: <a class="skill-link" href="https://github.com/SaveEnergy/openbyte/blob/main/API.md" target="_blank" rel="noopener noreferrer">API.md</a> | <a class="skill-link" href="https://github.com/SaveEnergy/openbyte/blob/main/api/openapi.yaml" target="_blank" rel="noopener noreferrer">OpenAPI 3.1</a></p>
+        </div>
+
+        <!-- Go SDK -->
+        <div class="dl-section">
+          <h2 class="dl-section-title">Go SDK</h2>
+          <div class="dl-install-block">
+            <div class="dl-code-block">
+              <code>go get github.com/saveenergy/openbyte/pkg/client</code>
+              <button class="dl-copy-btn" onclick="copyText('go get github.com/saveenergy/openbyte/pkg/client', this)" aria-label="Copy command">Copy</button>
+            </div>
+          </div>
+          <div class="skill-code-examples">
+            <div class="skill-example">
+              <h3 class="skill-example-title">Quick Check (~3-5s)</h3>
+              <pre class="skill-pre"><code>c := client.New("https://speed.example.com")
+result, err := c.Check(ctx)
+// result.Interpretation.Grade → "A" through "F"</code></pre>
+            </div>
+            <div class="skill-example">
+              <h3 class="skill-example-title">Full Speed Test</h3>
+              <pre class="skill-pre"><code>result, err := c.SpeedTest(ctx, client.SpeedTestOptions{
+    Direction: "download",
+    Duration:  10,
+})
+// result.ThroughputMbps, result.BytesTotal</code></pre>
+            </div>
+            <div class="skill-example">
+              <h3 class="skill-example-title">Diagnosis (~15-20s)</h3>
+              <pre class="skill-pre"><code>result, err := c.Diagnose(ctx)
+// result.DownloadMbps, result.UploadMbps
+// result.Interpretation — full grade + ratings</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- CLI -->
+        <div class="dl-section">
+          <h2 class="dl-section-title">CLI</h2>
+          <div class="skill-code-examples">
+            <div class="skill-example">
+              <h3 class="skill-example-title">Quick Check</h3>
+              <pre class="skill-pre"><code>openbyte check https://speed.example.com
+openbyte check --json          # structured output
+# Exit 0 = healthy (A-C), Exit 1 = degraded (D-F)</code></pre>
+            </div>
+            <div class="skill-example">
+              <h3 class="skill-example-title">Full Test</h3>
+              <pre class="skill-pre"><code>openbyte client -S https://speed.example.com -d download -t 10
+openbyte client -S https://speed.example.com -d upload --json</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Diagnostic -->
+        <div class="dl-section">
+          <h2 class="dl-section-title">Diagnostic Grades</h2>
+          <p class="skill-desc">All results include an <code>interpretation</code> with grade, ratings, and suitability.</p>
+          <table class="skill-table skill-table-compact">
+            <thead>
+              <tr><th>Grade</th><th>Meaning</th><th>Suitable For</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>A</td><td>Excellent</td><td>Everything: 4K streaming, gaming, video calls, large transfers</td></tr>
+              <tr><td>B</td><td>Good</td><td>HD streaming, video calls, web browsing, moderate transfers</td></tr>
+              <tr><td>C</td><td>Fair</td><td>Web browsing, SD streaming</td></tr>
+              <tr><td>D</td><td>Poor</td><td>Basic browsing only</td></tr>
+              <tr><td>F</td><td>Very poor</td><td>Unusable for most workloads</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Install Binary -->
+        <div class="dl-section">
+          <h2 class="dl-section-title">Install Binary</h2>
+          <div class="dl-install-block">
+            <div class="dl-code-block">
+              <code>curl -fsSL https://raw.githubusercontent.com/SaveEnergy/openbyte/main/scripts/install.sh | sh</code>
+              <button class="dl-copy-btn" onclick="copyText('curl -fsSL https://raw.githubusercontent.com/SaveEnergy/openbyte/main/scripts/install.sh | sh', this)" aria-label="Copy command">Copy</button>
+            </div>
+          </div>
+          <div class="skill-alt-installs">
+            <div class="dl-install-block">
+              <div class="dl-code-block">
+                <code>go install github.com/saveenergy/openbyte/cmd/openbyte@latest</code>
+                <button class="dl-copy-btn" onclick="copyText('go install github.com/saveenergy/openbyte/cmd/openbyte@latest', this)" aria-label="Copy command">Copy</button>
+              </div>
+            </div>
+            <div class="dl-install-block" style="margin-top: var(--space-sm)">
+              <div class="dl-code-block">
+                <code>docker run -p 8080:8080 ghcr.io/saveenergy/openbyte:latest server</code>
+                <button class="dl-copy-btn" onclick="copyText('docker run -p 8080:8080 ghcr.io/saveenergy/openbyte:latest server', this)" aria-label="Copy command">Copy</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <p class="download-meta" style="margin-top: var(--space-xl); text-align: center;">
+          Full documentation on
+          <a class="download-link" href="https://github.com/saveenergy/openbyte" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-links">
+        <a class="footer-link" href="/">Speed Test</a>
+        <span class="footer-divider">&middot;</span>
+        <a class="footer-link" href="/download.html">Download</a>
+        <span class="footer-divider">&middot;</span>
+        <a class="footer-link" href="https://github.com/saveenergy/openbyte" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    document.getElementById('copySkillBtn').addEventListener('click', function() {
+      copyText(document.getElementById('skillCmd').textContent, this);
+    });
+
+    function copyText(text, btn) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+          var orig = btn.textContent;
+          btn.textContent = 'Copied';
+          setTimeout(function() { btn.textContent = orig; }, 1500);
+        });
+      }
+    }
+  </script>
+</body>
+</html>
