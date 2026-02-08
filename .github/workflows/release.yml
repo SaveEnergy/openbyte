@@ -12,6 +12,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      image_pushed: ${{ steps.push.outcome }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -91,6 +93,7 @@ jobs:
             type=raw,value=latest
 
       - name: Build and push (server image)
+        id: push
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
@@ -106,3 +109,58 @@ jobs:
           cache-to: type=gha,mode=max
           sbom: true
           provenance: true
+
+  deploy:
+    needs: release
+    if: vars.SSH_HOST != '' && needs.release.outputs.image_pushed == 'success'
+    runs-on: ubuntu-latest
+    env:
+      SSH_HOST: ${{ vars.SSH_HOST }}
+      SSH_USER: ${{ vars.SSH_USER }}
+      SSH_PORT: ${{ vars.SSH_PORT }}
+      REMOTE_DIR: ${{ vars.REMOTE_DIR }}
+      GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
+      SSH_KEY: ${{ secrets.SSH_KEY }}
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key: ${{ env.SSH_KEY }}
+          port: ${{ env.SSH_PORT || 22 }}
+          script: |
+            if command -v bash >/dev/null 2>&1; then
+              bash -lc 'set -euo pipefail
+              echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
+              cd "${{ env.REMOTE_DIR }}"
+              docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull
+              docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d
+              for i in {1..20}; do
+                status=$(docker inspect -f "{{.State.Health.Status}}" openbyte 2>/dev/null || true)
+                if [ "$status" = "healthy" ]; then
+                  exit 0
+                fi
+                sleep 3
+              done
+              docker inspect openbyte --format "{{json .State.Health}}" || true
+              exit 1'
+              exit 0
+            fi
+            set -eu
+            echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
+            cd "${{ env.REMOTE_DIR }}"
+            docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull
+            docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d
+            i=1
+            while [ "$i" -le 20 ]; do
+              status=$(docker inspect -f "{{.State.Health.Status}}" openbyte 2>/dev/null || true)
+              if [ "$status" = "healthy" ]; then
+                exit 0
+              fi
+              i=$((i + 1))
+              sleep 3
+            done
+            docker inspect openbyte --format "{{json .State.Health}}" || true
+            exit 1
