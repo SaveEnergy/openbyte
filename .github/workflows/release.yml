@@ -151,10 +151,10 @@ jobs:
             "${SSH_USER}@${SSH_HOST}:${REMOTE_DIR}/docker/"
           ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" \
             "test -f \"${REMOTE_DIR}/docker/docker-compose.ghcr.yaml\" && test -f \"${REMOTE_DIR}/docker/docker-compose.ghcr.traefik.yaml\""
-          local_main_sha="$(sha256sum docker/docker-compose.ghcr.yaml | awk '{print $1}')"
-          local_traefik_sha="$(sha256sum docker/docker-compose.ghcr.traefik.yaml | awk '{print $1}')"
-          remote_main_sha="$(ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "sha256sum \"${REMOTE_DIR}/docker/docker-compose.ghcr.yaml\" | awk '{print \\$1}'")"
-          remote_traefik_sha="$(ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "sha256sum \"${REMOTE_DIR}/docker/docker-compose.ghcr.traefik.yaml\" | awk '{print \\$1}'")"
+          local_main_sha="$(sha256sum docker/docker-compose.ghcr.yaml | cut -d ' ' -f1)"
+          local_traefik_sha="$(sha256sum docker/docker-compose.ghcr.traefik.yaml | cut -d ' ' -f1)"
+          remote_main_sha="$(ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "sha256sum \"${REMOTE_DIR}/docker/docker-compose.ghcr.yaml\" | cut -d ' ' -f1")"
+          remote_traefik_sha="$(ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "sha256sum \"${REMOTE_DIR}/docker/docker-compose.ghcr.traefik.yaml\" | cut -d ' ' -f1")"
           if [ "$local_main_sha" != "$remote_main_sha" ]; then
             echo "compose checksum mismatch for docker-compose.ghcr.yaml"
             exit 1
@@ -178,9 +178,9 @@ jobs:
               DEPLOY_TAG="${DEPLOY_TAG#v}"
               echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
               cd "${{ env.REMOTE_DIR }}"
-              IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull
-              IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
               OWNER_LC=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+              GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull || { echo "docker compose pull failed"; exit 1; }
+              GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
               EXPECTED_IMAGE="ghcr.io/${OWNER_LC}/openbyte:${DEPLOY_TAG}"
               expected_id=$(docker image inspect "$EXPECTED_IMAGE" -f "{{.Id}}" 2>/dev/null || true)
               running_id=$(docker inspect -f "{{.Image}}" openbyte 2>/dev/null || true)
@@ -197,16 +197,16 @@ jobs:
               done
               docker inspect openbyte --format "{{json .State.Health}}" || true
               exit 1'
-              exit 0
+              exit $?
             fi
             set -eu
             DEPLOY_TAG="${{ github.ref_name }}"
             DEPLOY_TAG="${DEPLOY_TAG#v}"
             echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
             cd "${{ env.REMOTE_DIR }}"
-            IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull
-            IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
             OWNER_LC=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+            GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull || { echo "docker compose pull failed"; exit 1; }
+            GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
             EXPECTED_IMAGE="ghcr.io/${OWNER_LC}/openbyte:${DEPLOY_TAG}"
             expected_id=$(docker image inspect "$EXPECTED_IMAGE" -f "{{.Id}}" 2>/dev/null || true)
             running_id=$(docker inspect -f "{{.Image}}" openbyte 2>/dev/null || true)

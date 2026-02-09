@@ -32,8 +32,9 @@ test.describe('openByte UI', () => {
     await page.locator('#closeSettings').click();
 
     await page.locator('#startBtn').click();
-    await page.waitForTimeout(700);
+    await expect(page.locator('#testingState')).toBeVisible({ timeout: 5000 });
     await page.locator('#cancelBtn').click();
+    await expect(page.locator('#idleState')).toBeVisible({ timeout: 5000 });
     await page.locator('#startBtn').click();
 
     await expect(page.locator('#resultsState')).toBeVisible({ timeout: 60_000 });

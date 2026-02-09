@@ -86,6 +86,8 @@
 - Deploy jobs sync `docker-compose.ghcr.yaml` + `docker-compose.ghcr.traefik.yaml` from pipeline workspace to `${REMOTE_DIR}/docker` before remote compose commands, preventing server-side compose drift.
 - Deploy compose sync step verifies remote file SHA-256 checksums match workspace files before executing `docker compose`.
 - Deploy sync hardening: fail-fast `ssh-keyscan`, explicit remote compose file existence checks post-`scp`, and `always()` cleanup of temporary SSH key material on runner.
+- Deploy script propagates bash-script exit status (`exit $?`) and enforces `GHCR_OWNER` override during compose pull/up to avoid owner drift across server `.env` and workflow context.
+- Deploy pull step is explicit fail-fast (`docker compose pull || exit 1`) before recreate.
 - `WEB_ROOT` env overrides embedded FS for development.
 - Playwright NO_COLOR handling: CI step uses `env -u NO_COLOR ...`; npm scripts use `scripts/run-playwright.mjs` (cross-platform, unsets `NO_COLOR` before spawning `bunx playwright`).
 - `ReadTimeout: 0` (disabled); `ReadHeaderTimeout: 15s` (slowloris protection without killing uploads).
@@ -109,6 +111,8 @@
 - Registry handler tests validate `count` field presence/type before numeric comparison (avoid direct `resp["count"].(float64)` panics).
 - Integration tests validate response field types (not just non-nil), e.g. `stream_id`/`websocket_url` must be non-empty strings.
 - Results API GET now uses `Cache-Control: no-store` (matches HTML no-store policy) and unit test coverage checks this header.
+- Results page parser trims trailing slashes when extracting result IDs and logs fetch failures; render path now guards non-finite speed values.
+- Playwright cancel/restart test waits for UI states instead of fixed sleep to reduce CI flakiness.
 
 ### Dead Code Removed
 - QUIC server/client support (2026-02-02).

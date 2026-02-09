@@ -39,6 +39,10 @@ if [ -z "$LATEST" ]; then
     echo "Error: could not determine latest release"
     exit 1
 fi
+if ! echo "$LATEST" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$'; then
+    echo "Error: unexpected release tag format: ${LATEST}"
+    exit 1
+fi
 echo "Latest version: ${LATEST}"
 
 # Build download URL
@@ -54,7 +58,7 @@ TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
 echo "Downloading ${URL}..."
-curl -fsSL "$URL" -o "${TMPDIR}/${ARCHIVE}"
+curl -fsSL --connect-timeout 10 --max-time 60 "$URL" -o "${TMPDIR}/${ARCHIVE}"
 
 echo "Extracting..."
 if echo "$ARCHIVE" | grep -q '\.zip$'; then
