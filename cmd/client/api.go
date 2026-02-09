@@ -56,6 +56,7 @@ func startStream(ctx context.Context, config *Config) (*StreamResponse, error) {
 
 	var streamResp StreamResponse
 	if err := json.NewDecoder(resp.Body).Decode(&streamResp); err != nil {
+		io.Copy(io.Discard, resp.Body)
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 

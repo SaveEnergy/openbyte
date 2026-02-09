@@ -2,6 +2,7 @@ package results
 
 import (
 	"encoding/json"
+	"io"
 	"math"
 	"net/http"
 	"regexp"
@@ -58,6 +59,7 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 
 	var req saveRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		io.Copy(io.Discard, r.Body)
 		respondJSONError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}

@@ -154,7 +154,10 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 		Timeout:        time.Duration(config.Timeout) * time.Second,
 	}
 
-	engine := NewHTTPTestEngine(httpCfg)
+	engine, err := NewHTTPTestEngine(httpCfg)
+	if err != nil {
+		return fmt.Errorf("init http engine: %w", err)
+	}
 	defer engine.Close()
 
 	startTime := time.Now()

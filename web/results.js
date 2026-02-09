@@ -1,4 +1,12 @@
 (function() {
+  var loadingView = document.getElementById('loadingView');
+  var resultView = document.getElementById('resultView');
+  var errorView = document.getElementById('errorView');
+  if (!loadingView || !resultView || !errorView) {
+    console.error('Results page missing required view elements');
+    return;
+  }
+
   var parts = window.location.pathname.replace(/\/+$/, '').split('/').filter(Boolean);
   var id = parts[parts.length - 1];
   if (!id || !/^[0-9a-zA-Z]{8}$/.test(id)) {
@@ -6,17 +14,21 @@
     return;
   }
 
-  document.getElementById('loadingView').classList.remove('hidden');
-  document.getElementById('resultView').classList.add('hidden');
+  loadingView.classList.remove('hidden');
+  resultView.classList.add('hidden');
 
   fetch('/api/v1/results/' + id)
     .then(function(res) {
-      if (!res.ok) throw new Error('HTTP ' + res.status);
+      if (!res.ok) {
+        return res.text().catch(function() {}).then(function() {
+          throw new Error('HTTP ' + res.status);
+        });
+      }
       return res.json();
     })
     .then(function(data) {
-      document.getElementById('loadingView').classList.add('hidden');
-      document.getElementById('resultView').classList.remove('hidden');
+      loadingView.classList.add('hidden');
+      resultView.classList.remove('hidden');
       renderResult(data);
     })
     .catch(function(err) {
@@ -25,9 +37,9 @@
     });
 
   function showError() {
-    document.getElementById('loadingView').classList.add('hidden');
-    document.getElementById('resultView').classList.add('hidden');
-    document.getElementById('errorView').classList.remove('hidden');
+    loadingView.classList.add('hidden');
+    resultView.classList.add('hidden');
+    errorView.classList.remove('hidden');
   }
 
   function formatSpeed(speed) {

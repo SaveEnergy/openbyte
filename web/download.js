@@ -309,12 +309,17 @@
     .catch(function(err) {
       console.warn('Release fetch failed:', err);
       const btn = document.getElementById('recommendedBtn');
-      btn.href = releasePage;
-      btn.style.pointerEvents = '';
-      btn.style.opacity = '';
-      document.getElementById('recommendedLabel').textContent = 'View on GitHub';
-      document.getElementById('recommendedPlatform').textContent =
-        err && err.message ? err.message : 'Could not load release data';
+      const label = document.getElementById('recommendedLabel');
+      const platform = document.getElementById('recommendedPlatform');
+      if (btn) {
+        btn.href = releasePage;
+        btn.style.pointerEvents = '';
+        btn.style.opacity = '';
+      }
+      if (label) label.textContent = 'View on GitHub';
+      if (platform) {
+        platform.textContent = err && err.message ? err.message : 'Could not load release data';
+      }
       document.querySelectorAll('.download-links').forEach(function(c) {
         while (c.firstChild) c.removeChild(c.firstChild);
         const link = document.createElement('a');

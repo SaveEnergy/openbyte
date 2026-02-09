@@ -120,6 +120,13 @@
 - Frontend server-health indicators (`serverDot`/`serverText`) now tolerate missing DOM nodes to avoid runtime null dereferences.
 - Toast error helpers now guard missing toast elements (`errorToast`, `errorMessage`) to keep embedded/minimal layouts safe.
 - Copy button handlers on skill/download pages guard missing `.dl-code-block`/`code` nodes before dereferencing.
+- Frontend bind/init flow now exits safely when core controls are missing (`startBtn`, `restartBtn`, `duration`, `streams`) and logs a warning instead of throwing.
+- Web results page now validates required view containers upfront and drains non-OK fetch responses before surfacing HTTP errors.
+- HTTP client engine now fails fast if upload payload randomization fails (`crypto/rand.Read`), returning constructor error to caller.
+- JSON request decode helpers now drain unread request bodies on decode/single-object validation errors (`internal/api`, `internal/results`, `internal/registry`) to preserve connection reuse safety.
+- Client stream-start decode path drains response body on JSON decode errors before returning.
+- Settings load/save paths guard missing duration/streams controls, log parse failures, and server discovery now validates `servers` as an array before assignment.
+- CI workflow cleanup: removed unused `Force build override` step from `changes` job.
 
 ### Dead Code Removed
 - QUIC server/client support (2026-02-02).

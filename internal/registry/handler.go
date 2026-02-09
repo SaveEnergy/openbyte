@@ -3,6 +3,7 @@ package registry
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 
@@ -108,6 +109,7 @@ func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRegistryBodySize)
 	var info types.ServerInfo
 	if err := json.NewDecoder(r.Body).Decode(&info); err != nil {
+		io.Copy(io.Discard, r.Body)
 		respondRegistryError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -148,6 +150,7 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxRegistryBodySize)
 	var info types.ServerInfo
 	if err := json.NewDecoder(r.Body).Decode(&info); err != nil {
+		io.Copy(io.Discard, r.Body)
 		respondRegistryError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}

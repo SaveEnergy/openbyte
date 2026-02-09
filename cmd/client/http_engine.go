@@ -42,7 +42,7 @@ type HTTPTestEngine struct {
 	bufferPool    sync.Pool
 }
 
-func NewHTTPTestEngine(cfg *HTTPTestConfig) *HTTPTestEngine {
+func NewHTTPTestEngine(cfg *HTTPTestConfig) (*HTTPTestEngine, error) {
 	transport := &http.Transport{
 		DisableCompression: true,
 	}
@@ -55,7 +55,9 @@ func NewHTTPTestEngine(cfg *HTTPTestConfig) *HTTPTestEngine {
 		payloadSize = 4 * 1024 * 1024
 	}
 	payload := make([]byte, payloadSize)
-	_, _ = rand.Read(payload)
+	if _, err := rand.Read(payload); err != nil {
+		return nil, fmt.Errorf("generate upload payload: %w", err)
+	}
 
 	return &HTTPTestEngine{
 		config:        cfg,
@@ -66,7 +68,7 @@ func NewHTTPTestEngine(cfg *HTTPTestConfig) *HTTPTestEngine {
 				return make([]byte, 64*1024)
 			},
 		},
-	}
+	}, nil
 }
 
 func (e *HTTPTestEngine) Run(ctx context.Context) error {

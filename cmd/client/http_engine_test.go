@@ -30,7 +30,10 @@ func TestHTTPTestEngineDownload(t *testing.T) {
 		Timeout:        5 * time.Second,
 	}
 
-	engine := NewHTTPTestEngine(cfg)
+	engine, err := NewHTTPTestEngine(cfg)
+	if err != nil {
+		t.Fatalf("new http test engine: %v", err)
+	}
 	defer engine.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	t.Cleanup(cancel)
@@ -68,7 +71,10 @@ func TestHTTPTestEngineUpload(t *testing.T) {
 		Timeout:        5 * time.Second,
 	}
 
-	engine := NewHTTPTestEngine(cfg)
+	engine, err := NewHTTPTestEngine(cfg)
+	if err != nil {
+		t.Fatalf("new http test engine: %v", err)
+	}
 	defer engine.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	t.Cleanup(cancel)

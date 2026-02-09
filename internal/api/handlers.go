@@ -421,9 +421,11 @@ func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}, lim
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(dst); err != nil {
+		io.Copy(io.Discard, r.Body)
 		return err
 	}
 	if err := decoder.Decode(&struct{}{}); !stdErrors.Is(err, io.EOF) {
+		io.Copy(io.Discard, r.Body)
 		return stdErrors.New("request body must contain a single JSON object")
 	}
 	return nil

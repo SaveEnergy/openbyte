@@ -86,6 +86,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function bindEvents() {
+  if (!elements.startBtn || !elements.restartBtn || !elements.duration || !elements.streams) {
+    console.warn('Core UI elements missing; skipping event binding');
+    return;
+  }
   elements.startBtn.addEventListener('click', startTest);
   elements.restartBtn.addEventListener('click', resetToIdle);
   if (elements.cancelBtn) {
@@ -155,16 +159,19 @@ function loadSettings() {
       if (typeof s.serverUrl === 'string') {
         state.settings.serverUrl = s.serverUrl;
       }
-      elements.duration.value = state.settings.duration;
-      elements.streams.value = state.settings.streams;
+      if (elements.duration) elements.duration.value = state.settings.duration;
+      if (elements.streams) elements.streams.value = state.settings.streams;
       if (state.settings.serverUrl && elements.customServerUrl) {
         elements.customServerUrl.value = state.settings.serverUrl;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('Failed to parse saved settings:', e);
+    }
   }
 }
 
 function saveSettings() {
+  if (!elements.duration || !elements.streams) return;
   const d = parseInt(elements.duration.value, 10);
   const s = parseInt(elements.streams.value, 10);
   if (Number.isFinite(d) && d > 0) state.settings.duration = d;
@@ -339,7 +346,7 @@ async function loadServers() {
   try {
     const res = await fetch(`${apiBase}/servers`);
     const data = await res.json();
-    state.servers = data.servers || [];
+    state.servers = Array.isArray(data.servers) ? data.servers : [];
     
     if (state.servers.length > 0) {
       await selectFastestServer();
@@ -1237,6 +1244,7 @@ function showResults() {
   showState('results');
   
   const formatSpeedWithUnit = (speed) => {
+    if (typeof speed !== 'number' || !Number.isFinite(speed) || speed < 0) speed = 0;
     if (speed >= 1000) {
       return { value: (speed / 1000).toFixed(2), unit: 'Gbps' };
     }
@@ -1302,8 +1310,9 @@ async function saveAndEnableShare() {
     if (elements.shareBtn) {
       elements.shareBtn.classList.remove('hidden');
     }
-  } catch (_) {
+  } catch (err) {
     // Non-critical; share just won't be available
+    console.debug('Share save unavailable:', err);
   }
 }
 
