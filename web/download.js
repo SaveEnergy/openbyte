@@ -279,10 +279,14 @@
   }
 
   setupCopy('copyBtn', function() {
-    return document.getElementById('installCmd').textContent;
+    const installCmd = document.getElementById('installCmd');
+    return installCmd ? installCmd.textContent : '';
   });
   setupCopy('copyDockerBtn', function() {
-    return document.querySelector('#copyDockerBtn').closest('.dl-code-block').querySelector('code').textContent;
+    const btn = document.querySelector('#copyDockerBtn');
+    const block = btn ? btn.closest('.dl-code-block') : null;
+    const code = block ? block.querySelector('code') : null;
+    return code ? code.textContent : '';
   });
 
   const detected = detectPlatform();

@@ -48,7 +48,8 @@
     var btn = document.getElementById(btnId);
     if (!btn) return;
     btn.addEventListener('click', function() {
-      var code = btn.closest('.dl-code-block').querySelector('code');
+      var block = btn.closest('.dl-code-block');
+      var code = block ? block.querySelector('code') : null;
       if (code) copyText(code.textContent, btn);
     });
   }

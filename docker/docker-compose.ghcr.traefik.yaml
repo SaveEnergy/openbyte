@@ -87,7 +87,7 @@ services:
 networks:
   traefik:
     name: traefik
-    driver: bridge
+    external: true
 
 volumes:
   traefik-certs:

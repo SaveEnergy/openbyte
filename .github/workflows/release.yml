@@ -137,11 +137,13 @@ jobs:
           SSH_KEY: ${{ env.SSH_KEY }}
         run: |
           set -euo pipefail
+          [ -n "${REMOTE_DIR:-}" ] || { echo "REMOTE_DIR not set"; exit 1; }
           install -d -m 700 ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           touch ~/.ssh/known_hosts
-          ssh-keyscan -p "${SSH_PORT:-22}" -H "$SSH_HOST" > ~/.ssh/known_hosts.tmp
+          timeout 15 ssh-keyscan -p "${SSH_PORT:-22}" -H "$SSH_HOST" > ~/.ssh/known_hosts.tmp
+          [ -s ~/.ssh/known_hosts.tmp ] || { echo "ssh-keyscan returned no host keys"; exit 1; }
           cat ~/.ssh/known_hosts.tmp >> ~/.ssh/known_hosts
           rm -f ~/.ssh/known_hosts.tmp
           ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "mkdir -p \"${REMOTE_DIR}/docker\""
@@ -174,10 +176,13 @@ jobs:
           script: |
             if command -v bash >/dev/null 2>&1; then
               bash -lc 'set -euo pipefail
+              [ -n "${{ env.REMOTE_DIR }}" ] || { echo "REMOTE_DIR not set"; exit 1; }
+              test -f "${{ env.REMOTE_DIR }}/.env" || { echo "Missing .env at ${{ env.REMOTE_DIR }}/.env"; exit 1; }
               DEPLOY_TAG="${{ github.ref_name }}"
               DEPLOY_TAG="${DEPLOY_TAG#v}"
               echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
               cd "${{ env.REMOTE_DIR }}"
+              docker network inspect traefik >/dev/null 2>&1 || docker network create traefik >/dev/null
               OWNER_LC=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
               GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull || { echo "docker compose pull failed"; exit 1; }
               GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
@@ -199,11 +204,14 @@ jobs:
               exit 1'
               exit $?
             fi
-            set -eu
+            set -euo pipefail
+            [ -n "${{ env.REMOTE_DIR }}" ] || { echo "REMOTE_DIR not set"; exit 1; }
+            test -f "${{ env.REMOTE_DIR }}/.env" || { echo "Missing .env at ${{ env.REMOTE_DIR }}/.env"; exit 1; }
             DEPLOY_TAG="${{ github.ref_name }}"
             DEPLOY_TAG="${DEPLOY_TAG#v}"
             echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
             cd "${{ env.REMOTE_DIR }}"
+            docker network inspect traefik >/dev/null 2>&1 || docker network create traefik >/dev/null
             OWNER_LC=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
             GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull || { echo "docker compose pull failed"; exit 1; }
             GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate

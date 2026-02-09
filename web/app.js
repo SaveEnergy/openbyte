@@ -363,7 +363,7 @@ async function selectFastestServer() {
     return;
   }
 
-  elements.serverText.textContent = 'Finding fastest...';
+  if (elements.serverText) elements.serverText.textContent = 'Finding fastest...';
 
   const latencyPromises = state.servers.map(async (server) => {
     const healthUrl = getHealthURL(server);
@@ -547,13 +547,15 @@ async function checkServer() {
       throw new Error('Server offline');
     }
     
-    elements.serverDot.classList.remove('error', 'warning');
-    elements.serverDot.classList.add('connected');
+    if (elements.serverDot) {
+      elements.serverDot.classList.remove('error', 'warning');
+      elements.serverDot.classList.add('connected');
+    }
     
     if (state.selectedServer) {
-      elements.serverText.textContent = state.selectedServer.name || 'Ready';
+      if (elements.serverText) elements.serverText.textContent = state.selectedServer.name || 'Ready';
     } else {
-      elements.serverText.textContent = 'Ready';
+      if (elements.serverText) elements.serverText.textContent = 'Ready';
     }
     
     if (elements.serverStatus) {
@@ -562,18 +564,22 @@ async function checkServer() {
     }
   } catch (e) {
     if (baseUrl) {
-      elements.serverDot.classList.remove('connected', 'error');
-      elements.serverDot.classList.add('warning');
-      elements.serverText.textContent = state.selectedServer?.name || 'Custom';
+      if (elements.serverDot) {
+        elements.serverDot.classList.remove('connected', 'error');
+        elements.serverDot.classList.add('warning');
+      }
+      if (elements.serverText) elements.serverText.textContent = state.selectedServer?.name || 'Custom';
       
       if (elements.serverStatus) {
         elements.serverStatus.textContent = 'Unverified';
         elements.serverStatus.className = 'server-status warning';
       }
     } else {
-      elements.serverDot.classList.remove('connected', 'warning');
-      elements.serverDot.classList.add('error');
-      elements.serverText.textContent = 'Offline';
+      if (elements.serverDot) {
+        elements.serverDot.classList.remove('connected', 'warning');
+        elements.serverDot.classList.add('error');
+      }
+      if (elements.serverText) elements.serverText.textContent = 'Offline';
       
       if (elements.serverStatus) {
         elements.serverStatus.textContent = 'Offline';
@@ -1351,6 +1357,7 @@ function resetToIdle() {
 }
 
 function showError(message, isError = true) {
+  if (!elements.errorToast || !elements.errorMessage) return;
   elements.errorMessage.textContent = message;
   const icon = elements.errorToast.querySelector('.toast-icon');
   if (toastTimer) {
@@ -1374,6 +1381,7 @@ function showError(message, isError = true) {
 }
 
 function hideError() {
+  if (!elements.errorToast) return;
   elements.errorToast.classList.add('hidden');
 }
 

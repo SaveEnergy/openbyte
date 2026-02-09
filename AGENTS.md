@@ -88,6 +88,10 @@
 - Deploy sync hardening: fail-fast `ssh-keyscan`, explicit remote compose file existence checks post-`scp`, and `always()` cleanup of temporary SSH key material on runner.
 - Deploy script propagates bash-script exit status (`exit $?`) and enforces `GHCR_OWNER` override during compose pull/up to avoid owner drift across server `.env` and workflow context.
 - Deploy pull step is explicit fail-fast (`docker compose pull || exit 1`) before recreate.
+- Deploy sync validates `REMOTE_DIR` is non-empty before remote mkdir/scp/deploy paths are used.
+- Deploy sync uses `timeout 15 ssh-keyscan ...` and verifies non-empty host-key output before updating `known_hosts`.
+- Deploy step verifies `${REMOTE_DIR}/.env` exists before compose calls; fallback shell path now uses `set -euo pipefail`.
+- GHCR Traefik compose uses external `traefik` network; deploy ensures network exists (`docker network inspect ... || docker network create`) before compose to avoid label mismatch failures on pre-existing host networks.
 - `WEB_ROOT` env overrides embedded FS for development.
 - Playwright NO_COLOR handling: CI step uses `env -u NO_COLOR ...`; npm scripts use `scripts/run-playwright.mjs` (cross-platform, unsets `NO_COLOR` before spawning `bunx playwright`).
 - `ReadTimeout: 0` (disabled); `ReadHeaderTimeout: 15s` (slowloris protection without killing uploads).
@@ -113,6 +117,9 @@
 - Results API GET now uses `Cache-Control: no-store` (matches HTML no-store policy) and unit test coverage checks this header.
 - Results page parser trims trailing slashes when extracting result IDs and logs fetch failures; render path now guards non-finite speed values.
 - Playwright cancel/restart test waits for UI states instead of fixed sleep to reduce CI flakiness.
+- Frontend server-health indicators (`serverDot`/`serverText`) now tolerate missing DOM nodes to avoid runtime null dereferences.
+- Toast error helpers now guard missing toast elements (`errorToast`, `errorMessage`) to keep embedded/minimal layouts safe.
+- Copy button handlers on skill/download pages guard missing `.dl-code-block`/`code` nodes before dereferencing.
 
 ### Dead Code Removed
 - QUIC server/client support (2026-02-02).
