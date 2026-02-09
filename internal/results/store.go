@@ -10,6 +10,8 @@ import (
 	"time"
 
 	_ "modernc.org/sqlite"
+	sqlite "modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 
 	"github.com/saveenergy/openbyte/internal/logging"
 )
@@ -147,6 +149,10 @@ func (s *Store) Save(r Result) (string, error) {
 }
 
 func isUniqueViolation(err error) bool {
+	var sqliteErr *sqlite.Error
+	if errors.As(err, &sqliteErr) {
+		return sqliteErr.Code() == sqlite3.SQLITE_CONSTRAINT_UNIQUE
+	}
 	return strings.Contains(err.Error(), "UNIQUE constraint")
 }
 
@@ -173,9 +179,8 @@ func (s *Store) cleanup() {
 	res, err := s.db.Exec(`DELETE FROM results WHERE created_at < ?`, cutoff)
 	if err != nil {
 		logging.Warn("results cleanup (age) failed", logging.Field{Key: "error", Value: err})
-	} else if n, _ := res.RowsAffected(); n > 0 {
-		logging.Info("results cleanup: removed expired",
-			logging.Field{Key: "count", Value: n})
+	} else {
+		s.logCleanupCount("results cleanup: removed expired", "count", res)
 	}
 
 	// Trim to max count, keeping newest
@@ -186,11 +191,27 @@ func (s *Store) cleanup() {
 			)`, s.maxResults)
 		if err != nil {
 			logging.Warn("results cleanup (count) failed", logging.Field{Key: "error", Value: err})
-		} else if n, _ := res.RowsAffected(); n > 0 {
-			logging.Info("results cleanup: trimmed to max",
-				logging.Field{Key: "removed", Value: n},
-				logging.Field{Key: "max", Value: s.maxResults})
+		} else {
+			n, rowsErr := res.RowsAffected()
+			if rowsErr != nil {
+				logging.Warn("results cleanup (count): rows affected failed", logging.Field{Key: "error", Value: rowsErr})
+			} else if n > 0 {
+				logging.Info("results cleanup: trimmed to max",
+					logging.Field{Key: "removed", Value: n},
+					logging.Field{Key: "max", Value: s.maxResults})
+			}
 		}
+	}
+}
+
+func (s *Store) logCleanupCount(msg string, field string, res sql.Result) {
+	n, rowsErr := res.RowsAffected()
+	if rowsErr != nil {
+		logging.Warn(msg+": rows affected failed", logging.Field{Key: "error", Value: rowsErr})
+		return
+	}
+	if n > 0 {
+		logging.Info(msg, logging.Field{Key: field, Value: n})
 	}
 }
 

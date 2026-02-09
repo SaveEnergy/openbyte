@@ -2,6 +2,7 @@ package results
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"math"
 	"net/http"
@@ -57,10 +58,16 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxResultBodyBytes)
 
+	decoder := json.NewDecoder(r.Body)
 	var req saveRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decoder.Decode(&req); err != nil {
 		io.Copy(io.Discard, r.Body)
 		respondJSONError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		io.Copy(io.Discard, r.Body)
+		respondJSONError(w, "request body must contain a single JSON object", http.StatusBadRequest)
 		return
 	}
 

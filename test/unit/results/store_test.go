@@ -153,6 +153,7 @@ func TestHandlerSaveValidation(t *testing.T) {
 		{"valid", `{"download_mbps":100,"upload_mbps":50,"latency_ms":10,"jitter_ms":1}`, http.StatusCreated},
 		{"negative download", `{"download_mbps":-1,"upload_mbps":50,"latency_ms":10,"jitter_ms":1}`, http.StatusBadRequest},
 		{"out of range", `{"download_mbps":200000,"upload_mbps":50,"latency_ms":10,"jitter_ms":1}`, http.StatusBadRequest},
+		{"multiple json objects", `{"download_mbps":100}{"upload_mbps":50}`, http.StatusBadRequest},
 		{"invalid json", `{bad}`, http.StatusBadRequest},
 		{"empty body", ``, http.StatusBadRequest},
 	}

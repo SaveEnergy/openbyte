@@ -192,5 +192,6 @@ func (m *MultiStreamAggregator) nextCollector() *Collector {
 		return nil
 	}
 	idx := atomic.AddUint32(&m.rr, 1)
-	return m.collectors[int(idx-1)%len(m.collectors)]
+	n := uint32(len(m.collectors))
+	return m.collectors[int((idx-1)%n)]
 }

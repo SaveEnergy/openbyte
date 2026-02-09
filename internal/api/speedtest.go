@@ -177,6 +177,7 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 done:
+	io.Copy(io.Discard, r.Body)
 	if readFailed {
 		respondSpeedtestError(w, "upload failed", http.StatusInternalServerError)
 		return

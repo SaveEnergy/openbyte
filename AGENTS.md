@@ -57,12 +57,15 @@
 - `finally` block only cleans up if `state.abortController?.signal === signal` (prevents old test clobbering new).
 - `fetchWithTimeout` chains caller's abort signal with timeout controller; removes listener on cleanup (prevents accumulation).
 - `download.js` uses DOM manipulation (no `innerHTML`) for dynamic content.
+- Download page release rendering now guards invalid asset URLs/sizes and invalid publish dates before UI updates.
+- Download page release fetch drains non-OK response bodies before throwing (connection reuse).
 
 ### Storage
 - SQLite via `modernc.org/sqlite` (pure Go, no CGO) for cross-compilation.
 - WAL mode via explicit PRAGMA (not query string — driver ignores it).
 - 8-char base62 IDs via `crypto/rand`; single `rand.Read(8)` call per ID (not 8 individual syscalls).
 - 90-day retention + configurable max count with hourly cleanup.
+- Unique-constraint detection checks typed sqlite error code (`SQLITE_CONSTRAINT_UNIQUE`) with message fallback, not message match only.
 
 ### Agent Integration
 - MCP server (`openbyte mcp`) over stdio transport; 3 tools: `connectivity_check`, `speed_test`, `diagnose`. Uses `github.com/mark3labs/mcp-go`.
@@ -74,6 +77,7 @@
 - NDJSON streaming: `--ndjson` flag emits `{"type":"progress",...}` per tick + `{"type":"result","data":{...}}` final line.
 - OpenAPI 3.1 spec at `api/openapi.yaml` covering all `/api/v1/*` + `/health` endpoints.
 - Install script: `scripts/install.sh` (curl|sh, detects OS/arch, downloads from GitHub Releases).
+- Installer creates missing `INSTALL_DIR` (with `sudo` when needed) and verifies extracted binary exists before copy.
 - `go install github.com/saveenergy/openbyte/cmd/openbyte@latest` works (entry point at `cmd/openbyte/`).
 
 ### Build & Deploy
@@ -115,6 +119,8 @@
 - Registry handler tests validate `count` field presence/type before numeric comparison (avoid direct `resp["count"].(float64)` panics).
 - Integration tests validate response field types (not just non-nil), e.g. `stream_id`/`websocket_url` must be non-empty strings.
 - Results API GET now uses `Cache-Control: no-store` (matches HTML no-store policy) and unit test coverage checks this header.
+- Results save handler enforces single JSON object body (rejects concatenated JSON payloads) and drains on parse violations.
+- `loadServers` drains non-OK `/servers` responses before error path.
 - Results page parser trims trailing slashes when extracting result IDs and logs fetch failures; render path now guards non-finite speed values.
 - Playwright cancel/restart test waits for UI states instead of fixed sleep to reduce CI flakiness.
 - Frontend server-health indicators (`serverDot`/`serverText`) now tolerate missing DOM nodes to avoid runtime null dereferences.
@@ -127,6 +133,25 @@
 - Client stream-start decode path drains response body on JSON decode errors before returning.
 - Settings load/save paths guard missing duration/streams controls, log parse failures, and server discovery now validates `servers` as an array before assignment.
 - CI workflow cleanup: removed unused `Force build override` step from `changes` job.
+- Deploy jobs now include an explicit "Validate deploy configuration" step to fail fast when required vars/secrets (`SSH_*`, `REMOTE_DIR`, `GHCR_*`) are missing.
+- Client `startStream` now surfaces `io.ReadAll` failures on non-201 responses instead of silently ignoring body-read errors.
+- Web download test now drains non-OK HTTP responses before fallback handling to preserve browser connection reuse behavior.
+- Download/results pages add broader DOM null-guards to avoid runtime crashes in partial/minimal layouts.
+- Release workflow `image_pushed` output now emits boolean (`true` on successful push step), and deploy gate checks `== 'true'` for clearer control flow.
+- Client cancel/complete stream helpers now defensively drain/close non-nil HTTP responses on `Do` errors before returning.
+- UI speed/progress/state render helpers now short-circuit when required DOM nodes are absent; share state only enables when result ID is valid.
+- Client `startStream` now enforces a defensive minimum HTTP timeout (60s) when `config.Timeout <= 0` to avoid indefinite waits.
+- Multi-stream collector selection now computes round-robin index using bounded uint32 modulo to avoid signed overflow edge cases.
+- Results cleanup now handles and logs `RowsAffected()` errors instead of ignoring them.
+- Deploy job gates now require `REMOTE_DIR` and `GHCR_USERNAME` vars (in addition to `SSH_HOST`) before attempting sync/deploy.
+- Registry client `drainAndClose` now no-ops on nil response/body to prevent defensive-path panics.
+- Results page rendering now ignores invalid `created_at` timestamps and enforces string-safe rendering for `bufferbloat_grade` and `server_name`.
+- Speedtest upload handler now drains remaining request body before returning on success/error paths to improve connection reuse behavior.
+- `computeBufferbloatGrade` now rejects non-finite latency values early; results page numeric guards now consistently use `Number.isFinite`.
+- UI connected-state e2e matcher includes `Custom`/`Unverified` states for custom-server scenarios.
+- Deploy sync checksum verification now supports both `sha256sum` and `shasum -a 256` on remote hosts, improving Linux/macOS compatibility.
+- Deploy job gates now also require `SSH_USER` var before running deploy in both CI and release workflows.
+- Install script now requests GitHub API JSON explicitly and prefers `jq` for `tag_name` parsing with a POSIX fallback parser.
 
 ### Dead Code Removed
 - QUIC server/client support (2026-02-02).

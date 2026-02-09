@@ -200,6 +200,9 @@ func (c *Client) heartbeatLoop(getActiveTests func() int) {
 }
 
 func drainAndClose(resp *http.Response, logger *logging.Logger) {
+	if resp == nil || resp.Body == nil {
+		return
+	}
 	io.Copy(io.Discard, resp.Body)
 	if err := resp.Body.Close(); err != nil && logger != nil {
 		logger.Warn("Registry response close failed")

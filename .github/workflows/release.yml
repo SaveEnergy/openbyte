@@ -13,7 +13,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     outputs:
-      image_pushed: ${{ steps.push.outcome }}
+      image_pushed: ${{ steps.push.outcome == 'success' }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -114,7 +114,7 @@ jobs:
 
   deploy:
     needs: release
-    if: vars.SSH_HOST != '' && needs.release.outputs.image_pushed == 'success'
+    if: vars.SSH_HOST != '' && vars.SSH_USER != '' && vars.REMOTE_DIR != '' && vars.GHCR_USERNAME != '' && needs.release.outputs.image_pushed == 'true'
     runs-on: ubuntu-latest
     env:
       SSH_HOST: ${{ vars.SSH_HOST }}
@@ -125,6 +125,15 @@ jobs:
       SSH_KEY: ${{ secrets.SSH_KEY }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
     steps:
+      - name: Validate deploy configuration
+        run: |
+          [ -n "${SSH_HOST}" ] || { echo "SSH_HOST not set"; exit 1; }
+          [ -n "${SSH_USER}" ] || { echo "SSH_USER not set"; exit 1; }
+          [ -n "${REMOTE_DIR}" ] || { echo "REMOTE_DIR not set"; exit 1; }
+          [ -n "${GHCR_USERNAME}" ] || { echo "GHCR_USERNAME not set"; exit 1; }
+          [ -n "${SSH_KEY}" ] || { echo "SSH_KEY not set"; exit 1; }
+          [ -n "${GHCR_TOKEN}" ] || { echo "GHCR_TOKEN not set"; exit 1; }
+
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -155,8 +164,8 @@ jobs:
             "test -f \"${REMOTE_DIR}/docker/docker-compose.ghcr.yaml\" && test -f \"${REMOTE_DIR}/docker/docker-compose.ghcr.traefik.yaml\""
           local_main_sha="$(sha256sum docker/docker-compose.ghcr.yaml | cut -d ' ' -f1)"
           local_traefik_sha="$(sha256sum docker/docker-compose.ghcr.traefik.yaml | cut -d ' ' -f1)"
-          remote_main_sha="$(ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "sha256sum \"${REMOTE_DIR}/docker/docker-compose.ghcr.yaml\" | cut -d ' ' -f1")"
-          remote_traefik_sha="$(ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "sha256sum \"${REMOTE_DIR}/docker/docker-compose.ghcr.traefik.yaml\" | cut -d ' ' -f1")"
+          remote_main_sha="$(ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "if command -v sha256sum >/dev/null 2>&1; then sha256sum \"${REMOTE_DIR}/docker/docker-compose.ghcr.yaml\" | cut -d ' ' -f1; else shasum -a 256 \"${REMOTE_DIR}/docker/docker-compose.ghcr.yaml\" | cut -d ' ' -f1; fi")"
+          remote_traefik_sha="$(ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "if command -v sha256sum >/dev/null 2>&1; then sha256sum \"${REMOTE_DIR}/docker/docker-compose.ghcr.traefik.yaml\" | cut -d ' ' -f1; else shasum -a 256 \"${REMOTE_DIR}/docker/docker-compose.ghcr.traefik.yaml\" | cut -d ' ' -f1; fi")"
           if [ "$local_main_sha" != "$remote_main_sha" ]; then
             echo "compose checksum mismatch for docker-compose.ghcr.yaml"
             exit 1

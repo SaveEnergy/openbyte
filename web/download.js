@@ -55,14 +55,14 @@
   }
 
   function formatBytes(bytes) {
-    if (!bytes) return '';
+    if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes <= 0) return '';
     const mb = bytes / (1024 * 1024);
     return mb.toFixed(1) + ' MB';
   }
 
   function findAsset(assets, suffix) {
     return assets.find(function(a) {
-      return a.name.startsWith('openbyte_') && a.name.endsWith(suffix);
+      return a && typeof a.name === 'string' && a.name.startsWith('openbyte_') && a.name.endsWith(suffix);
     });
   }
 
@@ -89,10 +89,11 @@
     const btn = document.getElementById('recommendedBtn');
     const label = document.getElementById('recommendedLabel');
     const meta = document.getElementById('recommendedMeta');
+    if (!platformEl || !btn || !label || !meta) return;
 
     platformEl.textContent = platName + ' · ' + info.arch;
 
-    if (asset) {
+    if (asset && asset.browser_download_url) {
       btn.href = asset.browser_download_url;
       btn.style.pointerEvents = '';
       btn.style.opacity = '';
@@ -111,10 +112,10 @@
     // Alt architecture link
     const alt = altSuffix(detected);
     const altEl = document.getElementById('altArch');
-    if (alt) {
+    if (alt && altEl) {
       const altAsset = findAsset(assets, alt);
       const altInfo = archLabels[alt];
-      if (altAsset && altInfo) {
+      if (altAsset && altInfo && altAsset.browser_download_url) {
         const a = document.createElement('a');
         a.className = 'dl-alt-link';
         a.href = altAsset.browser_download_url;
@@ -135,7 +136,7 @@
 
       plat.suffixes.forEach(function(suffix) {
         const asset = findAsset(assets, suffix);
-        if (!asset) return;
+        if (!asset || !asset.browser_download_url) return;
         found = true;
         const info = archLabels[suffix] || { arch: suffix, short: suffix };
 
@@ -173,6 +174,7 @@
     const section = document.getElementById('installSection');
     const tabs = document.getElementById('installTabs');
     const cmd = document.getElementById('installCmd');
+    if (!section || !tabs || !cmd) return;
 
     let commands = {};
     const vTag = version || 'latest';
@@ -223,8 +225,10 @@
     const el = document.getElementById('versionTag');
     const parts = [];
     if (tag) parts.push(tag);
-    if (date) parts.push(date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }));
-    if (parts.length) el.textContent = ' · ' + parts.join(' · ');
+    if (date && Number.isFinite(date.getTime())) {
+      parts.push(date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }));
+    }
+    if (parts.length && el) el.textContent = ' · ' + parts.join(' · ');
   }
 
   function fallbackCopy(text) {
@@ -295,7 +299,9 @@
     .then(function(res) {
       if (!res.ok) {
         const reason = res.status === 403 ? 'GitHub API rate limited' : 'GitHub API error ' + res.status;
-        throw new Error(reason);
+        return res.text().catch(function() {}).then(function() {
+          throw new Error(reason);
+        });
       }
       return res.json();
     })

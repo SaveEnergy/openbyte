@@ -345,6 +345,10 @@ function getHealthURL(server) {
 async function loadServers() {
   try {
     const res = await fetch(`${apiBase}/servers`);
+    if (!res.ok) {
+      await res.text().catch(() => {});
+      throw new Error(`Failed to load servers: HTTP ${res.status}`);
+    }
     const data = await res.json();
     state.servers = Array.isArray(data.servers) ? data.servers : [];
     
@@ -809,6 +813,7 @@ async function measureLatency(signal) {
 }
 
 function computeBufferbloatGrade(idleLatency, loadedLatency) {
+  if (!Number.isFinite(idleLatency) || !Number.isFinite(loadedLatency)) return null;
   if (idleLatency <= 0 || loadedLatency <= 0) return null;
   const increase = loadedLatency - idleLatency;
   if (increase < 5) return 'A+';
@@ -950,6 +955,7 @@ async function runDownloadTest(duration, onProgress, signal) {
     }, (duration * 1000) + 10000);
     
     if (!res.ok || !res.body) {
+      await res.text().catch(() => {});
       if (res.status === 503) {
         const err = new Error('Server overloaded');
         err.status = 503;
@@ -1178,6 +1184,8 @@ async function runUploadTest(duration, onProgress, signal) {
 }
 
 function updateSpeed(speed, direction) {
+  if (typeof speed !== 'number' || !Number.isFinite(speed) || speed < 0) speed = 0;
+  if (!elements.speedNumber || !elements.speedUnit) return;
   state.currentSpeed = speed;
   
   let displaySpeed, unit;
@@ -1201,6 +1209,7 @@ function updateSpeed(speed, direction) {
 }
 
 function updateProgress(progress) {
+  if (!elements.progressRing) return;
   state.progress = progress;
   let offset = RING_CIRCUMFERENCE - (progress / 100) * RING_CIRCUMFERENCE;
   if (progress >= 99.5) {
@@ -1210,18 +1219,21 @@ function updateProgress(progress) {
 }
 
 function resetProgress() {
+  if (!elements.progressRing || !elements.speedNumber) return;
   state.progress = 0;
   elements.progressRing.style.strokeDashoffset = RING_CIRCUMFERENCE;
   elements.speedNumber.textContent = '0';
 }
 
 function updateTestType(text, className) {
+  if (!elements.testType || !elements.progressRing || !elements.speedNumber) return;
   elements.testType.textContent = text;
   elements.progressRing.className = 'progress-ring-fill ' + className;
   elements.speedNumber.className = 'speed-number ' + className;
 }
 
 function showState(stateName) {
+  if (!elements.idleState || !elements.testingState || !elements.resultsState) return;
   elements.idleState.classList.add('hidden');
   elements.testingState.classList.add('hidden');
   elements.resultsState.classList.add('hidden');
@@ -1241,6 +1253,9 @@ function showState(stateName) {
 }
 
 function showResults() {
+  if (!elements.downloadResult || !elements.uploadResult || !elements.latencyResult || !elements.jitterResult) {
+    return;
+  }
   showState('results');
   
   const formatSpeedWithUnit = (speed) => {
@@ -1306,8 +1321,10 @@ async function saveAndEnableShare() {
     });
     if (!res.ok) { await res.text().catch(() => {}); return; }
     const data = await res.json();
-    state.resultId = data.id;
-    if (elements.shareBtn) {
+    if (typeof data?.id === 'string' && data.id.length > 0) {
+      state.resultId = data.id;
+    }
+    if (state.resultId && elements.shareBtn) {
       elements.shareBtn.classList.remove('hidden');
     }
   } catch (err) {

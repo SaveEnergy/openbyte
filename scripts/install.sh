@@ -34,7 +34,12 @@ esac
 echo "Detected: ${OS}/${ARCH}"
 
 # Get latest release tag
-LATEST=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
+release_json="$(curl -fsSL -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${REPO}/releases/latest")"
+if command -v jq >/dev/null 2>&1; then
+    LATEST="$(printf '%s' "$release_json" | jq -r '.tag_name // empty')"
+else
+    LATEST="$(printf '%s' "$release_json" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | cut -d '"' -f4)"
+fi
 if [ -z "$LATEST" ]; then
     echo "Error: could not determine latest release"
     exit 1
@@ -68,6 +73,20 @@ else
 fi
 
 # Install
+if [ ! -d "$INSTALL_DIR" ]; then
+    if [ -w "$(dirname "$INSTALL_DIR")" ]; then
+        mkdir -p "$INSTALL_DIR"
+    else
+        echo "Creating ${INSTALL_DIR} (requires sudo)..."
+        sudo mkdir -p "$INSTALL_DIR"
+    fi
+fi
+
+if [ ! -f "${TMPDIR}/${BINARY_NAME}" ]; then
+    echo "Error: extracted archive did not contain ${BINARY_NAME}"
+    exit 1
+fi
+
 if [ -w "$INSTALL_DIR" ]; then
     cp "${TMPDIR}/${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
 else

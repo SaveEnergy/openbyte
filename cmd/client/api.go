@@ -42,7 +42,11 @@ func startStream(ctx context.Context, config *Config) (*StreamResponse, error) {
 		req.Header.Set("Authorization", "Bearer "+config.APIKey)
 	}
 
-	client := &http.Client{Timeout: time.Duration(config.Timeout) * time.Second}
+	timeout := time.Duration(config.Timeout) * time.Second
+	if timeout <= 0 {
+		timeout = 60 * time.Second
+	}
+	client := &http.Client{Timeout: timeout}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
@@ -50,7 +54,10 @@ func startStream(ctx context.Context, config *Config) (*StreamResponse, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
+		body, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return nil, fmt.Errorf("read error response: %w", readErr)
+		}
 		return nil, fmt.Errorf("server error: %d %s", resp.StatusCode, string(body))
 	}
 
@@ -76,6 +83,10 @@ func cancelStream(serverURL, streamID, apiKey string) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
+		if resp != nil {
+			io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+		}
 		return
 	}
 	io.Copy(io.Discard, resp.Body)
@@ -120,6 +131,10 @@ func completeStream(config *Config, streamID string, metrics EngineMetrics) {
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
+		if resp != nil {
+			io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+		}
 		fmt.Fprintf(os.Stderr, "openbyte: complete stream: %v\n", err)
 		return
 	}
