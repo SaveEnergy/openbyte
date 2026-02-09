@@ -128,6 +128,7 @@ func (r *Router) SetupRoutes(registrars ...RegistryRegistrar) http.Handler {
 	// Serve results.html for /results/{id} browser requests
 	if r.resultsHandler != nil {
 		mux.HandleFunc("GET /results/{id}", func(w http.ResponseWriter, req *http.Request) {
+			w.Header().Set("Cache-Control", "no-store")
 			f, err := webFS.Open("results.html")
 			if err != nil {
 				http.NotFound(w, req)
@@ -143,7 +144,7 @@ func (r *Router) SetupRoutes(registrars ...RegistryRegistrar) http.Handler {
 		})
 	}
 
-	mux.Handle("/", http.FileServer(webFS))
+	mux.Handle("/", staticCacheMiddleware(http.FileServer(webFS)))
 
 	// Let external registrars add routes before middleware wrapping
 	for _, reg := range registrars {
@@ -342,7 +343,18 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 				"style-src 'self' 'unsafe-inline'; "+
 				"script-src 'self'; "+
 				"img-src 'self' data:; "+
-				"connect-src *")
+				"connect-src 'self' https: http: ws: wss:")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func staticCacheMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet || r.Method == http.MethodHead {
+			if r.URL.Path == "/" || strings.HasSuffix(r.URL.Path, ".html") {
+				w.Header().Set("Cache-Control", "no-store")
+			}
+		}
 		next.ServeHTTP(w, r)
 	})
 }

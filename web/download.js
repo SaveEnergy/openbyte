@@ -227,21 +227,54 @@
     if (parts.length) el.textContent = ' · ' + parts.join(' · ');
   }
 
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'absolute';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch (_) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  function copyText(text, onSuccess, onFailure) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(onSuccess).catch(function() {
+        if (fallbackCopy(text)) {
+          onSuccess();
+          return;
+        }
+        onFailure();
+      });
+      return;
+    }
+
+    if (fallbackCopy(text)) {
+      onSuccess();
+      return;
+    }
+    onFailure();
+  }
+
   // Setup copy buttons
   function setupCopy(btnId, getTextFn) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
     btn.addEventListener('click', function() {
       const text = getTextFn();
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(function() {
-          btn.textContent = 'Copied!';
-          setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
-        }).catch(function() {
-          btn.textContent = 'Failed';
-          setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
-        });
-      }
+      copyText(text, function() {
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+      }, function() {
+        btn.textContent = 'Failed';
+        setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+      });
     });
   }
 

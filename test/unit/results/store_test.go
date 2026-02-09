@@ -271,6 +271,9 @@ func TestHandlerRoundTrip(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("get status = %d, want 200; body: %s", rec.Code, rec.Body.String())
 	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("cache-control = %q, want %q", got, "no-store")
+	}
 
 	var result results.Result
 	if err := json.NewDecoder(rec.Body).Decode(&result); err != nil {

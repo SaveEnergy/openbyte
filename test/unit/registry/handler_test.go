@@ -21,6 +21,19 @@ func setupHandler(apiKey string) (*registry.Handler, *http.ServeMux) {
 	return h, mux
 }
 
+func mustCountField(t *testing.T, resp map[string]interface{}) float64 {
+	t.Helper()
+	raw, ok := resp["count"]
+	if !ok {
+		t.Fatalf("response missing count field")
+	}
+	count, ok := raw.(float64)
+	if !ok {
+		t.Fatalf("count field has invalid type %T: %v", raw, raw)
+	}
+	return count
+}
+
 func TestHandlerRegisterAndList(t *testing.T) {
 	_, mux := setupHandler("")
 
@@ -48,8 +61,8 @@ func TestHandlerRegisterAndList(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode list: %v", err)
 	}
-	if resp["count"].(float64) != 1 {
-		t.Errorf("count = %v, want 1", resp["count"])
+	if got := mustCountField(t, resp); got != 1 {
+		t.Errorf("count = %.0f, want 1", got)
 	}
 }
 
@@ -270,8 +283,10 @@ func TestHandlerListHealthyFilter(t *testing.T) {
 	mux.ServeHTTP(rec, req)
 
 	var resp map[string]interface{}
-	json.NewDecoder(rec.Body).Decode(&resp)
-	if resp["count"].(float64) != 1 {
-		t.Errorf("healthy filter count = %v, want 1", resp["count"])
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode healthy filter response: %v", err)
+	}
+	if got := mustCountField(t, resp); got != 1 {
+		t.Errorf("healthy filter count = %.0f, want 1", got)
 	}
 }

@@ -3,9 +3,12 @@ package api_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/saveenergy/openbyte/internal/api"
+	"github.com/saveenergy/openbyte/internal/config"
+	"github.com/saveenergy/openbyte/internal/stream"
 )
 
 func TestRouterAllowedOriginWildcard(t *testing.T) {
@@ -88,5 +91,72 @@ func TestRouterRejectsInvalidStreamID(t *testing.T) {
 	}
 	if called {
 		t.Fatalf("handler should not be called for invalid stream id")
+	}
+}
+
+func TestStaticHTMLUsesNoStoreCacheControl(t *testing.T) {
+	manager := stream.NewManager(10, 10)
+	handler := api.NewHandler(manager)
+	router := api.NewRouter(handler, config.DefaultConfig())
+
+	h := router.SetupRoutes()
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("cache-control for / = %q, want %q", got, "no-store")
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "http://example.com/download.html", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("cache-control for html = %q, want %q", got, "no-store")
+	}
+}
+
+func TestStaticJSDoesNotForceNoStore(t *testing.T) {
+	manager := stream.NewManager(10, 10)
+	handler := api.NewHandler(manager)
+	router := api.NewRouter(handler, config.DefaultConfig())
+
+	h := router.SetupRoutes()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/app.js", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("Cache-Control"); got == "no-store" {
+		t.Fatalf("cache-control for js should not be no-store")
+	}
+}
+
+func TestSecurityHeadersMiddlewareSetsCSP(t *testing.T) {
+	h := api.SecurityHeadersMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	csp := rec.Header().Get("Content-Security-Policy")
+	if csp == "" {
+		t.Fatalf("content-security-policy header missing")
+	}
+	if !strings.Contains(csp, "script-src 'self'") {
+		t.Fatalf("csp missing script-src self: %q", csp)
+	}
+	if !strings.Contains(csp, "connect-src 'self' https: http: ws: wss:") {
+		t.Fatalf("csp missing expected connect-src policy: %q", csp)
+	}
+	if strings.Contains(csp, "connect-src *") {
+		t.Fatalf("csp should not allow wildcard connect-src: %q", csp)
 	}
 }

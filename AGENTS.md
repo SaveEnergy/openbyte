@@ -32,6 +32,9 @@
 ### Security
 - CORS wildcard: dot-boundary enforcement (`*.example.com` won't match `evilexample.com`).
 - CSP: `script-src 'self'`; all JS in external files (no inline scripts).
+- CSP `connect-src` narrowed from wildcard to explicit `'self' https: http: ws: wss:` (keeps API/WebSocket/server-probe flexibility without blanket allow-all).
+- Playwright regression: `skill.html` asserts no inline scripts (`<script src=...>` only) to prevent CSP regressions.
+- Static HTML responses (`/`, `*.html`, including `/results/{id}`) send `Cache-Control: no-store` to avoid stale page/script mismatches after deploy.
 - WebSocket `SetReadLimit(4096)` — server only reads for disconnect detection.
 - JSON body size limits on all POST endpoints.
 - Stream IDs: UUID format enforced at routing layer.
@@ -77,7 +80,14 @@
 - Single `openbyte` binary with `server`/`client`/`check`/`mcp` subcommands.
 - Web assets embedded via `//go:embed` (HTML, CSS, JS, fonts).
 - Self-hosted fonts (DM Sans, JetBrains Mono) — no external CDN dependencies.
+- Deploy scripts pin image tags explicitly (`IMAGE_TAG=$GITHUB_SHA` on CI main, `IMAGE_TAG=$SEMVER` on release tags) so pull/deploy targets deterministic image.
+- Deploy uses `docker compose up -d --force-recreate` after pull to ensure running container is replaced even when tag string is unchanged (`edge`/`latest` patterns).
+- Deploy scripts verify running container image ID matches expected GHCR image ID after recreate; owner normalized to lowercase for GHCR path compatibility.
+- Deploy jobs sync `docker-compose.ghcr.yaml` + `docker-compose.ghcr.traefik.yaml` from pipeline workspace to `${REMOTE_DIR}/docker` before remote compose commands, preventing server-side compose drift.
+- Deploy compose sync step verifies remote file SHA-256 checksums match workspace files before executing `docker compose`.
+- Deploy sync hardening: fail-fast `ssh-keyscan`, explicit remote compose file existence checks post-`scp`, and `always()` cleanup of temporary SSH key material on runner.
 - `WEB_ROOT` env overrides embedded FS for development.
+- Playwright NO_COLOR handling: CI step uses `env -u NO_COLOR ...`; npm scripts use `scripts/run-playwright.mjs` (cross-platform, unsets `NO_COLOR` before spawning `bunx playwright`).
 - `ReadTimeout: 0` (disabled); `ReadHeaderTimeout: 15s` (slowloris protection without killing uploads).
 - HTTP concurrency auto-scales from `CAPACITY_GBPS` via `MaxConcurrentHTTP()`.
 - Client env vars (`OBYTE_*`) removed; flags only. `NO_COLOR` standard convention retained.
@@ -94,6 +104,11 @@
 - Registry handlers validate `Content-Type: application/json`.
 - `json.Encode` errors logged (not silently dropped).
 - Response bodies drained before close for HTTP connection reuse.
+- Tests hardened: JSON decode/marshal errors are asserted in e2e/unit paths (no ignored decode/marshal results).
+- E2E map field extraction avoids direct type-assert panics (`value.(string)`): checks `ok` + non-empty first for clearer failures.
+- Registry handler tests validate `count` field presence/type before numeric comparison (avoid direct `resp["count"].(float64)` panics).
+- Integration tests validate response field types (not just non-nil), e.g. `stream_id`/`websocket_url` must be non-empty strings.
+- Results API GET now uses `Cache-Control: no-store` (matches HTML no-store policy) and unit test coverage checks this header.
 
 ### Dead Code Removed
 - QUIC server/client support (2026-02-02).

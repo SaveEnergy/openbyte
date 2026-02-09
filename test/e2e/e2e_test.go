@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -187,7 +188,6 @@ func TestStaticFiles(t *testing.T) {
 			t.Errorf("Failed to load %s: %v", file, err)
 			continue
 		}
-		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("%s status = %d, want %d", file, resp.StatusCode, http.StatusOK)
@@ -199,6 +199,9 @@ func TestStaticFiles(t *testing.T) {
 		}
 		if file == "/style.css" && !strings.Contains(contentType, "css") {
 			t.Errorf("%s content-type = %s, want css", file, contentType)
+		}
+		if err := resp.Body.Close(); err != nil {
+			t.Errorf("failed to close %s response body: %v", file, err)
 		}
 	}
 }
@@ -269,9 +272,12 @@ func TestAPIStartTest(t *testing.T) {
 		"streams":     2,
 		"packet_size": 1400,
 	}
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 
-	resp, err := http.Post(ts.baseURL+"/api/v1/stream/start", "application/json", strings.NewReader(string(body)))
+	resp, err := http.Post(ts.baseURL+"/api/v1/stream/start", "application/json", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("API request failed: %v", err)
 	}
@@ -306,9 +312,12 @@ func TestWebSocketConnection(t *testing.T) {
 		"duration":  3,
 		"streams":   1,
 	}
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 
-	resp, err := http.Post(ts.baseURL+"/api/v1/stream/start", "application/json", strings.NewReader(string(body)))
+	resp, err := http.Post(ts.baseURL+"/api/v1/stream/start", "application/json", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("Failed to start test: %v", err)
 	}
@@ -372,9 +381,12 @@ func TestWebSocketOriginRejected(t *testing.T) {
 		"duration":  3,
 		"streams":   1,
 	}
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 
-	resp, err := http.Post(ts.baseURL+"/api/v1/stream/start", "application/json", strings.NewReader(string(body)))
+	resp, err := http.Post(ts.baseURL+"/api/v1/stream/start", "application/json", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("Failed to start test: %v", err)
 	}
@@ -419,9 +431,12 @@ func TestFullFlow(t *testing.T) {
 		"duration":  5,
 		"streams":   2,
 	}
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 
-	resp, err := http.Post(ts.baseURL+"/api/v1/stream/start", "application/json", strings.NewReader(string(body)))
+	resp, err := http.Post(ts.baseURL+"/api/v1/stream/start", "application/json", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("Failed to start test: %v", err)
 	}
@@ -437,7 +452,10 @@ func TestFullFlow(t *testing.T) {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
 
-	streamID := startResp["stream_id"].(string)
+	streamID, ok := startResp["stream_id"].(string)
+	if !ok || streamID == "" {
+		t.Fatalf("stream_id missing or invalid in response: %#v", startResp["stream_id"])
+	}
 
 	statusResp, err := http.Get(ts.baseURL + "/api/v1/stream/" + streamID + "/status")
 	if err != nil {
@@ -449,7 +467,10 @@ func TestFullFlow(t *testing.T) {
 		t.Errorf("Status check failed: %d", statusResp.StatusCode)
 	}
 
-	wsURL := startResp["websocket_url"].(string)
+	wsURL, ok := startResp["websocket_url"].(string)
+	if !ok || wsURL == "" {
+		t.Fatalf("websocket_url missing or invalid in response: %#v", startResp["websocket_url"])
+	}
 	if strings.HasPrefix(wsURL, "/") {
 		wsURL = strings.Replace(ts.baseURL, "http://", "ws://", 1) + wsURL
 	} else {

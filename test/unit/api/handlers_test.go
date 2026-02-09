@@ -15,6 +15,15 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+func mustMarshalJSON(t *testing.T, v interface{}) []byte {
+	t.Helper()
+	body, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	return body
+}
+
 // createTestStream creates a running stream and returns its ID.
 func createTestStream(t *testing.T, handler *api.Handler) string {
 	t.Helper()
@@ -22,7 +31,7 @@ func createTestStream(t *testing.T, handler *api.Handler) string {
 		"protocol": "tcp", "direction": "download",
 		"duration": 10, "streams": 1,
 	}
-	body, _ := json.Marshal(payload)
+	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
@@ -30,8 +39,14 @@ func createTestStream(t *testing.T, handler *api.Handler) string {
 		t.Fatalf("createTestStream: status = %d, body: %s", rec.Code, rec.Body.String())
 	}
 	var resp map[string]interface{}
-	json.NewDecoder(rec.Body).Decode(&resp)
-	return resp["stream_id"].(string)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode start stream response: %v", err)
+	}
+	streamID, ok := resp["stream_id"].(string)
+	if !ok || streamID == "" {
+		t.Fatalf("stream_id missing or invalid: %#v", resp["stream_id"])
+	}
+	return streamID
 }
 
 func TestStartStreamRejectsLargeBody(t *testing.T) {
@@ -75,7 +90,7 @@ func TestStartStreamRespectsMaxTestDuration(t *testing.T) {
 		"duration":  50,
 		"streams":   1,
 	}
-	body, _ := json.Marshal(payload)
+	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
@@ -86,7 +101,7 @@ func TestStartStreamRespectsMaxTestDuration(t *testing.T) {
 
 	// Duration exceeding the configured max should be rejected
 	payload["duration"] = 120
-	body, _ = json.Marshal(payload)
+	body = mustMarshalJSON(t, payload)
 	req = httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
 	rec = httptest.NewRecorder()
 	handler.StartStream(rec, req)
@@ -113,7 +128,7 @@ func TestStartStreamRespectsMaxStreams(t *testing.T) {
 		"duration":  10,
 		"streams":   32,
 	}
-	body, _ := json.Marshal(payload)
+	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
@@ -124,7 +139,7 @@ func TestStartStreamRespectsMaxStreams(t *testing.T) {
 
 	// 33 streams should be rejected
 	payload["streams"] = 33
-	body, _ = json.Marshal(payload)
+	body = mustMarshalJSON(t, payload)
 	req = httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
 	rec = httptest.NewRecorder()
 	handler.StartStream(rec, req)
@@ -148,7 +163,9 @@ func TestGetVersion(t *testing.T) {
 	}
 
 	var resp api.VersionResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode version response: %v", err)
+	}
 	if resp.Version != "1.2.3" {
 		t.Errorf("version = %q, want 1.2.3", resp.Version)
 	}
@@ -163,7 +180,9 @@ func TestGetVersionDefault(t *testing.T) {
 	handler.GetVersion(rec, req)
 
 	var resp api.VersionResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode default version response: %v", err)
+	}
 	if resp.Version != "dev" {
 		t.Errorf("default version = %q, want dev", resp.Version)
 	}
@@ -186,7 +205,9 @@ func TestGetServers(t *testing.T) {
 	}
 
 	var resp api.ServersResponse
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode servers response: %v", err)
+	}
 	if len(resp.Servers) != 1 {
 		t.Fatalf("servers = %d, want 1", len(resp.Servers))
 	}
@@ -241,7 +262,7 @@ func TestReportMetrics(t *testing.T) {
 	streamID := createTestStream(t, handler)
 
 	metrics := types.Metrics{ThroughputMbps: 500, BytesTransferred: 1024}
-	body, _ := json.Marshal(metrics)
+	body := mustMarshalJSON(t, metrics)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/metrics", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.ReportMetrics(rec, req, streamID)
@@ -258,7 +279,7 @@ func TestReportMetricsNotFound(t *testing.T) {
 
 	handler := api.NewHandler(mgr)
 
-	body, _ := json.Marshal(types.Metrics{})
+	body := mustMarshalJSON(t, types.Metrics{})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/missing/metrics", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.ReportMetrics(rec, req, "missing")
@@ -280,7 +301,7 @@ func TestCompleteStream(t *testing.T) {
 		"status":  "completed",
 		"metrics": map[string]interface{}{"throughput_mbps": 100},
 	}
-	body, _ := json.Marshal(payload)
+	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.CompleteStream(rec, req, streamID)
@@ -302,7 +323,7 @@ func TestCompleteStreamFailed(t *testing.T) {
 		"status":  "failed",
 		"metrics": map[string]interface{}{},
 	}
-	body, _ := json.Marshal(payload)
+	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.CompleteStream(rec, req, streamID)
@@ -321,7 +342,7 @@ func TestCompleteStreamInvalidStatus(t *testing.T) {
 	streamID := createTestStream(t, handler)
 
 	payload := map[string]interface{}{"status": "invalid"}
-	body, _ := json.Marshal(payload)
+	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.CompleteStream(rec, req, streamID)
@@ -394,7 +415,7 @@ func TestGetStreamResultsCompleted(t *testing.T) {
 		"status":  "completed",
 		"metrics": map[string]interface{}{"throughput_mbps": 250},
 	}
-	body, _ := json.Marshal(payload)
+	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.CompleteStream(rec, req, streamID)
@@ -417,7 +438,7 @@ func TestStartStreamInvalidProtocol(t *testing.T) {
 		"protocol": "invalid", "direction": "download",
 		"duration": 10, "streams": 1,
 	}
-	body, _ := json.Marshal(payload)
+	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
@@ -435,7 +456,7 @@ func TestStartStreamInvalidDirection(t *testing.T) {
 		"protocol": "tcp", "direction": "sideways",
 		"duration": 10, "streams": 1,
 	}
-	body, _ := json.Marshal(payload)
+	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
@@ -453,7 +474,7 @@ func TestStartStreamInvalidMode(t *testing.T) {
 		"protocol": "tcp", "direction": "download",
 		"duration": 10, "streams": 1, "mode": "invalid",
 	}
-	body, _ := json.Marshal(payload)
+	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
@@ -471,7 +492,7 @@ func TestStartStreamInvalidPacketSize(t *testing.T) {
 		"protocol": "tcp", "direction": "download",
 		"duration": 10, "streams": 1, "packet_size": 10,
 	}
-	body, _ := json.Marshal(payload)
+	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)

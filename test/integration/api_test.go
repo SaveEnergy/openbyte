@@ -18,6 +18,19 @@ func testConfig() *config.Config {
 	return config.DefaultConfig()
 }
 
+func mustStringField(t *testing.T, m map[string]interface{}, key string) string {
+	t.Helper()
+	v, ok := m[key]
+	if !ok {
+		t.Fatalf("response missing %s", key)
+	}
+	s, ok := v.(string)
+	if !ok || s == "" {
+		t.Fatalf("response %s invalid type/value: %#v", key, v)
+	}
+	return s
+}
+
 func TestAPI_StartStream(t *testing.T) {
 	manager := stream.NewManager(10, 2)
 	manager.Start()
@@ -31,7 +44,10 @@ func TestAPI_StartStream(t *testing.T) {
 		"duration":  10,
 		"streams":   4,
 	}
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatalf("marshal request body: %v", err)
+	}
 
 	req := httptest.NewRequest("POST", "/api/v1/stream/start", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -50,12 +66,8 @@ func TestAPI_StartStream(t *testing.T) {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
 
-	if resp["stream_id"] == nil {
-		t.Error("Response missing stream_id")
-	}
-	if resp["websocket_url"] == nil {
-		t.Error("Response missing websocket_url")
-	}
+	_ = mustStringField(t, resp, "stream_id")
+	_ = mustStringField(t, resp, "websocket_url")
 }
 
 func TestAPI_GetStreamStatus(t *testing.T) {

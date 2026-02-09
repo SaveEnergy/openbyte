@@ -25,7 +25,7 @@ test:
 
 test-ui:
 	@echo "Running Playwright UI tests..."
-	@bunx playwright test
+	@env -u NO_COLOR bunx playwright test
 
 ci-test:
 	@echo "Running CI tests..."

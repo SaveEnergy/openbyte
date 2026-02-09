@@ -112,7 +112,7 @@ jobs:
 
       - name: Playwright e2e
         if: github.event_name != 'pull_request'
-        run: bunx playwright test
+        run: env -u NO_COLOR bunx playwright test
 
   build-push:
     needs: [checks, changes]
@@ -180,6 +180,45 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.SSH_HOST != '' && needs.build-push.result == 'success') ||
       (github.event_name == 'workflow_dispatch' && inputs.force_build && vars.SSH_HOST != '' && needs.build-push.result == 'success')
     steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Sync compose files to server
+        env:
+          SSH_HOST: ${{ env.SSH_HOST }}
+          SSH_USER: ${{ env.SSH_USER }}
+          SSH_PORT: ${{ env.SSH_PORT }}
+          REMOTE_DIR: ${{ env.REMOTE_DIR }}
+          SSH_KEY: ${{ env.SSH_KEY }}
+        run: |
+          set -euo pipefail
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          touch ~/.ssh/known_hosts
+          ssh-keyscan -p "${SSH_PORT:-22}" -H "$SSH_HOST" > ~/.ssh/known_hosts.tmp
+          cat ~/.ssh/known_hosts.tmp >> ~/.ssh/known_hosts
+          rm -f ~/.ssh/known_hosts.tmp
+          ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "mkdir -p \"${REMOTE_DIR}/docker\""
+          scp -i ~/.ssh/id_rsa -P "${SSH_PORT:-22}" \
+            docker/docker-compose.ghcr.yaml \
+            docker/docker-compose.ghcr.traefik.yaml \
+            "${SSH_USER}@${SSH_HOST}:${REMOTE_DIR}/docker/"
+          ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" \
+            "test -f \"${REMOTE_DIR}/docker/docker-compose.ghcr.yaml\" && test -f \"${REMOTE_DIR}/docker/docker-compose.ghcr.traefik.yaml\""
+          local_main_sha="$(sha256sum docker/docker-compose.ghcr.yaml | awk '{print $1}')"
+          local_traefik_sha="$(sha256sum docker/docker-compose.ghcr.traefik.yaml | awk '{print $1}')"
+          remote_main_sha="$(ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "sha256sum \"${REMOTE_DIR}/docker/docker-compose.ghcr.yaml\" | awk '{print \\$1}'")"
+          remote_traefik_sha="$(ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "sha256sum \"${REMOTE_DIR}/docker/docker-compose.ghcr.traefik.yaml\" | awk '{print \\$1}'")"
+          if [ "$local_main_sha" != "$remote_main_sha" ]; then
+            echo "compose checksum mismatch for docker-compose.ghcr.yaml"
+            exit 1
+          fi
+          if [ "$local_traefik_sha" != "$remote_traefik_sha" ]; then
+            echo "compose checksum mismatch for docker-compose.ghcr.traefik.yaml"
+            exit 1
+          fi
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
@@ -190,10 +229,19 @@ jobs:
           script: |
             if command -v bash >/dev/null 2>&1; then
               bash -lc 'set -euo pipefail
+              DEPLOY_TAG="${{ github.sha }}"
               echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
               cd "${{ env.REMOTE_DIR }}"
-              docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull
-              docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
+              IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull
+              IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
+              OWNER_LC=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+              EXPECTED_IMAGE="ghcr.io/${OWNER_LC}/openbyte:${DEPLOY_TAG}"
+              expected_id=$(docker image inspect "$EXPECTED_IMAGE" -f "{{.Id}}" 2>/dev/null || true)
+              running_id=$(docker inspect -f "{{.Image}}" openbyte 2>/dev/null || true)
+              if [ -z "$expected_id" ] || [ -z "$running_id" ] || [ "$expected_id" != "$running_id" ]; then
+                echo "deployed image mismatch expected=$EXPECTED_IMAGE expected_id=$expected_id running_id=$running_id"
+                exit 1
+              fi
               for i in {1..20}; do
                 status=$(docker inspect -f "{{.State.Health.Status}}" openbyte 2>/dev/null || true)
                 if [ "$status" = "healthy" ]; then
@@ -206,10 +254,19 @@ jobs:
               exit 0
             fi
             set -eu
+            DEPLOY_TAG="${{ github.sha }}"
             echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
             cd "${{ env.REMOTE_DIR }}"
-            docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull
-            docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
+            IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull
+            IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
+            OWNER_LC=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+            EXPECTED_IMAGE="ghcr.io/${OWNER_LC}/openbyte:${DEPLOY_TAG}"
+            expected_id=$(docker image inspect "$EXPECTED_IMAGE" -f "{{.Id}}" 2>/dev/null || true)
+            running_id=$(docker inspect -f "{{.Image}}" openbyte 2>/dev/null || true)
+            if [ -z "$expected_id" ] || [ -z "$running_id" ] || [ "$expected_id" != "$running_id" ]; then
+              echo "deployed image mismatch expected=$EXPECTED_IMAGE expected_id=$expected_id running_id=$running_id"
+              exit 1
+            fi
             i=1
             while [ "$i" -le 20 ]; do
               status=$(docker inspect -f "{{.State.Health.Status}}" openbyte 2>/dev/null || true)
@@ -221,3 +278,7 @@ jobs:
             done
             docker inspect openbyte --format "{{json .State.Health}}" || true
             exit 1
+
+      - name: Cleanup SSH key material
+        if: always()
+        run: rm -f ~/.ssh/id_rsa ~/.ssh/known_hosts ~/.ssh/known_hosts.tmp
