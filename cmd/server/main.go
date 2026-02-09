@@ -3,9 +3,14 @@ package server
 import (
 	"context"
 	"errors"
+	"flag"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -25,7 +30,41 @@ var (
 	exitFailure = 1
 )
 
-func Run(version string) int {
+type serverFlagValues struct {
+	port               *string
+	bindAddress        *string
+	tcpTestPort        *int
+	udpTestPort        *int
+	serverID           *string
+	serverName         *string
+	serverLocation     *string
+	serverRegion       *string
+	publicHost         *string
+	capacityGbps       *int
+	maxConcurrentTests *int
+	maxConcurrentPerIP *int
+	maxStreams         *int
+	maxTestDuration    *string
+	rateLimitPerIP     *int
+	globalRateLimit    *int
+	allowedOrigins     *string
+	trustProxyHeaders  *bool
+	trustedProxyCIDRs  *string
+	dataDir            *string
+	maxStoredResults   *int
+	webRoot            *string
+	pprofEnabled       *bool
+	pprofAddress       *string
+	perfStatsInterval  *string
+	registryEnabled    *bool
+	registryMode       *bool
+	registryURL        *string
+	registryAPIKey     *string
+	registryInterval   *string
+	registryServerTTL  *string
+}
+
+func Run(args []string, version string) int {
 	logLevel := logging.LevelInfo
 	if os.Getenv("LOG_LEVEL") == "debug" {
 		logLevel = logging.LevelDebug
@@ -35,6 +74,18 @@ func Run(version string) int {
 	cfg := config.DefaultConfig()
 	if err := cfg.LoadFromEnv(); err != nil {
 		logging.Error("Failed to load config", logging.Field{Key: "error", Value: err})
+		return exitFailure
+	}
+	fs, fv := buildServerFlagSet(cfg)
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return exitSuccess
+		}
+		logging.Error("Invalid flags", logging.Field{Key: "error", Value: err})
+		return exitFailure
+	}
+	if err := applyServerFlagOverrides(cfg, fs, fv); err != nil {
+		logging.Error("Invalid flag values", logging.Field{Key: "error", Value: err})
 		return exitFailure
 	}
 	if err := cfg.Validate(); err != nil {
@@ -177,6 +228,152 @@ func Run(version string) int {
 
 	logging.Info("Server stopped")
 	return exitCode
+}
+
+func buildServerFlagSet(cfg *config.Config) (*flag.FlagSet, *serverFlagValues) {
+	fs := flag.NewFlagSet("openbyte server", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stdout, "Usage: openbyte server [flags]\n\n")
+		fmt.Fprintf(os.Stdout, "Server flags (override environment variables when set):\n")
+		fs.SetOutput(os.Stdout)
+		fs.PrintDefaults()
+		fs.SetOutput(io.Discard)
+	}
+
+	fv := &serverFlagValues{
+		port:               fs.String("port", cfg.Port, "HTTP API port (env: PORT)"),
+		bindAddress:        fs.String("bind-address", cfg.BindAddress, "Bind address (env: BIND_ADDRESS)"),
+		tcpTestPort:        fs.Int("tcp-test-port", cfg.TCPTestPort, "TCP test port (env: TCP_TEST_PORT)"),
+		udpTestPort:        fs.Int("udp-test-port", cfg.UDPTestPort, "UDP test port (env: UDP_TEST_PORT)"),
+		serverID:           fs.String("server-id", cfg.ServerID, "Server ID (env: SERVER_ID)"),
+		serverName:         fs.String("server-name", cfg.ServerName, "Server display name (env: SERVER_NAME)"),
+		serverLocation:     fs.String("server-location", cfg.ServerLocation, "Server location (env: SERVER_LOCATION)"),
+		serverRegion:       fs.String("server-region", cfg.ServerRegion, "Server region (env: SERVER_REGION)"),
+		publicHost:         fs.String("public-host", cfg.PublicHost, "Public host for URLs (env: PUBLIC_HOST)"),
+		capacityGbps:       fs.Int("capacity-gbps", cfg.CapacityGbps, "Capacity in Gbps (env: CAPACITY_GBPS)"),
+		maxConcurrentTests: fs.Int("max-concurrent-tests", cfg.MaxConcurrentTests, "Max concurrent tests (env: MAX_CONCURRENT_TESTS)"),
+		maxConcurrentPerIP: fs.Int("max-concurrent-per-ip", cfg.MaxConcurrentPerIP, "Max concurrent tests per IP (env: MAX_CONCURRENT_PER_IP)"),
+		maxStreams:         fs.Int("max-streams", cfg.MaxStreams, "Max streams per test, 1-64 (env: MAX_STREAMS)"),
+		maxTestDuration:    fs.String("max-test-duration", cfg.MaxTestDuration.String(), "Max test duration, e.g. 300s (env: MAX_TEST_DURATION)"),
+		rateLimitPerIP:     fs.Int("rate-limit-per-ip", cfg.RateLimitPerIP, "Per-IP rate limit per minute (env: RATE_LIMIT_PER_IP)"),
+		globalRateLimit:    fs.Int("global-rate-limit", cfg.GlobalRateLimit, "Global rate limit per minute (env: GLOBAL_RATE_LIMIT)"),
+		allowedOrigins:     fs.String("allowed-origins", strings.Join(cfg.AllowedOrigins, ","), "Comma-separated allowed origins (env: ALLOWED_ORIGINS)"),
+		trustProxyHeaders:  fs.Bool("trust-proxy-headers", cfg.TrustProxyHeaders, "Trust proxy headers (env: TRUST_PROXY_HEADERS)"),
+		trustedProxyCIDRs:  fs.String("trusted-proxy-cidrs", strings.Join(cfg.TrustedProxyCIDRs, ","), "Comma-separated trusted proxy CIDRs (env: TRUSTED_PROXY_CIDRS)"),
+		dataDir:            fs.String("data-dir", cfg.DataDir, "Data directory (env: DATA_DIR)"),
+		maxStoredResults:   fs.Int("max-stored-results", cfg.MaxStoredResults, "Max stored results (env: MAX_STORED_RESULTS)"),
+		webRoot:            fs.String("web-root", cfg.WebRoot, "Static web root override (env: WEB_ROOT)"),
+		pprofEnabled:       fs.Bool("pprof-enabled", cfg.PprofEnabled, "Enable pprof server (env: PPROF_ENABLED)"),
+		pprofAddress:       fs.String("pprof-addr", cfg.PprofAddress, "Pprof address (env: PPROF_ADDR)"),
+		perfStatsInterval:  fs.String("perf-stats-interval", cfg.PerfStatsInterval.String(), "Runtime stats interval, e.g. 10s (env: PERF_STATS_INTERVAL)"),
+		registryEnabled:    fs.Bool("registry-enabled", cfg.RegistryEnabled, "Enable registry client mode (env: REGISTRY_ENABLED)"),
+		registryMode:       fs.Bool("registry-mode", cfg.RegistryMode, "Enable registry server mode (env: REGISTRY_MODE)"),
+		registryURL:        fs.String("registry-url", cfg.RegistryURL, "Registry URL (env: REGISTRY_URL)"),
+		registryAPIKey:     fs.String("registry-api-key", cfg.RegistryAPIKey, "Registry API key (env: REGISTRY_API_KEY)"),
+		registryInterval:   fs.String("registry-interval", cfg.RegistryInterval.String(), "Registry heartbeat interval, e.g. 30s (env: REGISTRY_INTERVAL)"),
+		registryServerTTL:  fs.String("registry-server-ttl", cfg.RegistryServerTTL.String(), "Registry server TTL, e.g. 60s (env: REGISTRY_SERVER_TTL)"),
+	}
+	return fs, fv
+}
+
+func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFlagValues) error {
+	var applyErr error
+	applyCSV := func(raw string) []string {
+		if strings.TrimSpace(raw) == "" {
+			return nil
+		}
+		parts := strings.Split(raw, ",")
+		out := make([]string, 0, len(parts))
+		for _, p := range parts {
+			s := strings.TrimSpace(p)
+			if s != "" {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	parseDuration := func(key string, raw string) time.Duration {
+		d, err := time.ParseDuration(raw)
+		if err != nil {
+			applyErr = fmt.Errorf("invalid --%s %q: %w", key, raw, err)
+			return 0
+		}
+		return d
+	}
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "port":
+			cfg.Port = *fv.port
+		case "bind-address":
+			cfg.BindAddress = *fv.bindAddress
+		case "tcp-test-port":
+			cfg.TCPTestPort = *fv.tcpTestPort
+		case "udp-test-port":
+			cfg.UDPTestPort = *fv.udpTestPort
+		case "server-id":
+			cfg.ServerID = *fv.serverID
+		case "server-name":
+			cfg.ServerName = *fv.serverName
+		case "server-location":
+			cfg.ServerLocation = *fv.serverLocation
+		case "server-region":
+			cfg.ServerRegion = *fv.serverRegion
+		case "public-host":
+			cfg.PublicHost = *fv.publicHost
+		case "capacity-gbps":
+			cfg.CapacityGbps = *fv.capacityGbps
+		case "max-concurrent-tests":
+			cfg.MaxConcurrentTests = *fv.maxConcurrentTests
+		case "max-concurrent-per-ip":
+			cfg.MaxConcurrentPerIP = *fv.maxConcurrentPerIP
+		case "max-streams":
+			cfg.MaxStreams = *fv.maxStreams
+		case "max-test-duration":
+			cfg.MaxTestDuration = parseDuration("max-test-duration", *fv.maxTestDuration)
+		case "rate-limit-per-ip":
+			cfg.RateLimitPerIP = *fv.rateLimitPerIP
+		case "global-rate-limit":
+			cfg.GlobalRateLimit = *fv.globalRateLimit
+		case "allowed-origins":
+			cfg.AllowedOrigins = applyCSV(*fv.allowedOrigins)
+		case "trust-proxy-headers":
+			cfg.TrustProxyHeaders = *fv.trustProxyHeaders
+		case "trusted-proxy-cidrs":
+			cfg.TrustedProxyCIDRs = applyCSV(*fv.trustedProxyCIDRs)
+		case "data-dir":
+			cfg.DataDir = *fv.dataDir
+		case "max-stored-results":
+			cfg.MaxStoredResults = *fv.maxStoredResults
+		case "web-root":
+			cfg.WebRoot = *fv.webRoot
+		case "pprof-enabled":
+			cfg.PprofEnabled = *fv.pprofEnabled
+		case "pprof-addr":
+			cfg.PprofAddress = *fv.pprofAddress
+		case "perf-stats-interval":
+			cfg.PerfStatsInterval = parseDuration("perf-stats-interval", *fv.perfStatsInterval)
+		case "registry-enabled":
+			cfg.RegistryEnabled = *fv.registryEnabled
+		case "registry-mode":
+			cfg.RegistryMode = *fv.registryMode
+		case "registry-url":
+			cfg.RegistryURL = *fv.registryURL
+		case "registry-api-key":
+			cfg.RegistryAPIKey = *fv.registryAPIKey
+		case "registry-interval":
+			cfg.RegistryInterval = parseDuration("registry-interval", *fv.registryInterval)
+		case "registry-server-ttl":
+			cfg.RegistryServerTTL = parseDuration("registry-server-ttl", *fv.registryServerTTL)
+		}
+	})
+	if applyErr != nil {
+		return applyErr
+	}
+	if _, err := strconv.Atoi(cfg.Port); err != nil {
+		return fmt.Errorf("invalid --port %q: must be a number", cfg.Port)
+	}
+	return nil
 }
 
 func broadcastMetrics(manager *stream.Manager, wsServer *websocket.Server) {

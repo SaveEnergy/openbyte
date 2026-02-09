@@ -78,10 +78,12 @@
 - OpenAPI 3.1 spec at `api/openapi.yaml` covering all `/api/v1/*` + `/health` endpoints.
 - Install script: `scripts/install.sh` (curl|sh, detects OS/arch, downloads from GitHub Releases).
 - Installer creates missing `INSTALL_DIR` (with `sudo` when needed) and verifies extracted binary exists before copy.
+- Installer rejects empty `INSTALL_DIR` before path operations to avoid ambiguous install targets.
 - `go install github.com/saveenergy/openbyte/cmd/openbyte@latest` works (entry point at `cmd/openbyte/`).
 
 ### Build & Deploy
 - Single `openbyte` binary with `server`/`client`/`check`/`mcp` subcommands.
+- `openbyte server` now accepts deploy-oriented CLI flags (ports, server identity, limits, registry/proxy options); when explicitly set, flags override env-derived config.
 - Web assets embedded via `//go:embed` (HTML, CSS, JS, fonts).
 - Self-hosted fonts (DM Sans, JetBrains Mono) — no external CDN dependencies.
 - Deploy scripts pin image tags explicitly (`IMAGE_TAG=$GITHUB_SHA` on CI main, `IMAGE_TAG=$SEMVER` on release tags) so pull/deploy targets deterministic image.
@@ -112,6 +114,8 @@
 - `http.ErrServerClosed` uses `errors.Is` everywhere.
 - All API errors return JSON `{"error":"..."}` (no plaintext `http.Error`).
 - Registry handlers validate `Content-Type: application/json`.
+- API stream start/metrics/complete handlers now also enforce JSON Content-Type (while allowing omitted header for compatibility).
+- Cancel-stream API now drains/closes request bodies before cancellation to keep HTTP connection reuse safe.
 - `json.Encode` errors logged (not silently dropped).
 - Response bodies drained before close for HTTP connection reuse.
 - Tests hardened: JSON decode/marshal errors are asserted in e2e/unit paths (no ignored decode/marshal results).
@@ -130,12 +134,20 @@
 - Web results page now validates required view containers upfront and drains non-OK fetch responses before surfacing HTTP errors.
 - HTTP client engine now fails fast if upload payload randomization fails (`crypto/rand.Read`), returning constructor error to caller.
 - JSON request decode helpers now drain unread request bodies on decode/single-object validation errors (`internal/api`, `internal/results`, `internal/registry`) to preserve connection reuse safety.
+- Registry register/update handlers now enforce single-object JSON bodies (reject concatenated payloads).
 - Client stream-start decode path drains response body on JSON decode errors before returning.
+- HTTP client engine now drains/closes non-nil responses on `Do` error paths in both download and upload loops.
+- CLI fastest-server health checks now drain/close non-nil responses even on `Get` error paths.
+- Proxy-mode CLI now cancels server stream if websocket metrics loop exits with error; client-mode cancel path also cancels server stream on context cancellation.
 - Settings load/save paths guard missing duration/streams controls, log parse failures, and server discovery now validates `servers` as an array before assignment.
 - CI workflow cleanup: removed unused `Force build override` step from `changes` job.
 - Deploy jobs now include an explicit "Validate deploy configuration" step to fail fast when required vars/secrets (`SSH_*`, `REMOTE_DIR`, `GHCR_*`) are missing.
 - Client `startStream` now surfaces `io.ReadAll` failures on non-201 responses instead of silently ignoring body-read errors.
 - Web download test now drains non-OK HTTP responses before fallback handling to preserve browser connection reuse behavior.
+- Address-family network probes (`v4.`/`v6.` ping) now drain non-OK responses before rejection.
+- Main `/ping` network probe now checks `res.ok` and drains non-OK responses before rejection.
+- `loadServers` now treats malformed JSON as a hard failure and clears server list fallback state.
+- E2E static-file checks drain non-OK response bodies before close.
 - Download/results pages add broader DOM null-guards to avoid runtime crashes in partial/minimal layouts.
 - Release workflow `image_pushed` output now emits boolean (`true` on successful push step), and deploy gate checks `== 'true'` for clearer control flow.
 - Client cancel/complete stream helpers now defensively drain/close non-nil HTTP responses on `Do` errors before returning.

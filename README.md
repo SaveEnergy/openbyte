@@ -12,6 +12,9 @@ make build
 
 # With server identity
 SERVER_ID=nyc-1 SERVER_NAME="New York" ./bin/openbyte server
+
+# With server flags (flags override env values when set)
+./bin/openbyte server --server-name "New York" --public-host speedtest.example.com
 ```
 
 ### CLI Client
@@ -97,6 +100,19 @@ Notes:
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
 - Default CORS allows all origins; set `ALLOWED_ORIGINS` to restrict (supports `*` and `*.example.com`).
 - If running behind a reverse proxy, increase max request body size (e.g. 35MB) and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.
+- Server command supports flags for deployment (`openbyte server --help`). If both env var and flag are set, the flag wins.
+
+### Deployment With Server Flags
+
+```bash
+# docker run
+docker run --rm -p 8080:8080 -p 8081:8081 -p 8082:8082 -p 8082:8082/udp \
+  ghcr.io/saveenergy/openbyte:latest \
+  server --server-name "My Box" --public-host speed.example.com
+
+# docker compose service command override
+# command: ["server", "--server-name=My Box", "--public-host=speed.example.com"]
+```
 
 ### IPv4/IPv6 Detection
 

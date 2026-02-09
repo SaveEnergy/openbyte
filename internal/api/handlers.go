@@ -80,6 +80,10 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
 		return
 	}
+	if !isJSONContentType(r) {
+		respondJSON(w, map[string]string{"error": "Content-Type must be application/json"}, http.StatusUnsupportedMediaType)
+		return
+	}
 
 	var req StartStreamRequest
 	if err := decodeJSONBody(w, r, &req, maxJSONBodyBytes); err != nil {
@@ -230,6 +234,10 @@ func (h *Handler) ReportMetrics(w http.ResponseWriter, r *http.Request, streamID
 		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
 		return
 	}
+	if !isJSONContentType(r) {
+		respondJSON(w, map[string]string{"error": "Content-Type must be application/json"}, http.StatusUnsupportedMediaType)
+		return
+	}
 
 	var metrics types.Metrics
 	if err := decodeJSONBody(w, r, &metrics, maxJSONBodyBytes); err != nil {
@@ -247,6 +255,10 @@ func (h *Handler) ReportMetrics(w http.ResponseWriter, r *http.Request, streamID
 func (h *Handler) CompleteStream(w http.ResponseWriter, r *http.Request, streamID string) {
 	if r.Method != http.MethodPost {
 		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
+		return
+	}
+	if !isJSONContentType(r) {
+		respondJSON(w, map[string]string{"error": "Content-Type must be application/json"}, http.StatusUnsupportedMediaType)
 		return
 	}
 
@@ -306,6 +318,10 @@ func (h *Handler) GetStreamResults(w http.ResponseWriter, r *http.Request, strea
 }
 
 func (h *Handler) CancelStream(w http.ResponseWriter, r *http.Request, streamID string) {
+	if r.Body != nil {
+		io.Copy(io.Discard, r.Body)
+		r.Body.Close()
+	}
 	if err := h.manager.CancelStream(streamID); err != nil {
 		respondError(w, err, http.StatusNotFound)
 		return
@@ -429,6 +445,11 @@ func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}, lim
 		return stdErrors.New("request body must contain a single JSON object")
 	}
 	return nil
+}
+
+func isJSONContentType(r *http.Request) bool {
+	ct := r.Header.Get("Content-Type")
+	return ct == "" || strings.HasPrefix(ct, "application/json")
 }
 
 func respondJSONBodyError(w http.ResponseWriter, err error) {

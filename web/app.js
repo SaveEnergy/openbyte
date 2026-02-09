@@ -183,7 +183,7 @@ function saveSettings() {
 function detectNetworkInfo() {
   // Main ping — captures whichever address family the browser chose
   const mainPing = fetch(`${apiBase}/ping`)
-    .then(res => res.json())
+    .then(res => res.ok ? res.json() : res.text().then(() => Promise.reject()))
     .then(data => {
       if (data.client_ip) {
         if (data.ipv6) {
@@ -207,7 +207,7 @@ function detectNetworkInfo() {
 
   const v4Ping = canProbe
     ? fetch(`${proto}//v4.${hostname}/api/v1/ping`, probeOpts)
-        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(res => res.ok ? res.json() : res.text().then(() => Promise.reject()))
         .then(data => {
           if (!data.ipv6 && data.client_ip) {
             state.networkInfo.ipv4 = data.client_ip;
@@ -218,7 +218,7 @@ function detectNetworkInfo() {
 
   const v6Ping = canProbe
     ? fetch(`${proto}//v6.${hostname}/api/v1/ping`, probeOpts)
-        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(res => res.ok ? res.json() : res.text().then(() => Promise.reject()))
         .then(data => {
           if (data.ipv6 && data.client_ip) {
             state.networkInfo.ipv6 = data.client_ip;
@@ -349,7 +349,13 @@ async function loadServers() {
       await res.text().catch(() => {});
       throw new Error(`Failed to load servers: HTTP ${res.status}`);
     }
-    const data = await res.json();
+    let data;
+    try {
+      data = await res.json();
+    } catch (err) {
+      state.servers = [];
+      throw new Error('Failed to parse servers response');
+    }
     state.servers = Array.isArray(data.servers) ? data.servers : [];
     
     if (state.servers.length > 0) {

@@ -3,6 +3,7 @@ package registry
 import (
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -107,10 +108,16 @@ func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxRegistryBodySize)
+	decoder := json.NewDecoder(r.Body)
 	var info types.ServerInfo
-	if err := json.NewDecoder(r.Body).Decode(&info); err != nil {
+	if err := decoder.Decode(&info); err != nil {
 		io.Copy(io.Discard, r.Body)
 		respondRegistryError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		io.Copy(io.Discard, r.Body)
+		respondRegistryError(w, "request body must contain a single JSON object", http.StatusBadRequest)
 		return
 	}
 
@@ -148,10 +155,16 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxRegistryBodySize)
+	decoder := json.NewDecoder(r.Body)
 	var info types.ServerInfo
-	if err := json.NewDecoder(r.Body).Decode(&info); err != nil {
+	if err := decoder.Decode(&info); err != nil {
 		io.Copy(io.Discard, r.Body)
 		respondRegistryError(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		io.Copy(io.Discard, r.Body)
+		respondRegistryError(w, "request body must contain a single JSON object", http.StatusBadRequest)
 		return
 	}
 

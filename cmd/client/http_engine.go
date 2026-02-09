@@ -109,6 +109,10 @@ func (e *HTTPTestEngine) runDownload(ctx context.Context) error {
 
 			resp, err := e.client.Do(req)
 			if err != nil {
+				if resp != nil {
+					io.Copy(io.Discard, resp.Body)
+					resp.Body.Close()
+				}
 				errCh <- err
 				return
 			}
@@ -178,6 +182,10 @@ func (e *HTTPTestEngine) runUpload(ctx context.Context) error {
 
 				resp, err := e.client.Do(req)
 				if err != nil {
+					if resp != nil {
+						io.Copy(io.Discard, resp.Body)
+						resp.Body.Close()
+					}
 					if ctx.Err() != nil {
 						return
 					}
@@ -278,6 +286,10 @@ func measureHTTPPing(ctx context.Context, serverURL string, samples int) ([]time
 		}
 		resp, err := client.Do(req)
 		if err != nil {
+			if resp != nil {
+				io.Copy(io.Discard, resp.Body)
+				resp.Body.Close()
+			}
 			continue
 		}
 		io.Copy(io.Discard, resp.Body)

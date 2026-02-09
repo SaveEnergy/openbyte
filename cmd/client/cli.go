@@ -196,12 +196,14 @@ func selectFastestServer(configFile *ConfigFile, verbose bool) (*ServerLatency, 
 			start := time.Now()
 			resp, err := client.Get(healthURL)
 			result.Latency = time.Since(start)
+			if resp != nil {
+				io.Copy(io.Discard, resp.Body)
+				resp.Body.Close()
+			}
 
 			if err != nil {
 				result.Error = err
 			} else {
-				io.Copy(io.Discard, resp.Body)
-				resp.Body.Close()
 				if resp.StatusCode != http.StatusOK {
 					result.Error = fmt.Errorf("health check failed: %d", resp.StatusCode)
 				}

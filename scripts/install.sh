@@ -7,6 +7,11 @@ REPO="saveenergy/openbyte"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 BINARY_NAME="openbyte"
 
+if [ -z "${INSTALL_DIR}" ]; then
+    echo "Error: INSTALL_DIR must be non-empty"
+    exit 1
+fi
+
 # Detect OS
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 case "$OS" in

@@ -31,7 +31,11 @@ func runStream(ctx context.Context, config *Config, formatter OutputFormatter, s
 		return runClientSideTest(ctx, config, formatter, streamResp)
 	}
 
-	return streamMetrics(ctx, streamResp.WebSocketURL, formatter, config)
+	if err := streamMetrics(ctx, streamResp.WebSocketURL, formatter, config); err != nil {
+		cancelStream(config.ServerURL, streamResp.StreamID, config.APIKey)
+		return err
+	}
+	return nil
 }
 
 // EngineRunner interface for TCP/UDP engines
@@ -126,6 +130,7 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 
 		case <-ctx.Done():
 			cancel()
+			cancelStream(config.ServerURL, streamResp.StreamID, config.APIKey)
 			return ctx.Err()
 		}
 	}

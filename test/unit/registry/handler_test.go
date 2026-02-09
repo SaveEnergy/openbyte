@@ -263,6 +263,20 @@ func TestHandlerRegisterWrongContentType(t *testing.T) {
 	}
 }
 
+func TestHandlerRegisterRejectsConcatenatedJSON(t *testing.T) {
+	_, mux := setupHandler("")
+
+	body := `{"id":"s1","name":"Test","host":"localhost"}{"id":"s2"}`
+	req := httptest.NewRequest("POST", "/api/v1/registry/servers", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("concatenated json: status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
 func TestHandlerListHealthyFilter(t *testing.T) {
 	_, mux := setupHandler("")
 
@@ -288,5 +302,26 @@ func TestHandlerListHealthyFilter(t *testing.T) {
 	}
 	if got := mustCountField(t, resp); got != 1 {
 		t.Errorf("healthy filter count = %.0f, want 1", got)
+	}
+}
+
+func TestHandlerUpdateRejectsConcatenatedJSON(t *testing.T) {
+	_, mux := setupHandler("")
+
+	// Register baseline server.
+	body := `{"id":"s1","name":"Before","host":"localhost"}`
+	req := httptest.NewRequest("POST", "/api/v1/registry/servers", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	updateBody := `{"name":"After","host":"remotehost"}{"name":"Extra"}`
+	req = httptest.NewRequest("PUT", "/api/v1/registry/servers/s1", strings.NewReader(updateBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("concatenated json update: status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }

@@ -190,6 +190,9 @@ func TestStaticFiles(t *testing.T) {
 		}
 
 		if resp.StatusCode != http.StatusOK {
+			if _, drainErr := io.Copy(io.Discard, resp.Body); drainErr != nil {
+				t.Errorf("failed to drain %s response body: %v", file, drainErr)
+			}
 			t.Errorf("%s status = %d, want %d", file, resp.StatusCode, http.StatusOK)
 		}
 

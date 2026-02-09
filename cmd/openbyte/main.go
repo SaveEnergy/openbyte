@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	check "github.com/saveenergy/openbyte/cmd/check"
 	client "github.com/saveenergy/openbyte/cmd/client"
@@ -15,12 +16,12 @@ var version = "dev"
 func main() {
 	args := os.Args[1:]
 	if len(args) == 0 {
-		os.Exit(server.Run(version))
+		os.Exit(server.Run(nil, version))
 	}
 
 	switch args[0] {
 	case "server":
-		os.Exit(server.Run(version))
+		os.Exit(server.Run(args[1:], version))
 	case "client":
 		os.Exit(client.Run(args[1:], version))
 	case "check":
@@ -34,6 +35,9 @@ func main() {
 		fmt.Printf("openbyte %s\n", version)
 		return
 	default:
+		if strings.HasPrefix(args[0], "-") {
+			os.Exit(server.Run(args, version))
+		}
 		fmt.Fprintf(os.Stderr, "openbyte: unknown command %q\n\n", args[0])
 		printUsage()
 		os.Exit(2)
