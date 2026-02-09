@@ -17,7 +17,7 @@
     <header class="header">
       <div class="brand">
         <div class="logo">open<span class="logo-accent">Byte</span></div>
-        <div class="server-name" id="serverName">Current Server</div>
+        <div class="server-name" id="serverName">OpenByte Server</div>
       </div>
       <div class="server-info" id="serverInfo">
         <span class="server-dot"></span>
@@ -150,16 +150,10 @@
               <option value="32">32 streams (~5 Gbps+)</option>
             </select>
           </div>
-          <div class="setting-group">
+          <div class="setting-group" id="serverSelectGroup" style="display: none;">
             <label class="setting-label" for="serverSelect">Test Server</label>
-            <select class="setting-input" id="serverSelect">
-              <option value="current">Current Server</option>
-            </select>
+            <select class="setting-input" id="serverSelect"></select>
             <span class="server-status" id="serverStatus"></span>
-          </div>
-          <div class="setting-group" id="customServerGroup" style="display: none;">
-            <label class="setting-label" for="customServerUrl">Custom Server URL</label>
-            <input type="text" class="setting-input" id="customServerUrl" placeholder="https://speedtest.example.com">
           </div>
         </div>
       </div>

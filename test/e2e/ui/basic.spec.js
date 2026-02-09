@@ -4,7 +4,7 @@ test.describe('openByte UI', () => {
   test('loads and shows connected state', async ({ page }) => {
     await page.goto('/');
     const serverInfo = page.locator('#serverInfo');
-    await expect(serverInfo).toContainText(/Connecting|OpenByte Server|Ready|Offline|Finding fastest|Custom|Unverified/i);
+    await expect(serverInfo).toContainText(/Connecting|OpenByte Server|Ready|Offline|Finding fastest/i);
   });
 
   test('runs a short test flow', async ({ page }) => {

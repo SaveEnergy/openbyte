@@ -18,8 +18,7 @@ const state = {
   selectedServer: null,
   settings: {
     duration: 30,
-    streams: 4,  // Default 4 streams for ~600 Mbps capacity
-    serverUrl: ''
+    streams: 4  // Default 4 streams for ~600 Mbps capacity
   },
   networkInfo: {
     ipv4: null,
@@ -56,8 +55,8 @@ const elements = {
   settingsModal: document.getElementById('settingsModal'),
   duration: document.getElementById('duration'),
   streams: document.getElementById('streams'),
+  serverSelectGroup: document.getElementById('serverSelectGroup'),
   serverSelect: document.getElementById('serverSelect'),
-  customServerUrl: document.getElementById('customServerUrl'),
   serverStatus: document.getElementById('serverStatus'),
   errorToast: document.getElementById('errorToast'),
   errorMessage: document.getElementById('errorMessage'),
@@ -104,10 +103,6 @@ function bindEvents() {
   
   if (elements.serverSelect) {
     elements.serverSelect.addEventListener('change', onServerChange);
-  }
-  if (elements.customServerUrl) {
-    elements.customServerUrl.addEventListener('change', onCustomServerChange);
-    elements.customServerUrl.addEventListener('blur', onCustomServerChange);
   }
   
   detectNetworkInfo();
@@ -156,14 +151,8 @@ function loadSettings() {
       if (typeof s.streams === 'number' && Number.isFinite(s.streams) && s.streams > 0) {
         state.settings.streams = s.streams;
       }
-      if (typeof s.serverUrl === 'string') {
-        state.settings.serverUrl = s.serverUrl;
-      }
       if (elements.duration) elements.duration.value = state.settings.duration;
       if (elements.streams) elements.streams.value = state.settings.streams;
-      if (state.settings.serverUrl && elements.customServerUrl) {
-        elements.customServerUrl.value = state.settings.serverUrl;
-      }
     } catch (e) {
       console.warn('Failed to parse saved settings:', e);
     }
@@ -325,6 +314,15 @@ function updateServerName() {
   }
 }
 
+function setSelectedServer(server) {
+  state.selectedServer = server || null;
+  if (state.selectedServer && state.selectedServer.api_endpoint) {
+    apiBase = `${state.selectedServer.api_endpoint}/api/v1`;
+  } else {
+    apiBase = '/api/v1';
+  }
+}
+
 function getHealthURL(server) {
   if (server.api_endpoint) {
     try {
@@ -369,6 +367,9 @@ async function loadServers() {
     checkServer();
   } catch (e) {
     console.error('Failed to load servers:', e);
+    state.servers = [];
+    setSelectedServer(null);
+    populateServerSelect();
     updateServerName();
     checkServer();
   }
@@ -417,13 +418,13 @@ async function selectFastestServer() {
   
   if (reachable.length === 0) {
     console.warn('No servers reachable, defaulting to current');
-    state.selectedServer = null;
+    setSelectedServer(null);
     updateServerName();
     return;
   }
   
   reachable.sort((a, b) => a.latency - b.latency);
-  state.selectedServer = reachable[0].server;
+  setSelectedServer(reachable[0].server);
   updateServerName();
   
   console.log('Auto-selected server:', state.selectedServer.name, 
@@ -431,16 +432,22 @@ async function selectFastestServer() {
 }
 
 function populateServerSelect() {
-  if (!elements.serverSelect) return;
+  if (!elements.serverSelect || !elements.serverSelectGroup) return;
   
   while (elements.serverSelect.firstChild) elements.serverSelect.removeChild(elements.serverSelect.firstChild);
-  
-  const currentOpt = document.createElement('option');
-  currentOpt.value = 'current';
-  currentOpt.textContent = 'Current Server';
-  elements.serverSelect.appendChild(currentOpt);
-  
+
   const reachableServers = state.servers.filter(server => server.api_endpoint && server.reachable);
+
+  if (reachableServers.length <= 1) {
+    elements.serverSelectGroup.style.display = 'none';
+    if (reachableServers.length === 1 && (!state.selectedServer || state.selectedServer.id !== reachableServers[0].id)) {
+      setSelectedServer(reachableServers[0]);
+      updateServerName();
+    }
+    return;
+  }
+
+  elements.serverSelectGroup.style.display = '';
   reachableServers.forEach(server => {
     const opt = document.createElement('option');
     opt.value = server.id;
@@ -448,97 +455,30 @@ function populateServerSelect() {
     opt.textContent = `${server.name}${location}`;
     elements.serverSelect.appendChild(opt);
   });
-  
-  const customOpt = document.createElement('option');
-  customOpt.value = 'custom';
-  customOpt.textContent = 'Custom Server...';
-  elements.serverSelect.appendChild(customOpt);
-  
-  if (state.settings.serverUrl) {
-    elements.serverSelect.value = 'custom';
-    showCustomServerInput(true);
-  } else if (state.selectedServer?.id && reachableServers.some(s => s.id === state.selectedServer.id)) {
+
+  if (state.selectedServer?.id && reachableServers.some(s => s.id === state.selectedServer.id)) {
     elements.serverSelect.value = state.selectedServer.id;
-    showCustomServerInput(false);
-  } else {
-    elements.serverSelect.value = 'current';
-    showCustomServerInput(false);
+  } else if (reachableServers[0]?.id) {
+    setSelectedServer(reachableServers[0]);
+    elements.serverSelect.value = reachableServers[0].id;
+    updateServerName();
   }
 }
 
 function onServerChange() {
   const value = elements.serverSelect.value;
-  
-  if (value === 'custom') {
-    showCustomServerInput(true);
-    return;
-  }
-  
-  showCustomServerInput(false);
-  
-  if (value === 'current') {
-    apiBase = '/api/v1';
-    state.settings.serverUrl = '';
-    state.selectedServer = null;
-  } else {
-    const server = state.servers.find(s => s.id === value);
-    if (server) {
-      apiBase = server.api_endpoint ? `${server.api_endpoint}/api/v1` : '/api/v1';
-      state.settings.serverUrl = server.api_endpoint || '';
-      state.selectedServer = server;
-    }
+  const server = state.servers.find(s => s.id === value && s.api_endpoint);
+  if (server) {
+    setSelectedServer(server);
   }
   
   updateServerName();
   saveSettings();
   checkServer();
-}
-
-function onCustomServerChange() {
-  const url = elements.customServerUrl.value.trim();
-  if (!url) {
-    apiBase = '/api/v1';
-    state.settings.serverUrl = '';
-    state.selectedServer = null;
-    updateServerName();
-    saveSettings();
-    checkServer();
-    return;
-  }
-  let serverUrl = url;
-  if (!/^https?:\/\//i.test(serverUrl)) {
-    const preferred = window.location.protocol === 'https:' ? 'https://' : 'http://';
-    serverUrl = preferred + serverUrl;
-  }
-  serverUrl = serverUrl.replace(/\/+$/, '');
-
-  const apiSuffix = '/api/v1';
-  let baseUrl = serverUrl;
-  if (baseUrl.toLowerCase().endsWith(apiSuffix)) {
-    baseUrl = baseUrl.slice(0, -apiSuffix.length);
-  }
-  baseUrl = baseUrl.replace(/\/+$/, '');
-  
-  apiBase = `${baseUrl}/api/v1`;
-  state.settings.serverUrl = baseUrl;
-  state.selectedServer = { id: 'custom', name: 'Custom', location: url, api_endpoint: baseUrl };
-  updateServerName();
-  saveSettings();
-  checkServer();
-}
-
-function showCustomServerInput(show) {
-  const container = elements.customServerUrl?.parentElement;
-  if (container) {
-    container.style.display = show ? 'block' : 'none';
-  }
 }
 
 async function checkServer() {
-  const baseUrl = state.settings.serverUrl;
-  const candidates = baseUrl
-    ? [`${baseUrl}/health`, `${apiBase}/health`, `${apiBase}/ping`]
-    : ['/health', `${apiBase}/health`, `${apiBase}/ping`];
+  const candidates = ['/health', `${apiBase}/health`, `${apiBase}/ping`];
   
   try {
     let ok = false;
@@ -580,28 +520,15 @@ async function checkServer() {
       elements.serverStatus.className = 'server-status connected';
     }
   } catch (e) {
-    if (baseUrl) {
-      if (elements.serverDot) {
-        elements.serverDot.classList.remove('connected', 'error');
-        elements.serverDot.classList.add('warning');
-      }
-      if (elements.serverText) elements.serverText.textContent = state.selectedServer?.name || 'Custom';
-      
-      if (elements.serverStatus) {
-        elements.serverStatus.textContent = 'Unverified';
-        elements.serverStatus.className = 'server-status warning';
-      }
-    } else {
-      if (elements.serverDot) {
-        elements.serverDot.classList.remove('connected', 'warning');
-        elements.serverDot.classList.add('error');
-      }
-      if (elements.serverText) elements.serverText.textContent = 'Offline';
-      
-      if (elements.serverStatus) {
-        elements.serverStatus.textContent = 'Offline';
-        elements.serverStatus.className = 'server-status error';
-      }
+    if (elements.serverDot) {
+      elements.serverDot.classList.remove('connected', 'warning');
+      elements.serverDot.classList.add('error');
+    }
+    if (elements.serverText) elements.serverText.textContent = 'Offline';
+    
+    if (elements.serverStatus) {
+      elements.serverStatus.textContent = 'Offline';
+      elements.serverStatus.className = 'server-status error';
     }
   }
 }
@@ -654,10 +581,7 @@ async function startTest() {
   } catch (e) {
     console.error('Test failed:', e);
     if (e.name !== 'AbortError') {
-      const isCustom = !!state.settings.serverUrl;
-      const message = isCustom && e instanceof TypeError
-        ? 'Custom server unreachable or blocked by CORS.'
-        : (e.message || 'Test failed');
+      const message = e.message || 'Test failed';
       showError(message);
     }
     resetToIdle();

@@ -147,6 +147,7 @@
 - Address-family network probes (`v4.`/`v6.` ping) now drain non-OK responses before rejection.
 - Main `/ping` network probe now checks `res.ok` and drains non-OK responses before rejection.
 - `loadServers` now treats malformed JSON as a hard failure and clears server list fallback state.
+- Settings UI server selection simplified: removed `Current Server` and custom URL modes; only reachable registry/current entries are selectable, and selector is hidden when there is <=1 server.
 - E2E static-file checks drain non-OK response bodies before close.
 - Download/results pages add broader DOM null-guards to avoid runtime crashes in partial/minimal layouts.
 - Release workflow `image_pushed` output now emits boolean (`true` on successful push step), and deploy gate checks `== 'true'` for clearer control flow.
