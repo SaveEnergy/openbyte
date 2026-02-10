@@ -174,4 +174,3 @@ func TestServerCloseIdempotentConcurrent(t *testing.T) {
 		}
 	}
 }
-

@@ -289,15 +289,15 @@ func TestResultsSaveAndGet(t *testing.T) {
 	defer ts.Close()
 
 	saveReq := map[string]interface{}{
-		"download_mbps":      123.45,
-		"upload_mbps":        67.89,
-		"latency_ms":         12.3,
-		"jitter_ms":          1.2,
-		"loaded_latency_ms":  18.4,
-		"bufferbloat_grade":  "A",
-		"ipv4":               "192.0.2.1",
-		"ipv6":               "",
-		"server_name":        "e2e-server",
+		"download_mbps":     123.45,
+		"upload_mbps":       67.89,
+		"latency_ms":        12.3,
+		"jitter_ms":         1.2,
+		"loaded_latency_ms": 18.4,
+		"bufferbloat_grade": "A",
+		"ipv4":              "192.0.2.1",
+		"ipv6":              "",
+		"server_name":       "e2e-server",
 	}
 	body, err := json.Marshal(saveReq)
 	if err != nil {
