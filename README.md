@@ -1,4 +1,19 @@
-# openByte
+<h1 align="center" style="font-size:3.4rem; line-height:1.05; letter-spacing:0.01em; margin:0.15em 0;">open<span style="color:#00d4aa;">Byte</span></h1>
+
+<p align="center">
+  <a href="https://github.com/SaveEnergy/openbyte/actions/workflows/ci.yml">
+    <img src="https://github.com/SaveEnergy/openbyte/actions/workflows/ci.yml/badge.svg" alt="CI">
+  </a>
+  <a href="https://github.com/SaveEnergy/openbyte/releases">
+    <img src="https://img.shields.io/github/v/release/SaveEnergy/openbyte?sort=semver" alt="Latest Release">
+  </a>
+  <a href="https://github.com/SaveEnergy/openbyte/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/SaveEnergy/openbyte" alt="License">
+  </a>
+  <a href="https://go.dev/">
+    <img src="https://img.shields.io/github/go-mod/go-version/SaveEnergy/openbyte" alt="Go Version">
+  </a>
+</p>
 
 High-performance network speed test server capable of 25 Gbit/s sustained throughput. TCP/UDP protocols, real-time metrics, multi-connection testing, BEREC-compliant measurement methodology.
 
