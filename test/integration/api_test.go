@@ -10,6 +10,7 @@ import (
 
 	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/internal/config"
+	"github.com/saveenergy/openbyte/internal/results"
 	"github.com/saveenergy/openbyte/internal/stream"
 	"github.com/saveenergy/openbyte/pkg/types"
 )
@@ -136,5 +137,66 @@ func TestCORSBlockedOrigin(t *testing.T) {
 
 	if w.Code != http.StatusForbidden {
 		t.Errorf("Status code = %d, want %d", w.Code, http.StatusForbidden)
+	}
+}
+
+func TestAPI_ResultsSaveAndGet(t *testing.T) {
+	manager := stream.NewManager(10, 2)
+	manager.Start()
+	defer manager.Stop()
+
+	handler := api.NewHandler(manager)
+	router := api.NewRouter(handler, testConfig())
+
+	store, err := results.New(t.TempDir()+"/results.db", 100)
+	if err != nil {
+		t.Fatalf("results.New: %v", err)
+	}
+	defer store.Close()
+	router.SetResultsHandler(results.NewHandler(store))
+
+	h := router.SetupRoutes()
+
+	saveBody := `{
+		"download_mbps": 321.5,
+		"upload_mbps": 123.4,
+		"latency_ms": 11.2,
+		"jitter_ms": 1.5,
+		"loaded_latency_ms": 16.8,
+		"bufferbloat_grade": "A",
+		"ipv4": "203.0.113.10",
+		"ipv6": "",
+		"server_name": "integration-server"
+	}`
+	saveReq := httptest.NewRequest(http.MethodPost, "/api/v1/results", bytes.NewBufferString(saveBody))
+	saveReq.Header.Set("Content-Type", "application/json")
+	saveRec := httptest.NewRecorder()
+	h.ServeHTTP(saveRec, saveReq)
+	if saveRec.Code != http.StatusCreated {
+		t.Fatalf("save status = %d, want %d; body=%s", saveRec.Code, http.StatusCreated, saveRec.Body.String())
+	}
+
+	var saveResp map[string]interface{}
+	if err := json.Unmarshal(saveRec.Body.Bytes(), &saveResp); err != nil {
+		t.Fatalf("decode save response: %v", err)
+	}
+	id := mustStringField(t, saveResp, "id")
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/results/"+id, nil)
+	getRec := httptest.NewRecorder()
+	h.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("get status = %d, want %d; body=%s", getRec.Code, http.StatusOK, getRec.Body.String())
+	}
+	if got := getRec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("cache-control = %q, want %q", got, "no-store")
+	}
+
+	var gotResult map[string]interface{}
+	if err := json.Unmarshal(getRec.Body.Bytes(), &gotResult); err != nil {
+		t.Fatalf("decode get response: %v", err)
+	}
+	if gotID, ok := gotResult["id"].(string); !ok || gotID != id {
+		t.Fatalf("result id = %#v, want %q", gotResult["id"], id)
 	}
 }

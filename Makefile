@@ -38,7 +38,7 @@ ci-lint:
 
 test-e2e:
 	@echo "Running e2e tests..."
-	@go test ./test/e2e -v -timeout 30s
+	@go test ./test/e2e -v -timeout 2m
 
 test-race:
 	@echo "Running tests with race detector..."

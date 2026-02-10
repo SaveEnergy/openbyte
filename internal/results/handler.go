@@ -105,6 +105,7 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 
 	id, err := h.store.Save(result)
 	if err != nil {
+		logging.Warn("results: save failed", logging.Field{Key: "error", Value: err})
 		respondJSONError(w, "failed to save result", http.StatusInternalServerError)
 		return
 	}

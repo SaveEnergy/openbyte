@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -144,7 +145,8 @@ func runTCPDownload(ctx context.Context, cfg config, worker int) (int64, error) 
 				total += int64(n)
 			}
 			if err != nil {
-				if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				var netErr net.Error
+				if errors.As(err, &netErr) && netErr.Timeout() {
 					continue
 				}
 				return total, err
@@ -173,6 +175,7 @@ func runTCPUpload(ctx context.Context, cfg config, worker int) (int64, error) {
 		case <-ctx.Done():
 			return total, nil
 		default:
+			_ = conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
 			n, err := conn.Write(buf)
 			if n > 0 {
 				total += int64(n)
@@ -212,6 +215,7 @@ func runTCPBidirectional(ctx context.Context, cfg config, worker int) (int64, in
 			case <-ctx.Done():
 				return
 			default:
+				_ = conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
 				n, err := conn.Write(writeBuf)
 				if n > 0 {
 					atomic.AddInt64(&sent, int64(n))
@@ -236,7 +240,8 @@ func runTCPBidirectional(ctx context.Context, cfg config, worker int) (int64, in
 					atomic.AddInt64(&recv, int64(n))
 				}
 				if err != nil {
-					if ne, ok := err.(net.Error); ok && ne.Timeout() {
+					var netErr net.Error
+					if errors.As(err, &netErr) && netErr.Timeout() {
 						continue
 					}
 					return
@@ -278,7 +283,8 @@ func runUDPDownload(ctx context.Context, cfg config, worker int) (int64, error) 
 				total += int64(n)
 			}
 			if err != nil {
-				if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				var netErr net.Error
+				if errors.As(err, &netErr) && netErr.Timeout() {
 					continue
 				}
 				return total, err
@@ -311,6 +317,7 @@ func runUDPUpload(ctx context.Context, cfg config, worker int) (int64, error) {
 			_, _ = conn.WriteToUDP([]byte{'S'}, remote)
 			return total, nil
 		default:
+			_ = conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
 			n, err := conn.WriteToUDP(buf, remote)
 			if n > 0 {
 				total += int64(n)
@@ -344,7 +351,8 @@ func runWebSocket(ctx context.Context, cfg config, worker int) error {
 		default:
 			_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 			if _, _, err := conn.ReadMessage(); err != nil {
-				if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				var netErr net.Error
+				if errors.As(err, &netErr) && netErr.Timeout() {
 					continue
 				}
 				return err

@@ -4,7 +4,7 @@ Production deployment guide for openByte speed test server.
 
 ## Prerequisites
 
-- Go 1.25+ installed
+- Go 1.25.0+ installed
 - SSH access to production server
 - Root or sudo access for port binding (<1024)
 - Firewall rules configured (ports 8080, 8081, 8082)
@@ -33,7 +33,7 @@ Publish Docker image to GitHub Container Registry (GHCR) and deploy via SSH.
 
 Workflow lives at `.github/workflows/ci.yml`:
 - Runs `go test ./...`
-- Builds and pushes `ghcr.io/<owner>/openbyte:latest` and `:SHA`
+- Builds and pushes `ghcr.io/<owner>/openbyte:edge` and `:SHA` on `main`
 - Optionally SSH deploys to your server
 
 ### 2. Required secrets (GitHub repo settings)
@@ -44,8 +44,10 @@ Workflow lives at `.github/workflows/ci.yml`:
 - `SSH_PORT` — optional (default 22)
 - `REMOTE_DIR` — path containing `docker/docker-compose.ghcr.yaml` (e.g., `/opt/openbyte`)
 - `GHCR_USERNAME` — GHCR username (e.g., `SaveEnergy`)
-- `GHCR_OWNER` — image owner/namespace (e.g., `SaveEnergy`)
-- `IMAGE_TAG` — optional image tag override (e.g., `1.2.3`, default `edge`)
+
+Notes:
+- CI/release workflows derive `GHCR_OWNER` from the repository owner.
+- CI deploy sets `IMAGE_TAG` to the commit SHA; release deploy sets `IMAGE_TAG` to the semver tag.
 
 **GHCR pull on server**
 - `GHCR_TOKEN` — PAT with `read:packages` scope
@@ -62,7 +64,7 @@ mkdir -p /opt/openbyte
 cd /opt/openbyte
 ```
 
-Copy `docker/docker-compose.ghcr.yaml` and create a `.env` with runtime values:
+Copy both `docker/docker-compose.ghcr.yaml` and `docker/docker-compose.ghcr.traefik.yaml`, then create a `.env` with runtime values:
 
 ```bash
 SERVER_ID=openbyte-1
@@ -72,16 +74,16 @@ PUBLIC_HOST="speedtest.example.com"
 ALLOWED_ORIGINS="https://speedtest.example.com"
 TRUST_PROXY_HEADERS=true
 TRUSTED_PROXY_CIDRS="10.0.0.0/8,192.168.0.0/16"
-GHCR_OWNER=SaveEnergy
-IMAGE_TAG=edge
 ```
 
 Then, GH Actions can SSH in and run:
 
 ```bash
-docker compose -f docker/docker-compose.ghcr.yaml pull
-docker compose -f docker/docker-compose.ghcr.yaml up -d
+docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull
+docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d
 ```
+
+CI deploy path is Traefik-based (the workflow syncs and uses both compose files). Ensure the external `traefik` network exists on the server.
 
 For direct HTTP access without Traefik, include the web override:
 

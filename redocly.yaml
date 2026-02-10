@@ -1,0 +1,12 @@
+extends:
+  - recommended
+
+rules:
+  # Project policy: some endpoints intentionally public/no-auth.
+  security-defined: off
+  # Project policy: local dev server in spec and minimal MIT license block.
+  no-server-example.com: off
+  info-license-strict: off
+  # Project policy: not all operations declare explicit 4xx/2xx variants.
+  operation-4xx-response: off
+  operation-2xx-response: off

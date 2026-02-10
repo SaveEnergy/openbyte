@@ -8,6 +8,7 @@ import (
 
 	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/internal/config"
+	"github.com/saveenergy/openbyte/internal/results"
 	"github.com/saveenergy/openbyte/internal/stream"
 )
 
@@ -158,5 +159,113 @@ func TestSecurityHeadersMiddlewareSetsCSP(t *testing.T) {
 	}
 	if strings.Contains(csp, "connect-src *") {
 		t.Fatalf("csp should not allow wildcard connect-src: %q", csp)
+	}
+}
+
+func TestRateLimitSkipPathsAndStreamPathBehavior(t *testing.T) {
+	manager := stream.NewManager(10, 10)
+	handler := api.NewHandler(manager)
+	cfg := config.DefaultConfig()
+	cfg.GlobalRateLimit = 1
+	cfg.RateLimitPerIP = 1
+	router := api.NewRouter(handler, cfg)
+	router.SetRateLimiter(cfg)
+	router.SetWebSocketHandler(func(w http.ResponseWriter, r *http.Request, streamID string) {
+		w.WriteHeader(http.StatusOK)
+	})
+	h := router.SetupRoutes()
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/version", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first version request status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/ping", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code == http.StatusTooManyRequests {
+		t.Fatalf("ping endpoint should bypass rate limit")
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/download", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code == http.StatusTooManyRequests {
+		t.Fatalf("download endpoint should bypass rate limit")
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/upload", strings.NewReader("x"))
+	req.Header.Set("Content-Type", "application/octet-stream")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code == http.StatusTooManyRequests {
+		t.Fatalf("upload endpoint should bypass rate limit")
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/stream/550e8400-e29b-41d4-a716-446655440000/stream", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("stream websocket endpoint should be rate limited, got %d", rec.Code)
+	}
+}
+
+func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
+	manager := stream.NewManager(10, 10)
+	handler := api.NewHandler(manager)
+	router := api.NewRouter(handler, config.DefaultConfig())
+
+	store, err := results.New(t.TempDir()+"/results.db", 10)
+	if err != nil {
+		t.Fatalf("results.New: %v", err)
+	}
+	defer store.Close()
+	router.SetResultsHandler(results.NewHandler(store))
+
+	h := router.SetupRoutes()
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/results/abc12345", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("cache-control = %q, want %q", got, "no-store")
+	}
+	contentType := rec.Header().Get("Content-Type")
+	if !strings.Contains(contentType, "text/html") {
+		t.Fatalf("content-type = %q, want text/html", contentType)
+	}
+}
+
+func TestCriticalRoutesRespondOK(t *testing.T) {
+	manager := stream.NewManager(10, 10)
+	handler := api.NewHandler(manager)
+	router := api.NewRouter(handler, config.DefaultConfig())
+	h := router.SetupRoutes()
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+	}{
+		{name: "health", method: http.MethodGet, path: "/health"},
+		{name: "version", method: http.MethodGet, path: "/api/v1/version"},
+		{name: "ping", method: http.MethodGet, path: "/api/v1/ping"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(tt.method, "http://example.com"+tt.path, nil)
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("%s %s status = %d, want %d", tt.method, tt.path, rec.Code, http.StatusOK)
+			}
+		})
 	}
 }

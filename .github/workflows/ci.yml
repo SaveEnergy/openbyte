@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       docker: ${{ steps.filter.outputs.docker }}
+      web: ${{ steps.filter.outputs.web }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -40,11 +41,19 @@ jobs:
               - "cmd/**"
               - "internal/**"
               - "pkg/**"
+              - "api/**"
               - "go.mod"
               - "go.sum"
               - "web/**"
+            web:
+              - "web/**"
+              - "package.json"
+              - "playwright.config.js"
+              - "scripts/run-playwright.mjs"
+              - "test/e2e/**"
 
   checks:
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -61,6 +70,9 @@ jobs:
       - name: Lint
         run: make ci-lint
 
+      - name: OpenAPI lint
+        run: npx @redocly/cli@latest lint api/openapi.yaml --config redocly.yaml
+
       - name: Go mod tidy check
         run: |
           go mod tidy
@@ -74,23 +86,27 @@ jobs:
         if: github.event_name != 'pull_request'
         run: go test ./...
 
+      - name: Race tests (main/tags)
+        if: github.event_name == 'push'
+        run: go test ./... -race -short
+
       - name: Set up Bun
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' || needs.changes.outputs.web == 'true'
         uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2.1.2
         with:
           bun-version: "latest"
 
       - name: Install Playwright deps
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' || needs.changes.outputs.web == 'true'
         run: bun install --no-save
 
       - name: Get Playwright version
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' || needs.changes.outputs.web == 'true'
         id: pw-version
         run: echo "version=$(bunx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' || needs.changes.outputs.web == 'true'
         uses: actions/cache@v4
         id: pw-cache
         with:
@@ -98,15 +114,15 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
 
       - name: Install Playwright browsers
-        if: github.event_name != 'pull_request' && steps.pw-cache.outputs.cache-hit != 'true'
+        if: (github.event_name != 'pull_request' || needs.changes.outputs.web == 'true') && steps.pw-cache.outputs.cache-hit != 'true'
         run: bunx playwright install --with-deps
 
       - name: Install Playwright system deps
-        if: github.event_name != 'pull_request' && steps.pw-cache.outputs.cache-hit == 'true'
+        if: (github.event_name != 'pull_request' || needs.changes.outputs.web == 'true') && steps.pw-cache.outputs.cache-hit == 'true'
         run: bunx playwright install-deps
 
       - name: Playwright e2e
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' || needs.changes.outputs.web == 'true'
         run: env -u NO_COLOR bunx playwright test
 
   build-push:
@@ -124,18 +140,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set image name
-        run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/openbyte" >> "$GITHUB_ENV"
-
-      - name: Set version/tag env
+      - name: Compute image metadata
+        id: image-meta
         run: |
+          IMAGE_NAME="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/openbyte"
           BASE_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo 0.0.0)"
           SHORT_SHA="${GITHUB_SHA:0:7}"
-          echo "VERSION=${BASE_TAG}+${SHORT_SHA}" >> "$GITHUB_ENV"
-          echo "IMAGE_TAGS<<EOF" >> "$GITHUB_ENV"
-          echo "${IMAGE_NAME}:edge" >> "$GITHUB_ENV"
-          echo "${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_ENV"
-          echo "EOF" >> "$GITHUB_ENV"
+          echo "version=${BASE_TAG}+${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "image_tags<<EOF" >> "$GITHUB_OUTPUT"
+          echo "${IMAGE_NAME}:edge" >> "$GITHUB_OUTPUT"
+          echo "${IMAGE_NAME}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
@@ -155,8 +170,8 @@ jobs:
           target: server
           push: true
           build-args: |
-            VERSION=${{ env.VERSION }}
-          tags: ${{ env.IMAGE_TAGS }}
+            VERSION=${{ steps.image-meta.outputs.version }}
+          tags: ${{ steps.image-meta.outputs.image_tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

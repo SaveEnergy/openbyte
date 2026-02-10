@@ -289,3 +289,59 @@ func TestDownloadRespectsMaxDuration(t *testing.T) {
 		t.Fatalf("chunk=abc: status = %d, want 400", rec3.Code)
 	}
 }
+
+func TestSpeedTestHandlerPingResponseShape(t *testing.T) {
+	handler := api.NewSpeedTestHandler(10, 300)
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/ping", nil)
+	req.RemoteAddr = "203.0.113.10:12345"
+	rec := httptest.NewRecorder()
+
+	handler.Ping(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf("content-type = %q, want %q", got, "application/json")
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("cache-control = %q, want %q", got, "no-store")
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if pong, ok := resp["pong"].(bool); !ok || !pong {
+		t.Fatalf("pong = %v, want true", resp["pong"])
+	}
+	if _, ok := resp["timestamp"].(float64); !ok {
+		t.Fatalf("timestamp missing or wrong type: %T", resp["timestamp"])
+	}
+	if ip, ok := resp["client_ip"].(string); !ok || ip != "203.0.113.10" {
+		t.Fatalf("client_ip = %v, want 203.0.113.10", resp["client_ip"])
+	}
+	if ipv6, ok := resp["ipv6"].(bool); !ok || ipv6 {
+		t.Fatalf("ipv6 = %v, want false", resp["ipv6"])
+	}
+}
+
+func TestSpeedTestHandlerPingNilResolverFallback(t *testing.T) {
+	handler := api.NewSpeedTestHandler(10, 300)
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/ping", nil)
+	req.RemoteAddr = "[2001:db8::1]:4242"
+	rec := httptest.NewRecorder()
+
+	handler.Ping(rec, req)
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if ip, ok := resp["client_ip"].(string); !ok || ip != "2001:db8::1" {
+		t.Fatalf("client_ip = %v, want 2001:db8::1", resp["client_ip"])
+	}
+	if ipv6, ok := resp["ipv6"].(bool); !ok || !ipv6 {
+		t.Fatalf("ipv6 = %v, want true", resp["ipv6"])
+	}
+}

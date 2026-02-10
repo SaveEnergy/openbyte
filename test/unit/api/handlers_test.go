@@ -581,3 +581,34 @@ func TestStartStreamInvalidPacketSize(t *testing.T) {
 		t.Fatalf("small packet: status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }
+
+func TestStartStreamReturnsServiceUnavailableWhenAtCapacity(t *testing.T) {
+	mgr := stream.NewManager(1, 0)
+	mgr.Start()
+	defer mgr.Stop()
+
+	handler := api.NewHandler(mgr)
+
+	payload := map[string]interface{}{
+		"protocol":  "tcp",
+		"direction": "download",
+		"duration":  10,
+		"streams":   1,
+	}
+
+	body := mustMarshalJSON(t, payload)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	handler.StartStream(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("first stream status = %d, want %d", rec.Code, http.StatusCreated)
+	}
+
+	body = mustMarshalJSON(t, payload)
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
+	rec = httptest.NewRecorder()
+	handler.StartStream(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("second stream status = %d, want %d; body: %s", rec.Code, http.StatusServiceUnavailable, rec.Body.String())
+	}
+}

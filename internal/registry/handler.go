@@ -45,10 +45,14 @@ func (h *Handler) authenticate(r *http.Request) bool {
 		return false
 	}
 
-	if len(auth) > 7 && auth[:7] == "Bearer " {
-		return subtle.ConstantTimeCompare([]byte(auth[7:]), []byte(h.apiKey)) == 1
+	if !strings.HasPrefix(auth, "Bearer ") {
+		return false
 	}
-	return false
+	token := strings.TrimPrefix(auth, "Bearer ")
+	if token == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(token), []byte(h.apiKey)) == 1
 }
 
 // maxRegistryBodySize limits JSON request bodies for registry endpoints.

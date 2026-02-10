@@ -58,9 +58,6 @@ echo "Latest version: ${LATEST}"
 # Build download URL
 VERSION="${LATEST#v}"
 ARCHIVE="${BINARY_NAME}_${VERSION}_${OS}_${ARCH}.tar.gz"
-if [ "$OS" = "windows" ]; then
-    ARCHIVE="${BINARY_NAME}_${VERSION}_${OS}_${ARCH}.zip"
-fi
 URL="https://github.com/${REPO}/releases/download/${LATEST}/${ARCHIVE}"
 
 # Download and extract
@@ -71,11 +68,7 @@ echo "Downloading ${URL}..."
 curl -fsSL --connect-timeout 10 --max-time 60 "$URL" -o "${TMPDIR}/${ARCHIVE}"
 
 echo "Extracting..."
-if echo "$ARCHIVE" | grep -q '\.zip$'; then
-    unzip -q "${TMPDIR}/${ARCHIVE}" -d "$TMPDIR"
-else
-    tar xzf "${TMPDIR}/${ARCHIVE}" -C "$TMPDIR"
-fi
+tar xzf "${TMPDIR}/${ARCHIVE}" -C "$TMPDIR"
 
 # Install
 if [ ! -d "$INSTALL_DIR" ]; then
@@ -106,6 +99,6 @@ echo "openbyte ${LATEST} installed to ${INSTALL_DIR}/${BINARY_NAME}"
 echo ""
 echo "Quick start:"
 echo "  openbyte server                          # Start server"
-echo "  openbyte check --json <server-url>       # Quick connectivity check"
+echo "  openbyte check --json https://speed.example.com  # Quick connectivity check"
 echo "  openbyte client -p http -d download      # Full speed test"
 echo "  openbyte mcp                             # MCP server for AI agents"

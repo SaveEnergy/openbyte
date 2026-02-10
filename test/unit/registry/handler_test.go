@@ -139,6 +139,23 @@ func TestHandlerAuthWrongKey(t *testing.T) {
 	}
 }
 
+func TestHandlerAuthMalformedBearerHeader(t *testing.T) {
+	_, mux := setupHandler("secret-key")
+
+	for _, auth := range []string{"Bearer", "Bearer ", "Bear secret-key"} {
+		body := `{"id":"s1","name":"Test","host":"localhost"}`
+		req := httptest.NewRequest("POST", "/api/v1/registry/servers", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", auth)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("auth=%q: status = %d, want %d", auth, rec.Code, http.StatusUnauthorized)
+		}
+	}
+}
+
 func TestHandlerUpdateServer(t *testing.T) {
 	_, mux := setupHandler("")
 

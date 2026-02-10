@@ -55,7 +55,10 @@ func init() {
 		"fc00::/7",
 		"fe80::/10",
 	} {
-		_, network, _ := net.ParseCIDR(cidr)
+		_, network, err := net.ParseCIDR(cidr)
+		if err != nil || network == nil {
+			continue
+		}
 		privateNets = append(privateNets, network)
 	}
 }
@@ -66,6 +69,9 @@ func isPrivateIP(ipStr string) bool {
 		return false
 	}
 	for _, network := range privateNets {
+		if network == nil {
+			continue
+		}
 		if network.Contains(ip) {
 			return true
 		}

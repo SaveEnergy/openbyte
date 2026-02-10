@@ -21,6 +21,7 @@ type Client struct {
 	logger     *logging.Logger
 	stopCh     chan struct{}
 	wg         sync.WaitGroup
+	stopOnce   sync.Once
 	mu         sync.RWMutex
 	registered bool
 }
@@ -64,15 +65,17 @@ func (c *Client) Stop() {
 		return
 	}
 
-	close(c.stopCh)
-	c.wg.Wait()
+	c.stopOnce.Do(func() {
+		close(c.stopCh)
+		c.wg.Wait()
 
-	c.mu.RLock()
-	registered := c.registered
-	c.mu.RUnlock()
-	if registered {
-		c.deregister()
-	}
+		c.mu.RLock()
+		registered := c.registered
+		c.mu.RUnlock()
+		if registered {
+			c.deregister()
+		}
+	})
 }
 
 func (c *Client) register(activeTests int) error {

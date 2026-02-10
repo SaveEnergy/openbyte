@@ -151,6 +151,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "429":
           $ref: "#/components/responses/RateLimited"
+        "503":
+          $ref: "#/components/responses/ServerBusy"
 
   /api/v1/stream/{id}/status:
     get:

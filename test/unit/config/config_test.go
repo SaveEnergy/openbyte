@@ -166,3 +166,21 @@ func TestMaxStoredResultsValidation(t *testing.T) {
 		t.Fatalf("MaxStoredResults=100 should be valid: %v", err)
 	}
 }
+
+func TestValidateTrustedProxyCIDRsWithoutTrustProxyHeaders(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.TrustProxyHeaders = false
+	cfg.TrustedProxyCIDRs = []string{"10.0.0.0/8", "192.168.0.0/16"}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("valid trusted proxy CIDRs should pass even when trust proxy headers disabled: %v", err)
+	}
+}
+
+func TestValidateTrustedProxyCIDRsRejectsInvalidCIDR(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.TrustProxyHeaders = false
+	cfg.TrustedProxyCIDRs = []string{"not-a-cidr"}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("invalid trusted proxy CIDR should fail validation")
+	}
+}

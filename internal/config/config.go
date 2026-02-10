@@ -305,7 +305,8 @@ func (c *Config) Validate() error {
 	if c.Port == "" {
 		return fmt.Errorf("port cannot be empty")
 	}
-	if p, err := strconv.Atoi(c.Port); err != nil || p < 1 || p > 65535 {
+	httpPort, err := strconv.Atoi(c.Port)
+	if err != nil || httpPort < 1 || httpPort > 65535 {
 		return fmt.Errorf("invalid port %q: must be 1-65535", c.Port)
 	}
 	if c.TCPTestPort <= 0 || c.TCPTestPort > 65535 {
@@ -317,7 +318,6 @@ func (c *Config) Validate() error {
 	if c.TCPTestPort == c.UDPTestPort {
 		return fmt.Errorf("TCP and UDP test ports cannot be the same")
 	}
-	httpPort, _ := strconv.Atoi(c.Port)
 	if httpPort == c.TCPTestPort {
 		return fmt.Errorf("HTTP port (%s) and TCP test port (%d) cannot be the same", c.Port, c.TCPTestPort)
 	}
@@ -352,7 +352,7 @@ func (c *Config) Validate() error {
 	if c.MaxStoredResults <= 0 {
 		return fmt.Errorf("max stored results must be > 0")
 	}
-	if c.TrustProxyHeaders && len(c.TrustedProxyCIDRs) > 0 {
+	if len(c.TrustedProxyCIDRs) > 0 {
 		for _, entry := range c.TrustedProxyCIDRs {
 			if _, _, err := net.ParseCIDR(entry); err != nil {
 				return fmt.Errorf("invalid trusted proxy CIDR: %s", entry)

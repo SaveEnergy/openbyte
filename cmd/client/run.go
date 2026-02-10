@@ -138,11 +138,16 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 
 func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatter) error {
 	pingCtx, pingCancel := context.WithTimeout(ctx, 10*time.Second)
-	pingSamples, _ := measureHTTPPing(pingCtx, config.ServerURL, 20)
+	pingSamples, pingErr := measureHTTPPing(pingCtx, config.ServerURL, 20)
 	pingCancel()
 
-	latencyStats := calculateClientLatency(pingSamples)
-	jitter := calculateClientJitter(pingSamples)
+	latencyStats, jitter := computePingMetrics(pingSamples)
+	if pingErr != nil {
+		fmt.Fprintf(os.Stderr, "openbyte client: warning: ping sampling failed: %v\n", pingErr)
+	}
+	if len(pingSamples) == 0 {
+		fmt.Fprintln(os.Stderr, "openbyte client: warning: ping sampling returned no successful samples; latency/jitter set to 0")
+	}
 
 	graceTime := time.Duration(config.WarmUp) * time.Second
 
@@ -243,6 +248,13 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 			return ctx.Err()
 		}
 	}
+}
+
+func computePingMetrics(samples []time.Duration) (LatencyStats, float64) {
+	if len(samples) == 0 {
+		return LatencyStats{}, 0
+	}
+	return calculateClientLatency(samples), calculateClientJitter(samples)
 }
 
 func buildResults(streamID string, config *Config, metrics EngineMetrics, startTime time.Time) *StreamResults {

@@ -33,11 +33,11 @@
           <h2 class="dl-section-title">Install Skill</h2>
           <div class="dl-install-block">
             <div class="dl-code-block">
-              <code id="skillCmd">npx skills add https://github.com/SaveEnergy/openbyte</code>
+              <code id="skillCmd">npx skills add https://github.com/saveenergy/openbyte</code>
               <button class="dl-copy-btn" id="copySkillBtn" aria-label="Copy command">Copy</button>
             </div>
           </div>
-          <p class="skill-note">Or read <a class="skill-link" href="https://github.com/SaveEnergy/openbyte/blob/main/SKILL.md" target="_blank" rel="noopener noreferrer">SKILL.md</a> directly.</p>
+          <p class="skill-note">Or read <a class="skill-link" href="https://github.com/saveenergy/openbyte/blob/main/SKILL.md" target="_blank" rel="noopener noreferrer">SKILL.md</a> directly.</p>
         </div>
 
         <!-- MCP Server -->
@@ -93,7 +93,7 @@
               <tr><td><code>GET</code></td><td><code>/api/v1/results/{id}</code></td><td>Retrieve saved results</td></tr>
             </tbody>
           </table>
-          <p class="skill-note">Public API — no auth required. Full spec: <a class="skill-link" href="https://github.com/SaveEnergy/openbyte/blob/main/API.md" target="_blank" rel="noopener noreferrer">API.md</a> | <a class="skill-link" href="https://github.com/SaveEnergy/openbyte/blob/main/api/openapi.yaml" target="_blank" rel="noopener noreferrer">OpenAPI 3.1</a></p>
+          <p class="skill-note">Public API — no auth required. Full spec: <a class="skill-link" href="https://github.com/saveenergy/openbyte/blob/main/API.md" target="_blank" rel="noopener noreferrer">API.md</a> | <a class="skill-link" href="https://github.com/saveenergy/openbyte/blob/main/api/openapi.yaml" target="_blank" rel="noopener noreferrer">OpenAPI 3.1</a></p>
         </div>
 
         <!-- Go SDK -->
@@ -170,7 +170,7 @@ openbyte client -S https://speed.example.com -d upload --json</code></pre>
           <h2 class="dl-section-title">Install Binary</h2>
           <div class="dl-install-block">
             <div class="dl-code-block">
-              <code>curl -fsSL https://raw.githubusercontent.com/SaveEnergy/openbyte/main/scripts/install.sh | sh</code>
+              <code>curl -fsSL https://raw.githubusercontent.com/saveenergy/openbyte/main/scripts/install.sh | sh</code>
               <button class="dl-copy-btn" id="copyCurlBtn" aria-label="Copy command">Copy</button>
             </div>
           </div>
@@ -183,7 +183,7 @@ openbyte client -S https://speed.example.com -d upload --json</code></pre>
             </div>
             <div class="dl-install-block" style="margin-top: var(--space-sm)">
               <div class="dl-code-block">
-                <code>docker run -p 8080:8080 ghcr.io/saveenergy/openbyte:latest server</code>
+                <code>docker run -p 8080:8080 -p 8081:8081 -p 8082:8082/udp ghcr.io/saveenergy/openbyte:latest server</code>
                 <button class="dl-copy-btn" id="copyDockerBtn" aria-label="Copy command">Copy</button>
               </div>
             </div>

@@ -490,7 +490,13 @@ async function checkServer() {
           continue;
         }
         
-        const data = await res.json();
+        let data;
+        try {
+          data = await res.json();
+        } catch (_) {
+          await res.text().catch(() => {});
+          continue;
+        }
         if (data.status === 'ok' || data.status === 'healthy' || data.pong === true) {
           ok = true;
           break;
@@ -701,7 +707,7 @@ async function measureLatency(signal) {
           }
           capturedIP = true;
         } catch (_) {
-          // JSON parse failed; skip
+          await res.text().catch(() => {});
         }
       } else {
         await res.text().catch(() => {});

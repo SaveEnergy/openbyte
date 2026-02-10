@@ -63,7 +63,7 @@ GET    /health                        # Health check
 ```
 
 **Implementation:**
-- `gorilla/mux` for routing
+- stdlib `net/http.ServeMux` (Go 1.22+) for routing
 - `gorilla/websocket` for real-time streaming
 - Token bucket rate limiting (per-IP + global)
 - CORS middleware with wildcard pattern support
@@ -235,7 +235,7 @@ Token bucket with fractional remainder preservation:
 
 ### Headers
 
-- `Content-Security-Policy`: `script-src 'self'`, `font-src 'self'`, `connect-src *`
+- `Content-Security-Policy`: `script-src 'self'`, `font-src 'self'`, `connect-src 'self' https: http: ws: wss:`
 - `X-Content-Type-Options`: `nosniff`
 - `X-Frame-Options`: `DENY`
 - `Referrer-Policy`: `strict-origin-when-cross-origin`

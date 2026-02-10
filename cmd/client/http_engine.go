@@ -294,7 +294,9 @@ func measureHTTPPing(ctx context.Context, serverURL string, samples int) ([]time
 		}
 		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
-		results = append(results, time.Since(start))
+		if resp.StatusCode == http.StatusOK {
+			results = append(results, time.Since(start))
+		}
 	}
 	return results, nil
 }

@@ -287,3 +287,11 @@ func TestHandlerRoundTrip(t *testing.T) {
 		t.Errorf("server_name = %q, want Test", result.ServerName)
 	}
 }
+
+func TestStoreCloseIdempotent(t *testing.T) {
+	store, cleanup := tempStore(t, 100)
+	defer cleanup()
+
+	store.Close()
+	store.Close()
+}

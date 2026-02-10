@@ -6,17 +6,17 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/SaveEnergy/openbyte/actions/workflows/ci.yml">
-    <img src="https://github.com/SaveEnergy/openbyte/actions/workflows/ci.yml/badge.svg" alt="CI">
+  <a href="https://github.com/saveenergy/openbyte/actions/workflows/ci.yml">
+    <img src="https://github.com/saveenergy/openbyte/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
-  <a href="https://github.com/SaveEnergy/openbyte/releases">
-    <img src="https://img.shields.io/github/v/release/SaveEnergy/openbyte?sort=semver" alt="Latest Release">
+  <a href="https://github.com/saveenergy/openbyte/releases">
+    <img src="https://img.shields.io/github/v/release/saveenergy/openbyte?sort=semver" alt="Latest Release">
   </a>
-  <a href="https://github.com/SaveEnergy/openbyte/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/SaveEnergy/openbyte" alt="License">
+  <a href="https://github.com/saveenergy/openbyte/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/saveenergy/openbyte" alt="License">
   </a>
   <a href="https://go.dev/">
-    <img src="https://img.shields.io/github/go-mod/go-version/SaveEnergy/openbyte" alt="Go Version">
+    <img src="https://img.shields.io/github/go-mod/go-version/saveenergy/openbyte" alt="Go Version">
   </a>
 </p>
 

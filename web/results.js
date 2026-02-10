@@ -2,6 +2,7 @@
   var loadingView = document.getElementById('loadingView');
   var resultView = document.getElementById('resultView');
   var errorView = document.getElementById('errorView');
+  var errorMessage = document.querySelector('#errorView .error-message');
   if (!loadingView || !resultView || !errorView) {
     console.error('Results page missing required view elements');
     return;
@@ -10,35 +11,63 @@
   var parts = window.location.pathname.replace(/\/+$/, '').split('/').filter(Boolean);
   var id = parts[parts.length - 1];
   if (!id || !/^[0-9a-zA-Z]{8}$/.test(id)) {
-    showError();
+    showError('Result ID format is invalid.');
     return;
   }
 
   loadingView.classList.remove('hidden');
   resultView.classList.add('hidden');
 
-  fetch('/api/v1/results/' + id)
+  function userError(message) {
+    var err = new Error(message);
+    err.userSafe = true;
+    return err;
+  }
+
+  var timeoutController = new AbortController();
+  var timeoutHandle = setTimeout(function() { timeoutController.abort(); }, 20000);
+
+  fetch('/api/v1/results/' + id, { signal: timeoutController.signal })
     .then(function(res) {
       if (!res.ok) {
+        var message = 'Unable to load result.';
+        if (res.status === 404) {
+          message = 'Result not found or has expired.';
+        } else if (res.status >= 500) {
+          message = 'Server error while loading result.';
+        }
         return res.text().catch(function() {}).then(function() {
-          throw new Error('HTTP ' + res.status);
+          throw userError(message);
         });
       }
       return res.json();
     })
     .then(function(data) {
+      clearTimeout(timeoutHandle);
       loadingView.classList.add('hidden');
       resultView.classList.remove('hidden');
       renderResult(data);
     })
     .catch(function(err) {
+      clearTimeout(timeoutHandle);
       console.error('Results fetch failed:', err);
-      showError();
+      if (err && err.name === 'AbortError') {
+        showError('Request timed out. Please try again.');
+        return;
+      }
+      if (err && err.userSafe && err.message) {
+        showError(err.message);
+        return;
+      }
+      showError('Unable to load result.');
     });
 
-  function showError() {
+  function showError(message) {
     loadingView.classList.add('hidden');
     resultView.classList.add('hidden');
+    if (errorMessage && typeof message === 'string' && message.trim() !== '') {
+      errorMessage.textContent = message;
+    }
     errorView.classList.remove('hidden');
   }
 
@@ -53,7 +82,7 @@
   }
 
   function renderResult(d) {
-    if (!d || typeof d !== 'object') { showError(); return; }
+    if (!d || typeof d !== 'object') { showError('Invalid result payload.'); return; }
     try {
       var downloadEl = document.getElementById('downloadResult');
       var uploadEl = document.getElementById('uploadResult');
@@ -106,6 +135,6 @@
 
       document.title = 'openByte — ' + dl.value + ' ' + dl.unit + ' / ' +
         ul.value + ' ' + ul.unit;
-    } catch (_) { showError(); }
+    } catch (_) { showError('Failed to render result.'); }
   }
 })();

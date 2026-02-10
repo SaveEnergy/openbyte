@@ -117,15 +117,26 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 	state, err := h.manager.CreateStream(config)
 	if err != nil {
 		var streamErr *errors.StreamError
-		if stdErrors.As(err, &streamErr) && streamErr.Code == errors.ErrCodeStreamAlreadyExists {
-			respondError(w, err, http.StatusConflict)
-			return
+		if stdErrors.As(err, &streamErr) {
+			if streamErr.Code == errors.ErrCodeStreamAlreadyExists {
+				respondError(w, err, http.StatusConflict)
+				return
+			}
+			if streamErr.Code == errors.ErrCodeResourceExhausted {
+				respondError(w, err, http.StatusServiceUnavailable)
+				return
+			}
 		}
 		respondError(w, err, http.StatusInternalServerError)
 		return
 	}
 
 	if err := h.manager.StartStream(state.Config.ID); err != nil {
+		if cancelErr := h.manager.CancelStream(state.Config.ID); cancelErr != nil {
+			logging.Warn("start stream cleanup failed",
+				logging.Field{Key: "stream_id", Value: state.Config.ID},
+				logging.Field{Key: "error", Value: cancelErr})
+		}
 		respondError(w, err, http.StatusInternalServerError)
 		return
 	}

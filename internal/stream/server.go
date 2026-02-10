@@ -31,6 +31,7 @@ type Server struct {
 	cancel           context.CancelFunc
 	randomData       []byte
 	recvPool         sync.Pool
+	closeOnce        sync.Once
 }
 
 const (
@@ -407,6 +408,7 @@ func (c *udpClients) getOrCreate(key string, addr *net.UDPAddr, s *Server) (*udp
 	}
 	client := &udpClientState{
 		addr:         addr,
+		senderActive: 1,
 		lastSeenUnix: time.Now().UnixNano(),
 	}
 	c.m[key] = client
@@ -418,10 +420,16 @@ func (c *udpClients) cleanup() {
 	c.mu.Lock()
 	for key, client := range c.m {
 		lastSeen := time.Unix(0, atomic.LoadInt64(&client.lastSeenUnix))
-		if now.Sub(lastSeen) > 30*time.Second {
+		if now.Sub(lastSeen) > 30*time.Second && atomic.LoadInt32(&client.senderActive) == 0 {
 			delete(c.m, key)
 		}
 	}
+	c.mu.Unlock()
+}
+
+func (c *udpClients) remove(key string) {
+	c.mu.Lock()
+	delete(c.m, key)
 	c.mu.Unlock()
 }
 
@@ -464,6 +472,7 @@ func (s *Server) udpReader(clients *udpClients, wg *sync.WaitGroup) {
 	buf := make([]byte, s.config.UDPBufferSize)
 
 	for {
+		_ = s.udpConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 		n, addr, err := s.udpConn.ReadFromUDP(buf)
 		if err != nil {
 			if s.ctx.Err() != nil {
@@ -473,6 +482,7 @@ func (s *Server) udpReader(clients *udpClients, wg *sync.WaitGroup) {
 			if errors.As(err, &netErr) && netErr.Timeout() {
 				continue
 			}
+			logging.Warn("UDP read error", logging.Field{Key: "error", Value: err})
 			return
 		}
 
@@ -491,7 +501,7 @@ func (s *Server) udpReader(clients *udpClients, wg *sync.WaitGroup) {
 			}
 			if created {
 				s.wg.Add(1)
-				go s.udpSender(client)
+				go s.udpSender(clients, clientKey, client)
 			}
 		}
 
@@ -515,13 +525,21 @@ func (s *Server) udpReader(clients *udpClients, wg *sync.WaitGroup) {
 type udpClientState struct {
 	addr         *net.UDPAddr
 	downloading  int32
+	senderActive int32
 	bytesRecv    int64
 	lastSeenUnix int64
 }
 
-func (s *Server) udpSender(client *udpClientState) {
+func (s *Server) udpSender(clients *udpClients, clientKey string, client *udpClientState) {
 	defer s.wg.Done()
 	defer atomic.AddInt64(&s.activeUDPSenders, -1)
+	defer atomic.StoreInt32(&client.senderActive, 0)
+	defer clients.remove(clientKey)
+	defer func() {
+		if s.udpConn != nil {
+			_ = s.udpConn.SetWriteDeadline(time.Time{})
+		}
+	}()
 
 	packet := make([]byte, s.config.UDPBufferSize)
 	n := len(packet)
@@ -541,6 +559,7 @@ func (s *Server) udpSender(client *udpClientState) {
 				return
 			}
 			if atomic.LoadInt32(&client.downloading) == 1 {
+				_ = s.udpConn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 				if _, err := s.udpConn.WriteToUDP(packet, client.addr); err != nil {
 					logging.Warn("UDP send error", logging.Field{Key: "error", Value: err})
 					return
@@ -565,15 +584,17 @@ func (s *Server) getRecvBuffer() []byte {
 }
 
 func (s *Server) Close() error {
-	s.cancel()
+	s.closeOnce.Do(func() {
+		s.cancel()
 
-	if s.tcpListener != nil {
-		s.tcpListener.Close()
-	}
-	if s.udpConn != nil {
-		s.udpConn.Close()
-	}
+		if s.tcpListener != nil {
+			s.tcpListener.Close()
+		}
+		if s.udpConn != nil {
+			s.udpConn.Close()
+		}
 
-	s.wg.Wait()
+		s.wg.Wait()
+	})
 	return nil
 }
