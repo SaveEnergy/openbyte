@@ -28,7 +28,7 @@ jobs:
         run: go test -short ./...
 
       - name: Race tests (release gate)
-        run: go test -race -short ./...
+        run: go test -race -short ./... -p 1
 
       - name: OpenAPI lint
         run: npx @redocly/cli@latest lint api/openapi.yaml --config redocly.yaml

@@ -89,6 +89,7 @@
 - Release workflow now gates artifact/image publish behind `go test -short ./...` to prevent untested tag releases.
 - Release workflow now also runs OpenAPI lint (`redocly lint api/openapi.yaml`) before asset/image publish.
 - Release workflow now includes race-detector short suite (`go test -race -short ./...`) before publishing artifacts/images.
+- CI/release race gates now run with package parallelism capped (`-p 1`) to reduce runner memory pressure and avoid intermittent SIGTERM/143 failures under race instrumentation.
 - `openbyte server` now accepts deploy-oriented CLI flags (ports, server identity, limits, registry/proxy options); when explicitly set, flags override env-derived config.
 - README now uses theme-aware SVG wordmark images (light/dark) plus status flairs (CI, release, license, Go version) for consistent GitHub rendering.
 - Web assets embedded via `//go:embed` (HTML, CSS, JS, fonts).
