@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 220" role="img" aria-label="openByte">
+  <title>openByte</title>
+  <text x="50%" y="55%" text-anchor="middle" dominant-baseline="middle"
+        font-family="DM Sans, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+        font-size="150" font-weight="700" letter-spacing="1">
+    <tspan fill="#0f172a">open</tspan><tspan fill="#00d4aa">Byte</tspan>
+  </text>
+</svg>

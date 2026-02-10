@@ -1,4 +1,9 @@
-<h1 align="center" style="font-size:3.4rem; line-height:1.05; letter-spacing:0.01em; margin:0.15em 0;">open<span style="color:#00d4aa;">Byte</span></h1>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="web/openbyte-wordmark-dark.svg">
+    <img src="web/openbyte-wordmark-light.svg" alt="openByte" width="460">
+  </picture>
+</p>
 
 <p align="center">
   <a href="https://github.com/SaveEnergy/openbyte/actions/workflows/ci.yml">

@@ -84,7 +84,7 @@
 ### Build & Deploy
 - Single `openbyte` binary with `server`/`client`/`check`/`mcp` subcommands.
 - `openbyte server` now accepts deploy-oriented CLI flags (ports, server identity, limits, registry/proxy options); when explicitly set, flags override env-derived config.
-- README now includes centered wordmark-style `openByte` heading + status flairs (CI, release, license, Go version) for quick project health visibility.
+- README now uses theme-aware SVG wordmark images (light/dark) plus status flairs (CI, release, license, Go version) for consistent GitHub rendering.
 - Web assets embedded via `//go:embed` (HTML, CSS, JS, fonts).
 - Self-hosted fonts (DM Sans, JetBrains Mono) — no external CDN dependencies.
 - Deploy scripts pin image tags explicitly (`IMAGE_TAG=$GITHUB_SHA` on CI main, `IMAGE_TAG=$SEMVER` on release tags) so pull/deploy targets deterministic image.
