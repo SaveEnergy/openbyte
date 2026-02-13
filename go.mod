@@ -8,7 +8,7 @@ require (
 	github.com/mark3labs/mcp-go v0.43.2
 	golang.org/x/term v0.40.0
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.44.3
+	modernc.org/sqlite v1.45.0
 )
 
 require (
