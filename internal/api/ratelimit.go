@@ -18,6 +18,7 @@ type RateLimiter struct {
 	lastCleanup      time.Time
 	cleanupInterval  time.Duration
 	ipLimitTTL       time.Duration
+	maxIPEntries     int
 	clientIPResolver *ClientIPResolver
 }
 
@@ -28,6 +29,10 @@ type IPLimit struct {
 }
 
 func NewRateLimiter(cfg *config.Config) *RateLimiter {
+	maxIPEntries := cfg.GlobalRateLimit * 20
+	if maxIPEntries < 10000 {
+		maxIPEntries = 10000
+	}
 	return &RateLimiter{
 		config:           cfg,
 		ipLimits:         make(map[string]*IPLimit),
@@ -36,6 +41,7 @@ func NewRateLimiter(cfg *config.Config) *RateLimiter {
 		lastCleanup:      time.Now(),
 		cleanupInterval:  5 * time.Minute,
 		ipLimitTTL:       10 * time.Minute,
+		maxIPEntries:     maxIPEntries,
 		clientIPResolver: NewClientIPResolver(cfg),
 	}
 }
@@ -64,6 +70,15 @@ func (rl *RateLimiter) SetCleanupPolicy(cleanupInterval, ipLimitTTL time.Duratio
 	rl.cleanupInterval = cleanupInterval
 	rl.ipLimitTTL = ipLimitTTL
 	rl.lastCleanup = time.Now()
+}
+
+// SetMaxIPEntries overrides the per-IP cardinality cap (mainly for tests).
+func (rl *RateLimiter) SetMaxIPEntries(limit int) {
+	rl.ipMu.Lock()
+	defer rl.ipMu.Unlock()
+	if limit > 0 {
+		rl.maxIPEntries = limit
+	}
 }
 
 func (rl *RateLimiter) allowGlobal() bool {
@@ -104,6 +119,13 @@ func (rl *RateLimiter) allowIP(ip string) bool {
 	}
 	limit, exists := rl.ipLimits[ip]
 	if !exists {
+		if rl.maxIPEntries > 0 && len(rl.ipLimits) >= rl.maxIPEntries {
+			rl.ipMu.Unlock()
+			if shouldCleanup {
+				rl.cleanupExpiredIPLimits(now)
+			}
+			return false
+		}
 		limit = &IPLimit{
 			tokens:     rl.config.RateLimitPerIP,
 			lastRefill: now,

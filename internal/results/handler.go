@@ -73,6 +73,7 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxResultBodyBytes)
 
 	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
 	var req saveRequest
 	if err := decoder.Decode(&req); err != nil {
 		io.Copy(io.Discard, r.Body)
@@ -125,7 +126,8 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 	id, err := h.store.Save(result)
 	if err != nil {
 		logging.Warn("results: save failed", logging.Field{Key: "error", Value: err})
-		respondJSONError(w, "failed to save result", http.StatusInternalServerError)
+		msg, code := mapSaveStoreError(err)
+		respondJSONError(w, msg, code)
 		return
 	}
 
@@ -161,6 +163,13 @@ func mapGetStoreError(err error) (string, int) {
 		return "store temporarily unavailable", http.StatusServiceUnavailable
 	}
 	return "internal error", http.StatusInternalServerError
+}
+
+func mapSaveStoreError(err error) (string, int) {
+	if errors.Is(err, ErrStoreRetryable) {
+		return "store temporarily unavailable", http.StatusServiceUnavailable
+	}
+	return "failed to save result", http.StatusInternalServerError
 }
 
 func hasNonFinite(vals ...float64) bool {

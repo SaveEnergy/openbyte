@@ -172,6 +172,14 @@ func TestServiceStartStop(t *testing.T) {
 	svc.Stop()
 }
 
+func TestServiceStartIdempotent(t *testing.T) {
+	svc := registry.NewService(30*time.Second, 20*time.Millisecond)
+	svc.Start()
+	svc.Start()
+	time.Sleep(30 * time.Millisecond)
+	svc.Stop()
+}
+
 func TestServiceCleanupExpired(t *testing.T) {
 	// TTL of 50ms + short cleanup interval
 	svc := registry.NewService(50*time.Millisecond, 20*time.Millisecond)

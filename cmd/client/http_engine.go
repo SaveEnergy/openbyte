@@ -148,11 +148,19 @@ func (e *HTTPTestEngine) runDownload(ctx context.Context) error {
 	}
 
 	wg.Wait()
-	select {
-	case err := <-errCh:
-		return err
-	default:
-		return nil
+	var errs []error
+	for {
+		select {
+		case err := <-errCh:
+			if err != nil {
+				errs = append(errs, err)
+			}
+		default:
+			if len(errs) == 0 {
+				return nil
+			}
+			return fmt.Errorf("download streams failed: %w", errors.Join(errs...))
+		}
 	}
 }
 
@@ -207,11 +215,19 @@ func (e *HTTPTestEngine) runUpload(ctx context.Context) error {
 	}
 
 	wg.Wait()
-	select {
-	case err := <-errCh:
-		return err
-	default:
-		return nil
+	var errs []error
+	for {
+		select {
+		case err := <-errCh:
+			if err != nil {
+				errs = append(errs, err)
+			}
+		default:
+			if len(errs) == 0 {
+				return nil
+			}
+			return fmt.Errorf("upload streams failed: %w", errors.Join(errs...))
+		}
 	}
 }
 

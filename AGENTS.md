@@ -80,7 +80,12 @@
 ### Live Queue (active only)
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 |---|---|---|---|---|---|---|
-| _none_ | - | - | - | Backlog cleared on `2026-02-15` | See `Last Completed Cycle` + git history | `go test -short ./...` |
+| — | — | A0 | Empty | Backlog pruned after full PDCA closeout; add only newly discovered work items here. | Completed rows archived in git history + last cycle notes below. | `go test -short ./...` |
+
+### Analysis Snapshot (2026-02-05)
+- Scope: backend runtime, client/web paths, storage/registry, CI/deploy workflows.
+- Method: multi-pass review + targeted source validation (high-confidence issues only).
+- Priority order: `stream-01` > `results-01` > `registry-01` > `api-02` > `web-02` > `api-03` > `stream-02` > `results-02` > `config-01` > `registry-02` > `web-01` > `api-04` > `metrics-01` > `compose-02` > `ci-01`.
 
 ### Last Completed Cycle
 - Cycle: `2026-02-15 #24`

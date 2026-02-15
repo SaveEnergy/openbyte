@@ -59,6 +59,7 @@ echo "Latest version: ${LATEST}"
 VERSION="${LATEST#v}"
 ARCHIVE="${BINARY_NAME}_${VERSION}_${OS}_${ARCH}.tar.gz"
 URL="https://github.com/${REPO}/releases/download/${LATEST}/${ARCHIVE}"
+CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${LATEST}/checksums.txt"
 
 # Download and extract
 TMPDIR=$(mktemp -d)
@@ -66,6 +67,28 @@ trap 'rm -rf "$TMPDIR"' EXIT
 
 echo "Downloading ${URL}..."
 curl -fsSL --connect-timeout 10 --max-time 60 "$URL" -o "${TMPDIR}/${ARCHIVE}"
+echo "Downloading checksums..."
+curl -fsSL --connect-timeout 10 --max-time 60 "$CHECKSUMS_URL" -o "${TMPDIR}/checksums.txt"
+
+if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
+    echo "Error: sha256sum or shasum required for checksum verification"
+    exit 1
+fi
+
+if command -v sha256sum >/dev/null 2>&1; then
+    ACTUAL_SUM="$(sha256sum "${TMPDIR}/${ARCHIVE}" | awk '{print $1}')"
+else
+    ACTUAL_SUM="$(shasum -a 256 "${TMPDIR}/${ARCHIVE}" | awk '{print $1}')"
+fi
+EXPECTED_SUM="$(awk -v f="$ARCHIVE" '$2 == f {print $1}' "${TMPDIR}/checksums.txt" | head -n 1)"
+if [ -z "$EXPECTED_SUM" ]; then
+    echo "Error: checksum entry missing for ${ARCHIVE}"
+    exit 1
+fi
+if [ "$ACTUAL_SUM" != "$EXPECTED_SUM" ]; then
+    echo "Error: checksum mismatch for ${ARCHIVE}"
+    exit 1
+fi
 
 echo "Extracting..."
 tar xzf "${TMPDIR}/${ARCHIVE}" -C "$TMPDIR"

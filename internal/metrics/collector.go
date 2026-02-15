@@ -54,6 +54,9 @@ func NewCollector() *Collector {
 }
 
 func (c *Collector) RecordBytes(bytes int64, direction string) {
+	if bytes <= 0 {
+		return
+	}
 	if direction == "sent" {
 		atomic.AddInt64(&c.bytesSent, bytes)
 	} else {

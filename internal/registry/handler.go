@@ -128,6 +128,7 @@ func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxRegistryBodySize)
 	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
 	var info types.ServerInfo
 	if err := decoder.Decode(&info); err != nil {
 		io.Copy(io.Discard, r.Body)
@@ -180,6 +181,7 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxRegistryBodySize)
 	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
 	var req updateServerRequest
 	if err := decoder.Decode(&req); err != nil {
 		io.Copy(io.Discard, r.Body)
@@ -202,16 +204,9 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	current, exists := h.service.Get(id)
-	if !exists {
-		respondRegistryError(w, "server not found", http.StatusNotFound)
-		return
-	}
-	merged := current.ServerInfo
-	applyServerUpdatePatch(&merged, req)
-	merged.ID = id
-
-	if !h.service.Update(id, merged) {
+	if !h.service.UpdatePatched(id, func(dst *types.ServerInfo) {
+		applyServerUpdatePatch(dst, req)
+	}) {
 		respondRegistryError(w, "server not found", http.StatusNotFound)
 		return
 	}

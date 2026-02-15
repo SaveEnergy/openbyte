@@ -71,7 +71,7 @@ func speedTestTool() mcp.Tool {
 			mcp.Description("Test direction: download or upload (default: download)"),
 		),
 		mcp.WithNumber("duration",
-			mcp.Description("Test duration in seconds, 1-60 (default: 10)"),
+			mcp.Description("Test duration in seconds, 1-300 (default: 10)"),
 		),
 		mcp.WithString("api_key",
 			mcp.Description("Optional bearer API key for authenticated endpoints"),
@@ -206,8 +206,8 @@ func ValidateSpeedTestInput(direction string, duration int) error {
 	if direction != "download" && direction != "upload" {
 		return fmt.Errorf("direction must be download or upload")
 	}
-	if duration < 1 || duration > 60 {
-		return fmt.Errorf("duration must be 1-60")
+	if duration < 1 || duration > 300 {
+		return fmt.Errorf("duration must be 1-300")
 	}
 	return nil
 }

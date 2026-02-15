@@ -215,25 +215,26 @@ jobs:
         run: |
           set -euo pipefail
           [ -n "${REMOTE_DIR:-}" ] || { echo "REMOTE_DIR not set"; exit 1; }
-          install -d -m 700 ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          touch ~/.ssh/known_hosts
-          timeout 15 ssh-keyscan -p "${SSH_PORT:-22}" -H "$SSH_HOST" > ~/.ssh/known_hosts.tmp
-          [ -s ~/.ssh/known_hosts.tmp ] || { echo "ssh-keyscan returned no host keys"; exit 1; }
-          cat ~/.ssh/known_hosts.tmp >> ~/.ssh/known_hosts
-          rm -f ~/.ssh/known_hosts.tmp
-          ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "mkdir -p \"${REMOTE_DIR}/docker\""
-          scp -i ~/.ssh/id_rsa -P "${SSH_PORT:-22}" \
+          SSH_TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$SSH_TMP_DIR"' EXIT
+          printf '%s\n' "$SSH_KEY" > "$SSH_TMP_DIR/id_rsa"
+          chmod 600 "$SSH_TMP_DIR/id_rsa"
+          touch "$SSH_TMP_DIR/known_hosts"
+          timeout 15 ssh-keyscan -p "${SSH_PORT:-22}" -H "$SSH_HOST" > "$SSH_TMP_DIR/known_hosts.tmp"
+          [ -s "$SSH_TMP_DIR/known_hosts.tmp" ] || { echo "ssh-keyscan returned no host keys"; exit 1; }
+          cat "$SSH_TMP_DIR/known_hosts.tmp" >> "$SSH_TMP_DIR/known_hosts"
+          rm -f "$SSH_TMP_DIR/known_hosts.tmp"
+          ssh -i "$SSH_TMP_DIR/id_rsa" -o UserKnownHostsFile="$SSH_TMP_DIR/known_hosts" -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "mkdir -p \"${REMOTE_DIR}/docker\""
+          scp -i "$SSH_TMP_DIR/id_rsa" -o UserKnownHostsFile="$SSH_TMP_DIR/known_hosts" -P "${SSH_PORT:-22}" \
             docker/docker-compose.ghcr.yaml \
             docker/docker-compose.ghcr.traefik.yaml \
             "${SSH_USER}@${SSH_HOST}:${REMOTE_DIR}/docker/"
-          ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" \
+          ssh -i "$SSH_TMP_DIR/id_rsa" -o UserKnownHostsFile="$SSH_TMP_DIR/known_hosts" -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" \
             "test -f \"${REMOTE_DIR}/docker/docker-compose.ghcr.yaml\" && test -f \"${REMOTE_DIR}/docker/docker-compose.ghcr.traefik.yaml\""
           local_main_sha="$(sha256sum docker/docker-compose.ghcr.yaml | cut -d ' ' -f1)"
           local_traefik_sha="$(sha256sum docker/docker-compose.ghcr.traefik.yaml | cut -d ' ' -f1)"
-          remote_main_sha="$(ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "if command -v sha256sum >/dev/null 2>&1; then sha256sum \"${REMOTE_DIR}/docker/docker-compose.ghcr.yaml\" | cut -d ' ' -f1; else shasum -a 256 \"${REMOTE_DIR}/docker/docker-compose.ghcr.yaml\" | cut -d ' ' -f1; fi")"
-          remote_traefik_sha="$(ssh -i ~/.ssh/id_rsa -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "if command -v sha256sum >/dev/null 2>&1; then sha256sum \"${REMOTE_DIR}/docker/docker-compose.ghcr.traefik.yaml\" | cut -d ' ' -f1; else shasum -a 256 \"${REMOTE_DIR}/docker/docker-compose.ghcr.traefik.yaml\" | cut -d ' ' -f1; fi")"
+          remote_main_sha="$(ssh -i "$SSH_TMP_DIR/id_rsa" -o UserKnownHostsFile="$SSH_TMP_DIR/known_hosts" -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "if command -v sha256sum >/dev/null 2>&1; then sha256sum \"${REMOTE_DIR}/docker/docker-compose.ghcr.yaml\" | cut -d ' ' -f1; else shasum -a 256 \"${REMOTE_DIR}/docker/docker-compose.ghcr.yaml\" | cut -d ' ' -f1; fi")"
+          remote_traefik_sha="$(ssh -i "$SSH_TMP_DIR/id_rsa" -o UserKnownHostsFile="$SSH_TMP_DIR/known_hosts" -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "if command -v sha256sum >/dev/null 2>&1; then sha256sum \"${REMOTE_DIR}/docker/docker-compose.ghcr.traefik.yaml\" | cut -d ' ' -f1; else shasum -a 256 \"${REMOTE_DIR}/docker/docker-compose.ghcr.traefik.yaml\" | cut -d ' ' -f1; fi")"
           if [ "$local_main_sha" != "$remote_main_sha" ]; then
             echo "compose checksum mismatch for docker-compose.ghcr.yaml"
             exit 1
@@ -262,12 +263,26 @@ jobs:
               docker network inspect traefik >/dev/null 2>&1 || { echo "traefik network missing after create"; exit 1; }
               OWNER_LC=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
               GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull || { echo "docker compose pull failed"; exit 1; }
-              GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
               EXPECTED_IMAGE="ghcr.io/${OWNER_LC}/openbyte:${DEPLOY_TAG}"
               expected_id=$(docker image inspect "$EXPECTED_IMAGE" -f "{{.Id}}" 2>/dev/null || true)
+              [ -n "$expected_id" ] || { echo "expected image missing after pull: $EXPECTED_IMAGE"; docker logout ghcr.io || true; exit 1; }
+              rollback_name="openbyte_rollback_prev"
+              rollback_enabled=0
+              if docker inspect openbyte >/dev/null 2>&1; then
+                docker rm -f "$rollback_name" >/dev/null 2>&1 || true
+                docker rename openbyte "$rollback_name"
+                rollback_enabled=1
+              fi
+              GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
               running_id=$(docker inspect -f "{{.Image}}" openbyte 2>/dev/null || true)
               if [ -z "$expected_id" ] || [ -z "$running_id" ] || [ "$expected_id" != "$running_id" ]; then
                 echo "deployed image mismatch expected=$EXPECTED_IMAGE expected_id=$expected_id running_id=$running_id"
+                if [ "$rollback_enabled" -eq 1 ]; then
+                  docker rm -f openbyte >/dev/null 2>&1 || true
+                  docker rename "$rollback_name" openbyte >/dev/null 2>&1 || true
+                  docker start openbyte >/dev/null 2>&1 || true
+                fi
+                docker logout ghcr.io || true
                 exit 1
               fi
               for i in {1..20}; do
@@ -279,11 +294,21 @@ jobs:
                 fi
                 status=$(docker inspect -f "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" openbyte 2>/dev/null || true)
                 if [ "$status" = "healthy" ]; then
+                  if [ "$rollback_enabled" -eq 1 ]; then
+                    docker rm -f "$rollback_name" >/dev/null 2>&1 || true
+                  fi
+                  docker logout ghcr.io || true
                   exit 0
                 fi
                 sleep 3
               done
               docker inspect openbyte --format "{{json .State}}" || true
+              if [ "$rollback_enabled" -eq 1 ]; then
+                docker rm -f openbyte >/dev/null 2>&1 || true
+                docker rename "$rollback_name" openbyte >/dev/null 2>&1 || true
+                docker start openbyte >/dev/null 2>&1 || true
+              fi
+              docker logout ghcr.io || true
               exit 1'
               exit $?
             fi
@@ -297,12 +322,26 @@ jobs:
             docker network inspect traefik >/dev/null 2>&1 || { echo "traefik network missing after create"; exit 1; }
             OWNER_LC=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
             GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull || { echo "docker compose pull failed"; exit 1; }
-            GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
             EXPECTED_IMAGE="ghcr.io/${OWNER_LC}/openbyte:${DEPLOY_TAG}"
             expected_id=$(docker image inspect "$EXPECTED_IMAGE" -f "{{.Id}}" 2>/dev/null || true)
+            [ -n "$expected_id" ] || { echo "expected image missing after pull: $EXPECTED_IMAGE"; docker logout ghcr.io || true; exit 1; }
+            rollback_name="openbyte_rollback_prev"
+            rollback_enabled=0
+            if docker inspect openbyte >/dev/null 2>&1; then
+              docker rm -f "$rollback_name" >/dev/null 2>&1 || true
+              docker rename openbyte "$rollback_name"
+              rollback_enabled=1
+            fi
+            GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
             running_id=$(docker inspect -f "{{.Image}}" openbyte 2>/dev/null || true)
             if [ -z "$expected_id" ] || [ -z "$running_id" ] || [ "$expected_id" != "$running_id" ]; then
               echo "deployed image mismatch expected=$EXPECTED_IMAGE expected_id=$expected_id running_id=$running_id"
+              if [ "$rollback_enabled" -eq 1 ]; then
+                docker rm -f openbyte >/dev/null 2>&1 || true
+                docker rename "$rollback_name" openbyte >/dev/null 2>&1 || true
+                docker start openbyte >/dev/null 2>&1 || true
+              fi
+              docker logout ghcr.io || true
               exit 1
             fi
             i=1
@@ -316,12 +355,22 @@ jobs:
               fi
               status=$(docker inspect -f "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" openbyte 2>/dev/null || true)
               if [ "$status" = "healthy" ]; then
+                if [ "$rollback_enabled" -eq 1 ]; then
+                  docker rm -f "$rollback_name" >/dev/null 2>&1 || true
+                fi
+                docker logout ghcr.io || true
                 exit 0
               fi
               i=$((i + 1))
               sleep 3
             done
             docker inspect openbyte --format "{{json .State}}" || true
+            if [ "$rollback_enabled" -eq 1 ]; then
+              docker rm -f openbyte >/dev/null 2>&1 || true
+              docker rename "$rollback_name" openbyte >/dev/null 2>&1 || true
+              docker start openbyte >/dev/null 2>&1 || true
+            fi
+            docker logout ghcr.io || true
             exit 1
 
       - name: Cleanup SSH key material

@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
@@ -27,6 +28,8 @@ type Router struct {
 	clientIPResolver *ClientIPResolver
 	webFS            http.FileSystem
 }
+
+var validResultID = regexp.MustCompile(`^[0-9a-zA-Z]{8}$`)
 
 func (r *Router) GetLimiter() *RateLimiter {
 	return r.limiter
@@ -129,6 +132,10 @@ func (r *Router) SetupRoutes(registrars ...RegistryRegistrar) http.Handler {
 	// Serve results.html for /results/{id} browser requests
 	if r.resultsHandler != nil {
 		resultsPageHandler := func(w http.ResponseWriter, req *http.Request) {
+			if !validResultID.MatchString(req.PathValue("id")) {
+				http.NotFound(w, req)
+				return
+			}
 			w.Header().Set("Cache-Control", "no-store")
 			f, err := webFS.Open("results.html")
 			if err != nil {

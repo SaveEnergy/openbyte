@@ -15,7 +15,7 @@ services:
     environment:
       - SERVER_ID=${SERVER_ID:-openbyte-1}
       - SERVER_NAME=${SERVER_NAME:-OpenByte Server}
-      - SERVER_LOCATION=${SERVER_LOCATION:-Local}
+      - SERVER_LOCATION=${SERVER_LOCATION:-Unknown}
       - SERVER_REGION=${SERVER_REGION:-}
       - PUBLIC_HOST=${PUBLIC_HOST:-}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}

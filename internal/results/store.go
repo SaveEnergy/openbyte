@@ -152,6 +152,9 @@ func (s *Store) Save(r Result) (string, error) {
 				time.Sleep(time.Duration(busyAttempt+1) * 25 * time.Millisecond)
 				continue
 			}
+			if isBusyError(err) {
+				return "", fmt.Errorf("%w: insert result: %w", ErrStoreRetryable, err)
+			}
 			return "", fmt.Errorf("insert result: %w", err)
 		}
 	}

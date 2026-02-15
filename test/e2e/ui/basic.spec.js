@@ -24,6 +24,36 @@ test.describe('openByte UI', () => {
     expect(downloadMbps).toBeGreaterThanOrEqual(0);
   });
 
+  test('saves result only when share is clicked', async ({ page }) => {
+    let saveRequests = 0;
+    page.on('dialog', async (dialog) => {
+      await dialog.dismiss().catch(() => {});
+    });
+    await page.route('**/api/v1/results', async (route) => {
+      saveRequests += 1;
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 'ABCD1234', url: '/results/ABCD1234' })
+      });
+    });
+
+    await page.goto('/');
+    await page.locator('#showSettings').click();
+    await expect(page.locator('#settingsModal')).toBeVisible();
+    await page.selectOption('#duration', '5');
+    await page.selectOption('#streams', '1');
+    await page.locator('#closeSettings').click();
+
+    await page.locator('#startBtn').click();
+    await expect(page.locator('#resultsState')).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator('#shareBtn')).toBeVisible();
+    await expect.poll(() => saveRequests).toBe(0);
+
+    await page.locator('#shareBtn').click();
+    await expect.poll(() => saveRequests).toBe(1);
+  });
+
   test('handles cancel then restart cleanly', async ({ page }) => {
     await page.goto('/');
 

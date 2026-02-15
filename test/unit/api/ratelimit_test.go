@@ -167,3 +167,21 @@ func TestRateLimiterCleanupConcurrentAllowStress(t *testing.T) {
 	close(stop)
 	wg.Wait()
 }
+
+func TestRateLimiterBoundedIPCardinality(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.GlobalRateLimit = 1000
+	cfg.RateLimitPerIP = 1000
+	rl := api.NewRateLimiter(cfg)
+	rl.SetMaxIPEntries(2)
+
+	if !rl.Allow("10.0.0.1") {
+		t.Fatal("first IP should be allowed")
+	}
+	if !rl.Allow("10.0.0.2") {
+		t.Fatal("second IP should be allowed")
+	}
+	if rl.Allow("10.0.0.3") {
+		t.Fatal("third unique IP should be rejected once map is full")
+	}
+}

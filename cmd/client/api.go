@@ -70,10 +70,12 @@ func startStream(ctx context.Context, config *Config) (*StreamResponse, error) {
 }
 
 func CancelStream(ctx context.Context, serverURL, streamID, apiKey string) error {
-	if ctx == nil {
-		ctx = context.Background()
+	parent := ctx
+	if parent == nil {
+		parent = context.Background()
 	}
-	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	parent = context.WithoutCancel(parent)
+	reqCtx, cancel := context.WithTimeout(parent, 5*time.Second)
 	defer cancel()
 
 	apiURL := serverURL + "/api/v1/stream/" + streamID + "/cancel"

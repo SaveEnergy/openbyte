@@ -778,6 +778,31 @@ func TestCompleteStreamInvalidStatus(t *testing.T) {
 	}
 }
 
+func TestCompleteStreamRejectsInvalidMetrics(t *testing.T) {
+	mgr := stream.NewManager(10, 10)
+	mgr.Start()
+	defer mgr.Stop()
+
+	handler := api.NewHandler(mgr)
+	streamID := createTestStream(t, handler)
+
+	payload := map[string]interface{}{
+		"status": "completed",
+		"metrics": map[string]interface{}{
+			"throughput_mbps": -1,
+		},
+	}
+	body := mustMarshalJSON(t, payload)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.CompleteStream(rec, req, streamID)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
 func TestCancelStream(t *testing.T) {
 	mgr := stream.NewManager(10, 10)
 	mgr.Start()

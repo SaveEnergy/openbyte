@@ -351,3 +351,36 @@ func TestHandlerSaveBodyTooLarge(t *testing.T) {
 		t.Fatalf("error = %q, want %q", got, "request body too large")
 	}
 }
+
+func TestHandlerSaveRejectsUnknownFields(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "results.db")
+	store, err := results.New(dbPath, 100)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	defer store.Close()
+
+	h := results.NewHandler(store)
+	body := `{
+		"download_mbps": 100,
+		"upload_mbps": 50,
+		"latency_ms": 10,
+		"jitter_ms": 1,
+		"loaded_latency_ms": 12,
+		"bufferbloat_grade": "A",
+		"ipv4": "203.0.113.10",
+		"ipv6": "",
+		"server_name": "test",
+		"unknown": 1
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/results", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.Save(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}

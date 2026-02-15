@@ -233,7 +233,8 @@ func TestValidateSpeedTestInput(t *testing.T) {
 		{name: "valid upload", direction: "upload", duration: 1, valid: true},
 		{name: "invalid direction", direction: "invalid", duration: 10, valid: false},
 		{name: "too small duration", direction: "download", duration: 0, valid: false},
-		{name: "too large duration", direction: "upload", duration: 61, valid: false},
+		{name: "max duration", direction: "upload", duration: 300, valid: true},
+		{name: "too large duration", direction: "upload", duration: 301, valid: false},
 	}
 
 	for _, tt := range tests {

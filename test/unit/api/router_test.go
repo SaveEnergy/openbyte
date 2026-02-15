@@ -253,6 +253,28 @@ func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
 	}
 }
 
+func TestResultsPageRouteRejectsInvalidID(t *testing.T) {
+	manager := stream.NewManager(10, 10)
+	handler := api.NewHandler(manager)
+	router := api.NewRouter(handler, config.DefaultConfig())
+
+	store, err := results.New(t.TempDir()+"/results.db", 10)
+	if err != nil {
+		t.Fatalf("results.New: %v", err)
+	}
+	defer store.Close()
+	router.SetResultsHandler(results.NewHandler(store))
+
+	h := router.SetupRoutes()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/results/not-valid-id", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
 func TestRegistryRoutesRateLimited(t *testing.T) {
 	manager := stream.NewManager(10, 10)
 	handler := api.NewHandler(manager)

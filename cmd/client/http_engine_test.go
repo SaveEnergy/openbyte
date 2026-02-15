@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -179,4 +180,49 @@ func TestMeasureHTTPPingAllFailuresReturnEmptyNoError(t *testing.T) {
 	if len(samples) != 0 {
 		t.Fatalf("samples len = %d, want 0 when all requests fail", len(samples))
 	}
+}
+
+func TestHTTPEngineMultiStreamFailure(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/download", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "overloaded", http.StatusServiceUnavailable)
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+
+	cfg := &HTTPTestConfig{
+		ServerURL:      server.URL,
+		Duration:       1 * time.Second,
+		Streams:        3,
+		ChunkSize:      64 * 1024,
+		Direction:      "download",
+		GraceTime:      0,
+		StreamDelay:    0,
+		OverheadFactor: 1.0,
+		Timeout:        2 * time.Second,
+	}
+	engine, err := NewHTTPTestEngine(cfg)
+	if err != nil {
+		t.Fatalf("new engine: %v", err)
+	}
+	defer engine.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	err = engine.Run(ctx)
+	if err == nil {
+		t.Fatal("expected failure when all streams fail")
+	}
+	if got := err.Error(); got == "" || !containsAll(got, "download streams failed", "download failed") {
+		t.Fatalf("unexpected error text: %q", got)
+	}
+}
+
+func containsAll(s string, parts ...string) bool {
+	for _, p := range parts {
+		if !strings.Contains(s, p) {
+			return false
+		}
+	}
+	return true
 }

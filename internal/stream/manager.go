@@ -25,6 +25,7 @@ type Manager struct {
 	retentionPeriod       time.Duration
 	metricsUpdateInterval time.Duration
 	stopOnce              sync.Once
+	droppedMetricsUpdates int64
 }
 
 type MetricsUpdate struct {
@@ -233,16 +234,15 @@ func (m *Manager) FailStream(streamID string, metrics types.Metrics) error {
 }
 
 func (m *Manager) UpdateMetrics(streamID string, metrics types.Metrics) error {
-	m.mu.RLock()
-	state, exists := m.streams[streamID]
-	if exists && isTerminalStatus(state.GetState().Status) {
-		m.mu.RUnlock()
-		return errors.ErrInvalidConfig("cannot update metrics for terminal stream", nil)
-	}
-	m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
+	state, exists := m.streams[streamID]
 	if !exists {
 		return errors.ErrStreamNotFound(streamID)
+	}
+	if isTerminalStatus(state.GetState().Status) {
+		return errors.ErrInvalidConfig("cannot update metrics for terminal stream", nil)
 	}
 
 	state.UpdateMetrics(metrics)
@@ -273,6 +273,10 @@ func (m *Manager) GetActiveStreams() []string {
 
 func (m *Manager) ActiveCount() int {
 	return int(atomic.LoadInt64(&m.activeCount))
+}
+
+func (m *Manager) DroppedMetricsUpdates() int64 {
+	return atomic.LoadInt64(&m.droppedMetricsUpdates)
 }
 
 func (m *Manager) cleanupExpiredStreams() {
@@ -439,6 +443,7 @@ func (m *Manager) sendMetricsUpdates() {
 		select {
 		case m.metricsUpdateCh <- update:
 		default:
+			atomic.AddInt64(&m.droppedMetricsUpdates, 1)
 		}
 	}
 }

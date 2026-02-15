@@ -10,9 +10,11 @@ import (
 	client "github.com/saveenergy/openbyte/cmd/client"
 )
 
-func TestCancelStreamHonorsCanceledContext(t *testing.T) {
+func TestCancelStreamUsesDetachedContextWhenParentCanceled(t *testing.T) {
+	called := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatal("request should not reach server when context is canceled")
+		called = true
+		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
 
@@ -23,11 +25,14 @@ func TestCancelStreamHonorsCanceledContext(t *testing.T) {
 	err := client.CancelStream(ctx, server.URL, "stream-id", "")
 	elapsed := time.Since(start)
 
-	if err == nil {
-		t.Fatal("expected error when cancel context already canceled")
+	if err != nil {
+		t.Fatalf("expected success with detached cancel context, got: %v", err)
 	}
-	if elapsed > 500*time.Millisecond {
-		t.Fatalf("CancelStream took too long with canceled context: %v", elapsed)
+	if !called {
+		t.Fatal("request should reach server even when parent context is canceled")
+	}
+	if elapsed > 2*time.Second {
+		t.Fatalf("CancelStream took too long: %v", elapsed)
 	}
 }
 

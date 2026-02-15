@@ -24,7 +24,8 @@ const state = {
     ipv4: null,
     ipv6: null
   },
-  resultId: null
+  resultId: null,
+  shareSavePromise: null
 };
 
 const elements = {
@@ -876,6 +877,8 @@ async function runDownloadTest(duration, onProgress, signal) {
   let totalBytes = 0;
   let allBytes = 0;
   let sawNetworkError = false;
+  let sawOverload = false;
+  let successfulStreams = 0;
   
   const warmUp = createWarmUpDetector(duration * 1000);
   let measureStartTime = 0;
@@ -972,6 +975,7 @@ async function runDownloadTest(duration, onProgress, signal) {
               return;
             }
             if (e.status === 503) {
+              sawOverload = true;
               await sleep(500);
               return;
             }
@@ -991,6 +995,7 @@ async function runDownloadTest(duration, onProgress, signal) {
           }
         }
         if (success) {
+          successfulStreams += 1;
           return;
         }
       }
@@ -1010,6 +1015,12 @@ async function runDownloadTest(duration, onProgress, signal) {
   if (totalBytes === 0 && sawNetworkError) {
     throw new Error('Network error during download. Try again or change server.');
   }
+  if (totalBytes === 0 && sawOverload) {
+    throw new Error('Server overloaded. Try again in a moment or change server.');
+  }
+  if (totalBytes === 0 && successfulStreams === 0) {
+    throw new Error('Download failed. No stream completed successfully.');
+  }
 
   return avgSpeed > 0 ? avgSpeed : 0;
 }
@@ -1025,6 +1036,8 @@ async function runUploadTest(duration, onProgress, signal) {
   let totalBytes = 0;
   let allBytes = 0;
   let sawNetworkError = false;
+  let sawOverload = false;
+  let successfulStreams = 0;
   
   const warmUp = createWarmUpDetector(duration * 1000);
   let measureStartTime = 0;
@@ -1057,6 +1070,7 @@ async function runUploadTest(duration, onProgress, signal) {
         if (!res.ok) {
           await res.text().catch(() => {});
           if (res.status === 503) {
+            sawOverload = true;
             await sleep(500);
             break;
           }
@@ -1070,6 +1084,7 @@ async function runUploadTest(duration, onProgress, signal) {
         
         const now = performance.now();
         allBytes += blobSize;
+        successfulStreams += 1;
         
         if (!warmUp.settled()) {
           warmUp.record(blobSize, now);
@@ -1114,6 +1129,12 @@ async function runUploadTest(duration, onProgress, signal) {
   
   if (totalBytes === 0 && sawNetworkError) {
     throw new Error('Network error during upload. Try again or change server.');
+  }
+  if (totalBytes === 0 && sawOverload) {
+    throw new Error('Server overloaded. Try again in a moment or change server.');
+  }
+  if (totalBytes === 0 && successfulStreams === 0) {
+    throw new Error('Upload failed. No stream completed successfully.');
   }
 
   return avgSpeed > 0 ? avgSpeed : 0;
@@ -1231,15 +1252,24 @@ function showResults() {
   }
   
   updateNetworkDisplay();
-  
-  saveAndEnableShare();
+
+  state.resultId = null;
+  state.shareSavePromise = null;
+  if (elements.shareBtn) {
+    elements.shareBtn.classList.remove('hidden');
+    elements.shareBtn.disabled = false;
+    elements.shareBtn.textContent = 'Share';
+  }
 }
 
 async function saveAndEnableShare() {
+  if (state.resultId) return state.resultId;
+  if (state.shareSavePromise) return state.shareSavePromise;
+
   const loadedLat = Math.max(state.downloadLatency, state.uploadLatency);
   const bbGrade = computeBufferbloatGrade(state.latencyResult, loadedLat) || '';
 
-  try {
+  state.shareSavePromise = (async () => {
     const res = await fetch(`${apiBase}/results`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1255,23 +1285,53 @@ async function saveAndEnableShare() {
         server_name: resolveServerName()
       })
     });
-    if (!res.ok) { await res.text().catch(() => {}); return; }
+    if (!res.ok) {
+      await res.text().catch(() => {});
+      throw new Error(`share save failed: HTTP ${res.status}`);
+    }
     const data = await res.json();
-    if (typeof data?.id === 'string' && data.id.length > 0) {
-      state.resultId = data.id;
+    if (state.phase !== 'results') {
+      return null;
     }
-    if (state.resultId && elements.shareBtn) {
-      elements.shareBtn.classList.remove('hidden');
+    if (typeof data?.id !== 'string' || data.id.length === 0) {
+      throw new Error('share save failed: invalid response');
     }
-  } catch (err) {
-    // Non-critical; share just won't be available
-    console.debug('Share save unavailable:', err);
+    state.resultId = data.id;
+    return state.resultId;
+  })();
+
+  try {
+    return await state.shareSavePromise;
+  } finally {
+    state.shareSavePromise = null;
   }
 }
 
-function handleShare() {
-  if (!state.resultId) return;
-  const url = window.location.origin + '/results/' + state.resultId;
+async function handleShare() {
+  if (state.phase !== 'results') return;
+
+  let resultId = state.resultId;
+  if (!resultId) {
+    if (elements.shareBtn) {
+      elements.shareBtn.disabled = true;
+      elements.shareBtn.textContent = 'Saving...';
+    }
+    try {
+      resultId = await saveAndEnableShare();
+    } catch (err) {
+      console.debug('Share save unavailable:', err);
+      showError('Unable to create share link right now');
+      return;
+    } finally {
+      if (elements.shareBtn && state.phase === 'results') {
+        elements.shareBtn.disabled = false;
+        elements.shareBtn.textContent = 'Share';
+      }
+    }
+  }
+  if (!resultId) return;
+
+  const url = window.location.origin + '/results/' + resultId;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(url).then(() => {
       showError('Link copied to clipboard', false);
@@ -1311,7 +1371,12 @@ function resetToIdle() {
   state.downloadLatency = 0;
   state.uploadLatency = 0;
   state.resultId = null;
-  if (elements.shareBtn) elements.shareBtn.classList.add('hidden');
+  state.shareSavePromise = null;
+  if (elements.shareBtn) {
+    elements.shareBtn.classList.add('hidden');
+    elements.shareBtn.disabled = false;
+    elements.shareBtn.textContent = 'Share';
+  }
   
   resetProgress();
   showState('idle');

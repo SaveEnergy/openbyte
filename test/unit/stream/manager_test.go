@@ -336,6 +336,30 @@ func TestManagerMetricsChannel(t *testing.T) {
 	m.Stop()
 }
 
+func TestManagerMetricsChannelDropAccounting(t *testing.T) {
+	m := stream.NewManager(300, 0)
+	m.SetMetricsUpdateInterval(10 * time.Millisecond)
+	m.Start()
+	defer m.Stop()
+
+	for i := 0; i < 150; i++ {
+		cfg := testConfig(types.DirectionDownload)
+		cfg.ClientIP = "10.0.0.1"
+		state, err := m.CreateStream(cfg)
+		if err != nil {
+			t.Fatalf("create stream %d: %v", i, err)
+		}
+		if err := m.StartStream(state.Config.ID); err != nil {
+			t.Fatalf("start stream %d: %v", i, err)
+		}
+	}
+
+	time.Sleep(120 * time.Millisecond)
+	if m.DroppedMetricsUpdates() == 0 {
+		t.Fatal("expected dropped metrics updates to be accounted")
+	}
+}
+
 func TestManagerStartStreamDoesNotOverrideTerminalStatus(t *testing.T) {
 	m := newTestManager()
 	defer m.Stop()

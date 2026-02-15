@@ -52,7 +52,7 @@ func WithHTTPClient(hc *http.Client) Option {
 func New(serverURL string, opts ...Option) *Client {
 	c := &Client{
 		serverURL:  strings.TrimRight(serverURL, "/"),
-		httpClient: &http.Client{Timeout: 60 * time.Second},
+		httpClient: &http.Client{},
 	}
 	for _, opt := range opts {
 		opt(c)

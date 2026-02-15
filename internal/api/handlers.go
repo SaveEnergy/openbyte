@@ -299,6 +299,10 @@ func (h *Handler) CompleteStream(w http.ResponseWriter, r *http.Request, streamI
 		respondJSONBodyError(w, err)
 		return
 	}
+	if err := validateMetricsPayload(req.Metrics); err != nil {
+		respondError(w, err, http.StatusBadRequest)
+		return
+	}
 
 	if req.Status == "completed" {
 		if err := h.manager.CompleteStream(streamID, req.Metrics); err != nil {

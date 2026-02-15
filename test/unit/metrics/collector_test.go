@@ -23,6 +23,18 @@ func TestCollector_RecordBytes(t *testing.T) {
 	}
 }
 
+func TestCollector_RecordBytesIgnoresNegative(t *testing.T) {
+	c := metrics.NewCollector()
+	c.RecordBytes(100, "sent")
+	c.RecordBytes(-50, "sent")
+	c.RecordBytes(-25, "recv")
+
+	m := c.GetMetrics()
+	if m.BytesTransferred != 100 {
+		t.Fatalf("BytesTransferred = %d, want 100", m.BytesTransferred)
+	}
+}
+
 func TestCollector_RecordPacket(t *testing.T) {
 	c := metrics.NewCollector()
 

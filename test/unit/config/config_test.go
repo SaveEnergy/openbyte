@@ -1,6 +1,8 @@
 package config_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -188,6 +190,7 @@ func TestValidateTrustedProxyCIDRsRejectsInvalidCIDR(t *testing.T) {
 func TestValidateRegistryIntervalWhenRegistryEnabled(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.RegistryEnabled = true
+	cfg.RegistryURL = "https://registry.example.com"
 	cfg.RegistryInterval = 0
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("registry interval <= 0 should fail when registry enabled")
@@ -196,6 +199,62 @@ func TestValidateRegistryIntervalWhenRegistryEnabled(t *testing.T) {
 	cfg.RegistryInterval = 5 * time.Second
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("valid registry interval should pass: %v", err)
+	}
+}
+
+func TestValidateTrustProxyHeadersRequiresTrustedCIDRs(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.TrustProxyHeaders = true
+	cfg.TrustedProxyCIDRs = nil
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected error when trust proxy headers enabled without trusted CIDRs")
+	}
+
+	cfg.TrustedProxyCIDRs = []string{"10.0.0.0/8"}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected trusted CIDR to satisfy validation: %v", err)
+	}
+}
+
+func TestConfigValidateRegistryURLRequired(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.RegistryEnabled = true
+	cfg.RegistryInterval = 5 * time.Second
+	cfg.RegistryURL = ""
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected error when registry enabled without URL")
+	}
+}
+
+func TestConfigValidateTLS(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.TLSCertFile = "/tmp/cert.pem"
+	cfg.TLSKeyFile = ""
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected error when only one TLS file is set")
+	}
+
+	dir := t.TempDir()
+	certPath := filepath.Join(dir, "cert.pem")
+	keyPath := filepath.Join(dir, "key.pem")
+	if err := os.WriteFile(certPath, []byte("cert"), 0o644); err != nil {
+		t.Fatalf("write cert: %v", err)
+	}
+	if err := os.WriteFile(keyPath, []byte("key"), 0o644); err != nil {
+		t.Fatalf("write key: %v", err)
+	}
+	cfg = config.DefaultConfig()
+	cfg.TLSCertFile = certPath
+	cfg.TLSKeyFile = keyPath
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected valid TLS file pair: %v", err)
+	}
+
+	cfg = config.DefaultConfig()
+	cfg.TLSCertFile = certPath
+	cfg.TLSKeyFile = filepath.Join(dir, "missing-key.pem")
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected error for missing TLS key file")
 	}
 }
 

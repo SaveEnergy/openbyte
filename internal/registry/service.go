@@ -15,6 +15,7 @@ type Service struct {
 	stopCh     chan struct{}
 	wg         sync.WaitGroup
 	stopOnce   sync.Once
+	startOnce  sync.Once
 }
 
 type RegisteredServer struct {
@@ -40,8 +41,10 @@ func NewService(ttl, cleanupInterval time.Duration) *Service {
 }
 
 func (s *Service) Start() {
-	s.wg.Add(1)
-	go s.cleanupLoop()
+	s.startOnce.Do(func() {
+		s.wg.Add(1)
+		go s.cleanupLoop()
+	})
 }
 
 func (s *Service) Stop() {
@@ -74,6 +77,27 @@ func (s *Service) Update(id string, info types.ServerInfo) bool {
 	now := time.Now()
 	s.servers[id] = &RegisteredServer{
 		ServerInfo: info,
+		LastSeen:   now,
+		ExpiresAt:  now.Add(s.ttl),
+	}
+	return true
+}
+
+func (s *Service) UpdatePatched(id string, patch func(*types.ServerInfo)) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	current, exists := s.servers[id]
+	if !exists {
+		return false
+	}
+
+	updated := current.ServerInfo
+	patch(&updated)
+	updated.ID = id
+	now := time.Now()
+	s.servers[id] = &RegisteredServer{
+		ServerInfo: updated,
 		LastSeen:   now,
 		ExpiresAt:  now.Add(s.ttl),
 	}

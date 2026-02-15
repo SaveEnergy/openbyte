@@ -365,8 +365,25 @@ func (c *Config) Validate() error {
 			}
 		}
 	}
+	if c.TrustProxyHeaders && len(c.TrustedProxyCIDRs) == 0 {
+		return fmt.Errorf("trusted proxy CIDRs required when trust proxy headers is enabled")
+	}
 	if c.RegistryEnabled && c.RegistryInterval <= 0 {
 		return fmt.Errorf("registry interval must be > 0 when registry is enabled")
+	}
+	if c.RegistryEnabled && strings.TrimSpace(c.RegistryURL) == "" {
+		return fmt.Errorf("registry URL required when registry is enabled")
+	}
+	if (c.TLSCertFile == "") != (c.TLSKeyFile == "") {
+		return fmt.Errorf("TLS_CERT_FILE and TLS_KEY_FILE must both be set or both be empty")
+	}
+	if c.TLSCertFile != "" {
+		if _, err := os.Stat(c.TLSCertFile); err != nil {
+			return fmt.Errorf("TLS cert file not accessible: %w", err)
+		}
+		if _, err := os.Stat(c.TLSKeyFile); err != nil {
+			return fmt.Errorf("TLS key file not accessible: %w", err)
+		}
 	}
 	return nil
 }
