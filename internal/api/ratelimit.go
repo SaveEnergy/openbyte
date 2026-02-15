@@ -51,6 +51,7 @@ func (rl *RateLimiter) Allow(ip string) bool {
 		return false
 	}
 	if !rl.allowIP(ip) {
+		rl.refundGlobal()
 		return false
 	}
 	return true
@@ -107,6 +108,14 @@ func (rl *RateLimiter) allowGlobal() bool {
 	}
 
 	return false
+}
+
+func (rl *RateLimiter) refundGlobal() {
+	rl.globalMu.Lock()
+	defer rl.globalMu.Unlock()
+	if rl.globalTokens < rl.config.GlobalRateLimit {
+		rl.globalTokens++
+	}
 }
 
 func (rl *RateLimiter) allowIP(ip string) bool {

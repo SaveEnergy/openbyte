@@ -38,37 +38,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.duration)
 	defer cancel()
 
-	var bytesSent int64
-	var bytesRecv int64
-
-	var wg sync.WaitGroup
-	wg.Add(cfg.concurrency)
-	for i := 0; i < cfg.concurrency; i++ {
-		go func(worker int) {
-			defer wg.Done()
-			switch cfg.mode {
-			case "tcp-download":
-				n, _ := runTCPDownload(ctx, cfg, worker)
-				atomic.AddInt64(&bytesRecv, n)
-			case "tcp-upload":
-				n, _ := runTCPUpload(ctx, cfg, worker)
-				atomic.AddInt64(&bytesSent, n)
-			case "tcp-bidirectional":
-				sent, recv, _ := runTCPBidirectional(ctx, cfg, worker)
-				atomic.AddInt64(&bytesSent, sent)
-				atomic.AddInt64(&bytesRecv, recv)
-			case "udp-download":
-				n, _ := runUDPDownload(ctx, cfg, worker)
-				atomic.AddInt64(&bytesRecv, n)
-			case "udp-upload":
-				n, _ := runUDPUpload(ctx, cfg, worker)
-				atomic.AddInt64(&bytesSent, n)
-			case "ws":
-				_ = runWebSocket(ctx, cfg, worker)
-			}
-		}(i)
-	}
-	wg.Wait()
+	bytesSent, bytesRecv, workerErrs := runLoadtest(ctx, cfg)
 
 	seconds := cfg.duration.Seconds()
 	if seconds <= 0 {
@@ -78,11 +48,15 @@ func main() {
 		cfg.mode,
 		cfg.concurrency,
 		cfg.duration,
-		atomic.LoadInt64(&bytesSent),
-		atomic.LoadInt64(&bytesRecv),
-		float64(atomic.LoadInt64(&bytesSent)*8)/seconds/1_000_000,
-		float64(atomic.LoadInt64(&bytesRecv)*8)/seconds/1_000_000,
+		bytesSent,
+		bytesRecv,
+		float64(bytesSent*8)/seconds/1_000_000,
+		float64(bytesRecv*8)/seconds/1_000_000,
 	)
+	if workerErrs > 0 {
+		fmt.Fprintf(os.Stderr, "loadtest: %d worker(s) failed\n", workerErrs)
+		os.Exit(1)
+	}
 }
 
 func parseFlags() config {
@@ -114,10 +88,84 @@ func validateConfig(cfg config) error {
 	if cfg.mode == "ws" && cfg.wsURL == "" {
 		return fmt.Errorf("ws-url required for ws mode")
 	}
+	if cfg.tcpPort < 1 || cfg.tcpPort > 65535 {
+		return fmt.Errorf("tcp-port must be 1-65535")
+	}
+	if cfg.udpPort < 1 || cfg.udpPort > 65535 {
+		return fmt.Errorf("udp-port must be 1-65535")
+	}
 	if cfg.packetSize < 64 {
 		return fmt.Errorf("packet-size must be >= 64")
 	}
+	if cfg.packetSize > 9000 {
+		return fmt.Errorf("packet-size must be <= 9000")
+	}
+	if cfg.mode == "ws" {
+		parsed, err := url.Parse(cfg.wsURL)
+		if err != nil {
+			return fmt.Errorf("invalid ws-url: %w", err)
+		}
+		if parsed.Scheme != "ws" && parsed.Scheme != "wss" {
+			return fmt.Errorf("ws-url scheme must be ws or wss")
+		}
+		if parsed.Host == "" {
+			return fmt.Errorf("ws-url host is required")
+		}
+	}
 	return nil
+}
+
+func runLoadtest(ctx context.Context, cfg config) (int64, int64, int64) {
+	var bytesSent int64
+	var bytesRecv int64
+	var workerErrs int64
+
+	var wg sync.WaitGroup
+	wg.Add(cfg.concurrency)
+	for i := 0; i < cfg.concurrency; i++ {
+		go func(worker int) {
+			defer wg.Done()
+			switch cfg.mode {
+			case "tcp-download":
+				n, err := runTCPDownload(ctx, cfg, worker)
+				atomic.AddInt64(&bytesRecv, n)
+				if err != nil && !errors.Is(err, context.Canceled) {
+					atomic.AddInt64(&workerErrs, 1)
+				}
+			case "tcp-upload":
+				n, err := runTCPUpload(ctx, cfg, worker)
+				atomic.AddInt64(&bytesSent, n)
+				if err != nil && !errors.Is(err, context.Canceled) {
+					atomic.AddInt64(&workerErrs, 1)
+				}
+			case "tcp-bidirectional":
+				sent, recv, err := runTCPBidirectional(ctx, cfg, worker)
+				atomic.AddInt64(&bytesSent, sent)
+				atomic.AddInt64(&bytesRecv, recv)
+				if err != nil && !errors.Is(err, context.Canceled) {
+					atomic.AddInt64(&workerErrs, 1)
+				}
+			case "udp-download":
+				n, err := runUDPDownload(ctx, cfg, worker)
+				atomic.AddInt64(&bytesRecv, n)
+				if err != nil && !errors.Is(err, context.Canceled) {
+					atomic.AddInt64(&workerErrs, 1)
+				}
+			case "udp-upload":
+				n, err := runUDPUpload(ctx, cfg, worker)
+				atomic.AddInt64(&bytesSent, n)
+				if err != nil && !errors.Is(err, context.Canceled) {
+					atomic.AddInt64(&workerErrs, 1)
+				}
+			case "ws":
+				if err := runWebSocket(ctx, cfg, worker); err != nil && !errors.Is(err, context.Canceled) {
+					atomic.AddInt64(&workerErrs, 1)
+				}
+			}
+		}(i)
+	}
+	wg.Wait()
+	return atomic.LoadInt64(&bytesSent), atomic.LoadInt64(&bytesRecv), atomic.LoadInt64(&workerErrs)
 }
 
 func runTCPDownload(ctx context.Context, cfg config, worker int) (int64, error) {

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -119,6 +120,13 @@ func (e *HTTPTestEngine) runDownload(ctx context.Context) error {
 			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
+				if resp.StatusCode == http.StatusTooManyRequests {
+					wait := parseRetryAfter(resp.Header.Get("Retry-After"), time.Second)
+					select {
+					case <-time.After(wait):
+					case <-ctx.Done():
+					}
+				}
 				io.Copy(io.Discard, resp.Body)
 				errCh <- fmt.Errorf("download failed: %s", resp.Status)
 				return
@@ -204,6 +212,13 @@ func (e *HTTPTestEngine) runUpload(ctx context.Context) error {
 				resp.Body.Close()
 
 				if resp.StatusCode != http.StatusOK {
+					if resp.StatusCode == http.StatusTooManyRequests {
+						wait := parseRetryAfter(resp.Header.Get("Retry-After"), time.Second)
+						select {
+						case <-time.After(wait):
+						case <-ctx.Done():
+						}
+					}
 					errCh <- fmt.Errorf("upload failed: %s", resp.Status)
 					return
 				}
@@ -284,6 +299,22 @@ func (e *HTTPTestEngine) Close() {
 
 func (e *HTTPTestEngine) IsRunning() bool {
 	return atomic.LoadInt32(&e.running) == 1
+}
+
+func parseRetryAfter(value string, fallback time.Duration) time.Duration {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return fallback
+	}
+	sec, err := strconv.Atoi(trimmed)
+	if err != nil || sec < 1 {
+		return fallback
+	}
+	d := time.Duration(sec) * time.Second
+	if d > 2*time.Minute {
+		return 2 * time.Minute
+	}
+	return d
 }
 
 func measureHTTPPing(ctx context.Context, serverURL string, samples int) ([]time.Duration, error) {

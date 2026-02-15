@@ -98,10 +98,17 @@ func parseFlags(args []string, version string) (*Config, map[string]bool, int, e
 	}
 
 	rest := flagSet.Args()
+	if len(rest) > 1 {
+		return nil, nil, exitUsage, fmt.Errorf("too many positional arguments")
+	}
 	if len(rest) > 0 {
 		server := rest[0]
 		if strings.HasPrefix(server, "http://") || strings.HasPrefix(server, "https://") {
-			config.ServerURL = server
+			normalized, err := normalizeAndValidateServerURL(server)
+			if err != nil {
+				return nil, nil, exitUsage, fmt.Errorf("invalid server URL: %w", err)
+			}
+			config.ServerURL = normalized
 			flagsSet["server-url"] = true
 		} else {
 			config.Server = server
@@ -305,6 +312,11 @@ func validateConfig(config *Config) error {
 				"See: openbyte client --help", config.ChunkSize)
 		}
 	}
+	normalizedURL, err := normalizeAndValidateServerURL(config.ServerURL)
+	if err != nil {
+		return fmt.Errorf("invalid server URL: %w", err)
+	}
+	config.ServerURL = normalizedURL
 	return nil
 }
 

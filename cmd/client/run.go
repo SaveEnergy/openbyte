@@ -180,6 +180,10 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 		APIKey:         config.APIKey,
 		Timeout:        time.Duration(config.Timeout) * time.Second,
 	}
+	minTimeout := httpCfg.Duration + 10*time.Second
+	if httpCfg.Timeout < minTimeout {
+		httpCfg.Timeout = minTimeout
+	}
 
 	engine, err := NewHTTPTestEngine(httpCfg)
 	if err != nil {

@@ -11,7 +11,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -99,11 +98,8 @@ func handleConnectivityCheck(ctx context.Context, req mcp.CallToolRequest) (*mcp
 		return mcp.NewToolResultError(fmt.Sprintf("Invalid server_url: %v", err)), nil
 	}
 
-	checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	c := clientFromRequest(serverURL, req)
-	result, err := c.Check(checkCtx)
+	result, err := c.Check(ctx)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Connectivity check failed: %v", err)), nil
 	}
@@ -127,11 +123,8 @@ func handleSpeedTest(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 		return mcp.NewToolResultError(fmt.Sprintf("Invalid speed_test input: %v", err)), nil
 	}
 
-	testCtx, cancel := context.WithTimeout(ctx, time.Duration(duration+15)*time.Second)
-	defer cancel()
-
 	c := clientFromRequest(serverURL, req)
-	result, err := c.SpeedTest(testCtx, client.SpeedTestOptions{
+	result, err := c.SpeedTest(ctx, client.SpeedTestOptions{
 		Direction: direction,
 		Duration:  duration,
 	})
@@ -152,11 +145,8 @@ func handleDiagnose(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallTool
 		return mcp.NewToolResultError(fmt.Sprintf("Invalid server_url: %v", err)), nil
 	}
 
-	diagCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
 	c := clientFromRequest(serverURL, req)
-	result, err := c.Diagnose(diagCtx)
+	result, err := c.Diagnose(ctx)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Diagnosis failed: %v", err)), nil
 	}

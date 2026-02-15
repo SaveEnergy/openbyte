@@ -53,9 +53,7 @@ func writeJSON(w http.ResponseWriter, code int, payload interface{}) {
 		body = []byte(`{"error":"internal error"}` + "\n")
 	}
 	w.Header().Set("Content-Type", "application/json")
-	if code == http.StatusOK {
-		w.Header().Set("Cache-Control", "no-store")
-	}
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(code)
 	if _, err := w.Write(body); err != nil {
 		logging.Warn("results: write response failed", logging.Field{Key: "error", Value: err})

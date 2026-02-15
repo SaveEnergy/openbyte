@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -137,13 +139,24 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	startTime := time.Now()
 	deadline := uploadReadDeadline(startTime, h.maxDurationSec)
+	readCtx, cancel := context.WithDeadline(r.Context(), deadline)
+	defer cancel()
+	var closeBodyOnce sync.Once
+	go func() {
+		<-readCtx.Done()
+		if errors.Is(readCtx.Err(), context.DeadlineExceeded) {
+			closeBodyOnce.Do(func() {
+				_ = r.Body.Close()
+			})
+		}
+	}()
 
 	buf := make([]byte, 256*1024)
 	var totalBytes int64
 	var readFailed bool
-	for time.Now().Before(deadline) {
+	for {
 		select {
-		case <-r.Context().Done():
+		case <-readCtx.Done():
 			goto done
 		default:
 		}
@@ -153,6 +166,9 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			if !errors.Is(err, io.EOF) {
 				readFailed = true
 			}
+			break
+		}
+		if time.Now().After(deadline) {
 			break
 		}
 	}

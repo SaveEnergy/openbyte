@@ -63,21 +63,19 @@ func (m *MultiStreamAggregator) GetAggregatedMetrics() types.Metrics {
 	var totalJitterSum time.Duration
 	var totalJitterCount int64
 	var overflow uint32
-
-	for i := range m.bucketCounts {
-		m.bucketCounts[i] = 0
-	}
+	bucketCounts := make([]uint32, len(m.bucketCounts))
+	bucketScratch := make([]uint32, len(m.bucketScratch))
 
 	for _, collector := range m.collectors {
 		totalBytesSent += atomic.LoadInt64(&collector.bytesSent)
 		totalBytesRecv += atomic.LoadInt64(&collector.bytesRecv)
 		totalPacketsSent += atomic.LoadInt64(&collector.packetsSent)
 		totalPacketsRecv += atomic.LoadInt64(&collector.packetsRecv)
-		if len(m.bucketScratch) > 0 {
-			for i := range m.bucketScratch {
-				m.bucketScratch[i] = 0
+		if len(bucketScratch) > 0 {
+			for i := range bucketScratch {
+				bucketScratch[i] = 0
 			}
-			snap := collector.SnapshotLatencyStats(m.bucketScratch)
+			snap := collector.SnapshotLatencyStats(bucketScratch)
 			overflow += snap.Overflow
 			totalLatencyCount += snap.Count
 			totalLatencySum += snap.Sum
@@ -92,8 +90,8 @@ func (m *MultiStreamAggregator) GetAggregatedMetrics() types.Metrics {
 			}
 			totalJitterSum += snap.JitterSum
 			totalJitterCount += snap.JitterCount
-			for i, v := range m.bucketScratch {
-				m.bucketCounts[i] += v
+			for i, v := range bucketScratch {
+				bucketCounts[i] += v
 			}
 		}
 	}
@@ -110,7 +108,7 @@ func (m *MultiStreamAggregator) GetAggregatedMetrics() types.Metrics {
 
 	latency := types.LatencyMetrics{}
 	if totalLatencyCount > 0 && m.bucketWidth > 0 {
-		latency = CalculateLatencyFromHistogram(m.bucketCounts, overflow, m.bucketWidth, totalLatencyCount, totalLatencyMin, totalLatencyMax, totalLatencySum)
+		latency = CalculateLatencyFromHistogram(bucketCounts, overflow, m.bucketWidth, totalLatencyCount, totalLatencyMin, totalLatencyMax, totalLatencySum)
 	}
 	jitter := float64(0)
 	if totalJitterCount > 0 {

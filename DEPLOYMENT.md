@@ -32,6 +32,7 @@ Publish Docker image to GitHub Container Registry (GHCR) and deploy via SSH.
 ### 1. GitHub Actions workflow
 
 Workflow lives at `.github/workflows/ci.yml`:
+
 - Runs `go test ./...`
 - Builds and pushes `ghcr.io/<owner>/openbyte:edge` and `:SHA` on `main`
 - Optionally SSH deploys to your server
@@ -39,6 +40,7 @@ Workflow lives at `.github/workflows/ci.yml`:
 ### 2. Required secrets (GitHub repo settings)
 
 **Repository variables**
+
 - `SSH_HOST` — server hostname/IP
 - `SSH_USER` — SSH user
 - `SSH_PORT` — optional (default 22)
@@ -46,13 +48,16 @@ Workflow lives at `.github/workflows/ci.yml`:
 - `GHCR_USERNAME` — GHCR username (e.g., `SaveEnergy`)
 
 Notes:
+
 - CI/release workflows derive `GHCR_OWNER` from the repository owner.
 - CI deploy sets `IMAGE_TAG` to the commit SHA; release deploy sets `IMAGE_TAG` to the semver tag.
 
 **GHCR pull on server**
+
 - `GHCR_TOKEN` — PAT with `read:packages` scope
 
 **Secrets**
+
 - `SSH_KEY` — private key (no passphrase) with Docker access
 
 ### 3. Server setup
@@ -84,6 +89,13 @@ docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.
 ```
 
 CI deploy path is Traefik-based (the workflow syncs and uses both compose files). Ensure the external `traefik` network exists on the server.
+
+Workflow behavior details (important for on-call):
+
+- Deployment keeps previous container as `openbyte_rollback_prev` until health checks pass.
+- Health gate polls container state/health for up to 20 attempts (3s interval, ~60s window).
+- On image mismatch or failed health gate, workflow removes failed container, restores `openbyte_rollback_prev`, and exits non-zero.
+- GHCR session is logged out on script exit via shell trap.
 
 For direct HTTP access without Traefik, run only the base GHCR compose file:
 
@@ -270,6 +282,7 @@ server {
 Speed tests upload multi-megabyte request bodies (default ~4MB per request, repeated). Many reverse proxies default to 1MB and will reject or buffer uploads, which can produce errors or unrealistic upload speeds.
 
 Minimum recommendations:
+
 - Increase max request body (e.g. `client_max_body_size 35m;` in Nginx).
 - Disable request buffering for upload to avoid early responses:
   - Nginx: `location /api/v1/upload { proxy_request_buffering off; proxy_http_version 1.1; }`
@@ -300,6 +313,7 @@ docker network inspect traefik --format '{{ (index .IPAM.Config 0).Subnet }}'
 ```
 
 For reliable upload tests through Traefik:
+
 - Ensure the upload router allows large request bodies (e.g. 35MB).
 - Apply buffering middleware only to `/api/v1/upload` to avoid impacting download streams.
 
@@ -307,14 +321,15 @@ The provided Traefik compose files include a dedicated upload router with a 35MB
 
 **Environment variables:**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TRAEFIK_HOST` | `speedtest.localhost` | Domain for HTTP routing |
-| `TRAEFIK_ENTRYPOINT` | `web` | Traefik entrypoint name |
-| `TRAEFIK_NETWORK` | `traefik` | External network name |
-| `TRAEFIK_CERTRESOLVER` | `letsencrypt` | TLS cert resolver |
+| Variable               | Default               | Description             |
+| ---------------------- | --------------------- | ----------------------- |
+| `TRAEFIK_HOST`         | `speedtest.localhost` | Domain for HTTP routing |
+| `TRAEFIK_ENTRYPOINT`   | `web`                 | Traefik entrypoint name |
+| `TRAEFIK_NETWORK`      | `traefik`             | External network name   |
+| `TRAEFIK_CERTRESOLVER` | `letsencrypt`         | TLS cert resolver       |
 
 **Important:** TCP (8081) and UDP (8082) ports cannot be proxied through HTTP. They must be:
+
 - Exposed directly on the host, or
 - Configured as Traefik TCP/UDP routers (advanced)
 
@@ -341,10 +356,10 @@ v4.speedtest.example.com.  A     203.0.113.10
 v6.speedtest.example.com.  AAAA  2001:db8::1
 ```
 
-| Subdomain | Record | Value | Notes |
-|-----------|--------|-------|-------|
-| `v4.<domain>` | A only | Server IPv4 | No AAAA record |
-| `v6.<domain>` | AAAA only | Server IPv6 | No A record |
+| Subdomain     | Record    | Value       | Notes          |
+| ------------- | --------- | ----------- | -------------- |
+| `v4.<domain>` | A only    | Server IPv4 | No AAAA record |
+| `v6.<domain>` | AAAA only | Server IPv6 | No A record    |
 
 Verify:
 

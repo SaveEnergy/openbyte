@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ var (
 	exitSuccess = 0
 	exitFailure = 1
 	exitUsage   = 2
+	runCheckFn  = runCheck
 )
 
 const (
@@ -87,12 +89,15 @@ func Run(args []string, version string) int {
 			return exitUsage
 		}
 	}
+	if !isValidServerURL(serverURL) {
+		fmt.Fprintf(os.Stderr, "openbyte check: invalid server URL: %q\n", serverURL)
+		return exitUsage
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	start := time.Now()
-	result, err := runCheck(ctx, serverURL, apiKey)
+	result, err := runCheckFn(ctx, serverURL, apiKey)
 
 	if err != nil {
 		if jsonOut {
@@ -110,8 +115,6 @@ func Run(args []string, version string) int {
 		}
 		return exitFailure
 	}
-	result.DurationMs = time.Since(start).Milliseconds()
-
 	if jsonOut {
 		if encErr := json.NewEncoder(os.Stdout).Encode(result); encErr != nil {
 			fmt.Fprintf(os.Stderr, "openbyte check: json encode error: %v\n", encErr)
@@ -198,5 +201,14 @@ func isValidServerURL(raw string) bool {
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return false
 	}
-	return u.Host != ""
+	if u.Host == "" || u.RawQuery != "" || u.Fragment != "" {
+		return false
+	}
+	if port := u.Port(); port != "" {
+		n, convErr := strconv.Atoi(port)
+		if convErr != nil || n < 1 || n > 65535 {
+			return false
+		}
+	}
+	return true
 }

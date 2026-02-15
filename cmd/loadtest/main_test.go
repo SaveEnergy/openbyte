@@ -33,6 +33,10 @@ func TestValidateConfig(t *testing.T) {
 		{name: "ws missing url", cfg: func() config { c := valid; c.mode = "ws"; c.wsURL = ""; return c }(), wantErr: true},
 		{name: "ws with url", cfg: func() config { c := valid; c.mode = "ws"; c.wsURL = "ws://example.com"; return c }(), wantErr: false},
 		{name: "too small packet", cfg: func() config { c := valid; c.packetSize = 63; return c }(), wantErr: true},
+		{name: "tcp port too low", cfg: func() config { c := valid; c.tcpPort = 0; return c }(), wantErr: true},
+		{name: "udp port too high", cfg: func() config { c := valid; c.udpPort = 70000; return c }(), wantErr: true},
+		{name: "oversized packet", cfg: func() config { c := valid; c.packetSize = 9001; return c }(), wantErr: true},
+		{name: "ws invalid scheme", cfg: func() config { c := valid; c.mode = "ws"; c.wsURL = "http://example.com"; return c }(), wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -45,6 +49,52 @@ func TestValidateConfig(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+func TestValidateConfigRejectsInvalidPortsAndOversizedPackets(t *testing.T) {
+	cfg := config{
+		mode:        "tcp-download",
+		host:        "127.0.0.1",
+		tcpPort:     8081,
+		udpPort:     8082,
+		duration:    1 * time.Second,
+		concurrency: 1,
+		packetSize:  1200,
+	}
+
+	cfg.tcpPort = 0
+	if err := validateConfig(cfg); err == nil {
+		t.Fatal("expected tcp-port validation failure")
+	}
+	cfg.tcpPort = 8081
+	cfg.udpPort = 70000
+	if err := validateConfig(cfg); err == nil {
+		t.Fatal("expected udp-port validation failure")
+	}
+	cfg.udpPort = 8082
+	cfg.packetSize = 9001
+	if err := validateConfig(cfg); err == nil {
+		t.Fatal("expected packet-size upper-bound validation failure")
+	}
+}
+
+func TestLoadtestReportsWorkerErrors(t *testing.T) {
+	cfg := config{
+		mode:        "tcp-download",
+		host:        "127.0.0.1",
+		tcpPort:     1,
+		udpPort:     8082,
+		duration:    100 * time.Millisecond,
+		concurrency: 2,
+		packetSize:  1200,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.duration)
+	defer cancel()
+
+	_, _, workerErrs := runLoadtest(ctx, cfg)
+	if workerErrs == 0 {
+		t.Fatal("expected worker errors to be surfaced")
 	}
 }
 

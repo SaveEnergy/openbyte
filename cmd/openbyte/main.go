@@ -17,7 +17,7 @@ var (
 	runServer = func(args []string, ver string) int { return server.Run(args, ver) }
 	runClient = func(args []string, ver string) int { return client.Run(args, ver) }
 	runCheck  = func(args []string, ver string) int { return check.Run(args, ver) }
-	runMCP    = func(ver string) int { return mcpcmd.Run(ver) }
+	runMCP    = func(args []string, ver string) int { return mcpcmd.Run(ver) }
 )
 
 func main() {
@@ -37,7 +37,11 @@ func run(args []string, ver string) int {
 	case "check":
 		return runCheck(args[1:], ver)
 	case "mcp":
-		return runMCP(ver)
+		if len(args) > 1 {
+			fmt.Fprintf(os.Stderr, "openbyte: mcp does not accept arguments: %q\n", strings.Join(args[1:], " "))
+			return 2
+		}
+		return runMCP(args[1:], ver)
 	case "help", "-h", "--help":
 		printUsage()
 		return 0

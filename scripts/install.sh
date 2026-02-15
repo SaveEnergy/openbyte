@@ -76,11 +76,27 @@ if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1
 fi
 
 if command -v sha256sum >/dev/null 2>&1; then
-    ACTUAL_SUM="$(sha256sum "${TMPDIR}/${ARCHIVE}" | awk '{print $1}')"
+    ACTUAL_SUM="$(sha256sum "${TMPDIR}/${ARCHIVE}" | awk '{print tolower($1)}')"
 else
-    ACTUAL_SUM="$(shasum -a 256 "${TMPDIR}/${ARCHIVE}" | awk '{print $1}')"
+    ACTUAL_SUM="$(shasum -a 256 "${TMPDIR}/${ARCHIVE}" | awk '{print tolower($1)}')"
 fi
-EXPECTED_SUM="$(awk -v f="$ARCHIVE" '$2 == f {print $1}' "${TMPDIR}/checksums.txt" | head -n 1)"
+EXPECTED_SUM="$(
+    awk -v f="$ARCHIVE" '
+        NF >= 2 {
+            sum = tolower($1)
+            $1 = ""
+            sub(/^[[:space:]]+/, "", $0)
+            if ($0 == f && sum ~ /^[0-9a-f]{64}$/) {
+                print sum
+                found = 1
+                exit
+            }
+        }
+        END {
+            if (!found) exit 1
+        }
+    ' "${TMPDIR}/checksums.txt" 2>/dev/null || true
+)"
 if [ -z "$EXPECTED_SUM" ]; then
     echo "Error: checksum entry missing for ${ARCHIVE}"
     exit 1

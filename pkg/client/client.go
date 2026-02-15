@@ -74,18 +74,15 @@ type CheckResult struct {
 
 // Check runs a quick ~3-5 second connectivity check (latency + burst download + burst upload).
 func (c *Client) Check(ctx context.Context) (*CheckResult, error) {
-	checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	start := time.Now()
 
-	if err := c.healthCheck(checkCtx); err != nil {
+	if err := c.healthCheck(ctx); err != nil {
 		return nil, err
 	}
 
-	avgLatency, jitter, latencyOK := c.measureLatency(checkCtx, 5)
-	downMbps, downOK := c.downloadBurst(checkCtx, 2)
-	upMbps, upOK := c.uploadBurst(checkCtx, 2)
+	avgLatency, jitter, latencyOK := c.measureLatency(ctx, 5)
+	downMbps, downOK := c.downloadBurst(ctx, 2)
+	upMbps, upOK := c.uploadBurst(ctx, 2)
 	if !latencyOK {
 		return nil, ErrLatencyMeasurementFailed
 	}
@@ -101,6 +98,7 @@ func (c *Client) Check(ctx context.Context) (*CheckResult, error) {
 		UploadMbps:   upMbps,
 		LatencyMs:    avgLatency,
 		JitterMs:     jitter,
+		PacketLoss:   -1,
 	})
 
 	return &CheckResult{
@@ -190,6 +188,7 @@ func (c *Client) SpeedTest(ctx context.Context, opts SpeedTestOptions) (*SpeedTe
 		UploadMbps:   upMbps,
 		LatencyMs:    avgLatency,
 		JitterMs:     jitter,
+		PacketLoss:   -1,
 	})
 
 	return &SpeedTestResult{
@@ -246,6 +245,7 @@ func (c *Client) Diagnose(ctx context.Context) (*DiagnoseResult, error) {
 		UploadMbps:   upMbps,
 		LatencyMs:    avgLatency,
 		JitterMs:     jitter,
+		PacketLoss:   -1,
 	})
 
 	return &DiagnoseResult{

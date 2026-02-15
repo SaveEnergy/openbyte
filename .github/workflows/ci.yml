@@ -258,6 +258,7 @@ jobs:
               test -f "${{ env.REMOTE_DIR }}/.env" || { echo "Missing .env at ${{ env.REMOTE_DIR }}/.env"; exit 1; }
               DEPLOY_TAG="${{ github.sha }}"
               echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
+              trap "docker logout ghcr.io >/dev/null 2>&1 || true" EXIT
               cd "${{ env.REMOTE_DIR }}"
               docker network inspect traefik >/dev/null 2>&1 || docker network create traefik >/dev/null 2>&1 || { echo "failed to create traefik network"; exit 1; }
               docker network inspect traefik >/dev/null 2>&1 || { echo "traefik network missing after create"; exit 1; }
@@ -279,8 +280,8 @@ jobs:
                 echo "deployed image mismatch expected=$EXPECTED_IMAGE expected_id=$expected_id running_id=$running_id"
                 if [ "$rollback_enabled" -eq 1 ]; then
                   docker rm -f openbyte >/dev/null 2>&1 || true
-                  docker rename "$rollback_name" openbyte >/dev/null 2>&1 || true
-                  docker start openbyte >/dev/null 2>&1 || true
+                  docker rename "$rollback_name" openbyte >/dev/null 2>&1 || { echo "rollback rename failed"; exit 1; }
+                  docker start openbyte >/dev/null 2>&1 || { echo "rollback start failed"; exit 1; }
                 fi
                 docker logout ghcr.io || true
                 exit 1
@@ -305,8 +306,8 @@ jobs:
               docker inspect openbyte --format "{{json .State}}" || true
               if [ "$rollback_enabled" -eq 1 ]; then
                 docker rm -f openbyte >/dev/null 2>&1 || true
-                docker rename "$rollback_name" openbyte >/dev/null 2>&1 || true
-                docker start openbyte >/dev/null 2>&1 || true
+              docker rename "$rollback_name" openbyte >/dev/null 2>&1 || { echo "rollback rename failed"; exit 1; }
+              docker start openbyte >/dev/null 2>&1 || { echo "rollback start failed"; exit 1; }
               fi
               docker logout ghcr.io || true
               exit 1'
@@ -317,6 +318,7 @@ jobs:
             test -f "${{ env.REMOTE_DIR }}/.env" || { echo "Missing .env at ${{ env.REMOTE_DIR }}/.env"; exit 1; }
             DEPLOY_TAG="${{ github.sha }}"
             echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
+            trap "docker logout ghcr.io >/dev/null 2>&1 || true" EXIT
             cd "${{ env.REMOTE_DIR }}"
             docker network inspect traefik >/dev/null 2>&1 || docker network create traefik >/dev/null 2>&1 || { echo "failed to create traefik network"; exit 1; }
             docker network inspect traefik >/dev/null 2>&1 || { echo "traefik network missing after create"; exit 1; }
@@ -338,8 +340,8 @@ jobs:
               echo "deployed image mismatch expected=$EXPECTED_IMAGE expected_id=$expected_id running_id=$running_id"
               if [ "$rollback_enabled" -eq 1 ]; then
                 docker rm -f openbyte >/dev/null 2>&1 || true
-                docker rename "$rollback_name" openbyte >/dev/null 2>&1 || true
-                docker start openbyte >/dev/null 2>&1 || true
+                docker rename "$rollback_name" openbyte >/dev/null 2>&1 || { echo "rollback rename failed"; exit 1; }
+                docker start openbyte >/dev/null 2>&1 || { echo "rollback start failed"; exit 1; }
               fi
               docker logout ghcr.io || true
               exit 1
@@ -367,8 +369,8 @@ jobs:
             docker inspect openbyte --format "{{json .State}}" || true
             if [ "$rollback_enabled" -eq 1 ]; then
               docker rm -f openbyte >/dev/null 2>&1 || true
-              docker rename "$rollback_name" openbyte >/dev/null 2>&1 || true
-              docker start openbyte >/dev/null 2>&1 || true
+              docker rename "$rollback_name" openbyte >/dev/null 2>&1 || { echo "rollback rename failed"; exit 1; }
+              docker start openbyte >/dev/null 2>&1 || { echo "rollback start failed"; exit 1; }
             fi
             docker logout ghcr.io || true
             exit 1

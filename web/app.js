@@ -1,7 +1,7 @@
-let apiBase = '/api/v1';
+let apiBase = "/api/v1";
 
 const state = {
-  phase: 'idle',
+  phase: "idle",
   isRunning: false,
   downloadResult: 0,
   uploadResult: 0,
@@ -18,50 +18,50 @@ const state = {
   selectedServer: null,
   settings: {
     duration: 30,
-    streams: 4  // Default 4 streams for ~600 Mbps capacity
+    streams: 4, // Default 4 streams for ~600 Mbps capacity
   },
   networkInfo: {
     ipv4: null,
-    ipv6: null
+    ipv6: null,
   },
   resultId: null,
-  shareSavePromise: null
+  shareSavePromise: null,
 };
 
 const elements = {
-  idleState: document.getElementById('idleState'),
-  testingState: document.getElementById('testingState'),
-  resultsState: document.getElementById('resultsState'),
-  startBtn: document.getElementById('startBtn'),
-  speedNumber: document.getElementById('speedNumber'),
-  speedUnit: document.getElementById('speedUnit'),
-  testType: document.getElementById('testType'),
-  progressRing: document.getElementById('progressRing'),
-  downloadResult: document.getElementById('downloadResult'),
-  uploadResult: document.getElementById('uploadResult'),
-  latencyResult: document.getElementById('latencyResult'),
-  jitterResult: document.getElementById('jitterResult'),
-  loadedLatencyResult: document.getElementById('loadedLatencyResult'),
-  bufferbloatResult: document.getElementById('bufferbloatResult'),
-  serverName: document.getElementById('serverName'),
-  networkIPv4: document.getElementById('networkIPv4'),
-  networkIPv6: document.getElementById('networkIPv6'),
-  restartBtn: document.getElementById('restartBtn'),
-  cancelBtn: document.getElementById('cancelBtn'),
-  serverInfo: document.getElementById('serverInfo'),
-  serverDot: document.querySelector('.server-dot'),
-  serverText: document.querySelector('.server-text'),
-  showSettings: document.getElementById('showSettings'),
-  closeSettings: document.getElementById('closeSettings'),
-  settingsModal: document.getElementById('settingsModal'),
-  duration: document.getElementById('duration'),
-  streams: document.getElementById('streams'),
-  serverSelectGroup: document.getElementById('serverSelectGroup'),
-  serverSelect: document.getElementById('serverSelect'),
-  serverStatus: document.getElementById('serverStatus'),
-  errorToast: document.getElementById('errorToast'),
-  errorMessage: document.getElementById('errorMessage'),
-  shareBtn: document.getElementById('shareBtn')
+  idleState: document.getElementById("idleState"),
+  testingState: document.getElementById("testingState"),
+  resultsState: document.getElementById("resultsState"),
+  startBtn: document.getElementById("startBtn"),
+  speedNumber: document.getElementById("speedNumber"),
+  speedUnit: document.getElementById("speedUnit"),
+  testType: document.getElementById("testType"),
+  progressRing: document.getElementById("progressRing"),
+  downloadResult: document.getElementById("downloadResult"),
+  uploadResult: document.getElementById("uploadResult"),
+  latencyResult: document.getElementById("latencyResult"),
+  jitterResult: document.getElementById("jitterResult"),
+  loadedLatencyResult: document.getElementById("loadedLatencyResult"),
+  bufferbloatResult: document.getElementById("bufferbloatResult"),
+  serverName: document.getElementById("serverName"),
+  networkIPv4: document.getElementById("networkIPv4"),
+  networkIPv6: document.getElementById("networkIPv6"),
+  restartBtn: document.getElementById("restartBtn"),
+  cancelBtn: document.getElementById("cancelBtn"),
+  serverInfo: document.getElementById("serverInfo"),
+  serverDot: document.querySelector(".server-dot"),
+  serverText: document.querySelector(".server-text"),
+  showSettings: document.getElementById("showSettings"),
+  closeSettings: document.getElementById("closeSettings"),
+  settingsModal: document.getElementById("settingsModal"),
+  duration: document.getElementById("duration"),
+  streams: document.getElementById("streams"),
+  serverSelectGroup: document.getElementById("serverSelectGroup"),
+  serverSelect: document.getElementById("serverSelect"),
+  serverStatus: document.getElementById("serverStatus"),
+  errorToast: document.getElementById("errorToast"),
+  errorMessage: document.getElementById("errorMessage"),
+  shareBtn: document.getElementById("shareBtn"),
 };
 
 const RING_CIRCUMFERENCE = 2 * Math.PI * 90;
@@ -69,48 +69,71 @@ const RING_END_OFFSET = 2;
 let lastModalTrigger = null;
 let toastTimer = null;
 
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const retryAfterMs = (response, fallbackMs = 1000) => {
+  if (!response || !response.headers) return fallbackMs;
+  const value = response.headers.get("Retry-After");
+  if (!value) return fallbackMs;
+  const seconds = Number.parseInt(value, 10);
+  if (!Number.isFinite(seconds) || seconds < 1) return fallbackMs;
+  return Math.min(seconds * 1000, 120000);
+};
 
 const isNetworkError = (err) => {
   if (!err) return false;
-  if (err.name === 'AbortError') return false;
-  if (err.name === 'TypeError') return true;
-  const message = (err.message || '').toLowerCase();
-  return message.includes('network') || message.includes('failed to fetch') || message.includes('http2');
+  if (err.name === "AbortError") return false;
+  if (err.name === "TypeError") return true;
+  const message = (err.message || "").toLowerCase();
+  return (
+    message.includes("network") ||
+    message.includes("failed to fetch") ||
+    message.includes("http2")
+  );
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
   loadSettings();
   loadServers();
   bindEvents();
 });
 
 function bindEvents() {
-  if (!elements.startBtn || !elements.restartBtn || !elements.duration || !elements.streams) {
-    console.warn('Core UI elements missing; skipping event binding');
+  if (
+    !elements.startBtn ||
+    !elements.restartBtn ||
+    !elements.duration ||
+    !elements.streams
+  ) {
+    console.warn("Core UI elements missing; skipping event binding");
     return;
   }
-  elements.startBtn.addEventListener('click', startTest);
-  elements.restartBtn.addEventListener('click', resetToIdle);
+  elements.startBtn.addEventListener("click", startTest);
+  elements.restartBtn.addEventListener("click", resetToIdle);
   if (elements.cancelBtn) {
-    elements.cancelBtn.addEventListener('click', resetToIdle);
+    elements.cancelBtn.addEventListener("click", resetToIdle);
   }
   if (elements.shareBtn) {
-    elements.shareBtn.addEventListener('click', handleShare);
+    elements.shareBtn.addEventListener("click", handleShare);
   }
   initSettingsModal();
-  elements.duration.addEventListener('change', saveSettings);
-  elements.streams.addEventListener('change', saveSettings);
-  
+  elements.duration.addEventListener("change", saveSettings);
+  elements.streams.addEventListener("change", saveSettings);
+
   if (elements.serverSelect) {
-    elements.serverSelect.addEventListener('change', onServerChange);
+    elements.serverSelect.addEventListener("change", onServerChange);
   }
-  
+
   detectNetworkInfo();
 }
 
 function initSettingsModal() {
-  if (!elements.settingsModal || !elements.showSettings || !elements.closeSettings) return;
+  if (
+    !elements.settingsModal ||
+    !elements.showSettings ||
+    !elements.closeSettings
+  )
+    return;
 
   const focusFirstSetting = () => {
     if (elements.duration) elements.duration.focus();
@@ -124,38 +147,46 @@ function initSettingsModal() {
 
   const closeModal = () => {
     elements.settingsModal.close();
-    if (lastModalTrigger && typeof lastModalTrigger.focus === 'function') {
+    if (lastModalTrigger && typeof lastModalTrigger.focus === "function") {
       lastModalTrigger.focus();
     }
   };
 
-  elements.showSettings.addEventListener('click', openModal);
-  elements.closeSettings.addEventListener('click', closeModal);
-  elements.settingsModal.addEventListener('cancel', (e) => {
+  elements.showSettings.addEventListener("click", openModal);
+  elements.closeSettings.addEventListener("click", closeModal);
+  elements.settingsModal.addEventListener("cancel", (e) => {
     e.preventDefault();
     closeModal();
   });
-  elements.settingsModal.addEventListener('click', (e) => {
+  elements.settingsModal.addEventListener("click", (e) => {
     if (e.target === elements.settingsModal) closeModal();
   });
 }
 
 function loadSettings() {
-  const saved = localStorage.getItem('obyte-settings');
+  const saved = localStorage.getItem("obyte-settings");
   if (saved) {
     try {
       const s = JSON.parse(saved);
       // Validate parsed values before applying
-      if (typeof s.duration === 'number' && Number.isFinite(s.duration) && s.duration > 0) {
+      if (
+        typeof s.duration === "number" &&
+        Number.isFinite(s.duration) &&
+        s.duration > 0
+      ) {
         state.settings.duration = s.duration;
       }
-      if (typeof s.streams === 'number' && Number.isFinite(s.streams) && s.streams > 0) {
+      if (
+        typeof s.streams === "number" &&
+        Number.isFinite(s.streams) &&
+        s.streams > 0
+      ) {
         state.settings.streams = s.streams;
       }
       if (elements.duration) elements.duration.value = state.settings.duration;
       if (elements.streams) elements.streams.value = state.settings.streams;
     } catch (e) {
-      console.warn('Failed to parse saved settings:', e);
+      console.warn("Failed to parse saved settings:", e);
     }
   }
 }
@@ -166,15 +197,17 @@ function saveSettings() {
   const s = parseInt(elements.streams.value, 10);
   if (Number.isFinite(d) && d > 0) state.settings.duration = d;
   if (Number.isFinite(s) && s > 0) state.settings.streams = s;
-  localStorage.setItem('obyte-settings', JSON.stringify(state.settings));
+  localStorage.setItem("obyte-settings", JSON.stringify(state.settings));
   notifySettingsSaved();
 }
 
 function detectNetworkInfo() {
   // Main ping — captures whichever address family the browser chose
   const mainPing = fetch(`${apiBase}/ping`)
-    .then(res => res.ok ? res.json() : res.text().then(() => Promise.reject()))
-    .then(data => {
+    .then((res) =>
+      res.ok ? res.json() : res.text().then(() => Promise.reject()),
+    )
+    .then((data) => {
       if (data.client_ip) {
         if (data.ipv6) {
           state.networkInfo.ipv6 = data.client_ip;
@@ -187,18 +220,23 @@ function detectNetworkInfo() {
 
   // Dedicated probes — A-only / AAAA-only subdomains force address family
   const hostname = window.location.hostname;
-  const canProbe = hostname && hostname !== 'localhost' &&
-    !hostname.startsWith('v4.') && !hostname.startsWith('v6.') &&
-    !hostname.startsWith('[') &&
+  const canProbe =
+    hostname &&
+    hostname !== "localhost" &&
+    !hostname.startsWith("v4.") &&
+    !hostname.startsWith("v6.") &&
+    !hostname.startsWith("[") &&
     !hostname.match(/^\d/);
 
-  const probeOpts = { cache: 'no-store', credentials: 'omit', mode: 'cors' };
+  const probeOpts = { cache: "no-store", credentials: "omit", mode: "cors" };
   const proto = window.location.protocol;
 
   const v4Ping = canProbe
     ? fetch(`${proto}//v4.${hostname}/api/v1/ping`, probeOpts)
-        .then(res => res.ok ? res.json() : res.text().then(() => Promise.reject()))
-        .then(data => {
+        .then((res) =>
+          res.ok ? res.json() : res.text().then(() => Promise.reject()),
+        )
+        .then((data) => {
           if (!data.ipv6 && data.client_ip) {
             state.networkInfo.ipv4 = data.client_ip;
           }
@@ -208,8 +246,10 @@ function detectNetworkInfo() {
 
   const v6Ping = canProbe
     ? fetch(`${proto}//v6.${hostname}/api/v1/ping`, probeOpts)
-        .then(res => res.ok ? res.json() : res.text().then(() => Promise.reject()))
-        .then(data => {
+        .then((res) =>
+          res.ok ? res.json() : res.text().then(() => Promise.reject()),
+        )
+        .then((data) => {
           if (data.ipv6 && data.client_ip) {
             state.networkInfo.ipv6 = data.client_ip;
           }
@@ -217,15 +257,17 @@ function detectNetworkInfo() {
         .catch(() => {})
     : Promise.resolve();
 
-  Promise.allSettled([mainPing, v4Ping, v6Ping]).then(() => updateNetworkDisplay());
+  Promise.allSettled([mainPing, v4Ping, v6Ping]).then(() =>
+    updateNetworkDisplay(),
+  );
 }
 
 function updateNetworkDisplay() {
   if (elements.networkIPv4) {
-    elements.networkIPv4.textContent = state.networkInfo.ipv4 || '-';
+    elements.networkIPv4.textContent = state.networkInfo.ipv4 || "-";
   }
   if (elements.networkIPv6) {
-    elements.networkIPv6.textContent = state.networkInfo.ipv6 || '-';
+    elements.networkIPv6.textContent = state.networkInfo.ipv6 || "-";
   }
 }
 
@@ -243,12 +285,12 @@ function resolveChunkSize() {
 // Detect HTTP protocol and return appropriate overhead factor
 function detectOverheadFactor() {
   try {
-    const entries = performance.getEntriesByType('resource');
+    const entries = performance.getEntriesByType("resource");
     // Find the most recent API fetch to detect protocol
     for (let i = entries.length - 1; i >= 0; i--) {
       const e = entries[i];
-      if (e.name && e.name.includes('/api/v1/') && e.nextHopProtocol) {
-        if (e.nextHopProtocol === 'h2' || e.nextHopProtocol === 'h3') {
+      if (e.name && e.name.includes("/api/v1/") && e.nextHopProtocol) {
+        if (e.nextHopProtocol === "h2" || e.nextHopProtocol === "h3") {
           // HTTP/2: ~9 bytes frame header per chunk — negligible
           return 1.0;
         }
@@ -271,7 +313,7 @@ function isSameOriginURL(url) {
 }
 
 function fetchWithTimeout(url, options, timeoutMs) {
-  if (typeof AbortController === 'undefined' || !timeoutMs) {
+  if (typeof AbortController === "undefined" || !timeoutMs) {
     return fetch(url, options);
   }
   const controller = new AbortController();
@@ -285,7 +327,7 @@ function fetchWithTimeout(url, options, timeoutMs) {
       controller.abort();
     } else {
       onAbort = () => controller.abort();
-      externalSignal.addEventListener('abort', onAbort, { once: true });
+      externalSignal.addEventListener("abort", onAbort, { once: true });
     }
   }
 
@@ -293,7 +335,7 @@ function fetchWithTimeout(url, options, timeoutMs) {
   return fetch(url, opts).finally(() => {
     clearTimeout(timer);
     if (onAbort && externalSignal) {
-      externalSignal.removeEventListener('abort', onAbort);
+      externalSignal.removeEventListener("abort", onAbort);
     }
   });
 }
@@ -306,7 +348,7 @@ function resolveServerName() {
     const fallback = state.servers[0]?.name;
     if (fallback) return fallback;
   }
-  return 'Current Server';
+  return "Current Server";
 }
 
 function updateServerName() {
@@ -320,7 +362,7 @@ function setSelectedServer(server) {
   if (state.selectedServer && state.selectedServer.api_endpoint) {
     apiBase = `${state.selectedServer.api_endpoint}/api/v1`;
   } else {
-    apiBase = '/api/v1';
+    apiBase = "/api/v1";
   }
 }
 
@@ -328,16 +370,19 @@ function getHealthURL(server) {
   if (server.api_endpoint) {
     try {
       const apiURL = new URL(server.api_endpoint);
-      if (window.location.protocol === 'https:' && apiURL.protocol === 'http:') {
-        apiURL.protocol = 'https:';
+      if (
+        window.location.protocol === "https:" &&
+        apiURL.protocol === "http:"
+      ) {
+        apiURL.protocol = "https:";
       }
-      apiURL.pathname = apiURL.pathname.replace(/\/+$/, '') + '/health';
+      apiURL.pathname = apiURL.pathname.replace(/\/+$/, "") + "/health";
       return apiURL.toString();
     } catch (e) {
       return `${server.api_endpoint}/health`;
     }
   }
-  const protocol = window.location.protocol || 'http:';
+  const protocol = window.location.protocol || "http:";
   return `${protocol}//${server.host}/health`;
 }
 
@@ -353,21 +398,21 @@ async function loadServers() {
       data = await res.json();
     } catch (err) {
       state.servers = [];
-      throw new Error('Failed to parse servers response');
+      throw new Error("Failed to parse servers response");
     }
     state.servers = Array.isArray(data.servers) ? data.servers : [];
-    
+
     if (state.servers.length > 0) {
       await selectFastestServer();
     } else {
       state.selectedServer = null;
     }
-    
+
     populateServerSelect();
     updateServerName();
     checkServer();
   } catch (e) {
-    console.error('Failed to load servers:', e);
+    console.error("Failed to load servers:", e);
     state.servers = [];
     setSelectedServer(null);
     populateServerSelect();
@@ -382,82 +427,100 @@ async function selectFastestServer() {
     return;
   }
 
-  if (elements.serverText) elements.serverText.textContent = 'Finding fastest...';
+  if (elements.serverText)
+    elements.serverText.textContent = "Finding fastest...";
 
   const latencyPromises = state.servers.map(async (server) => {
     const healthUrl = getHealthURL(server);
     const isSameOrigin = isSameOriginURL(healthUrl);
-    
+
     const start = performance.now();
     try {
-      const res = await fetchWithTimeout(healthUrl, { 
-        method: 'GET',
-        mode: isSameOrigin ? 'same-origin' : 'cors'
-      }, 5000);
+      const res = await fetchWithTimeout(
+        healthUrl,
+        {
+          method: "GET",
+          mode: isSameOrigin ? "same-origin" : "cors",
+        },
+        5000,
+      );
       const latency = performance.now() - start;
-      
+
       if (res.ok) {
         // Consume body to free connection for reuse
         await res.text().catch(() => {});
         return { server, latency, error: null };
       }
       await res.text().catch(() => {});
-      return { server, latency: Infinity, error: 'unhealthy' };
+      return { server, latency: Infinity, error: "unhealthy" };
     } catch (e) {
       return { server, latency: Infinity, error: e.message };
     }
   });
 
   const results = await Promise.all(latencyPromises);
-  
+
   results.forEach(({ server, latency, error }) => {
     server.reachable = error === null;
     server.latency = error === null ? latency : null;
   });
-  
-  const reachable = results.filter(r => r.error === null);
-  
+
+  const reachable = results.filter((r) => r.error === null);
+
   if (reachable.length === 0) {
-    console.warn('No servers reachable, defaulting to current');
+    console.warn("No servers reachable, defaulting to current");
     setSelectedServer(null);
     updateServerName();
     return;
   }
-  
+
   reachable.sort((a, b) => a.latency - b.latency);
   setSelectedServer(reachable[0].server);
   updateServerName();
-  
-  console.log('Auto-selected server:', state.selectedServer.name, 
-    `(${Math.round(reachable[0].latency)}ms)`);
+
+  console.log(
+    "Auto-selected server:",
+    state.selectedServer.name,
+    `(${Math.round(reachable[0].latency)}ms)`,
+  );
 }
 
 function populateServerSelect() {
   if (!elements.serverSelect || !elements.serverSelectGroup) return;
-  
-  while (elements.serverSelect.firstChild) elements.serverSelect.removeChild(elements.serverSelect.firstChild);
 
-  const reachableServers = state.servers.filter(server => server.api_endpoint && server.reachable);
+  while (elements.serverSelect.firstChild)
+    elements.serverSelect.removeChild(elements.serverSelect.firstChild);
+
+  const reachableServers = state.servers.filter(
+    (server) => server.api_endpoint && server.reachable,
+  );
 
   if (reachableServers.length <= 1) {
-    elements.serverSelectGroup.style.display = 'none';
-    if (reachableServers.length === 1 && (!state.selectedServer || state.selectedServer.id !== reachableServers[0].id)) {
+    elements.serverSelectGroup.style.display = "none";
+    if (
+      reachableServers.length === 1 &&
+      (!state.selectedServer ||
+        state.selectedServer.id !== reachableServers[0].id)
+    ) {
       setSelectedServer(reachableServers[0]);
       updateServerName();
     }
     return;
   }
 
-  elements.serverSelectGroup.style.display = '';
-  reachableServers.forEach(server => {
-    const opt = document.createElement('option');
+  elements.serverSelectGroup.style.display = "";
+  reachableServers.forEach((server) => {
+    const opt = document.createElement("option");
     opt.value = server.id;
-    const location = server.location ? ` (${server.location})` : '';
+    const location = server.location ? ` (${server.location})` : "";
     opt.textContent = `${server.name}${location}`;
     elements.serverSelect.appendChild(opt);
   });
 
-  if (state.selectedServer?.id && reachableServers.some(s => s.id === state.selectedServer.id)) {
+  if (
+    state.selectedServer?.id &&
+    reachableServers.some((s) => s.id === state.selectedServer.id)
+  ) {
     elements.serverSelect.value = state.selectedServer.id;
   } else if (reachableServers[0]?.id) {
     setSelectedServer(reachableServers[0]);
@@ -468,19 +531,19 @@ function populateServerSelect() {
 
 function onServerChange() {
   const value = elements.serverSelect.value;
-  const server = state.servers.find(s => s.id === value && s.api_endpoint);
+  const server = state.servers.find((s) => s.id === value && s.api_endpoint);
   if (server) {
     setSelectedServer(server);
   }
-  
+
   updateServerName();
   saveSettings();
   checkServer();
 }
 
 async function checkServer() {
-  const candidates = ['/health', `${apiBase}/health`, `${apiBase}/ping`];
-  
+  const candidates = ["/health", `${apiBase}/health`, `${apiBase}/ping`];
+
   try {
     let ok = false;
     for (const url of candidates) {
@@ -490,7 +553,7 @@ async function checkServer() {
           await res.text().catch(() => {});
           continue;
         }
-        
+
         let data;
         try {
           data = await res.json();
@@ -498,7 +561,11 @@ async function checkServer() {
           await res.text().catch(() => {});
           continue;
         }
-        if (data.status === 'ok' || data.status === 'healthy' || data.pong === true) {
+        if (
+          data.status === "ok" ||
+          data.status === "healthy" ||
+          data.pong === true
+        ) {
           ok = true;
           break;
         }
@@ -506,89 +573,89 @@ async function checkServer() {
         continue;
       }
     }
-    
+
     if (!ok) {
-      throw new Error('Server offline');
+      throw new Error("Server offline");
     }
-    
+
     if (elements.serverDot) {
-      elements.serverDot.classList.remove('error', 'warning');
-      elements.serverDot.classList.add('connected');
+      elements.serverDot.classList.remove("error", "warning");
+      elements.serverDot.classList.add("connected");
     }
-    
+
     if (state.selectedServer) {
-      if (elements.serverText) elements.serverText.textContent = state.selectedServer.name || 'Ready';
+      if (elements.serverText)
+        elements.serverText.textContent = state.selectedServer.name || "Ready";
     } else {
-      if (elements.serverText) elements.serverText.textContent = 'Ready';
+      if (elements.serverText) elements.serverText.textContent = "Ready";
     }
-    
+
     if (elements.serverStatus) {
-      elements.serverStatus.textContent = 'Connected';
-      elements.serverStatus.className = 'server-status connected';
+      elements.serverStatus.textContent = "Connected";
+      elements.serverStatus.className = "server-status connected";
     }
   } catch (e) {
     if (elements.serverDot) {
-      elements.serverDot.classList.remove('connected', 'warning');
-      elements.serverDot.classList.add('error');
+      elements.serverDot.classList.remove("connected", "warning");
+      elements.serverDot.classList.add("error");
     }
-    if (elements.serverText) elements.serverText.textContent = 'Offline';
-    
+    if (elements.serverText) elements.serverText.textContent = "Offline";
+
     if (elements.serverStatus) {
-      elements.serverStatus.textContent = 'Offline';
-      elements.serverStatus.className = 'server-status error';
+      elements.serverStatus.textContent = "Offline";
+      elements.serverStatus.className = "server-status error";
     }
   }
 }
 
 async function startTest() {
   if (state.isRunning) {
-    showError('Test already in progress');
+    showError("Test already in progress");
     return;
   }
-  
+
   state.isRunning = true;
   state.abortController = new AbortController();
   const signal = state.abortController.signal;
-  
+
   try {
-    state.phase = 'latency';
-    showState('testing');
-    updateTestType('◎ Latency', 'measuring');
-    
+    state.phase = "latency";
+    showState("testing");
+    updateTestType("◎ Latency", "measuring");
+
     const latency = await measureLatency(signal);
     state.latencyResult = latency;
-    
+
     if (signal.aborted) return;
-    
-    state.phase = 'download';
+
+    state.phase = "download";
     resetProgress();
-    updateTestType('↓ Download', 'downloading');
-    
+    updateTestType("↓ Download", "downloading");
+
     // Yield to render UI before starting test
-    await new Promise(r => requestAnimationFrame(r));
-    
-    const downloadSpeed = await runTest('download', signal);
+    await new Promise((r) => requestAnimationFrame(r));
+
+    const downloadSpeed = await runTest("download", signal);
     state.downloadResult = downloadSpeed;
-    
+
     if (signal.aborted) return;
-    
-    state.phase = 'upload';
+
+    state.phase = "upload";
     resetProgress();
-    updateTestType('↑ Upload', 'uploading');
-    
+    updateTestType("↑ Upload", "uploading");
+
     // Yield to render UI before starting test
-    await new Promise(r => requestAnimationFrame(r));
-    
-    const uploadSpeed = await runTest('upload', signal);
+    await new Promise((r) => requestAnimationFrame(r));
+
+    const uploadSpeed = await runTest("upload", signal);
     state.uploadResult = uploadSpeed;
-    
-    state.phase = 'results';
+
+    state.phase = "results";
     showResults();
-    
   } catch (e) {
-    console.error('Test failed:', e);
-    if (e.name !== 'AbortError') {
-      const message = e.message || 'Test failed';
+    console.error("Test failed:", e);
+    if (e.name !== "AbortError") {
+      const message = e.message || "Test failed";
       showError(message);
     }
     resetToIdle();
@@ -603,16 +670,16 @@ async function startTest() {
 
 async function runTest(direction, signal) {
   if (signal.aborted) {
-    throw new Error('Test cancelled');
+    throw new Error("Test cancelled");
   }
-  
+
   const duration = state.settings.duration;
   const startTime = performance.now();
   let lastUpdate = startTime;
   let lastBytes = 0;
   let ewmaSpeed = 0;
   const ewmaAlpha = 0.3; // ~1s effective smoothing window
-  
+
   // Smooth ring animation: advance based on wall clock time, independent of data callbacks
   const progressTick = setInterval(() => {
     if (signal.aborted) return;
@@ -624,7 +691,7 @@ async function runTest(direction, signal) {
     if (elapsed > duration) return; // Past end time — freeze display
     const now = performance.now();
     const intervalMs = now - lastUpdate;
-    
+
     if (intervalMs >= 200) {
       // Reset tracking on warmup-to-measurement transition (bytes counter resets)
       if (bytes < lastBytes) {
@@ -632,29 +699,31 @@ async function runTest(direction, signal) {
         ewmaSpeed = 0;
       }
       const intervalBytes = bytes - lastBytes;
-      
+
       if (intervalBytes > 0 && intervalMs > 0) {
-        const instantSpeed = (intervalBytes * 8) / (intervalMs / 1000) / 1_000_000;
+        const instantSpeed =
+          (intervalBytes * 8) / (intervalMs / 1000) / 1_000_000;
         // EWMA smoothing for stable live display
-        ewmaSpeed = ewmaSpeed === 0
-          ? instantSpeed
-          : ewmaAlpha * instantSpeed + (1 - ewmaAlpha) * ewmaSpeed;
+        ewmaSpeed =
+          ewmaSpeed === 0
+            ? instantSpeed
+            : ewmaAlpha * instantSpeed + (1 - ewmaAlpha) * ewmaSpeed;
         updateSpeed(Math.max(0, ewmaSpeed), direction);
       }
-      
+
       updateProgress(Math.min(100, (elapsed / duration) * 100));
-      
+
       lastUpdate = now;
       lastBytes = Math.max(lastBytes, bytes);
     }
   };
-  
+
   // Run loaded latency probe in background during the test
   const latencyProbe = startLoadedLatencyProbe(signal);
-  
+
   let result;
   try {
-    if (direction === 'download') {
+    if (direction === "download") {
       result = await runDownloadTest(duration, onProgress, signal);
     } else {
       result = await runUploadTest(duration, onProgress, signal);
@@ -664,7 +733,7 @@ async function runTest(direction, signal) {
     await latencyProbe.stop();
   }
   const loadedLatency = latencyProbe.getMedian();
-  if (direction === 'download') {
+  if (direction === "download") {
     state.downloadLatency = loadedLatency;
   } else {
     state.uploadLatency = loadedLatency;
@@ -682,18 +751,18 @@ async function measureLatency(signal) {
   const numSamples = 24;
   const warmUpPings = 2; // First pings include DNS/TLS overhead
   let capturedIP = false;
-  
+
   for (let i = 0; i < numSamples; i++) {
     if (signal.aborted) break;
-    
+
     const start = performance.now();
     try {
-      const res = await fetch(`${apiBase}/ping`, { 
-        method: 'GET',
-        signal
+      const res = await fetch(`${apiBase}/ping`, {
+        method: "GET",
+        signal,
       });
       const rtt = performance.now() - start;
-      
+
       // Capture IP info from first successful response
       if (!capturedIP && res.ok) {
         try {
@@ -713,26 +782,27 @@ async function measureLatency(signal) {
       } else {
         await res.text().catch(() => {});
       }
-      
+
       rawSamples.push(rtt);
-      
+
       updateProgress((i / numSamples) * 100);
-      updateSpeed(rtt, 'latency');
+      updateSpeed(rtt, "latency");
     } catch (e) {
-      if (e.name === 'AbortError') break;
+      if (e.name === "AbortError") break;
     }
   }
-  
+
   if (rawSamples.length === 0) return null;
-  
+
   // Discard warm-up pings (DNS/TLS overhead)
-  const samples = rawSamples.length > warmUpPings
-    ? rawSamples.slice(warmUpPings)
-    : rawSamples;
-  
+  const samples =
+    rawSamples.length > warmUpPings
+      ? rawSamples.slice(warmUpPings)
+      : rawSamples;
+
   // IQR outlier filter
   const filtered = filterOutliersIQR(samples);
-  
+
   if (filtered.length >= 2) {
     let sumDiff = 0;
     for (let i = 1; i < filtered.length; i++) {
@@ -742,23 +812,24 @@ async function measureLatency(signal) {
   } else {
     state.jitterResult = 0;
   }
-  
+
   filtered.sort((a, b) => a - b);
   const median = filtered[Math.floor(filtered.length / 2)];
-  
+
   return median;
 }
 
 function computeBufferbloatGrade(idleLatency, loadedLatency) {
-  if (!Number.isFinite(idleLatency) || !Number.isFinite(loadedLatency)) return null;
+  if (!Number.isFinite(idleLatency) || !Number.isFinite(loadedLatency))
+    return null;
   if (idleLatency <= 0 || loadedLatency <= 0) return null;
   const increase = loadedLatency - idleLatency;
-  if (increase < 5) return 'A+';
-  if (increase < 15) return 'A';
-  if (increase < 30) return 'B';
-  if (increase < 60) return 'C';
-  if (increase < 150) return 'D';
-  return 'F';
+  if (increase < 5) return "A+";
+  if (increase < 15) return "A";
+  if (increase < 30) return "B";
+  if (increase < 60) return "C";
+  if (increase < 150) return "D";
+  return "F";
 }
 
 function filterOutliersIQR(samples) {
@@ -769,22 +840,22 @@ function filterOutliersIQR(samples) {
   const iqr = q3 - q1;
   const lower = q1 - 1.5 * iqr;
   const upper = q3 + 1.5 * iqr;
-  return samples.filter(s => s >= lower && s <= upper);
+  return samples.filter((s) => s >= lower && s <= upper);
 }
 
 // Background latency measurement during load (bufferbloat detection)
 function startLoadedLatencyProbe(signal) {
   const samples = [];
   let running = true;
-  
+
   const loop = async () => {
     while (running && !signal.aborted) {
       const start = performance.now();
       try {
         const res = await fetch(`${apiBase}/ping`, {
-          method: 'GET',
-          cache: 'no-store',
-          signal
+          method: "GET",
+          cache: "no-store",
+          signal,
         });
         samples.push(performance.now() - start);
         await res.text().catch(() => {});
@@ -794,18 +865,21 @@ function startLoadedLatencyProbe(signal) {
       await sleep(500);
     }
   };
-  
+
   const promise = loop();
-  
+
   return {
-    stop() { running = false; return promise; },
+    stop() {
+      running = false;
+      return promise;
+    },
     getMedian() {
       if (samples.length === 0) return 0;
       const filtered = filterOutliersIQR(samples);
       if (filtered.length === 0) return 0;
       filtered.sort((a, b) => a - b);
       return filtered[Math.floor(filtered.length / 2)];
-    }
+    },
   };
 }
 
@@ -815,16 +889,18 @@ function createWarmUpDetector(durationMs) {
   const stabilityThreshold = 0.15; // 15% variance
   const requiredStableWindows = 3;
   const maxGraceMs = Math.min(durationMs * 0.3, 5000);
-  
+
   let windowBytes = 0;
   let windowStart = 0;
   let detectorStart = 0;
   let recentSpeeds = [];
   let settled = false;
-  
+
   return {
-    settled() { return settled; },
-    
+    settled() {
+      return settled;
+    },
+
     record(bytes, now) {
       if (settled) return;
       if (detectorStart === 0) {
@@ -833,13 +909,13 @@ function createWarmUpDetector(durationMs) {
       }
       windowBytes += bytes;
       const windowElapsed = now - windowStart;
-      
+
       if (windowElapsed >= windowMs) {
         const speed = (windowBytes * 8) / (windowElapsed / 1000);
         recentSpeeds.push(speed);
         windowBytes = 0;
         windowStart = now;
-        
+
         // Check stability over last N windows
         if (recentSpeeds.length >= requiredStableWindows) {
           const recent = recentSpeeds.slice(-requiredStableWindows);
@@ -849,19 +925,21 @@ function createWarmUpDetector(durationMs) {
             settled = true;
             return;
           }
-          const maxDev = Math.max(...recent.map(s => Math.abs(s - avg) / avg));
+          const maxDev = Math.max(
+            ...recent.map((s) => Math.abs(s - avg) / avg),
+          );
           if (maxDev < stabilityThreshold) {
             settled = true;
             return;
           }
         }
-        
+
         // Hard cap: don't spend more than maxGraceMs warming up
         if (now - detectorStart > maxGraceMs) {
           settled = true;
         }
       }
-    }
+    },
   };
 }
 
@@ -873,36 +951,41 @@ async function runDownloadTest(duration, onProgress, signal) {
   const streamDelay = 200;
   const maxNetworkRetries = 2;
   const retryDelayMs = 250;
-  const endTime = startTime + (duration * 1000);
+  const endTime = startTime + duration * 1000;
   let totalBytes = 0;
   let allBytes = 0;
   let sawNetworkError = false;
   let sawOverload = false;
   let successfulStreams = 0;
-  
+
   const warmUp = createWarmUpDetector(duration * 1000);
   let measureStartTime = 0;
-  
+
   const streamPromises = [];
-  
+
   const downloadStream = async (chunk) => {
-    const res = await fetchWithTimeout(`${apiBase}/download?duration=${duration}&chunk=${chunk}`, {
-      method: 'GET',
-      cache: 'no-store',
-      credentials: 'omit',
-      signal: signal
-    }, (duration * 1000) + 10000);
-    
+    const res = await fetchWithTimeout(
+      `${apiBase}/download?duration=${duration}&chunk=${chunk}`,
+      {
+        method: "GET",
+        cache: "no-store",
+        credentials: "omit",
+        signal: signal,
+      },
+      duration * 1000 + 10000,
+    );
+
     if (!res.ok || !res.body) {
       await res.text().catch(() => {});
-      if (res.status === 503) {
-        const err = new Error('Server overloaded');
-        err.status = 503;
+      if (res.status === 503 || res.status === 429) {
+        const err = new Error("Server overloaded");
+        err.status = res.status;
+        err.retryAfter = retryAfterMs(res, 500);
         throw err;
       }
       return false;
     }
-    
+
     const reader = res.body.getReader();
     try {
       while (true) {
@@ -916,9 +999,9 @@ async function runDownloadTest(duration, onProgress, signal) {
 
         const { done, value } = await reader.read();
         if (done) break;
-        
+
         allBytes += value.length;
-        
+
         if (!warmUp.settled()) {
           warmUp.record(value.length, now);
           if (warmUp.settled()) {
@@ -929,7 +1012,7 @@ async function runDownloadTest(duration, onProgress, signal) {
         } else {
           totalBytes += value.length;
         }
-        
+
         const elapsedSec = (now - startTime) / 1000;
         const displayBytes = warmUp.settled() ? totalBytes : allBytes;
         onProgress(displayBytes, elapsedSec);
@@ -939,7 +1022,7 @@ async function runDownloadTest(duration, onProgress, signal) {
     }
     return true;
   };
-  
+
   const buildChunkAttempts = () => {
     const preferredFallback = 256 * 1024;
     const attempts = [chunkSize];
@@ -954,12 +1037,16 @@ async function runDownloadTest(duration, onProgress, signal) {
 
   for (let i = 0; i < numStreams; i++) {
     const delay = i * streamDelay;
-    
+
     const streamPromise = (async () => {
-      await new Promise(r => setTimeout(r, delay));
-      
+      await new Promise((r) => setTimeout(r, delay));
+
       const attempts = buildChunkAttempts();
-      for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
+      for (
+        let attemptIndex = 0;
+        attemptIndex < attempts.length;
+        attemptIndex++
+      ) {
         if (signal.aborted) return;
         const attemptChunk = attempts[attemptIndex];
         let success = false;
@@ -971,12 +1058,12 @@ async function runDownloadTest(duration, onProgress, signal) {
               break;
             }
           } catch (e) {
-            if (e.name === 'AbortError' || signal.aborted) {
+            if (e.name === "AbortError" || signal.aborted) {
               return;
             }
-            if (e.status === 503) {
+            if (e.status === 503 || e.status === 429) {
               sawOverload = true;
-              await sleep(500);
+              await sleep(e.retryAfter || 500);
               return;
             }
             if (isNetworkError(e)) {
@@ -987,9 +1074,9 @@ async function runDownloadTest(duration, onProgress, signal) {
               }
             }
             if (attemptIndex < attempts.length - 1) {
-              console.warn('Download stream failed, retrying smaller chunk', e);
+              console.warn("Download stream failed, retrying smaller chunk", e);
             } else {
-              console.warn('Download stream failed after retries', e);
+              console.warn("Download stream failed after retries", e);
             }
             break;
           }
@@ -1000,26 +1087,31 @@ async function runDownloadTest(duration, onProgress, signal) {
         }
       }
     })();
-    
+
     streamPromises.push(streamPromise);
   }
-  
+
   await Promise.all(streamPromises);
-  
+
   const overheadFactor = detectOverheadFactor();
   const endNow = Math.min(performance.now(), endTime);
-  const actualMeasureStart = measureStartTime > 0 ? measureStartTime : startTime;
+  const actualMeasureStart =
+    measureStartTime > 0 ? measureStartTime : startTime;
   const measureTime = Math.max(0.001, (endNow - actualMeasureStart) / 1000);
   const avgSpeed = (totalBytes * 8 * overheadFactor) / measureTime / 1_000_000;
-  
+
   if (totalBytes === 0 && sawNetworkError) {
-    throw new Error('Network error during download. Try again or change server.');
+    throw new Error(
+      "Network error during download. Try again or change server.",
+    );
   }
   if (totalBytes === 0 && sawOverload) {
-    throw new Error('Server overloaded. Try again in a moment or change server.');
+    throw new Error(
+      "Server overloaded. Try again in a moment or change server.",
+    );
   }
   if (totalBytes === 0 && successfulStreams === 0) {
-    throw new Error('Download failed. No stream completed successfully.');
+    throw new Error("Download failed. No stream completed successfully.");
   }
 
   return avgSpeed > 0 ? avgSpeed : 0;
@@ -1038,10 +1130,10 @@ async function runUploadTest(duration, onProgress, signal) {
   let sawNetworkError = false;
   let sawOverload = false;
   let successfulStreams = 0;
-  
+
   const warmUp = createWarmUpDetector(duration * 1000);
   let measureStartTime = 0;
-  
+
   const chunks = [];
   for (let i = 0; i < blobSize; i += 65536) {
     const piece = new Uint8Array(Math.min(65536, blobSize - i));
@@ -1049,29 +1141,33 @@ async function runUploadTest(duration, onProgress, signal) {
     chunks.push(piece);
   }
   const blob = new Blob(chunks);
-  
-  const endTime = startTime + (duration * 1000);
-  
+
+  const endTime = startTime + duration * 1000;
+
   const uploadStream = async (delay) => {
-    await new Promise(r => setTimeout(r, delay));
-    
+    await new Promise((r) => setTimeout(r, delay));
+
     let consecutiveErrors = 0;
     while (performance.now() < endTime && !signal.aborted) {
       try {
-        const res = await fetchWithTimeout(`${apiBase}/upload`, {
-          method: 'POST',
-          body: blob,
-          headers: { 'Content-Type': 'application/octet-stream' },
-          cache: 'no-store',
-          credentials: 'omit',
-          signal: signal
-        }, (duration * 1000) + 10000);
-        
+        const res = await fetchWithTimeout(
+          `${apiBase}/upload`,
+          {
+            method: "POST",
+            body: blob,
+            headers: { "Content-Type": "application/octet-stream" },
+            cache: "no-store",
+            credentials: "omit",
+            signal: signal,
+          },
+          duration * 1000 + 10000,
+        );
+
         if (!res.ok) {
           await res.text().catch(() => {});
-          if (res.status === 503) {
+          if (res.status === 503 || res.status === 429) {
             sawOverload = true;
-            await sleep(500);
+            await sleep(retryAfterMs(res, 500));
             break;
           }
           consecutiveErrors += 1;
@@ -1081,11 +1177,11 @@ async function runUploadTest(duration, onProgress, signal) {
         }
         consecutiveErrors = 0;
         await res.text().catch(() => {}); // drain body for HTTP/2 stream reuse
-        
+
         const now = performance.now();
         allBytes += blobSize;
         successfulStreams += 1;
-        
+
         if (!warmUp.settled()) {
           warmUp.record(blobSize, now);
           if (warmUp.settled()) {
@@ -1095,13 +1191,12 @@ async function runUploadTest(duration, onProgress, signal) {
         } else {
           totalBytes += blobSize;
         }
-        
+
         const elapsedSec = (now - startTime) / 1000;
         const displayBytes = warmUp.settled() ? totalBytes : allBytes;
         onProgress(displayBytes, elapsedSec);
-        
       } catch (e) {
-        if (e.name === 'AbortError') break;
+        if (e.name === "AbortError") break;
         if (isNetworkError(e)) {
           sawNetworkError = true;
           consecutiveErrors += 1;
@@ -1114,53 +1209,61 @@ async function runUploadTest(duration, onProgress, signal) {
       }
     }
   };
-  
+
   const streams = [];
   for (let i = 0; i < numStreams; i++) {
     streams.push(uploadStream(i * streamDelay));
   }
   await Promise.all(streams);
-  
+
   const overheadFactor = detectOverheadFactor();
   const endNow = Math.min(performance.now(), endTime);
-  const actualMeasureStart = measureStartTime > 0 ? measureStartTime : startTime;
+  const actualMeasureStart =
+    measureStartTime > 0 ? measureStartTime : startTime;
   const measureTime = Math.max(0.001, (endNow - actualMeasureStart) / 1000);
   const avgSpeed = (totalBytes * 8 * overheadFactor) / measureTime / 1_000_000;
-  
+
   if (totalBytes === 0 && sawNetworkError) {
-    throw new Error('Network error during upload. Try again or change server.');
+    throw new Error("Network error during upload. Try again or change server.");
   }
   if (totalBytes === 0 && sawOverload) {
-    throw new Error('Server overloaded. Try again in a moment or change server.');
+    throw new Error(
+      "Server overloaded. Try again in a moment or change server.",
+    );
   }
   if (totalBytes === 0 && successfulStreams === 0) {
-    throw new Error('Upload failed. No stream completed successfully.');
+    throw new Error("Upload failed. No stream completed successfully.");
   }
 
   return avgSpeed > 0 ? avgSpeed : 0;
 }
 
 function updateSpeed(speed, direction) {
-  if (typeof speed !== 'number' || !Number.isFinite(speed) || speed < 0) speed = 0;
+  if (typeof speed !== "number" || !Number.isFinite(speed) || speed < 0)
+    speed = 0;
   if (!elements.speedNumber || !elements.speedUnit) return;
   state.currentSpeed = speed;
-  
+
   let displaySpeed, unit;
-  
-  if (direction === 'latency') {
+
+  if (direction === "latency") {
     displaySpeed = speed.toFixed(0);
-    unit = 'ms';
-    elements.speedNumber.className = 'speed-number measuring';
+    unit = "ms";
+    elements.speedNumber.className = "speed-number measuring";
   } else if (speed >= 1000) {
     displaySpeed = (speed / 1000).toFixed(2);
-    unit = 'Gbps';
-    elements.speedNumber.className = 'speed-number ' + (direction === 'download' ? 'downloading' : 'uploading');
+    unit = "Gbps";
+    elements.speedNumber.className =
+      "speed-number " +
+      (direction === "download" ? "downloading" : "uploading");
   } else {
     displaySpeed = speed.toFixed(1);
-    unit = 'Mbps';
-    elements.speedNumber.className = 'speed-number ' + (direction === 'download' ? 'downloading' : 'uploading');
+    unit = "Mbps";
+    elements.speedNumber.className =
+      "speed-number " +
+      (direction === "download" ? "downloading" : "uploading");
   }
-  
+
   elements.speedNumber.textContent = displaySpeed;
   elements.speedUnit.textContent = unit;
 }
@@ -1179,86 +1282,95 @@ function resetProgress() {
   if (!elements.progressRing || !elements.speedNumber) return;
   state.progress = 0;
   elements.progressRing.style.strokeDashoffset = RING_CIRCUMFERENCE;
-  elements.speedNumber.textContent = '0';
+  elements.speedNumber.textContent = "0";
 }
 
 function updateTestType(text, className) {
-  if (!elements.testType || !elements.progressRing || !elements.speedNumber) return;
+  if (!elements.testType || !elements.progressRing || !elements.speedNumber)
+    return;
   elements.testType.textContent = text;
-  elements.progressRing.className = 'progress-ring-fill ' + className;
-  elements.speedNumber.className = 'speed-number ' + className;
+  elements.progressRing.className = "progress-ring-fill " + className;
+  elements.speedNumber.className = "speed-number " + className;
 }
 
 function showState(stateName) {
-  if (!elements.idleState || !elements.testingState || !elements.resultsState) return;
-  elements.idleState.classList.add('hidden');
-  elements.testingState.classList.add('hidden');
-  elements.resultsState.classList.add('hidden');
-  document.body.classList.toggle('results-view', stateName === 'results');
-  
+  if (!elements.idleState || !elements.testingState || !elements.resultsState)
+    return;
+  elements.idleState.classList.add("hidden");
+  elements.testingState.classList.add("hidden");
+  elements.resultsState.classList.add("hidden");
+  document.body.classList.toggle("results-view", stateName === "results");
+
   switch (stateName) {
-    case 'idle':
-      elements.idleState.classList.remove('hidden');
+    case "idle":
+      elements.idleState.classList.remove("hidden");
       break;
-    case 'testing':
-      elements.testingState.classList.remove('hidden');
+    case "testing":
+      elements.testingState.classList.remove("hidden");
       break;
-    case 'results':
-      elements.resultsState.classList.remove('hidden');
+    case "results":
+      elements.resultsState.classList.remove("hidden");
       break;
   }
 }
 
 function showResults() {
-  if (!elements.downloadResult || !elements.uploadResult || !elements.latencyResult || !elements.jitterResult) {
+  if (
+    !elements.downloadResult ||
+    !elements.uploadResult ||
+    !elements.latencyResult ||
+    !elements.jitterResult
+  ) {
     return;
   }
-  showState('results');
-  
+  showState("results");
+
   const formatSpeedWithUnit = (speed) => {
-    if (typeof speed !== 'number' || !Number.isFinite(speed) || speed < 0) speed = 0;
+    if (typeof speed !== "number" || !Number.isFinite(speed) || speed < 0)
+      speed = 0;
     if (speed >= 1000) {
-      return { value: (speed / 1000).toFixed(2), unit: 'Gbps' };
+      return { value: (speed / 1000).toFixed(2), unit: "Gbps" };
     }
-    return { value: speed.toFixed(1), unit: 'Mbps' };
+    return { value: speed.toFixed(1), unit: "Mbps" };
   };
-  
+
   const download = formatSpeedWithUnit(state.downloadResult);
   const upload = formatSpeedWithUnit(state.uploadResult);
-  
+
   elements.downloadResult.textContent = download.value;
   elements.uploadResult.textContent = upload.value;
-  
-  const downloadUnit = document.querySelector('.result-primary .result-unit');
-  const uploadUnit = document.querySelector('.result-secondary .result-unit');
+
+  const downloadUnit = document.querySelector(".result-primary .result-unit");
+  const uploadUnit = document.querySelector(".result-secondary .result-unit");
   if (downloadUnit) downloadUnit.textContent = download.unit;
   if (uploadUnit) uploadUnit.textContent = upload.unit;
-  
-  elements.latencyResult.textContent = state.latencyResult != null ? `${state.latencyResult.toFixed(1)} ms` : '-';
-  elements.jitterResult.textContent = state.jitterResult != null ? `${state.jitterResult.toFixed(1)} ms` : '-';
-  
+
+  elements.latencyResult.textContent =
+    state.latencyResult != null ? `${state.latencyResult.toFixed(1)} ms` : "-";
+  elements.jitterResult.textContent =
+    state.jitterResult != null ? `${state.jitterResult.toFixed(1)} ms` : "-";
+
   // Loaded latency: use the worse of download/upload loaded latency
   const loadedLatency = Math.max(state.downloadLatency, state.uploadLatency);
   if (elements.loadedLatencyResult) {
-    elements.loadedLatencyResult.textContent = loadedLatency > 0
-      ? `${loadedLatency.toFixed(1)} ms`
-      : '-';
+    elements.loadedLatencyResult.textContent =
+      loadedLatency > 0 ? `${loadedLatency.toFixed(1)} ms` : "-";
   }
-  
+
   // Bufferbloat grade based on latency increase under load
   if (elements.bufferbloatResult) {
     const grade = computeBufferbloatGrade(state.latencyResult, loadedLatency);
-    elements.bufferbloatResult.textContent = grade || '-';
+    elements.bufferbloatResult.textContent = grade || "-";
   }
-  
+
   updateNetworkDisplay();
 
   state.resultId = null;
   state.shareSavePromise = null;
   if (elements.shareBtn) {
-    elements.shareBtn.classList.remove('hidden');
+    elements.shareBtn.classList.remove("hidden");
     elements.shareBtn.disabled = false;
-    elements.shareBtn.textContent = 'Share';
+    elements.shareBtn.textContent = "Share";
   }
 }
 
@@ -1267,12 +1379,12 @@ async function saveAndEnableShare() {
   if (state.shareSavePromise) return state.shareSavePromise;
 
   const loadedLat = Math.max(state.downloadLatency, state.uploadLatency);
-  const bbGrade = computeBufferbloatGrade(state.latencyResult, loadedLat) || '';
+  const bbGrade = computeBufferbloatGrade(state.latencyResult, loadedLat) || "";
 
   state.shareSavePromise = (async () => {
     const res = await fetch(`${apiBase}/results`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         download_mbps: state.downloadResult,
         upload_mbps: state.uploadResult,
@@ -1280,21 +1392,21 @@ async function saveAndEnableShare() {
         jitter_ms: state.jitterResult || 0,
         loaded_latency_ms: loadedLat,
         bufferbloat_grade: bbGrade,
-        ipv4: state.networkInfo.ipv4 || '',
-        ipv6: state.networkInfo.ipv6 || '',
-        server_name: resolveServerName()
-      })
+        ipv4: state.networkInfo.ipv4 || "",
+        ipv6: state.networkInfo.ipv6 || "",
+        server_name: resolveServerName(),
+      }),
     });
     if (!res.ok) {
       await res.text().catch(() => {});
       throw new Error(`share save failed: HTTP ${res.status}`);
     }
     const data = await res.json();
-    if (state.phase !== 'results') {
+    if (state.phase !== "results") {
       return null;
     }
-    if (typeof data?.id !== 'string' || data.id.length === 0) {
-      throw new Error('share save failed: invalid response');
+    if (typeof data?.id !== "string" || data.id.length === 0) {
+      throw new Error("share save failed: invalid response");
     }
     state.resultId = data.id;
     return state.resultId;
@@ -1308,36 +1420,39 @@ async function saveAndEnableShare() {
 }
 
 async function handleShare() {
-  if (state.phase !== 'results') return;
+  if (state.phase !== "results") return;
 
   let resultId = state.resultId;
   if (!resultId) {
     if (elements.shareBtn) {
       elements.shareBtn.disabled = true;
-      elements.shareBtn.textContent = 'Saving...';
+      elements.shareBtn.textContent = "Saving...";
     }
     try {
       resultId = await saveAndEnableShare();
     } catch (err) {
-      console.debug('Share save unavailable:', err);
-      showError('Unable to create share link right now');
+      console.debug("Share save unavailable:", err);
+      showError("Unable to create share link right now");
       return;
     } finally {
-      if (elements.shareBtn && state.phase === 'results') {
+      if (elements.shareBtn && state.phase === "results") {
         elements.shareBtn.disabled = false;
-        elements.shareBtn.textContent = 'Share';
+        elements.shareBtn.textContent = "Share";
       }
     }
   }
   if (!resultId) return;
 
-  const url = window.location.origin + '/results/' + resultId;
+  const url = window.location.origin + "/results/" + resultId;
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(url).then(() => {
-      showError('Link copied to clipboard', false);
-    }).catch(() => {
-      promptShareUrl(url);
-    });
+    navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        showError("Link copied to clipboard", false);
+      })
+      .catch(() => {
+        promptShareUrl(url);
+      });
   } else {
     promptShareUrl(url);
   }
@@ -1345,9 +1460,11 @@ async function handleShare() {
 
 function promptShareUrl(url) {
   if (navigator.share) {
-    navigator.share({ title: 'openByte Speed Test Result', url }).catch(() => {});
+    navigator
+      .share({ title: "openByte Speed Test Result", url })
+      .catch(() => {});
   } else {
-    window.prompt('Copy this link:', url);
+    window.prompt("Copy this link:", url);
   }
 }
 
@@ -1360,8 +1477,8 @@ function cancelTest() {
 
 function resetToIdle() {
   cancelTest();
-  
-  state.phase = 'idle';
+
+  state.phase = "idle";
   state.currentSpeed = 0;
   state.progress = 0;
   state.downloadResult = 0;
@@ -1373,47 +1490,47 @@ function resetToIdle() {
   state.resultId = null;
   state.shareSavePromise = null;
   if (elements.shareBtn) {
-    elements.shareBtn.classList.add('hidden');
+    elements.shareBtn.classList.add("hidden");
     elements.shareBtn.disabled = false;
-    elements.shareBtn.textContent = 'Share';
+    elements.shareBtn.textContent = "Share";
   }
-  
+
   resetProgress();
-  showState('idle');
+  showState("idle");
   hideError();
 }
 
 function showError(message, isError = true) {
   if (!elements.errorToast || !elements.errorMessage) return;
   elements.errorMessage.textContent = message;
-  const icon = elements.errorToast.querySelector('.toast-icon');
+  const icon = elements.errorToast.querySelector(".toast-icon");
   if (toastTimer) {
     clearTimeout(toastTimer);
     toastTimer = null;
   }
   if (isError) {
-    if (icon) icon.textContent = '⚠';
-    elements.errorToast.classList.remove('hidden');
-    elements.errorToast.style.background = '';
+    if (icon) icon.textContent = "⚠";
+    elements.errorToast.classList.remove("hidden");
+    elements.errorToast.style.background = "";
     toastTimer = setTimeout(hideError, 5000);
   } else {
-    if (icon) icon.textContent = '✓';
-    elements.errorToast.classList.remove('hidden');
-    elements.errorToast.style.background = 'var(--accent-primary)';
+    if (icon) icon.textContent = "✓";
+    elements.errorToast.classList.remove("hidden");
+    elements.errorToast.style.background = "var(--accent-primary)";
     toastTimer = setTimeout(() => {
       hideError();
-      elements.errorToast.style.background = '';
+      elements.errorToast.style.background = "";
     }, 2000);
   }
 }
 
 function hideError() {
   if (!elements.errorToast) return;
-  elements.errorToast.classList.add('hidden');
+  elements.errorToast.classList.add("hidden");
 }
 
 function notifySettingsSaved() {
   if (elements.settingsModal?.open) {
-    showError('Settings saved', false);
+    showError("Settings saved", false);
   }
 }

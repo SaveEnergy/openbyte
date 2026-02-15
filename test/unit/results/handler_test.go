@@ -229,6 +229,9 @@ func TestSaveSucceedsReturns201WithIDAndURL(t *testing.T) {
 	if url != "/results/"+id {
 		t.Fatalf("url = %q, want %q", url, "/results/"+id)
 	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("cache-control = %q, want %q", got, "no-store")
+	}
 }
 
 func TestHandlerSaveRejectsWrongContentTypeDrainsBody(t *testing.T) {
@@ -382,5 +385,46 @@ func TestHandlerSaveRejectsUnknownFields(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("cache-control = %q, want %q", got, "no-store")
+	}
+}
+
+func TestResultsResponsesSetNoStore(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "results.db")
+	store, err := results.New(dbPath, 100)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	defer store.Close()
+
+	h := results.NewHandler(store)
+
+	saveReq := httptest.NewRequest(http.MethodPost, "/api/v1/results", strings.NewReader(`{
+		"download_mbps": 100,
+		"upload_mbps": 50,
+		"latency_ms": 10,
+		"jitter_ms": 1,
+		"loaded_latency_ms": 12,
+		"bufferbloat_grade": "A",
+		"ipv4": "203.0.113.10",
+		"ipv6": "",
+		"server_name": "test"
+	}`))
+	saveReq.Header.Set("Content-Type", "application/json")
+	saveRec := httptest.NewRecorder()
+	h.Save(saveRec, saveReq)
+	if saveRec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("save cache-control = %q, want %q", saveRec.Header().Get("Cache-Control"), "no-store")
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/results/missing1", nil)
+	getReq.SetPathValue("id", "missing1")
+	getRec := httptest.NewRecorder()
+	h.Get(getRec, getReq)
+	if getRec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("get cache-control = %q, want %q", getRec.Header().Get("Cache-Control"), "no-store")
 	}
 }

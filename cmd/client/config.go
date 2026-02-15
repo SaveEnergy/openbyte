@@ -2,8 +2,11 @@ package client
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -242,6 +245,19 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 }
 
 func validateConfigFile(config *ConfigFile) error {
+	if config.ServerURL != "" {
+		if _, err := normalizeAndValidateServerURL(config.ServerURL); err != nil {
+			return fmt.Errorf("invalid server_url: %w", err)
+		}
+	}
+	for alias, server := range config.Servers {
+		if strings.TrimSpace(server.URL) == "" {
+			return fmt.Errorf("invalid server %q url: empty", alias)
+		}
+		if _, err := normalizeAndValidateServerURL(server.URL); err != nil {
+			return fmt.Errorf("invalid server %q url: %w", alias, err)
+		}
+	}
 	if config.Protocol != "" && config.Protocol != "tcp" && config.Protocol != "udp" && config.Protocol != "http" {
 		return fmt.Errorf("invalid protocol: %s (must be tcp, udp, or http)", config.Protocol)
 	}
@@ -267,4 +283,30 @@ func validateConfigFile(config *ConfigFile) error {
 		return fmt.Errorf("invalid timeout: %d (must be positive)", config.Timeout)
 	}
 	return nil
+}
+
+func normalizeAndValidateServerURL(raw string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return "", err
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", fmt.Errorf("scheme must be http or https")
+	}
+	if u.Host == "" {
+		return "", fmt.Errorf("host is required")
+	}
+	if u.RawQuery != "" {
+		return "", fmt.Errorf("query is not allowed")
+	}
+	if u.Fragment != "" {
+		return "", fmt.Errorf("fragment is not allowed")
+	}
+	if port := u.Port(); port != "" {
+		n, convErr := strconv.Atoi(port)
+		if convErr != nil || n < 1 || n > 65535 {
+			return "", fmt.Errorf("port must be in range 1-65535")
+		}
+	}
+	return strings.TrimRight(u.String(), "/"), nil
 }

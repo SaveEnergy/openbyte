@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
@@ -178,5 +179,33 @@ func TestRunCancelStreamError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "cancel cleanup failed") {
 		t.Fatalf("error = %q, want cancel cleanup context", err.Error())
+	}
+}
+
+func TestHTTPTimeoutAtLeastDuration(t *testing.T) {
+	handler := api.NewSpeedTestHandler(10, 300)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/download", handler.Download)
+	mux.HandleFunc("/api/v1/ping", handler.Ping)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	cfg := &Config{
+		ServerURL:  server.URL,
+		Protocol:   "http",
+		Direction:  "download",
+		Duration:   2,
+		Streams:    1,
+		ChunkSize:  65536,
+		Timeout:    1,
+		WarmUp:     0,
+		NoProgress: true,
+		Plain:      true,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+	if err := runHTTPStream(ctx, cfg, noopOutputFormatter{}); err != nil {
+		t.Fatalf("runHTTPStream failed with short timeout config: %v", err)
 	}
 }

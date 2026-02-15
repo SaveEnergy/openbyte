@@ -333,6 +333,9 @@ func (c *Config) Validate() error {
 	if c.MaxStreams <= 0 || c.MaxStreams > 64 {
 		return fmt.Errorf("max streams must be 1-64")
 	}
+	if c.CapacityGbps <= 0 {
+		return fmt.Errorf("capacity gbps must be > 0")
+	}
 	if c.PprofEnabled && c.PprofAddress == "" {
 		return fmt.Errorf("pprof address cannot be empty when enabled")
 	}

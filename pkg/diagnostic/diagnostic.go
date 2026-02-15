@@ -80,8 +80,8 @@ func rateSpeed(downMbps, upMbps float64) string {
 }
 
 func rateStability(jitterMs, packetLoss float64) string {
-	if jitterMs <= 0 && packetLoss <= 0 {
-		return "stable" // no data = assume stable
+	if jitterMs <= 0 && packetLoss < 0 {
+		return "unknown"
 	}
 	if packetLoss > 2 {
 		return "unstable"
@@ -116,7 +116,7 @@ func suitability(p Params) []string {
 	}
 
 	// Gaming: latency < 50ms, jitter < 15ms, loss < 1%
-	if p.LatencyMs < 50 && p.JitterMs < 15 && p.PacketLoss < 1 {
+	if p.PacketLoss >= 0 && p.LatencyMs < 50 && p.JitterMs < 15 && p.PacketLoss < 1 {
 		s = append(s, "gaming")
 	}
 
@@ -137,7 +137,7 @@ func concerns(p Params) []string {
 	if p.JitterMs > 30 {
 		c = append(c, "high_jitter")
 	}
-	if p.PacketLoss > 1 {
+	if p.PacketLoss >= 0 && p.PacketLoss > 1 {
 		c = append(c, "packet_loss")
 	}
 	if p.DownloadMbps > 0 && p.DownloadMbps < 5 {

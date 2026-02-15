@@ -1,4 +1,0 @@
-services:
-  openbyte:
-    ports:
-      - "8080:8080"   # API + Web UI

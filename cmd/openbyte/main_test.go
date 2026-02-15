@@ -28,7 +28,7 @@ func TestRunDispatch(t *testing.T) {
 		got.args = append([]string(nil), args...)
 		return 13
 	}
-	runMCP = func(_ string) int {
+	runMCP = func(_ []string, _ string) int {
 		got.target = "mcp"
 		got.args = nil
 		return 14
@@ -77,5 +77,23 @@ func TestRunHelpVersionAndUnknown(t *testing.T) {
 	}
 	if code := run([]string{"--unknown-flag"}, "test"); code != 2 {
 		t.Fatalf("unknown top-level flag exit code = %d, want 2", code)
+	}
+}
+
+func TestMCPSubcommandArgsValidation(t *testing.T) {
+	oldMCP := runMCP
+	t.Cleanup(func() { runMCP = oldMCP })
+
+	called := false
+	runMCP = func(_ []string, _ string) int {
+		called = true
+		return 0
+	}
+
+	if code := run([]string{"mcp", "--help"}, "test"); code != 2 {
+		t.Fatalf("mcp extra args exit code = %d, want 2", code)
+	}
+	if called {
+		t.Fatal("runMCP should not be called when extra args are provided")
 	}
 }

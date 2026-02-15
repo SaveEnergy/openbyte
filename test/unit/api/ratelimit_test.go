@@ -185,3 +185,21 @@ func TestRateLimiterBoundedIPCardinality(t *testing.T) {
 		t.Fatal("third unique IP should be rejected once map is full")
 	}
 }
+
+func TestRateLimiterNoGlobalBurnOnIPReject(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.GlobalRateLimit = 2
+	cfg.RateLimitPerIP = 1
+	rl := api.NewRateLimiter(cfg)
+
+	if !rl.Allow("10.0.0.1") {
+		t.Fatal("first request should pass")
+	}
+	if rl.Allow("10.0.0.1") {
+		t.Fatal("second request from same IP should fail per-IP limit")
+	}
+	// If global token was not refunded on IP reject, this request would fail.
+	if !rl.Allow("10.0.0.2") {
+		t.Fatal("global token should be available for different IP")
+	}
+}

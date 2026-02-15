@@ -258,6 +258,14 @@ func TestConfigValidateTLS(t *testing.T) {
 	}
 }
 
+func TestConfigValidateCapacityGbpsPositive(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.CapacityGbps = 0
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected error for non-positive capacity gbps")
+	}
+}
+
 func TestValidateMaxConcurrentPerIPWithinBounds(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.MaxConcurrentTests = 10

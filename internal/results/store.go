@@ -124,6 +124,7 @@ func migrate(db *sql.DB) error {
 
 const maxIDRetries = 5
 const maxBusyRetries = 3
+const busyRetryBackoff = 25 * time.Millisecond
 
 func (s *Store) Save(r Result) (string, error) {
 	now := time.Now().UTC()
@@ -149,7 +150,7 @@ func (s *Store) Save(r Result) (string, error) {
 				break
 			}
 			if isBusyError(err) && busyAttempt < maxBusyRetries {
-				time.Sleep(time.Duration(busyAttempt+1) * 25 * time.Millisecond)
+				time.Sleep(time.Duration(busyAttempt+1) * busyRetryBackoff)
 				continue
 			}
 			if isBusyError(err) {
@@ -180,29 +181,36 @@ func isBusyError(err error) bool {
 }
 
 func (s *Store) Get(id string) (*Result, error) {
-	var r Result
-	err := s.db.QueryRow(
-		`SELECT id, download_mbps, upload_mbps, latency_ms, jitter_ms,
-			loaded_latency_ms, bufferbloat_grade, ipv4, ipv6, server_name, created_at
-		FROM results WHERE id = ?`, id,
-	).Scan(&r.ID, &r.DownloadMbps, &r.UploadMbps, &r.LatencyMs, &r.JitterMs,
-		&r.LoadedLatencyMs, &r.BufferbloatGrade, &r.IPv4, &r.IPv6, &r.ServerName,
-		&r.CreatedAt)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
+	for busyAttempt := 0; busyAttempt <= maxBusyRetries; busyAttempt++ {
+		var r Result
+		err := s.db.QueryRow(
+			`SELECT id, download_mbps, upload_mbps, latency_ms, jitter_ms,
+				loaded_latency_ms, bufferbloat_grade, ipv4, ipv6, server_name, created_at
+			FROM results WHERE id = ?`, id,
+		).Scan(&r.ID, &r.DownloadMbps, &r.UploadMbps, &r.LatencyMs, &r.JitterMs,
+			&r.LoadedLatencyMs, &r.BufferbloatGrade, &r.IPv4, &r.IPv6, &r.ServerName,
+			&r.CreatedAt)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		if err == nil {
+			return &r, nil
+		}
+		if isBusyError(err) && busyAttempt < maxBusyRetries {
+			time.Sleep(time.Duration(busyAttempt+1) * busyRetryBackoff)
+			continue
+		}
 		if isBusyError(err) {
 			return nil, fmt.Errorf("%w: query result: %w", ErrStoreRetryable, err)
 		}
 		return nil, fmt.Errorf("query result: %w", err)
 	}
-	return &r, nil
+	return nil, fmt.Errorf("%w: query result retries exhausted", ErrStoreRetryable)
 }
 
 func (s *Store) cleanup() {
 	cutoff := time.Now().UTC().Add(-retentionDays * 24 * time.Hour)
-	res, err := s.db.Exec(`DELETE FROM results WHERE created_at < ?`, cutoff)
+	res, err := s.execWithBusyRetry(`DELETE FROM results WHERE created_at < ?`, cutoff)
 	if err != nil {
 		logging.Warn("results cleanup (age) failed", logging.Field{Key: "error", Value: err})
 	} else {
@@ -211,7 +219,7 @@ func (s *Store) cleanup() {
 
 	// Trim to max count, keeping newest
 	if s.maxResults > 0 {
-		res, err = s.db.Exec(
+		res, err = s.execWithBusyRetry(
 			`DELETE FROM results
 			WHERE id IN (
 				SELECT id FROM results
@@ -231,6 +239,25 @@ func (s *Store) cleanup() {
 			}
 		}
 	}
+}
+
+func (s *Store) execWithBusyRetry(query string, args ...interface{}) (sql.Result, error) {
+	var (
+		res sql.Result
+		err error
+	)
+	for busyAttempt := 0; busyAttempt <= maxBusyRetries; busyAttempt++ {
+		res, err = s.db.Exec(query, args...)
+		if err == nil {
+			return res, nil
+		}
+		if isBusyError(err) && busyAttempt < maxBusyRetries {
+			time.Sleep(time.Duration(busyAttempt+1) * busyRetryBackoff)
+			continue
+		}
+		return nil, err
+	}
+	return nil, err
 }
 
 func (s *Store) logCleanupCount(msg string, field string, res sql.Result) {

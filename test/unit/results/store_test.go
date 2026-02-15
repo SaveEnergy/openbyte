@@ -248,6 +248,118 @@ func TestStoreSaveRetriesOnBusyError(t *testing.T) {
 	}
 }
 
+func TestStoreGetRetriesOnBusyError(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "busy-read-retry.db")
+
+	store, err := results.New(dbPath, 10)
+	if err != nil {
+		t.Fatalf("New store: %v", err)
+	}
+	defer store.Close()
+
+	id, err := store.Save(results.Result{DownloadMbps: 10, UploadMbps: 5, LatencyMs: 12, JitterMs: 1})
+	if err != nil {
+		t.Fatalf("save seed result: %v", err)
+	}
+
+	lockDB, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open lock db: %v", err)
+	}
+	defer lockDB.Close()
+	if _, err := lockDB.Exec("PRAGMA busy_timeout=5000"); err != nil {
+		t.Fatalf("set lock busy_timeout: %v", err)
+	}
+	if _, err := lockDB.Exec("BEGIN EXCLUSIVE"); err != nil {
+		t.Fatalf("begin exclusive: %v", err)
+	}
+	defer lockDB.Exec("ROLLBACK")
+
+	released := make(chan struct{})
+	go func() {
+		time.Sleep(7 * time.Second)
+		_, _ = lockDB.Exec("COMMIT")
+		close(released)
+	}()
+
+	start := time.Now()
+	got, getErr := store.Get(id)
+	_ = time.Since(start)
+	if getErr != nil {
+		t.Fatalf("Get after busy lock: %v", getErr)
+	}
+	if got == nil {
+		t.Fatal("expected result after lock release")
+	}
+	<-released
+}
+
+func TestStoreCleanupRetriesOnBusyError(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "busy-cleanup-retry.db")
+
+	store, err := results.New(dbPath, 10)
+	if err != nil {
+		t.Fatalf("New store: %v", err)
+	}
+
+	id, err := store.Save(results.Result{DownloadMbps: 10, UploadMbps: 5, LatencyMs: 12, JitterMs: 1})
+	if err != nil {
+		t.Fatalf("save seed result: %v", err)
+	}
+	store.Close()
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	old := time.Now().Add(-100 * 24 * time.Hour).UTC()
+	if _, err := db.Exec(`UPDATE results SET created_at = ? WHERE id = ?`, old, id); err != nil {
+		t.Fatalf("backdate result: %v", err)
+	}
+	db.Close()
+
+	lockDB, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open lock db: %v", err)
+	}
+	defer lockDB.Close()
+	if _, err := lockDB.Exec("PRAGMA busy_timeout=5000"); err != nil {
+		t.Fatalf("set lock busy_timeout: %v", err)
+	}
+	if _, err := lockDB.Exec("BEGIN EXCLUSIVE"); err != nil {
+		t.Fatalf("begin exclusive: %v", err)
+	}
+	defer lockDB.Exec("ROLLBACK")
+
+	released := make(chan struct{})
+	go func() {
+		time.Sleep(7 * time.Second)
+		_, _ = lockDB.Exec("COMMIT")
+		close(released)
+	}()
+
+	reopenStart := time.Now()
+	store2, err := results.New(dbPath, 10)
+	if err != nil {
+		t.Fatalf("reopen store: %v", err)
+	}
+	defer store2.Close()
+	<-released
+	if time.Since(reopenStart) < 5*time.Second {
+		t.Fatalf("expected cleanup to block on lock and retry")
+	}
+
+	trimmed, err := store2.Get(id)
+	if err != nil {
+		t.Fatalf("get trimmed result: %v", err)
+	}
+	if trimmed != nil {
+		t.Fatalf("expected old result to be deleted by cleanup retry")
+	}
+}
+
 func TestHandlerSaveValidation(t *testing.T) {
 	store, cleanup := tempStore(t, 100)
 	defer cleanup()

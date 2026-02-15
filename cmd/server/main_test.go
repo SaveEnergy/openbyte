@@ -112,3 +112,17 @@ func TestRunShutdownBroadcastDrain(t *testing.T) {
 		t.Fatal("broadcastMetrics goroutine did not drain after manager.Stop")
 	}
 }
+
+func TestCapacityGbpsFlagBypassValidation(t *testing.T) {
+	cfg := config.DefaultConfig()
+	fs, fv := buildServerFlagSet(cfg)
+	if err := fs.Parse([]string{"--capacity-gbps=0"}); err != nil {
+		t.Fatalf("parse flags: %v", err)
+	}
+	if err := applyServerFlagOverrides(cfg, fs, fv); err != nil {
+		t.Fatalf("apply overrides: %v", err)
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected validation error for capacity-gbps=0")
+	}
+}

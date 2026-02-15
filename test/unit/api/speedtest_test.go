@@ -150,6 +150,23 @@ func (tb *failingTrackingBody) Close() error {
 	return nil
 }
 
+type blockingUploadBody struct {
+	closed chan struct{}
+	once   sync.Once
+}
+
+func (b *blockingUploadBody) Read(_ []byte) (int, error) {
+	<-b.closed
+	return 0, io.ErrClosedPipe
+}
+
+func (b *blockingUploadBody) Close() error {
+	b.once.Do(func() {
+		close(b.closed)
+	})
+	return nil
+}
+
 func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 	maxConcurrent := 2
 	handler := api.NewSpeedTestHandler(maxConcurrent, 300)
@@ -381,6 +398,25 @@ func TestUploadAtCapacityDrainsBodyBefore503(t *testing.T) {
 	}
 	if !tb.closed {
 		t.Fatalf("expected request body to be closed")
+	}
+}
+
+func TestUploadRespectsReadDeadlineWhenBodyStalls(t *testing.T) {
+	handler := api.NewSpeedTestHandler(10, 1)
+	body := &blockingUploadBody{closed: make(chan struct{})}
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/upload", nil)
+	req.Body = body
+	rec := httptest.NewRecorder()
+
+	start := time.Now()
+	handler.Upload(rec, req)
+	elapsed := time.Since(start)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+	if elapsed > 2*time.Second {
+		t.Fatalf("upload read deadline not enforced, elapsed=%v", elapsed)
 	}
 }
 

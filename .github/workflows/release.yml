@@ -18,6 +18,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - name: Validate SemVer tag early
+        run: |
+          set -euo pipefail
+          echo "${GITHUB_REF_NAME}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "invalid release tag format: ${GITHUB_REF_NAME}"; exit 1; }
+
       - name: Set up Go
         uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
@@ -213,6 +218,7 @@ jobs:
               [[ "$DEPLOY_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "invalid release tag format: $DEPLOY_TAG"; exit 1; }
               DEPLOY_TAG="${DEPLOY_TAG#v}"
               echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
+              trap "docker logout ghcr.io >/dev/null 2>&1 || true" EXIT
               cd "${{ env.REMOTE_DIR }}"
               docker network inspect traefik >/dev/null 2>&1 || docker network create traefik >/dev/null 2>&1 || { echo "failed to create traefik network"; exit 1; }
               docker network inspect traefik >/dev/null 2>&1 || { echo "traefik network missing after create"; exit 1; }
@@ -234,8 +240,8 @@ jobs:
                 echo "deployed image mismatch expected=$EXPECTED_IMAGE expected_id=$expected_id running_id=$running_id"
                 if [ "$rollback_enabled" -eq 1 ]; then
                   docker rm -f openbyte >/dev/null 2>&1 || true
-                  docker rename "$rollback_name" openbyte >/dev/null 2>&1 || true
-                  docker start openbyte >/dev/null 2>&1 || true
+                  docker rename "$rollback_name" openbyte >/dev/null 2>&1 || { echo "rollback rename failed"; exit 1; }
+                  docker start openbyte >/dev/null 2>&1 || { echo "rollback start failed"; exit 1; }
                 fi
                 docker logout ghcr.io || true
                 exit 1
@@ -260,8 +266,8 @@ jobs:
               docker inspect openbyte --format "{{json .State}}" || true
               if [ "$rollback_enabled" -eq 1 ]; then
                 docker rm -f openbyte >/dev/null 2>&1 || true
-                docker rename "$rollback_name" openbyte >/dev/null 2>&1 || true
-                docker start openbyte >/dev/null 2>&1 || true
+                docker rename "$rollback_name" openbyte >/dev/null 2>&1 || { echo "rollback rename failed"; exit 1; }
+                docker start openbyte >/dev/null 2>&1 || { echo "rollback start failed"; exit 1; }
               fi
               docker logout ghcr.io || true
               exit 1'
@@ -274,6 +280,7 @@ jobs:
             echo "$DEPLOY_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "invalid release tag format: $DEPLOY_TAG"; exit 1; }
             DEPLOY_TAG="${DEPLOY_TAG#v}"
             echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
+            trap "docker logout ghcr.io >/dev/null 2>&1 || true" EXIT
             cd "${{ env.REMOTE_DIR }}"
             docker network inspect traefik >/dev/null 2>&1 || docker network create traefik >/dev/null 2>&1 || { echo "failed to create traefik network"; exit 1; }
             docker network inspect traefik >/dev/null 2>&1 || { echo "traefik network missing after create"; exit 1; }
@@ -295,8 +302,8 @@ jobs:
               echo "deployed image mismatch expected=$EXPECTED_IMAGE expected_id=$expected_id running_id=$running_id"
               if [ "$rollback_enabled" -eq 1 ]; then
                 docker rm -f openbyte >/dev/null 2>&1 || true
-                docker rename "$rollback_name" openbyte >/dev/null 2>&1 || true
-                docker start openbyte >/dev/null 2>&1 || true
+                docker rename "$rollback_name" openbyte >/dev/null 2>&1 || { echo "rollback rename failed"; exit 1; }
+                docker start openbyte >/dev/null 2>&1 || { echo "rollback start failed"; exit 1; }
               fi
               docker logout ghcr.io || true
               exit 1
@@ -324,8 +331,8 @@ jobs:
             docker inspect openbyte --format "{{json .State}}" || true
             if [ "$rollback_enabled" -eq 1 ]; then
               docker rm -f openbyte >/dev/null 2>&1 || true
-              docker rename "$rollback_name" openbyte >/dev/null 2>&1 || true
-              docker start openbyte >/dev/null 2>&1 || true
+              docker rename "$rollback_name" openbyte >/dev/null 2>&1 || { echo "rollback rename failed"; exit 1; }
+              docker start openbyte >/dev/null 2>&1 || { echo "rollback start failed"; exit 1; }
             fi
             docker logout ghcr.io || true
             exit 1
