@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"testing"
@@ -11,6 +12,12 @@ import (
 	client "github.com/saveenergy/openbyte/cmd/client"
 	"github.com/saveenergy/openbyte/pkg/types"
 )
+
+type failingWriter struct{}
+
+func (failingWriter) Write(_ []byte) (int, error) {
+	return 0, errors.New("write failed")
+}
 
 // --- JSONFormatter.FormatError ---
 
@@ -263,6 +270,14 @@ func TestNDJSONMultilineOutput(t *testing.T) {
 		if err := json.Unmarshal(line, &parsed); err != nil {
 			t.Errorf("line %d is not valid JSON: %v", i, err)
 		}
+	}
+}
+
+func TestNDJSONFormatterCapturesWriteError(t *testing.T) {
+	f := &client.NDJSONFormatter{Writer: failingWriter{}}
+	f.FormatProgress(10, 1, 9)
+	if err := f.LastError(); err == nil {
+		t.Fatal("expected LastError after failed write")
 	}
 }
 

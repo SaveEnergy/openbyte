@@ -2,6 +2,8 @@ package results_test
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +13,50 @@ import (
 
 	"github.com/saveenergy/openbyte/internal/results"
 )
+
+type failingResponseWriter struct {
+	header http.Header
+	status int
+	writes int
+}
+
+func (fw *failingResponseWriter) Header() http.Header {
+	if fw.header == nil {
+		fw.header = make(http.Header)
+	}
+	return fw.header
+}
+
+func (fw *failingResponseWriter) WriteHeader(code int) {
+	fw.status = code
+}
+
+func (fw *failingResponseWriter) Write(_ []byte) (int, error) {
+	fw.writes++
+	return 0, errors.New("write failed")
+}
+
+type trackingBody struct {
+	data   []byte
+	offset int
+	reads  int
+	closed bool
+}
+
+func (tb *trackingBody) Read(p []byte) (int, error) {
+	tb.reads++
+	if tb.offset >= len(tb.data) {
+		return 0, io.EOF
+	}
+	n := copy(p, tb.data[tb.offset:])
+	tb.offset += n
+	return n, nil
+}
+
+func (tb *trackingBody) Close() error {
+	tb.closed = true
+	return nil
+}
 
 func TestSaveReturnsInternalErrorWhenStoreFails(t *testing.T) {
 	t.Helper()
@@ -185,6 +231,35 @@ func TestSaveSucceedsReturns201WithIDAndURL(t *testing.T) {
 	}
 }
 
+func TestHandlerSaveRejectsWrongContentTypeDrainsBody(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "results.db")
+	store, err := results.New(dbPath, 100)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	defer store.Close()
+
+	h := results.NewHandler(store)
+	tb := &trackingBody{data: []byte(`{"download_mbps":1}`)}
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/results", nil)
+	req.Body = tb
+	req.Header.Set("Content-Type", "text/plain")
+	rec := httptest.NewRecorder()
+
+	h.Save(rec, req)
+
+	if rec.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnsupportedMediaType)
+	}
+	if tb.reads == 0 {
+		t.Fatal("expected body to be drained")
+	}
+	if !tb.closed {
+		t.Fatal("expected body to be closed")
+	}
+}
+
 func TestGetReturnsInternalErrorWhenStoreFails(t *testing.T) {
 	tempDir := t.TempDir()
 	dbPath := filepath.Join(tempDir, "results.db")
@@ -210,5 +285,69 @@ func TestGetReturnsInternalErrorWhenStoreFails(t *testing.T) {
 	}
 	if got := resp["error"]; got != "internal error" {
 		t.Fatalf("error = %q, want %q", got, "internal error")
+	}
+}
+
+func TestSaveWithWriteFailureStillSetsCreatedStatus(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "results.db")
+	store, err := results.New(dbPath, 100)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	defer store.Close()
+
+	h := results.NewHandler(store)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/results", strings.NewReader(`{
+		"download_mbps": 100,
+		"upload_mbps": 50,
+		"latency_ms": 10,
+		"jitter_ms": 1,
+		"loaded_latency_ms": 12,
+		"bufferbloat_grade": "A",
+		"ipv4": "203.0.113.10",
+		"ipv6": "",
+		"server_name": "test"
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	fw := &failingResponseWriter{}
+
+	h.Save(fw, req)
+	if fw.status != http.StatusCreated {
+		t.Fatalf("status = %d, want %d", fw.status, http.StatusCreated)
+	}
+	if fw.writes == 0 {
+		t.Fatal("expected write to be attempted")
+	}
+}
+
+func TestHandlerSaveBodyTooLarge(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "results.db")
+	store, err := results.New(dbPath, 100)
+	if err != nil {
+		t.Fatalf("new store: %v", err)
+	}
+	defer store.Close()
+
+	h := results.NewHandler(store)
+	large := strings.Repeat("x", 5000)
+	body := `{"download_mbps":1,"upload_mbps":1,"latency_ms":1,"jitter_ms":1,"loaded_latency_ms":1,"bufferbloat_grade":"A","ipv4":"203.0.113.10","ipv6":"","server_name":"` + large + `"}`
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/results", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.Save(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
+	}
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got := resp["error"]; got != "request body too large" {
+		t.Fatalf("error = %q, want %q", got, "request body too large")
 	}
 }

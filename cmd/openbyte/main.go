@@ -13,34 +13,46 @@ import (
 
 var version = "dev"
 
+var (
+	runServer = func(args []string, ver string) int { return server.Run(args, ver) }
+	runClient = func(args []string, ver string) int { return client.Run(args, ver) }
+	runCheck  = func(args []string, ver string) int { return check.Run(args, ver) }
+	runMCP    = func(ver string) int { return mcpcmd.Run(ver) }
+)
+
 func main() {
-	args := os.Args[1:]
+	os.Exit(run(os.Args[1:], version))
+}
+
+func run(args []string, ver string) int {
 	if len(args) == 0 {
-		os.Exit(server.Run(nil, version))
+		return runServer(nil, ver)
 	}
 
 	switch args[0] {
 	case "server":
-		os.Exit(server.Run(args[1:], version))
+		return runServer(args[1:], ver)
 	case "client":
-		os.Exit(client.Run(args[1:], version))
+		return runClient(args[1:], ver)
 	case "check":
-		os.Exit(check.Run(args[1:], version))
+		return runCheck(args[1:], ver)
 	case "mcp":
-		os.Exit(mcpcmd.Run(version))
+		return runMCP(ver)
 	case "help", "-h", "--help":
 		printUsage()
-		return
+		return 0
 	case "version", "--version":
-		fmt.Printf("openbyte %s\n", version)
-		return
+		fmt.Printf("openbyte %s\n", ver)
+		return 0
 	default:
 		if strings.HasPrefix(args[0], "-") {
-			os.Exit(server.Run(args, version))
+			fmt.Fprintf(os.Stderr, "openbyte: unknown top-level flag %q\n\n", args[0])
+			printUsage()
+			return 2
 		}
 		fmt.Fprintf(os.Stderr, "openbyte: unknown command %q\n\n", args[0])
 		printUsage()
-		os.Exit(2)
+		return 2
 	}
 }
 

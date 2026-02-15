@@ -85,11 +85,11 @@ docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.
 
 CI deploy path is Traefik-based (the workflow syncs and uses both compose files). Ensure the external `traefik` network exists on the server.
 
-For direct HTTP access without Traefik, include the web override:
+For direct HTTP access without Traefik, run only the base GHCR compose file:
 
 ```bash
-docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.web.yaml pull
-docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.web.yaml up -d
+docker compose -f docker/docker-compose.ghcr.yaml pull
+docker compose -f docker/docker-compose.ghcr.yaml up -d
 ```
 
 ## Release Pipeline (SemVer)

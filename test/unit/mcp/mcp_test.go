@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	cmdmcp "github.com/saveenergy/openbyte/cmd/mcp"
 	"github.com/saveenergy/openbyte/internal/api"
 	pkgclient "github.com/saveenergy/openbyte/pkg/client"
 	"github.com/saveenergy/openbyte/pkg/diagnostic"
@@ -187,6 +188,88 @@ func TestDiagnostic_JSONSchema(t *testing.T) {
 	for _, key := range expectedKeys {
 		if _, ok := parsed[key]; !ok {
 			t.Errorf("missing key %q in interpretation JSON", key)
+		}
+	}
+}
+
+func TestValidateServerURL(t *testing.T) {
+	tests := []struct {
+		name  string
+		raw   string
+		valid bool
+	}{
+		{name: "http", raw: "http://localhost:8080", valid: true},
+		{name: "https", raw: "https://speed.example.com", valid: true},
+		{name: "missing scheme", raw: "localhost:8080", valid: false},
+		{name: "unsupported scheme", raw: "ftp://example.com", valid: false},
+		{name: "missing host", raw: "http://", valid: false},
+		{name: "query not allowed", raw: "https://speed.example.com?x=1", valid: false},
+		{name: "fragment not allowed", raw: "https://speed.example.com#frag", valid: false},
+		{name: "port too high", raw: "https://speed.example.com:65536", valid: false},
+		{name: "port zero", raw: "https://speed.example.com:0", valid: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := cmdmcp.ValidateServerURL(tt.raw)
+			if tt.valid && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !tt.valid && err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
+func TestValidateSpeedTestInput(t *testing.T) {
+	tests := []struct {
+		name      string
+		direction string
+		duration  int
+		valid     bool
+	}{
+		{name: "valid download", direction: "download", duration: 10, valid: true},
+		{name: "valid upload", direction: "upload", duration: 1, valid: true},
+		{name: "invalid direction", direction: "invalid", duration: 10, valid: false},
+		{name: "too small duration", direction: "download", duration: 0, valid: false},
+		{name: "too large duration", direction: "upload", duration: 61, valid: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := cmdmcp.ValidateSpeedTestInput(tt.direction, tt.duration)
+			if tt.valid && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !tt.valid && err == nil {
+				t.Fatal("expected validation error")
+			}
+		})
+	}
+}
+
+func TestMCPToolContract(t *testing.T) {
+	tools := cmdmcp.ToolDefinitions()
+	if len(tools) != 3 {
+		t.Fatalf("tool count = %d, want 3", len(tools))
+	}
+
+	byName := make(map[string]bool, len(tools))
+	for _, tool := range tools {
+		byName[tool.Name] = true
+		props := tool.InputSchema.Properties
+		if _, ok := props["server_url"]; !ok {
+			t.Fatalf("%s missing server_url argument", tool.Name)
+		}
+		if _, ok := props["api_key"]; !ok {
+			t.Fatalf("%s missing api_key argument", tool.Name)
+		}
+	}
+
+	for _, name := range []string{"connectivity_check", "speed_test", "diagnose"} {
+		if !byName[name] {
+			t.Fatalf("missing tool definition %q", name)
 		}
 	}
 }

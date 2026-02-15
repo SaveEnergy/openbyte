@@ -342,3 +342,87 @@ func TestHandlerUpdateRejectsConcatenatedJSON(t *testing.T) {
 		t.Fatalf("concatenated json update: status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }
+
+func TestHandlerRegisterBodyTooLarge(t *testing.T) {
+	_, mux := setupHandler("")
+	oversized := strings.Repeat("x", 70*1024)
+	body := `{"id":"s1","name":"` + oversized + `","host":"localhost"}`
+
+	req := httptest.NewRequest("POST", "/api/v1/registry/servers", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("register body too large: status = %d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
+	}
+}
+
+func TestHandlerUpdateBodyTooLarge(t *testing.T) {
+	_, mux := setupHandler("")
+	// Register first
+	body := `{"id":"s1","name":"Before","host":"localhost"}`
+	req := httptest.NewRequest("POST", "/api/v1/registry/servers", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	oversized := strings.Repeat("x", 70*1024)
+	update := `{"name":"` + oversized + `","host":"localhost"}`
+	req = httptest.NewRequest("PUT", "/api/v1/registry/servers/s1", strings.NewReader(update))
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("update body too large: status = %d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
+	}
+}
+
+func TestHandlerUpdateServerPreservesRequiredFields(t *testing.T) {
+	_, mux := setupHandler("")
+
+	// Register with required baseline fields.
+	registerBody := `{"id":"s1","name":"Before","host":"localhost","tcp_port":8081,"udp_port":8082,"api_endpoint":"http://localhost:8080","health":"healthy"}`
+	req := httptest.NewRequest("POST", "/api/v1/registry/servers", strings.NewReader(registerBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("register status = %d, want %d", rec.Code, http.StatusCreated)
+	}
+
+	// Partial update should not zero omitted fields.
+	updateBody := `{"name":"After"}`
+	req = httptest.NewRequest("PUT", "/api/v1/registry/servers/s1", strings.NewReader(updateBody))
+	req.Header.Set("Content-Type", "application/json")
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	req = httptest.NewRequest("GET", "/api/v1/registry/servers/s1", nil)
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var got map[string]interface{}
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatalf("decode server: %v", err)
+	}
+	if got["name"] != "After" {
+		t.Fatalf("name = %v, want After", got["name"])
+	}
+	if got["host"] != "localhost" {
+		t.Fatalf("host = %v, want localhost", got["host"])
+	}
+	if got["tcp_port"] != float64(8081) {
+		t.Fatalf("tcp_port = %v, want 8081", got["tcp_port"])
+	}
+	if got["udp_port"] != float64(8082) {
+		t.Fatalf("udp_port = %v, want 8082", got["udp_port"])
+	}
+}

@@ -57,6 +57,7 @@ func respondSpeedtestError(w http.ResponseWriter, msg string, code int) {
 func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 	if v := atomic.AddInt64(&h.activeDownloads, 1); v > h.maxConcurrent {
 		atomic.AddInt64(&h.activeDownloads, -1)
+		drainRequestBody(r)
 		respondSpeedtestError(w, "too many concurrent downloads", http.StatusServiceUnavailable)
 		return
 	}
@@ -67,6 +68,7 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 	if durationStr != "" {
 		d, err := strconv.Atoi(durationStr)
 		if err != nil || d < 1 || d > h.maxDurationSec {
+			drainRequestBody(r)
 			respondSpeedtestError(w, "duration must be 1-"+strconv.Itoa(h.maxDurationSec), http.StatusBadRequest)
 			return
 		}
@@ -77,6 +79,7 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 	if cs := r.URL.Query().Get("chunk"); cs != "" {
 		c, err := strconv.Atoi(cs)
 		if err != nil || c < 65536 || c > 4194304 {
+			drainRequestBody(r)
 			respondSpeedtestError(w, "chunk must be 65536-4194304", http.StatusBadRequest)
 			return
 		}
@@ -87,11 +90,12 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 
 	flusher, canFlush := w.(http.Flusher)
-
-	var chunk []byte
-	if len(h.randomData) < chunkSize {
-		chunk = make([]byte, chunkSize)
-		if _, err := rand.Read(chunk); err != nil {
+	randomSource := h.randomData
+	if len(randomSource) == 0 {
+		// Keep fallback allocation bounded; stream logic handles chunk expansion.
+		randomSource = make([]byte, 64*1024)
+		if _, err := rand.Read(randomSource); err != nil {
+			drainRequestBody(r)
 			respondSpeedtestError(w, "failed to generate random data", http.StatusInternalServerError)
 			return
 		}
@@ -107,34 +111,8 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		default:
-			if len(h.randomData) >= chunkSize {
-				if offset+chunkSize <= len(h.randomData) {
-					_, err := w.Write(h.randomData[offset : offset+chunkSize])
-					if err != nil {
-						return
-					}
-					offset += chunkSize
-					if offset == len(h.randomData) {
-						offset = 0
-					}
-				} else {
-					first := h.randomData[offset:]
-					if _, err := w.Write(first); err != nil {
-						return
-					}
-					remaining := chunkSize - len(first)
-					if remaining > 0 {
-						if _, err := w.Write(h.randomData[:remaining]); err != nil {
-							return
-						}
-					}
-					offset = remaining
-				}
-			} else {
-				_, err := w.Write(chunk)
-				if err != nil {
-					return
-				}
+			if err := writeChunkFromSource(w, randomSource, chunkSize, &offset); err != nil {
+				return
 			}
 			writeCount++
 			if canFlush && writeCount%flushInterval == 0 {
@@ -148,6 +126,8 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
+	defer drainRequestBody(r)
+
 	if v := atomic.AddInt64(&h.activeUploads, 1); v > h.maxConcurrent {
 		atomic.AddInt64(&h.activeUploads, -1)
 		respondSpeedtestError(w, "too many concurrent uploads", http.StatusServiceUnavailable)
@@ -156,7 +136,7 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	defer atomic.AddInt64(&h.activeUploads, -1)
 
 	startTime := time.Now()
-	deadline := startTime.Add(time.Duration(h.maxDurationSec+30) * time.Second)
+	deadline := uploadReadDeadline(startTime, h.maxDurationSec)
 
 	buf := make([]byte, 256*1024)
 	var totalBytes int64
@@ -177,7 +157,6 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 done:
-	io.Copy(io.Discard, r.Body)
 	if readFailed {
 		respondSpeedtestError(w, "upload failed", http.StatusInternalServerError)
 		return
@@ -200,7 +179,15 @@ done:
 	}
 }
 
+func uploadReadDeadline(start time.Time, maxDurationSec int) time.Time {
+	if maxDurationSec <= 0 {
+		maxDurationSec = 300
+	}
+	return start.Add(time.Duration(maxDurationSec) * time.Second)
+}
+
 func (h *SpeedTestHandler) Ping(w http.ResponseWriter, r *http.Request) {
+	drainRequestBody(r)
 	clientIP := h.resolveClientIP(r)
 	isIPv6 := strings.Contains(clientIP, ":")
 
@@ -222,4 +209,40 @@ func (h *SpeedTestHandler) resolveClientIP(r *http.Request) string {
 		return ipString(parseRemoteIP(r.RemoteAddr))
 	}
 	return h.clientIPResolver.FromRequest(r)
+}
+
+func writeChunkFromSource(w http.ResponseWriter, source []byte, chunkSize int, offset *int) error {
+	if len(source) == 0 || chunkSize <= 0 || offset == nil {
+		return errors.New("invalid chunk source")
+	}
+
+	remaining := chunkSize
+	for remaining > 0 {
+		start := *offset
+		if start >= len(source) {
+			start = 0
+			*offset = 0
+		}
+
+		available := len(source) - start
+		toWrite := remaining
+		if toWrite > available {
+			toWrite = available
+		}
+		if toWrite <= 0 {
+			*offset = 0
+			continue
+		}
+
+		if _, err := w.Write(source[start : start+toWrite]); err != nil {
+			return err
+		}
+
+		remaining -= toWrite
+		*offset = start + toWrite
+		if *offset >= len(source) {
+			*offset = 0
+		}
+	}
+	return nil
 }

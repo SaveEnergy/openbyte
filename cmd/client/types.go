@@ -2,6 +2,7 @@ package client
 
 import (
 	"io"
+	"sync"
 
 	"github.com/saveenergy/openbyte/pkg/diagnostic"
 	"github.com/saveenergy/openbyte/pkg/types"
@@ -44,6 +45,8 @@ func NewInteractiveFormatter(w io.Writer, verbose, noColor, noProgress bool) *In
 // one final line with the complete result. Machine-readable streaming output.
 type NDJSONFormatter struct {
 	Writer io.Writer
+	errMu  sync.Mutex
+	err    error
 }
 
 type Config struct {

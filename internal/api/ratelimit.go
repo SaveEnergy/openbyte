@@ -95,18 +95,12 @@ func (rl *RateLimiter) allowGlobal() bool {
 }
 
 func (rl *RateLimiter) allowIP(ip string) bool {
-	rl.ipMu.Lock()
 	now := time.Now()
+	shouldCleanup := false
+	rl.ipMu.Lock()
 	if rl.cleanupInterval > 0 && rl.ipLimitTTL > 0 && now.Sub(rl.lastCleanup) >= rl.cleanupInterval {
-		for key, limit := range rl.ipLimits {
-			limit.mu.Lock()
-			lastRefill := limit.lastRefill
-			limit.mu.Unlock()
-			if now.Sub(lastRefill) >= rl.ipLimitTTL {
-				delete(rl.ipLimits, key)
-			}
-		}
 		rl.lastCleanup = now
+		shouldCleanup = true
 	}
 	limit, exists := rl.ipLimits[ip]
 	if !exists {
@@ -117,6 +111,9 @@ func (rl *RateLimiter) allowIP(ip string) bool {
 		rl.ipLimits[ip] = limit
 	}
 	rl.ipMu.Unlock()
+	if shouldCleanup {
+		rl.cleanupExpiredIPLimits(now)
+	}
 
 	limit.mu.Lock()
 	defer limit.mu.Unlock()
@@ -141,6 +138,40 @@ func (rl *RateLimiter) allowIP(ip string) bool {
 	}
 
 	return false
+}
+
+func (rl *RateLimiter) cleanupExpiredIPLimits(now time.Time) {
+	rl.ipMu.RLock()
+	ttl := rl.ipLimitTTL
+	expired := make([]string, 0)
+	for key, limit := range rl.ipLimits {
+		limit.mu.Lock()
+		lastRefill := limit.lastRefill
+		limit.mu.Unlock()
+		if now.Sub(lastRefill) >= ttl {
+			expired = append(expired, key)
+		}
+	}
+	rl.ipMu.RUnlock()
+
+	if len(expired) == 0 {
+		return
+	}
+
+	rl.ipMu.Lock()
+	for _, key := range expired {
+		limit, exists := rl.ipLimits[key]
+		if !exists {
+			continue
+		}
+		limit.mu.Lock()
+		isExpired := now.Sub(limit.lastRefill) >= ttl
+		limit.mu.Unlock()
+		if isExpired {
+			delete(rl.ipLimits, key)
+		}
+	}
+	rl.ipMu.Unlock()
 }
 
 // skipRateLimitPaths are endpoints that should not be rate limited

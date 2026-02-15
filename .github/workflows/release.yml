@@ -31,7 +31,10 @@ jobs:
         run: go test -race -short ./... -p 1
 
       - name: OpenAPI lint
-        run: npx @redocly/cli@latest lint api/openapi.yaml --config redocly.yaml
+        run: npx @redocly/cli@2.18.1 lint api/openapi.yaml --config redocly.yaml
+
+      - name: OpenAPI route contract
+        run: go test ./test/unit/api -run TestOpenAPIRouteContract
 
       - name: Build release assets
         run: |
@@ -197,10 +200,12 @@ jobs:
               [ -n "${{ env.REMOTE_DIR }}" ] || { echo "REMOTE_DIR not set"; exit 1; }
               test -f "${{ env.REMOTE_DIR }}/.env" || { echo "Missing .env at ${{ env.REMOTE_DIR }}/.env"; exit 1; }
               DEPLOY_TAG="${{ github.ref_name }}"
+              [[ "$DEPLOY_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "invalid release tag format: $DEPLOY_TAG"; exit 1; }
               DEPLOY_TAG="${DEPLOY_TAG#v}"
               echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
               cd "${{ env.REMOTE_DIR }}"
-              docker network inspect traefik >/dev/null 2>&1 || docker network create traefik >/dev/null
+              docker network inspect traefik >/dev/null 2>&1 || docker network create traefik >/dev/null 2>&1 || { echo "failed to create traefik network"; exit 1; }
+              docker network inspect traefik >/dev/null 2>&1 || { echo "traefik network missing after create"; exit 1; }
               OWNER_LC=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
               GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull || { echo "docker compose pull failed"; exit 1; }
               GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
@@ -212,13 +217,19 @@ jobs:
                 exit 1
               fi
               for i in {1..20}; do
-                status=$(docker inspect -f "{{.State.Health.Status}}" openbyte 2>/dev/null || true)
+                state=$(docker inspect -f "{{.State.Status}}" openbyte 2>/dev/null || true)
+                if [ "$state" != "running" ]; then
+                  echo "container not running: state=$state"
+                  sleep 3
+                  continue
+                fi
+                status=$(docker inspect -f "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" openbyte 2>/dev/null || true)
                 if [ "$status" = "healthy" ]; then
                   exit 0
                 fi
                 sleep 3
               done
-              docker inspect openbyte --format "{{json .State.Health}}" || true
+              docker inspect openbyte --format "{{json .State}}" || true
               exit 1'
               exit $?
             fi
@@ -226,10 +237,15 @@ jobs:
             [ -n "${{ env.REMOTE_DIR }}" ] || { echo "REMOTE_DIR not set"; exit 1; }
             test -f "${{ env.REMOTE_DIR }}/.env" || { echo "Missing .env at ${{ env.REMOTE_DIR }}/.env"; exit 1; }
             DEPLOY_TAG="${{ github.ref_name }}"
+            case "$DEPLOY_TAG" in
+              v[0-9]*.[0-9]*.[0-9]*) ;;
+              *) echo "invalid release tag format: $DEPLOY_TAG"; exit 1 ;;
+            esac
             DEPLOY_TAG="${DEPLOY_TAG#v}"
             echo "${{ env.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ env.GHCR_USERNAME }}" --password-stdin
             cd "${{ env.REMOTE_DIR }}"
-            docker network inspect traefik >/dev/null 2>&1 || docker network create traefik >/dev/null
+            docker network inspect traefik >/dev/null 2>&1 || docker network create traefik >/dev/null 2>&1 || { echo "failed to create traefik network"; exit 1; }
+            docker network inspect traefik >/dev/null 2>&1 || { echo "traefik network missing after create"; exit 1; }
             OWNER_LC=$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
             GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml pull || { echo "docker compose pull failed"; exit 1; }
             GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$DEPLOY_TAG" docker compose --env-file "${{ env.REMOTE_DIR }}/.env" -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d --force-recreate
@@ -242,14 +258,21 @@ jobs:
             fi
             i=1
             while [ "$i" -le 20 ]; do
-              status=$(docker inspect -f "{{.State.Health.Status}}" openbyte 2>/dev/null || true)
+              state=$(docker inspect -f "{{.State.Status}}" openbyte 2>/dev/null || true)
+              if [ "$state" != "running" ]; then
+                echo "container not running: state=$state"
+                i=$((i + 1))
+                sleep 3
+                continue
+              fi
+              status=$(docker inspect -f "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}" openbyte 2>/dev/null || true)
               if [ "$status" = "healthy" ]; then
                 exit 0
               fi
               i=$((i + 1))
               sleep 3
             done
-            docker inspect openbyte --format "{{json .State.Health}}" || true
+            docker inspect openbyte --format "{{json .State}}" || true
             exit 1
 
       - name: Cleanup SSH key material

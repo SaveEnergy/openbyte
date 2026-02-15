@@ -2,6 +2,9 @@ package client_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -205,5 +208,158 @@ func TestSDK_Check_HasInterpretation(t *testing.T) {
 	}
 	if result.Interpretation.Concerns == nil {
 		t.Error("concerns should not be nil")
+	}
+}
+
+func TestSDK_Check_ReturnsLatencyMeasurementErrorWhenPingFails(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+	mux.HandleFunc("GET /api/v1/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	mux.HandleFunc("GET /api/v1/download", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+	mux.HandleFunc("POST /api/v1/upload", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	c := pkgclient.New(srv.URL)
+	_, err := c.Check(context.Background())
+	if !errors.Is(err, pkgclient.ErrLatencyMeasurementFailed) {
+		t.Fatalf("err = %v, want ErrLatencyMeasurementFailed", err)
+	}
+}
+
+func TestSDK_SpeedTest_ReturnsDownloadMeasurementErrorWhenDownloadFails(t *testing.T) {
+	mux := http.NewServeMux()
+	handler := api.NewSpeedTestHandler(10, 300)
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+	mux.HandleFunc("GET /api/v1/ping", handler.Ping)
+	mux.HandleFunc("GET /api/v1/download", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	})
+	mux.HandleFunc("POST /api/v1/upload", handler.Upload)
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	c := pkgclient.New(srv.URL)
+	_, err := c.SpeedTest(context.Background(), pkgclient.SpeedTestOptions{
+		Direction: "download",
+		Duration:  1,
+	})
+	if !errors.Is(err, pkgclient.ErrDownloadMeasurementFailed) {
+		t.Fatalf("err = %v, want ErrDownloadMeasurementFailed", err)
+	}
+}
+
+func TestSDK_SpeedTest_DownloadUnexpectedEOF(t *testing.T) {
+	mux := http.NewServeMux()
+	handler := api.NewSpeedTestHandler(10, 300)
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+	mux.HandleFunc("GET /api/v1/ping", handler.Ping)
+	mux.HandleFunc("GET /api/v1/download", func(w http.ResponseWriter, r *http.Request) {
+		// Force body truncation so client sees non-EOF read error.
+		w.Header().Set("Content-Length", "1048576")
+		_, _ = fmt.Fprint(w, "short")
+	})
+	mux.HandleFunc("POST /api/v1/upload", handler.Upload)
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	c := pkgclient.New(srv.URL)
+	_, err := c.SpeedTest(context.Background(), pkgclient.SpeedTestOptions{
+		Direction: "download",
+		Duration:  1,
+	})
+	if !errors.Is(err, pkgclient.ErrDownloadMeasurementFailed) {
+		t.Fatalf("err = %v, want ErrDownloadMeasurementFailed", err)
+	}
+}
+
+func TestSDK_SpeedTest_UploadDurationImpactsWorkload(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+	mux.HandleFunc("GET /api/v1/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mux.HandleFunc("POST /api/v1/upload", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	c := pkgclient.New(srv.URL)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	res1, err := c.SpeedTest(ctx, pkgclient.SpeedTestOptions{Direction: "upload", Duration: 1})
+	if err != nil {
+		t.Fatalf("duration=1 speed test failed: %v", err)
+	}
+	bytes1 := res1.BytesTotal
+
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 25*time.Second)
+	defer cancel2()
+	res2, err := c.SpeedTest(ctx2, pkgclient.SpeedTestOptions{Direction: "upload", Duration: 2})
+	if err != nil {
+		t.Fatalf("duration=2 speed test failed: %v", err)
+	}
+	bytes2 := res2.BytesTotal
+
+	if bytes2 <= bytes1 {
+		t.Fatalf("bytes for longer duration should increase: duration1=%d duration2=%d", bytes1, bytes2)
+	}
+}
+
+func TestSDK_MeasureLatency_MinimumSamplesForJitter(t *testing.T) {
+	var pingCount int
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+	mux.HandleFunc("GET /api/v1/ping", func(w http.ResponseWriter, r *http.Request) {
+		pingCount++
+		if pingCount == 1 {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+	})
+	mux.HandleFunc("POST /api/v1/upload", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mux.HandleFunc("GET /api/v1/download", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	c := pkgclient.New(srv.URL)
+	_, err := c.SpeedTest(context.Background(), pkgclient.SpeedTestOptions{
+		Direction: "upload",
+		Duration:  1,
+	})
+	if !errors.Is(err, pkgclient.ErrLatencyMeasurementFailed) {
+		t.Fatalf("err = %v, want ErrLatencyMeasurementFailed", err)
 	}
 }

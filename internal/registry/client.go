@@ -23,6 +23,7 @@ type Client struct {
 	wg         sync.WaitGroup
 	stopOnce   sync.Once
 	mu         sync.RWMutex
+	started    bool
 	registered bool
 }
 
@@ -46,6 +47,14 @@ func (c *Client) Start(getActiveTests func() int) error {
 		c.logger.Warn("Registry enabled but no URL configured")
 		return nil
 	}
+
+	c.mu.Lock()
+	if c.started {
+		c.mu.Unlock()
+		return nil
+	}
+	c.started = true
+	c.mu.Unlock()
 
 	c.logger.Info("Starting registry client")
 
@@ -179,6 +188,15 @@ func (c *Client) deregister() {
 		return
 	}
 	drainAndClose(resp, c.logger)
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		c.logger.Error("Deregister from registry",
+			logging.Field{Key: "status_code", Value: resp.StatusCode})
+		return
+	}
+	c.mu.Lock()
+	c.registered = false
+	c.mu.Unlock()
 
 	c.logger.Info("Deregistered from registry")
 }

@@ -18,6 +18,21 @@ type Handler struct {
 	apiKey  string
 }
 
+type updateServerRequest struct {
+	ID           *string `json:"id,omitempty"`
+	Name         *string `json:"name,omitempty"`
+	Location     *string `json:"location,omitempty"`
+	Region       *string `json:"region,omitempty"`
+	Host         *string `json:"host,omitempty"`
+	TCPPort      *int    `json:"tcp_port,omitempty"`
+	UDPPort      *int    `json:"udp_port,omitempty"`
+	APIEndpoint  *string `json:"api_endpoint,omitempty"`
+	Health       *string `json:"health,omitempty"`
+	CapacityGbps *int    `json:"capacity_gbps,omitempty"`
+	ActiveTests  *int    `json:"active_tests,omitempty"`
+	MaxTests     *int    `json:"max_tests,omitempty"`
+}
+
 func NewHandler(service *Service, logger *logging.Logger, apiKey string) *Handler {
 	return &Handler{
 		service: service,
@@ -116,6 +131,11 @@ func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
 	var info types.ServerInfo
 	if err := decoder.Decode(&info); err != nil {
 		io.Copy(io.Discard, r.Body)
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			respondRegistryError(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		respondRegistryError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -160,9 +180,14 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxRegistryBodySize)
 	decoder := json.NewDecoder(r.Body)
-	var info types.ServerInfo
-	if err := decoder.Decode(&info); err != nil {
+	var req updateServerRequest
+	if err := decoder.Decode(&req); err != nil {
 		io.Copy(io.Discard, r.Body)
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			respondRegistryError(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		respondRegistryError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -172,13 +197,21 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if info.ID != "" && info.ID != id {
+	if req.ID != nil && *req.ID != "" && *req.ID != id {
 		respondRegistryError(w, "body ID conflicts with URL path", http.StatusBadRequest)
 		return
 	}
-	info.ID = id
 
-	if !h.service.Update(id, info) {
+	current, exists := h.service.Get(id)
+	if !exists {
+		respondRegistryError(w, "server not found", http.StatusNotFound)
+		return
+	}
+	merged := current.ServerInfo
+	applyServerUpdatePatch(&merged, req)
+	merged.ID = id
+
+	if !h.service.Update(id, merged) {
 		respondRegistryError(w, "server not found", http.StatusNotFound)
 		return
 	}
@@ -189,6 +222,42 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 		"server_id": id,
 	}); err != nil {
 		h.logger.Warn("encode update response", logging.Field{Key: "error", Value: err})
+	}
+}
+
+func applyServerUpdatePatch(dst *types.ServerInfo, req updateServerRequest) {
+	if req.Name != nil {
+		dst.Name = *req.Name
+	}
+	if req.Location != nil {
+		dst.Location = *req.Location
+	}
+	if req.Region != nil {
+		dst.Region = *req.Region
+	}
+	if req.Host != nil {
+		dst.Host = *req.Host
+	}
+	if req.TCPPort != nil {
+		dst.TCPPort = *req.TCPPort
+	}
+	if req.UDPPort != nil {
+		dst.UDPPort = *req.UDPPort
+	}
+	if req.APIEndpoint != nil {
+		dst.APIEndpoint = *req.APIEndpoint
+	}
+	if req.Health != nil {
+		dst.Health = *req.Health
+	}
+	if req.CapacityGbps != nil {
+		dst.CapacityGbps = *req.CapacityGbps
+	}
+	if req.ActiveTests != nil {
+		dst.ActiveTests = *req.ActiveTests
+	}
+	if req.MaxTests != nil {
+		dst.MaxTests = *req.MaxTests
 	}
 }
 

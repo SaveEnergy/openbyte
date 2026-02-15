@@ -42,16 +42,30 @@ type saveResponse struct {
 }
 
 func respondJSONError(w http.ResponseWriter, msg string, code int) {
+	writeJSON(w, code, map[string]string{"error": msg})
+}
+
+func writeJSON(w http.ResponseWriter, code int, payload interface{}) {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		logging.Warn("results: marshal response failed", logging.Field{Key: "error", Value: err})
+		code = http.StatusInternalServerError
+		body = []byte(`{"error":"internal error"}` + "\n")
+	}
 	w.Header().Set("Content-Type", "application/json")
+	if code == http.StatusOK {
+		w.Header().Set("Cache-Control", "no-store")
+	}
 	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
-		logging.Warn("results: encode error response", logging.Field{Key: "error", Value: err})
+	if _, err := w.Write(body); err != nil {
+		logging.Warn("results: write response failed", logging.Field{Key: "error", Value: err})
 	}
 }
 
 func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 	ct := r.Header.Get("Content-Type")
 	if ct != "" && !strings.HasPrefix(ct, "application/json") {
+		drainRequestBody(r)
 		respondJSONError(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -62,6 +76,11 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 	var req saveRequest
 	if err := decoder.Decode(&req); err != nil {
 		io.Copy(io.Discard, r.Body)
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			respondJSONError(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		respondJSONError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -110,14 +129,10 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(saveResponse{
+	writeJSON(w, http.StatusCreated, saveResponse{
 		ID:  id,
 		URL: "/results/" + id,
-	}); err != nil {
-		logging.Warn("results: encode save response", logging.Field{Key: "error", Value: err})
-	}
+	})
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -129,7 +144,8 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.store.Get(id)
 	if err != nil {
-		respondJSONError(w, "internal error", http.StatusInternalServerError)
+		msg, code := mapGetStoreError(err)
+		respondJSONError(w, msg, code)
 		return
 	}
 	if result == nil {
@@ -137,11 +153,14 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store")
-	if err := json.NewEncoder(w).Encode(result); err != nil {
-		logging.Warn("results: encode get response", logging.Field{Key: "error", Value: err})
+	writeJSON(w, http.StatusOK, result)
+}
+
+func mapGetStoreError(err error) (string, int) {
+	if errors.Is(err, ErrStoreRetryable) {
+		return "store temporarily unavailable", http.StatusServiceUnavailable
 	}
+	return "internal error", http.StatusInternalServerError
 }
 
 func hasNonFinite(vals ...float64) bool {
@@ -151,4 +170,12 @@ func hasNonFinite(vals ...float64) bool {
 		}
 	}
 	return false
+}
+
+func drainRequestBody(r *http.Request) {
+	if r == nil || r.Body == nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, r.Body)
+	_ = r.Body.Close()
 }

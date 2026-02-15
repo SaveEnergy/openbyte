@@ -132,14 +132,18 @@ func (m *Manager) CreateStream(config types.StreamConfig) (*types.StreamState, e
 }
 
 func (m *Manager) StartStream(streamID string) error {
-	m.mu.RLock()
-	state, exists := m.streams[streamID]
-	m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
+	state, exists := m.streams[streamID]
 	if !exists {
 		return errors.ErrStreamNotFound(streamID)
 	}
 
+	current := state.GetState().Status
+	if isTerminalStatus(current) {
+		return errors.ErrInvalidConfig("cannot start terminal stream", nil)
+	}
 	state.UpdateStatus(types.StreamStatusRunning)
 	return nil
 }
@@ -155,31 +159,45 @@ func (m *Manager) GetStream(streamID string) (*types.StreamState, error) {
 }
 
 func (m *Manager) CancelStream(streamID string) error {
-	m.mu.RLock()
-	state, exists := m.streams[streamID]
-	m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
+	state, exists := m.streams[streamID]
 	if !exists {
 		return errors.ErrStreamNotFound(streamID)
 	}
 
+	current := state.GetState().Status
+	if isTerminalStatus(current) {
+		if current == types.StreamStatusCancelled {
+			return nil
+		}
+		return errors.ErrInvalidConfig("stream already finalized", nil)
+	}
 	state.UpdateStatus(types.StreamStatusCancelled)
-	m.releaseActiveStream(streamID)
+	m.releaseActiveStreamLocked(streamID)
 	return nil
 }
 
 func (m *Manager) CompleteStream(streamID string, metrics types.Metrics) error {
-	m.mu.RLock()
-	state, exists := m.streams[streamID]
-	m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
+	state, exists := m.streams[streamID]
 	if !exists {
 		return errors.ErrStreamNotFound(streamID)
 	}
 
+	current := state.GetState().Status
+	if isTerminalStatus(current) {
+		if current == types.StreamStatusCompleted {
+			return nil
+		}
+		return errors.ErrInvalidConfig("stream already finalized", nil)
+	}
 	state.UpdateMetrics(metrics)
 	state.UpdateStatus(types.StreamStatusCompleted)
-	m.releaseActiveStream(streamID)
+	m.releaseActiveStreamLocked(streamID)
 
 	logging.Info("Stream completed",
 		logging.Field{Key: "id", Value: streamID},
@@ -189,17 +207,24 @@ func (m *Manager) CompleteStream(streamID string, metrics types.Metrics) error {
 }
 
 func (m *Manager) FailStream(streamID string, metrics types.Metrics) error {
-	m.mu.RLock()
-	state, exists := m.streams[streamID]
-	m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
+	state, exists := m.streams[streamID]
 	if !exists {
 		return errors.ErrStreamNotFound(streamID)
 	}
 
+	current := state.GetState().Status
+	if isTerminalStatus(current) {
+		if current == types.StreamStatusFailed {
+			return nil
+		}
+		return errors.ErrInvalidConfig("stream already finalized", nil)
+	}
 	state.UpdateMetrics(metrics)
 	state.UpdateStatus(types.StreamStatusFailed)
-	m.releaseActiveStream(streamID)
+	m.releaseActiveStreamLocked(streamID)
 
 	logging.Info("Stream failed",
 		logging.Field{Key: "id", Value: streamID})
@@ -210,6 +235,10 @@ func (m *Manager) FailStream(streamID string, metrics types.Metrics) error {
 func (m *Manager) UpdateMetrics(streamID string, metrics types.Metrics) error {
 	m.mu.RLock()
 	state, exists := m.streams[streamID]
+	if exists && isTerminalStatus(state.GetState().Status) {
+		m.mu.RUnlock()
+		return errors.ErrInvalidConfig("cannot update metrics for terminal stream", nil)
+	}
 	m.mu.RUnlock()
 
 	if !exists {
@@ -218,6 +247,12 @@ func (m *Manager) UpdateMetrics(streamID string, metrics types.Metrics) error {
 
 	state.UpdateMetrics(metrics)
 	return nil
+}
+
+func isTerminalStatus(status types.StreamStatus) bool {
+	return status == types.StreamStatusCompleted ||
+		status == types.StreamStatusFailed ||
+		status == types.StreamStatusCancelled
 }
 
 func (m *Manager) GetActiveStreams() []string {

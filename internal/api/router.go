@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -127,7 +128,7 @@ func (r *Router) SetupRoutes(registrars ...RegistryRegistrar) http.Handler {
 
 	// Serve results.html for /results/{id} browser requests
 	if r.resultsHandler != nil {
-		mux.HandleFunc("GET /results/{id}", func(w http.ResponseWriter, req *http.Request) {
+		resultsPageHandler := func(w http.ResponseWriter, req *http.Request) {
 			w.Header().Set("Cache-Control", "no-store")
 			f, err := webFS.Open("results.html")
 			if err != nil {
@@ -141,10 +142,14 @@ func (r *Router) SetupRoutes(registrars ...RegistryRegistrar) http.Handler {
 				return
 			}
 			http.ServeContent(w, req, "results.html", stat.ModTime(), f)
-		})
+		}
+		if r.limiter != nil {
+			resultsPageHandler = applyRateLimit(r.limiter, resultsPageHandler)
+		}
+		mux.HandleFunc("GET /results/{id}", resultsPageHandler)
 	}
 
-	mux.Handle("/", staticCacheMiddleware(http.FileServer(webFS)))
+	mux.Handle("/", staticCacheMiddleware(newStaticAllowlistHandler(webFS)))
 
 	// Let external registrars add routes before middleware wrapping
 	for _, reg := range registrars {
@@ -153,11 +158,81 @@ func (r *Router) SetupRoutes(registrars ...RegistryRegistrar) http.Handler {
 
 	// Wrap with middleware (outermost runs first)
 	var handler http.Handler = mux
+	if r.limiter != nil {
+		handler = registryRateLimitMiddleware(r.limiter, handler)
+	}
 	handler = r.CORSMiddleware(handler)
 	handler = SecurityHeadersMiddleware(handler)
 	handler = r.LoggingMiddleware(handler)
 
 	return handler
+}
+
+func registryRateLimitMiddleware(limiter *RateLimiter, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/api/v1/registry/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if skipRateLimitPaths[r.URL.Path] {
+			next.ServeHTTP(w, r)
+			return
+		}
+		ip := limiter.ClientIP(r)
+		if !limiter.Allow(ip) {
+			w.Header().Set("Retry-After", "60")
+			respondJSON(w, map[string]string{"error": "rate limit exceeded"}, http.StatusTooManyRequests)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
+	allowed := map[string]bool{
+		"index.html":                 true,
+		"download.html":              true,
+		"results.html":               true,
+		"skill.html":                 true,
+		"app.js":                     true,
+		"download.js":                true,
+		"results.js":                 true,
+		"skill.js":                   true,
+		"style.css":                  true,
+		"favicon.svg":                true,
+		"openbyte-wordmark-dark.svg": true,
+		"openbyte-wordmark-light.svg": true,
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.NotFound(w, r)
+			return
+		}
+		name := path.Clean(strings.TrimPrefix(r.URL.Path, "/"))
+		if name == "." || name == "/" {
+			name = "index.html"
+		}
+		switch name {
+		case "download", "results", "skill":
+			name += ".html"
+		}
+		if strings.Contains(name, "..") || !allowed[name] {
+			http.NotFound(w, r)
+			return
+		}
+		f, err := webFS.Open(name)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		defer f.Close()
+		stat, err := f.Stat()
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		http.ServeContent(w, r, name, stat.ModTime(), f)
+	})
 }
 
 // applyRateLimit wraps a handler with rate limit checking.

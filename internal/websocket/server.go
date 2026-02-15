@@ -104,12 +104,14 @@ func (s *Server) HandleStream(w http.ResponseWriter, r *http.Request, streamID s
 }
 
 func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
+	isTerminal := isTerminalStreamStatus(state.Status)
+
 	s.mu.RLock()
 	clients := s.clients[streamID]
 	if clients == nil {
 		s.mu.RUnlock()
 		// Clean up sentStatus for streams with no clients on terminal status
-		if state.Status == types.StreamStatusCompleted || state.Status == types.StreamStatusFailed {
+		if isTerminal {
 			s.mu.Lock()
 			delete(s.sentStatus, streamID)
 			s.mu.Unlock()
@@ -121,7 +123,6 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 	for _, client := range clients {
 		clientList = append(clientList, client)
 	}
-	lastSentStatus := s.sentStatus[streamID]
 	s.mu.RUnlock()
 
 	var msgType string
@@ -134,9 +135,16 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 		msgType = "metrics"
 	}
 
-	if (state.Status == types.StreamStatusCompleted || state.Status == types.StreamStatusFailed) &&
-		lastSentStatus == state.Status {
-		return
+	if isTerminal {
+		// Deduplicate terminal events atomically under one lock to avoid races
+		// where concurrent broadcasts can both read "not sent yet" and both emit.
+		s.mu.Lock()
+		if s.sentStatus[streamID] == state.Status {
+			s.mu.Unlock()
+			return
+		}
+		s.sentStatus[streamID] = state.Status
+		s.mu.Unlock()
 	}
 
 	elapsed := float64(0)
@@ -209,11 +217,6 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 		}
 	}
 
-	if state.Status == types.StreamStatusCompleted || state.Status == types.StreamStatusFailed {
-		s.mu.Lock()
-		s.sentStatus[streamID] = state.Status
-		s.mu.Unlock()
-	}
 }
 
 func (s *Server) startPingLoop() {
@@ -245,6 +248,7 @@ func (s *Server) Close() {
 	s.stopOnce.Do(func() {
 		close(s.stopCh)
 	})
+	s.closeActiveConnections()
 	s.wg.Wait()
 }
 
@@ -296,13 +300,21 @@ func (s *Server) removeClient(streamID string, conn *websocket.Conn) {
 }
 
 func (s *Server) isAllowedOrigin(origin string, host string) bool {
-	if origin == "" {
-		return true
-	}
-
 	s.mu.RLock()
 	allowedOrigins := append([]string(nil), s.allowedOrigins...)
 	s.mu.RUnlock()
+
+	if origin == "" {
+		if len(allowedOrigins) == 0 {
+			return true
+		}
+		for _, allowed := range allowedOrigins {
+			if strings.TrimSpace(allowed) == "*" {
+				return true
+			}
+		}
+		return false
+	}
 
 	if len(allowedOrigins) == 0 {
 		return sameOrigin(origin, host)
@@ -399,4 +411,25 @@ func (c *clientConn) writeMessage(messageType int, data []byte) error {
 	defer c.mu.Unlock()
 	c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 	return c.conn.WriteMessage(messageType, data)
+}
+
+func (s *Server) closeActiveConnections() {
+	s.mu.Lock()
+	conns := make([]*websocket.Conn, 0)
+	for streamID, streamClients := range s.clients {
+		for conn := range streamClients {
+			conns = append(conns, conn)
+		}
+		delete(s.clients, streamID)
+	}
+	s.sentStatus = make(map[string]types.StreamStatus)
+	s.mu.Unlock()
+
+	for _, conn := range conns {
+		_ = conn.Close()
+	}
+}
+
+func isTerminalStreamStatus(status types.StreamStatus) bool {
+	return status == types.StreamStatusCompleted || status == types.StreamStatusFailed
 }

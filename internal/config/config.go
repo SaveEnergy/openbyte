@@ -346,6 +346,12 @@ func (c *Config) Validate() error {
 	if c.GlobalRateLimit < c.RateLimitPerIP {
 		return fmt.Errorf("global rate limit must be >= rate limit per IP")
 	}
+	if c.MaxConcurrentPerIP <= 0 {
+		return fmt.Errorf("max concurrent per IP must be > 0")
+	}
+	if c.MaxConcurrentPerIP > c.MaxConcurrentTests {
+		return fmt.Errorf("max concurrent per IP must be <= max concurrent tests")
+	}
 	if c.DataDir == "" {
 		return fmt.Errorf("data directory cannot be empty")
 	}
@@ -358,6 +364,9 @@ func (c *Config) Validate() error {
 				return fmt.Errorf("invalid trusted proxy CIDR: %s", entry)
 			}
 		}
+	}
+	if c.RegistryEnabled && c.RegistryInterval <= 0 {
+		return fmt.Errorf("registry interval must be > 0 when registry is enabled")
 	}
 	return nil
 }

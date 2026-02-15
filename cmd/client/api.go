@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -70,11 +69,17 @@ func startStream(ctx context.Context, config *Config) (*StreamResponse, error) {
 	return &streamResp, nil
 }
 
-func cancelStream(serverURL, streamID, apiKey string) {
+func CancelStream(ctx context.Context, serverURL, streamID, apiKey string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	apiURL := serverURL + "/api/v1/stream/" + streamID + "/cancel"
-	req, err := http.NewRequest("POST", apiURL, nil)
+	req, err := http.NewRequestWithContext(reqCtx, "POST", apiURL, nil)
 	if err != nil {
-		return
+		return err
 	}
 	if apiKey != "" {
 		req.Header.Set("Authorization", "Bearer "+apiKey)
@@ -87,13 +92,23 @@ func cancelStream(serverURL, streamID, apiKey string) {
 			io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
 		}
-		return
+		return err
 	}
 	io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("cancel stream failed: status %d", resp.StatusCode)
+	}
+	return nil
 }
 
-func completeStream(config *Config, streamID string, metrics EngineMetrics) {
+func completeStream(ctx context.Context, config *Config, streamID string, metrics EngineMetrics) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	reqBody := map[string]interface{}{
 		"status": "completed",
 		"metrics": map[string]interface{}{
@@ -115,13 +130,11 @@ func completeStream(config *Config, streamID string, metrics EngineMetrics) {
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "openbyte: complete stream marshal: %v\n", err)
-		return
+		return fmt.Errorf("complete stream marshal: %w", err)
 	}
-	req, err := http.NewRequest("POST", config.ServerURL+"/api/v1/stream/"+streamID+"/complete", bytes.NewReader(jsonData))
+	req, err := http.NewRequestWithContext(reqCtx, "POST", config.ServerURL+"/api/v1/stream/"+streamID+"/complete", bytes.NewReader(jsonData))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "openbyte: complete stream request: %v\n", err)
-		return
+		return fmt.Errorf("complete stream request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if config.APIKey != "" {
@@ -135,11 +148,14 @@ func completeStream(config *Config, streamID string, metrics EngineMetrics) {
 			io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
 		}
-		fmt.Fprintf(os.Stderr, "openbyte: complete stream: %v\n", err)
-		return
+		return fmt.Errorf("complete stream send: %w", err)
 	}
 	io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("complete stream failed: status %d", resp.StatusCode)
+	}
+	return nil
 }
 
 func streamMetrics(ctx context.Context, wsURL string, formatter OutputFormatter, config *Config) error {
@@ -187,6 +203,7 @@ func streamMetrics(ctx context.Context, wsURL string, formatter OutputFormatter,
 		conn.Close()
 	}()
 
+	receivedComplete := false
 	for {
 		conn.SetReadDeadline(time.Now().Add(readTimeout))
 
@@ -196,7 +213,10 @@ func streamMetrics(ctx context.Context, wsURL string, formatter OutputFormatter,
 				return ctx.Err()
 			}
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				return nil
+				if receivedComplete {
+					return nil
+				}
+				return fmt.Errorf("websocket closed before completion message")
 			}
 			var netErr interface{ Timeout() bool }
 			if errors.As(err, &netErr) && netErr.Timeout() {
@@ -213,6 +233,7 @@ func streamMetrics(ctx context.Context, wsURL string, formatter OutputFormatter,
 				formatter.FormatMetrics(msg.Metrics)
 			}
 		case "complete":
+			receivedComplete = true
 			if msg.Results != nil {
 				formatter.FormatComplete(msg.Results)
 				return nil

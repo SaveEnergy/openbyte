@@ -1,306 +1,140 @@
 ## Architecture Decisions
 
+### Core Runtime
+- Single `openbyte` binary with `server` / `client` / `check` / `mcp` subcommands.
+- Routing uses stdlib `net/http.ServeMux` (`METHOD /path/{param}` + `r.PathValue`).
+- Web assets are embedded (`//go:embed`) with optional `WEB_ROOT` override for development.
+- Stream lifecycle and counters are atomic-first on hot paths; mutexes reserved for coordination paths.
+
 ### Performance
-- Fixed-bucket latency histogram (1ms buckets, 2s window) avoids O(n log n) percentile sorts.
-- WebSocket fanout: single marshal per tick + serialized writes (not per-client marshal).
-- Buffer pooling (`sync.Pool`) for TCP/UDP receive buffers; pre-generated 1MB random data block for downloads.
-- Atomic counters on hot paths (bytes, packets, active count); mutexes only for cold paths.
-- `LatencyHistogram` uses `sync.RWMutex` — writers exclusive, readers (`CopyTo`) concurrent.
-- Manager `ActiveCount()` is O(1) via `atomic.LoadInt64` (not map scan).
+- Fixed-bucket latency histogram (1ms buckets, 2s window) replaces sort-heavy percentile computation.
+- WebSocket fanout uses single marshal per tick plus serialized writes.
+- TCP/UDP code paths use buffer pooling (`sync.Pool`) and bounded goroutine patterns.
+- HTTP/UI speed logic uses warm-up gating and EWMA smoothing for stable live display.
 
-### Concurrency & Shutdown
-- `sync.Once` on `Manager.Stop()` and `RegistryService.Stop()` for idempotent shutdown.
-- `sync.Once` on `stream.Server.Close()` for idempotent, race-safe double-close behavior under concurrent shutdown paths.
-- Broadcast goroutine tracked by `sync.WaitGroup`; shutdown waits for exit before closing WebSocket server.
-- Shutdown order: `manager.Stop()` → `wsServer.Close()` (channel closes first, then WS).
-- TCP connection limit (`activeTCPConns` atomic + `maxTCPConns`) with hard duration cap per connection.
-- UDP sender concurrency limit with double-checked locking after write lock (TOCTOU fix).
-- UDP read parallelism: `min(GOMAXPROCS, 4)` reader goroutines on single `UDPConn`; `udpClients` struct owns map+mutex; ticker-based cleanup (not inline).
-- UDP readers now set short read deadlines (100ms) so shutdown/cancel exits promptly even under low packet flow.
-- UDP sender now owns client-entry removal on exit (plus senderActive flag), preventing stale-client orphaning and sender-limit drift after idle exits.
-- Client `streamID` uses `atomic.Value` for race-safe signal handler access.
+### Reliability & Concurrency
+- `sync.Once` on close/stop paths for idempotent shutdown (`Manager`, registry service, stream server).
+- Shutdown order is explicit: stop producer paths first, then websocket/server teardown.
+- Request/response bodies are drained on error paths to preserve HTTP/2 connection reuse.
+- Stream start cleans up state if `CreateStream` succeeded but `StartStream` fails.
+- Client cancel paths actively cancel server streams on context/error exits to avoid orphaned runs.
 
-### Rate Limiting
-- Token bucket with fractional remainder preservation (avoids `int()` truncation losing tokens).
-- Per-IP: `rightmostUntrustedIP` walks XFF right-to-left, skipping trusted proxy CIDRs (prevents spoofing).
-- Upload handler has duration cap + context cancellation (prevents slow-drip slot exhaustion).
-- Download/upload concurrency uses atomic increment-then-check (eliminates TOCTOU).
+### Security & Validation
+- CORS wildcard matching enforces safe dot-boundary behavior.
+- CSP is strict (`script-src 'self'`), with JS moved to external files only.
+- JSON API handlers enforce size limits and single-object decoding for POST/PUT payloads.
+- Registry auth uses constant-time compare for bearer token validation.
+- Config validation includes port collision checks and trusted CIDR parsing.
 
-### Metrics
-- Jitter: RFC 3550 mean consecutive difference (both server-side and client RTTCollector).
-- Percentile: `math.Ceil(count * ratio)` — no off-by-one.
-- Packet loss clamped ≥ 0 (atomic timing can cause `recv > sent`).
-- RTTCollector uses ring buffer (fixed backing array, head/count indices) — no reslice leak.
-
-### Security
-- CORS wildcard: dot-boundary enforcement (`*.example.com` won't match `evilexample.com`).
-- CSP: `script-src 'self'`; all JS in external files (no inline scripts).
-- CSP `connect-src` narrowed from wildcard to explicit `'self' https: http: ws: wss:` (keeps API/WebSocket/server-probe flexibility without blanket allow-all).
-- Playwright regression: `skill.html` asserts no inline scripts (`<script src=...>` only) to prevent CSP regressions.
-- Static HTML responses (`/`, `*.html`, including `/results/{id}`) send `Cache-Control: no-store` to avoid stale page/script mismatches after deploy.
-- WebSocket `SetReadLimit(4096)` — server only reads for disconnect detection.
-- JSON body size limits on all POST endpoints.
-- Stream IDs: UUID format enforced at routing layer.
-- Registry API key compared with `subtle.ConstantTimeCompare`.
-- Port collision validation (HTTP vs TCP/UDP) in config.
-
-### HTTP Streaming (Web UI)
-- Web UI uses HTTP endpoints (`/download`, `/upload`, `/ping`), not TCP/UDP proxy mode.
-- EWMA-smoothed live speed display (alpha=0.3); final result uses raw `totalBytes / elapsed`.
-- Dynamic warm-up: rolling throughput windows, settles when last 3 vary < 15%.
-- 24 latency pings, 2 warm-up discarded, IQR outlier filter.
-- Loaded latency probe (500ms interval) during download/upload for bufferbloat grading.
-- Multi-step chunk fallback on download errors (1MB → 256KB → 64KB).
-- Cancel+restart: captured `signal` threaded through all phases; `finally` checks signal ownership before cleanup.
-- All fetch responses drained (success and error paths) for HTTP/2 stream reuse.
-
-### Frontend Signal Threading
-- `startTest()` captures local `signal = state.abortController.signal`.
-- All phase functions (`measureLatency`, `runTest`, `runDownloadTest`, `runUploadTest`, `startLoadedLatencyProbe`) accept and use this signal.
-- `finally` block only cleans up if `state.abortController?.signal === signal` (prevents old test clobbering new).
-- `fetchWithTimeout` chains caller's abort signal with timeout controller; removes listener on cleanup (prevents accumulation).
-- `download.js` uses DOM manipulation (no `innerHTML`) for dynamic content.
-- Download page release rendering now guards invalid asset URLs/sizes and invalid publish dates before UI updates.
-- Download page release fetch drains non-OK response bodies before throwing (connection reuse).
+### Frontend Behavior
+- HTTP test mode uses `/download`, `/upload`, `/ping`; not TCP/UDP proxy mode.
+- Network probe and health-check fetch paths drain non-OK and malformed JSON responses.
+- Server settings UI is simplified:
+  - no custom URL mode,
+  - no synthetic "Current Server" mode,
+  - selector hidden when <=1 reachable server.
+- UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.
 
 ### Storage
-- SQLite via `modernc.org/sqlite` (pure Go, no CGO) for cross-compilation.
-- WAL mode via explicit PRAGMA (not query string — driver ignores it).
-- 8-char base62 IDs via `crypto/rand`; single `rand.Read(8)` call per ID (not 8 individual syscalls).
-- 90-day retention + configurable max count with hourly cleanup.
-- Unique-constraint detection checks typed sqlite error code (`SQLITE_CONSTRAINT_UNIQUE`) with message fallback, not message match only.
+- Results store uses SQLite (`modernc.org/sqlite`, pure Go, no CGO), WAL mode via PRAGMA.
+- Share IDs are short crypto-random base62.
+- Retention and max-count cleanup are enforced with periodic pruning.
+- Unique constraint detection uses typed sqlite error code with fallback message match.
 
-### Agent Integration
-- MCP server (`openbyte mcp`) over stdio transport; 3 tools: `connectivity_check`, `speed_test`, `diagnose`. Uses `github.com/mark3labs/mcp-go`.
-- Go SDK in `pkg/client/`: `New()`, `Check()`, `SpeedTest()`, `Diagnose()`, `Healthy()` — wraps HTTP engine; no shell needed.
-- Quick check (`openbyte check`): 3-5s latency + burst download + burst upload; returns grade A-F + interpretation. Exit code 0 = healthy, 1 = degraded.
-- Diagnostic interpretation in `pkg/diagnostic/`: grades (A-F), ratings (latency/speed/stability), suitability list, concerns. Shared by CLI, MCP, SDK.
-- Structured JSON errors: `--json` emits `{"error":true,"code":"...","message":"..."}` to stdout (not unstructured stderr). Error codes: `connection_refused`, `timeout`, `rate_limited`, `server_unavailable`, `invalid_config`, `cancelled`, `network_error`.
-- Schema versioning: `schema_version: "1.0"` on all JSON output (results + errors). Semver independent of binary version.
-- NDJSON streaming: `--ndjson` flag emits `{"type":"progress",...}` per tick + `{"type":"result","data":{...}}` final line.
-- OpenAPI 3.1 spec at `api/openapi.yaml` covering all `/api/v1/*` + `/health` endpoints.
-- Install script: `scripts/install.sh` (curl|sh, detects OS/arch, downloads from GitHub Releases).
-- Installer creates missing `INSTALL_DIR` (with `sudo` when needed) and verifies extracted binary exists before copy.
-- Installer rejects empty `INSTALL_DIR` before path operations to avoid ambiguous install targets.
-- `go install github.com/saveenergy/openbyte/cmd/openbyte@latest` works (entry point at `cmd/openbyte/`).
+### Agent & API Surface
+- MCP server available via `openbyte mcp` (stdio transport).
+- Go SDK (`pkg/client`) exposes `Check`, `SpeedTest`, `Diagnose`, `Healthy`.
+- OpenAPI spec lives at `api/openapi.yaml`; CI/release lint it.
+- JSON output supports schema versioning and structured error contracts.
 
-### Build & Deploy
-- Single `openbyte` binary with `server`/`client`/`check`/`mcp` subcommands.
-- Release workflow now gates artifact/image publish behind `go test -short ./...` to prevent untested tag releases.
-- Release workflow now also runs OpenAPI lint (`redocly lint api/openapi.yaml`) before asset/image publish.
-- Release workflow now includes race-detector short suite (`go test -race -short ./...`) before publishing artifacts/images.
-- CI/release race gates now run with package parallelism capped (`-p 1`) to reduce runner memory pressure and avoid intermittent SIGTERM/143 failures under race instrumentation.
-- `openbyte server` now accepts deploy-oriented CLI flags (ports, server identity, limits, registry/proxy options); when explicitly set, flags override env-derived config.
-- README now uses theme-aware SVG wordmark images (light/dark) plus status flairs (CI, release, license, Go version) for consistent GitHub rendering.
-- Web assets embedded via `//go:embed` (HTML, CSS, JS, fonts).
-- Self-hosted fonts (DM Sans, JetBrains Mono) — no external CDN dependencies.
-- Deploy scripts pin image tags explicitly (`IMAGE_TAG=$GITHUB_SHA` on CI main, `IMAGE_TAG=$SEMVER` on release tags) so pull/deploy targets deterministic image.
-- Deploy uses `docker compose up -d --force-recreate` after pull to ensure running container is replaced even when tag string is unchanged (`edge`/`latest` patterns).
-- Deploy scripts verify running container image ID matches expected GHCR image ID after recreate; owner normalized to lowercase for GHCR path compatibility.
-- Deploy jobs sync `docker-compose.ghcr.yaml` + `docker-compose.ghcr.traefik.yaml` from pipeline workspace to `${REMOTE_DIR}/docker` before remote compose commands, preventing server-side compose drift.
-- Deployment docs now match workflow behavior for CI tags (`edge` + SHA), Traefik compose invocation, and workflow-owned owner/tag resolution.
-- Deploy compose sync step verifies remote file SHA-256 checksums match workspace files before executing `docker compose`.
-- Deploy sync hardening: fail-fast `ssh-keyscan`, explicit remote compose file existence checks post-`scp`, and `always()` cleanup of temporary SSH key material on runner.
-- Deploy script propagates bash-script exit status (`exit $?`) and enforces `GHCR_OWNER` override during compose pull/up to avoid owner drift across server `.env` and workflow context.
-- Deploy pull step is explicit fail-fast (`docker compose pull || exit 1`) before recreate.
-- Deploy sync validates `REMOTE_DIR` is non-empty before remote mkdir/scp/deploy paths are used.
-- Deploy sync uses `timeout 15 ssh-keyscan ...` and verifies non-empty host-key output before updating `known_hosts`.
-- Deploy step verifies `${REMOTE_DIR}/.env` exists before compose calls; fallback shell path now uses `set -euo pipefail`.
-- GHCR Traefik compose uses external `traefik` network; deploy ensures network exists (`docker network inspect ... || docker network create`) before compose to avoid label mismatch failures on pre-existing host networks.
-- `WEB_ROOT` env overrides embedded FS for development.
-- Playwright NO_COLOR handling: CI step uses `env -u NO_COLOR ...`; npm scripts use `scripts/run-playwright.mjs` (cross-platform, unsets `NO_COLOR` before spawning `bunx playwright`).
-- `ReadTimeout: 0` (disabled); `ReadHeaderTimeout: 15s` (slowloris protection without killing uploads).
-- HTTP concurrency auto-scales from `CAPACITY_GBPS` via `MaxConcurrentHTTP()`.
-- Client env vars (`OBYTE_*`) removed; flags only. `NO_COLOR` standard convention retained.
-- `ServerInfo` shared via `pkg/types/server.go` (deduplicated from `api` + `registry`).
-- `buildServerInfo` derives scheme from `TrustProxyHeaders` (not hardcoded `http://`).
-- Client context timeout adds test duration to base timeout (lifecycle ≠ test phase).
-- TCP/UDP warm-up: data flows during first `WarmUp` seconds but `addBytes` gates recording; one-time CAS resets counters/`measureStart` at transition. Same pattern as HTTP engine `graceBytes`/`graceDone`. Test context runs for `WarmUp + Duration`.
-- Routing: stdlib `net/http.ServeMux` (Go 1.22+); `"METHOD /path/{param}"` patterns, `r.PathValue("param")`. `RegistryRegistrar` interface for external route registration before middleware wrapping.
-- Install script now aligns with supported platforms (`linux`/`darwin`) and always downloads/extracts release tarballs (removed unreachable Windows/zip branch).
+### Build / CI / Deploy
+- CI main builds/pushes `edge` + `sha`; release pipeline publishes semver + `latest`.
+- Deploy path syncs compose files before remote execution to prevent server-side drift.
+- Deploy runs `docker compose pull` + `up -d --force-recreate`, then verifies expected image/container state.
+- Traefik deploy uses external `traefik` network; workflows ensure network presence.
+- Workflow gates require required deploy vars/secrets and fail fast on missing config.
 
-### Error Handling Patterns
-- All `io.EOF` / `net.Error` checks use `errors.Is` / `errors.As` (not bare `==` / type assertion).
-- `http.ErrServerClosed` uses `errors.Is` everywhere.
-- All API errors return JSON `{"error":"..."}` (no plaintext `http.Error`).
-- Registry handlers validate `Content-Type: application/json`.
-- Registry auth now requires `Authorization: Bearer <token>` with non-empty token; malformed bearer headers fail closed and are regression-tested.
-- HTTP client run flow now warns on ping sampling failure/empty sample sets and safely falls back to zero latency/jitter instead of silently proceeding.
-- Config validation now validates `TrustedProxyCIDRs` whenever provided (independent of `TrustProxyHeaders`) and has dedicated unit coverage for invalid CIDR rejection.
-- API stream start/metrics/complete handlers now also enforce JSON Content-Type (while allowing omitted header for compatibility).
-- Cancel-stream API now drains/closes request bodies before cancellation to keep HTTP connection reuse safe.
-- Start-stream handler now cleans up stream state if `CreateStream` succeeds but `StartStream` fails, preventing temporary active-slot leakage.
-- Start-stream cleanup path now logs `CancelStream` failures with stream ID for better diagnosis if cleanup ever fails.
-- Start-stream now maps `resource_exhausted` errors to HTTP 503 (instead of 500) to align capacity semantics with API docs/clients.
-- Registry client `Stop()` is idempotent via `sync.Once` (prevents double-close panic when stop called multiple times).
-- `cmd/loadtest` timeout checks now use `errors.As(err, &net.Error)` (not type assertions), preserving behavior under wrapped network errors.
-- `cmd/loadtest` upload and bidirectional write loops now set write deadlines before `Write` calls to avoid indefinite blocking when peer stops reading.
-- `cmd/loadtest` UDP upload loop now also sets write deadlines before `WriteToUDP`, closing remaining indefinite-block path during peer stalls.
-- `json.Encode` errors logged (not silently dropped).
-- Response bodies drained before close for HTTP connection reuse.
-- Tests hardened: JSON decode/marshal errors are asserted in e2e/unit paths (no ignored decode/marshal results).
-- E2E map field extraction avoids direct type-assert panics (`value.(string)`): checks `ok` + non-empty first for clearer failures.
-- Registry handler tests validate `count` field presence/type before numeric comparison (avoid direct `resp["count"].(float64)` panics).
-- Integration tests validate response field types (not just non-nil), e.g. `stream_id`/`websocket_url` must be non-empty strings.
-- Results API GET now uses `Cache-Control: no-store` (matches HTML no-store policy) and unit test coverage checks this header.
-- Results handler tests now cover `Get` not-found and invalid-ID contracts in addition to save-failure path.
-- Results handler tests now also cover save-success contract (`201` with `id` + `/results/{id}` URL) and `Get` internal-error path on store failure.
-- Results save handler enforces single JSON object body (rejects concatenated JSON payloads) and drains on parse violations.
-- `loadServers` drains non-OK `/servers` responses before error path.
-- Results page parser trims trailing slashes when extracting result IDs and logs fetch failures; render path now guards non-finite speed values.
-- Playwright cancel/restart test waits for UI states instead of fixed sleep to reduce CI flakiness.
-- Frontend server-health indicators (`serverDot`/`serverText`) now tolerate missing DOM nodes to avoid runtime null dereferences.
-- Toast error helpers now guard missing toast elements (`errorToast`, `errorMessage`) to keep embedded/minimal layouts safe.
-- Copy button handlers on skill/download pages guard missing `.dl-code-block`/`code` nodes before dereferencing.
-- Frontend bind/init flow now exits safely when core controls are missing (`startBtn`, `restartBtn`, `duration`, `streams`) and logs a warning instead of throwing.
-- Web results page now validates required view containers upfront and drains non-OK fetch responses before surfacing HTTP errors.
-- HTTP client engine now fails fast if upload payload randomization fails (`crypto/rand.Read`), returning constructor error to caller.
-- JSON request decode helpers now drain unread request bodies on decode/single-object validation errors (`internal/api`, `internal/results`, `internal/registry`) to preserve connection reuse safety.
-- Registry register/update handlers now enforce single-object JSON bodies (reject concatenated payloads).
-- Client stream-start decode path drains response body on JSON decode errors before returning.
-- HTTP client engine now drains/closes non-nil responses on `Do` error paths in both download and upload loops.
-- CLI fastest-server health checks now drain/close non-nil responses even on `Get` error paths.
-- Proxy-mode CLI now cancels server stream if websocket metrics loop exits with error; client-mode cancel path also cancels server stream on context cancellation.
-- Settings load/save paths guard missing duration/streams controls, log parse failures, and server discovery now validates `servers` as an array before assignment.
-- CI workflow cleanup: removed unused `Force build override` step from `changes` job.
-- Deploy jobs now include an explicit "Validate deploy configuration" step to fail fast when required vars/secrets (`SSH_*`, `REMOTE_DIR`, `GHCR_*`) are missing.
-- Client `startStream` now surfaces `io.ReadAll` failures on non-201 responses instead of silently ignoring body-read errors.
-- Web download test now drains non-OK HTTP responses before fallback handling to preserve browser connection reuse behavior.
-- Address-family network probes (`v4.`/`v6.` ping) now drain non-OK responses before rejection.
-- Main `/ping` network probe now checks `res.ok` and drains non-OK responses before rejection.
-- Latency probe now drains ping response body when JSON parsing fails to preserve connection reuse.
-- `loadServers` now treats malformed JSON as a hard failure and clears server list fallback state.
-- `checkServer` now drains and skips 200 responses with malformed JSON payloads before trying the next health candidate.
-- Rate-limit tests now assert skip-list behavior for `/api/v1/download`, `/api/v1/upload`, `/api/v1/ping` and enforcement on `/api/v1/stream/{id}/stream`.
-- Registry client tests now cover start/heartbeat/stop lifecycle (register, periodic heartbeat, deregister) and heartbeat 404 re-registration behavior.
-- Speedtest handler tests now include direct `/ping` response-shape coverage and nil-resolver fallback parsing from `RemoteAddr`.
-- Results store tests now verify `Close()` idempotency (double close safe).
-- `cmd/loadtest` now has unit coverage for `validateConfig` invalid/valid mode, duration, concurrency, ws-url, and packet-size rules.
-- `cmd/loadtest` now also has real-socket coverage for `runTCPDownload` and `runUDPDownload` against a live `stream.Server` (short-duration transfer assertions).
-- HTTP client ping helper now has direct tests for successful sample collection and prompt return on context cancellation.
-- HTTP client ping sampling now records latency only for `200 OK` responses; non-OK ping responses are drained and ignored.
-- HTTP client ping helper now has regression coverage for all-failure scenarios (connection-refused path returns empty samples with nil error).
-- E2E short mode now keeps lightweight coverage and skips heavy flow tests via `skipIfShort` instead of exiting the entire e2e package.
-- E2E short mode now also includes `/api/v1/ping` smoke coverage (response status/cache/json shape), improving fast-path signal.
-- Settings UI server selection simplified: removed `Current Server` and custom URL modes; only reachable registry/current entries are selectable, and selector is hidden when there is <=1 server.
-- E2E static-file checks drain non-OK response bodies before close.
-- Download/results pages add broader DOM null-guards to avoid runtime crashes in partial/minimal layouts.
-- Release workflow `image_pushed` output now emits boolean (`true` on successful push step), and deploy gate checks `== 'true'` for clearer control flow.
-- Client cancel/complete stream helpers now defensively drain/close non-nil HTTP responses on `Do` errors before returning.
-- UI speed/progress/state render helpers now short-circuit when required DOM nodes are absent; share state only enables when result ID is valid.
-- Client `startStream` now enforces a defensive minimum HTTP timeout (60s) when `config.Timeout <= 0` to avoid indefinite waits.
-- Multi-stream collector selection now computes round-robin index using bounded uint32 modulo to avoid signed overflow edge cases.
-- Results cleanup now handles and logs `RowsAffected()` errors instead of ignoring them.
-- Config validation now parses HTTP port once and reuses parsed value for collision checks (removed ignored `Atoi` conversion path).
-- Deploy job gates now require `REMOTE_DIR` and `GHCR_USERNAME` vars (in addition to `SSH_HOST`) before attempting sync/deploy.
-- Registry client `drainAndClose` now no-ops on nil response/body to prevent defensive-path panics.
-- Results page rendering now ignores invalid `created_at` timestamps and enforces string-safe rendering for `bufferbloat_grade` and `server_name`.
-- Speedtest upload handler now drains remaining request body before returning on success/error paths to improve connection reuse behavior.
-- `computeBufferbloatGrade` now rejects non-finite latency values early; results page numeric guards now consistently use `Number.isFinite`.
-- UI connected-state e2e matcher includes `Custom`/`Unverified` states for custom-server scenarios.
-- Deploy sync checksum verification now supports both `sha256sum` and `shasum -a 256` on remote hosts, improving Linux/macOS compatibility.
-- Deploy job gates now also require `SSH_USER` var before running deploy in both CI and release workflows.
-- CI path-change detection now includes `api/**`, so OpenAPI-only changes participate in build/deploy gating logic.
-- CI checks now run OpenAPI lint (`redocly lint api/openapi.yaml`) with repo policy config in `redocly.yaml`.
-- CI checks now run short race-detector coverage on push events (`go test ./... -race -short`) in addition to existing unit/e2e matrix.
-- CI changes job now exports a dedicated `web` filter (`web/**`, Playwright config/script, `test/e2e/ui/**`), and checks run Playwright on PRs when web-related files changed.
-- CI web-change filter now also tracks `package.json` and full `test/e2e/**` so Playwright runs on PRs when UI tests or test-runner deps change.
-- CI/release OpenAPI lint commands now pass explicit config (`--config redocly.yaml`) to avoid cwd/config-discovery drift.
-- CI/release workflow image metadata now uses explicit step outputs (version/tags/image_name) instead of cross-step env interpolation, removing workflow-context warnings and making action inputs deterministic.
-- Install script now requests GitHub API JSON explicitly and prefers `jq` for `tag_name` parsing with a POSIX fallback parser.
-- Skill page install snippets now use lowercase GitHub raw URL and full Docker port mapping (8080/tcp, 8081/tcp, 8082/udp).
-- Project docs now use consistent lowercase GitHub org links (`saveenergy/openbyte`) across README and skill page snippets.
-- Deployment docs now pin prerequisite wording to `Go 1.25.0+` to match `go.mod`.
-- Private CIDR initialization now guards parse failures/nil networks before append/Contains checks in `pkg/types/network.go`.
-- Results save handler now logs store persistence failures before returning HTTP 500, with unit coverage for closed-store failure path.
-- Stream server now logs unexpected UDP read errors before reader exit; stream unit tests cover start/close shutdown path.
-- Internal stream tests now assert UDP sender exit cleanup: senderActive reset, map entry removal, and `activeUDPSenders` decrement.
-- Internal stream tests now also cover: sender-limit rejection in `udpClients.getOrCreate`, TCP accept rejection when at connection limit, and prompt `Server.Close()` with active UDP traffic.
-- Internal stream tests now include concurrent double-close coverage for `Server.Close()` idempotency.
-- Stream manager internal cleanup now has direct regression coverage for expired pending streams (fail + removal + active-count release).
-- E2E now includes black-box stream protocol smoke for direct TCP/UDP download commands (`D`) against real stream-server sockets.
-- TCP connection-limit internal test now uses single bounded read deadline (2s) and rejects timeout-as-pass, reducing polling-related flake risk.
-- TCP connection-limit internal test now initializes limit before accept goroutine startup (no post-start mutation), removing race-detector false positives in test harness.
-- Added `test/unit/api/openapi_contract_test.go` to enforce OpenAPI route/method contract against implemented HTTP surface (router + registry routes), preventing silent spec/route drift.
-- E2E test harness now wires real results storage (`results.Store` + `results.Handler`) like production startup path, and e2e covers `POST /api/v1/results` + `GET /api/v1/results/{id}` contract.
-- Playwright UI suite now includes shared-result rendering coverage (`/results/{id}`): creates result via API, opens page, asserts rendered speed/server fields, and verifies non-error view.
-- Shared results page now enforces client-side fetch timeout (20s AbortController) and maps failure classes to user-facing messages (invalid ID, not found, server error, timeout, render failure) instead of generic fallback only.
-- Playwright UI now covers shared-result error paths: invalid ID format and valid-but-missing ID (`404`) both assert error view + message behavior.
-- Shared-results fetch error handling now exposes only curated user-safe messages (predefined HTTP/timeout cases), avoiding raw JSON parser/internal error text leakage in UI.
-- Playwright shared-results suite now covers server-error (`500`), timeout, and malformed-JSON API payload paths in addition to success/invalid/not-found cases.
-- Router unit coverage now includes `/results/{id}` page response contract when results handler enabled (`200` HTML + `Cache-Control: no-store`).
-- Integration test suite now wires results handler and validates router-level `POST /api/v1/results` -> `GET /api/v1/results/{id}` save/get contract (including `Cache-Control: no-store` on GET).
-- Router smoke coverage now includes critical readiness routes (`/health`, `/api/v1/version`, `/api/v1/ping`) with status-200 assertions to guard accidental route wiring regressions.
-- Playwright shared-results coverage now includes Gbps rendering path (`>=1000 Mbps`) with value+unit assertions (`Gbps`) for both download and upload cards.
+## Engineering Guardrails
+- Keep behavior changes minimal and explicit; avoid orthogonal refactors in reliability passes.
+- Prefer fixing root-cause over masking symptoms.
+- Add regression tests for bug fixes; strengthen existing tests instead of broad rewrites.
+- Keep docs aligned with actual workflow/runtime behavior after each operational change.
 
-### Dead Code Removed
-- QUIC server/client support (2026-02-02).
-- `ErrConnectionFailed`, `IsContextError`, `ErrCodeTimeout`, `ErrCodeCancelled` from `pkg/errors`.
-- `MeasureRTT` → `measureRTT` (unexported).
-- `Collector.GetSnapshot`, `MultiStreamAggregator.GetCollector`.
-- `sendPool` / `getSendBuffer` from stream server.
-- `activeStreams` map / `StreamSession` struct from stream server.
-- `isPublicIP`, `firstClientIP` from clientip.
-- `saveConfigFile` from client config.
-- `stringsTrimSuffix` wrapper (inlined `strings.TrimRight`).
-- Dead CSS (`.counting`, `countUp` keyframe, overridden `border: none`).
-- Deprecated `version: '3.8'` from compose files.
-- TCP/UDP `runWarmUp` no-op removed; warm-up integrated into data phase via `addBytes` gating.
-- `math/big` import removed from `results/store.go` (replaced by `rand.Read`).
-- `gorilla/mux` dependency removed; migrated to Go 1.22+ `net/http.ServeMux` (`{name}` path params + `METHOD /path` patterns).
-- `RateLimitMiddleware` (gorilla middleware adapter) replaced by `applyRateLimit` (direct `HandlerFunc` wrapper).
+## Dynamic Backlog (Parallel PDCA)
+
+### Coordination Contract
+- Treat this section as shared state for concurrent agents.
+- Use monotonic status flow only: `Planned -> Claimed -> In Progress -> Check -> Done` (or `Blocked` / `Cancelled`).
+- Keep entries attributable (`Agent`, `UTC`, `Evidence`, `Check`).
+- If overlaps happen, resolve explicitly in `Decision Notes` (no silent overwrite).
+
+### Work Item Schema
+- `ID`: `YYYYMMDD-<area>-<nn>`
+- `Area`: `api`, `client`, `web`, `ci`, `docs`, ...
+- `Agent`: owner tag (`A0`, `A1`, ...)
+- `Status`: allowed state
+- `Plan`: one-line intent
+- `Evidence`: concrete proof
+- `Check`: exact verification command
+
+### Live Queue (active only)
+| ID | Area | Agent | Status | Plan | Evidence | Check |
+|---|---|---|---|---|---|---|
+| _none_ | - | - | - | Backlog cleared on `2026-02-15` | See `Last Completed Cycle` + git history | `go test -short ./...` |
+
+### Last Completed Cycle
+- Cycle: `2026-02-15 #24`
+- Goal: close remaining reliability backlog (results + API concurrency/rollback edges)
+- State: closed
+- Completion evidence:
+  - Results store retries transient BUSY/LOCKED writes and trims deterministically on equal timestamps.
+  - Results `Get` error mapping distinguishes retryable (`503`) from internal (`500`) failures.
+  - Speedtest upload read deadline aligns with configured max-duration contract.
+  - Added rate-limiter cleanup concurrent stress test and rollback-cleanup failure branch regression.
+  - Validation passed: targeted regressions + full `go test -short ./...`.
+
+### Recent Decision Notes
+- Used package-internal white-box tests for rollback/mapping branches hard to trigger from black-box HTTP tests.
+- Added explicit semver tag-format guard in release deploy script for fail-fast behavior in reused/manual contexts.
+- Applied rate-limit parity to registrar routes and browser results route.
+- Tightened API mutation contract (explicit JSON content-type + unknown-field rejection).
+- Preferred fail-fast CLI/config validation over silent fallback behavior.
+
+### Archive Note
+- Detailed completed queue rows and full event/decision history were intentionally pruned for readability.
+- Canonical historical record remains in git history.
+
+### Verification Baseline
+- `go test ./cmd/check ./cmd/mcp ./cmd/server ./cmd/client`
+- `go test ./test/unit/api ./test/unit/client ./test/unit/mcp ./test/unit/results ./test/unit/websocket`
+- `go test ./internal/results`
+
+### Test Layout Note
+- Preferred location: `test/` tree.
+- Exception: legacy white-box tests still co-located under `cmd/` and `internal/` where package-private access is required.
+- Newly added rogue tests were moved to `test/unit/`.
 
 ## Open / Deferred
+- Public hosted test fleet (infra/cost decision).
+- Additional SDKs from OpenAPI (TypeScript/Python).
+- Packaging/distribution polish (Homebrew/apt repos).
 
-- Public test servers (infrastructure cost; defer until adoption justifies).
-- Python/TypeScript SDKs (auto-generate from OpenAPI spec).
-- WebSocket MCP transport (stdio is standard for local tools).
-- Homebrew formula / apt repo (distribution polish).
+## Changelog Highlights
 
-## Changelog Summary
+### v0.6.x
+- Deployment/workflow hardening (config validation, checksum portability, network handling, force-recreate behavior).
+- UI robustness and server-selection simplification.
+- Server CLI flags for deploy-time config overrides (flags win when explicitly set).
+- README branding improvements (theme-aware wordmark + flairs).
 
-### v0.5.0 (2026-02-05)
-- Agent integration layer: MCP server (`openbyte mcp`), Go SDK (`pkg/client/`), quick check (`openbyte check`), diagnostic interpretation (`pkg/diagnostic/`).
-- Structured JSON errors with machine-readable error codes when `--json` active.
-- Schema versioning (`schema_version: "1.0"`) on all JSON output.
-- NDJSON streaming formatter (`--ndjson`) for real-time progress.
-- OpenAPI 3.1 spec (`api/openapi.yaml`).
-- Install script (`scripts/install.sh`) for one-liner installation.
-- Interpretation layer in all results: grade, ratings, suitability, concerns.
-- New dependency: `github.com/mark3labs/mcp-go` (MCP protocol).
-- `cmd/check` and `cmd/mcp` deduplicated: now use `pkg/client` SDK instead of reimplementing HTTP helpers (net -348 lines).
-- `bytes.NewReader(payload)` replaces `strings.NewReader(string(payload))` — avoids 1MB unnecessary copy in upload bursts.
-- `json.Encode`/`MarshalIndent` errors now handled in NDJSON formatter, check command, and MCP handlers (no silent failures).
+### v0.5.x
+- MCP + SDK + `check` integration and structured diagnostics.
+- OpenAPI publication and install/skill-page additions.
 
-### v0.4.2 (2026-02-08)
-- Migrated `gorilla/mux` → Go stdlib `net/http.ServeMux`; `"METHOD /path/{param}"` patterns + `r.PathValue()`. Removed `RateLimitMiddleware`. `RegistryRegistrar` interface for external route registration.
-- UDP multi-reader: N goroutines (`min(GOMAXPROCS, 4)`, floor 2) call `ReadFromUDP` concurrently on same `UDPConn`. Client state extracted to `udpClients` struct; cleanup on `time.Ticker` instead of inline in hot path. No more `SetReadDeadline` polling — readers block until packet or connection close.
-- `ServerInfo` dedup to `pkg/types`; `generateID` batched entropy; `buildServerInfo` TLS-aware scheme.
-- `fetchWithTimeout` listener leak fix; `selectFastestServer` body drain; `sentStatus` cleanup for clientless streams.
-- `navigator.platform` → `userAgentData`; `innerHTML` → DOM manipulation.
-- TCP/UDP warm-up integrated into data phase via `addBytes` gating (no-op sleep removed).
-- Client context timeout separated from test duration; HTTP engine overhead/grace wired from config.
-- Makefile `perf-smoke` uses built binary; Playwright CI caching.
-- Flaky concurrency tests replaced with signal-based sync; Registry API documented in `API.md`.
-- Test coverage expansion: registry service + handler (15 tests), stream manager (16 tests), latency histogram (12 tests), RTT collector (10 tests), network helpers (7 tests), API handlers expanded (19 new tests covering GetVersion, GetServers, ReportMetrics, CompleteStream, CancelStream, GetStreamResults, validation edge cases). Agent-friendly layer tests: diagnostic interpretation (42 tests: latency/speed/stability rating boundaries, grade computation A-F, suitability workloads, concerns, summary formatting, nil-safety), formatter (16 tests: JSON structured errors with all error codes, schema versioning, NDJSON progress/metrics/complete/error streaming, multiline output), SDK (11 tests: health check OK/unreachable/unhealthy, speed test download/upload/default/invalid/clamped/unreachable, API key option, Check interpretation), MCP integration (6 tests: connectivity check/speed test/diagnose via SDK, error readability, grade table-driven, JSON schema validation).
-- HTTP download error path now drains response body before close (HTTP/2 connection reuse).
-- Negative `PacketSize` defaults to 1400 instead of passing validation.
-- Registry `UpdateServer` rejects body ID conflicting with URL path param.
-- CIDR parse errors logged as warnings (no longer silently skipped).
-- `copy` builtin shadowing fixed in `registry/service.go`.
-- Last `innerHTML` usage replaced with DOM manipulation (`serverSelect` clearing).
-- UDP packet size default 1500 → 1400: avoids IP fragmentation on 1500-byte MTU links (1400 payload + 28 IPv4/UDP headers = 1428 < 1500). Also safe for IPv6 (1400 + 48 = 1448) and common tunnel encapsulations (PPPoE, VPN).
-- `InteractiveFormatter.FormatComplete` de-bloated: extracted color helper, eliminated 30-line color/no-color duplication.
-- Results handler: added `math.IsNaN`/`math.IsInf` defense-in-depth validation on all float64 fields.
-- `completeStream` now logs errors to stderr instead of silently swallowing.
-- `download.js`: modernized `var` → `const`/`let` throughout.
-- `diagnostic.suitability()`/`concerns()` return `[]string{}` (not nil) — prevents JSON `null` in agent output.
+### v0.4.x
+- Router migration to stdlib `ServeMux`.
+- HTTP streaming parity and broad reliability/body-drain fixes.
+- SQLite share-results flow and results page hardening.
 
-### v0.4.1 (2026-02-07)
-18 improvement rounds covering: error handling (`errors.Is`/`errors.As` throughout), cancel+restart race fixes (signal threading), rate limiter token refill fix (40% throughput recovery), CSP headers + inline script extraction, `ReadHeaderTimeout` replacing `ReadTimeout`, self-hosted fonts, client env var removal, latency histogram mutex upgrade, dead code cleanup, documentation overhaul.
-
-### v0.4.0 (2026-02-05)
-SQLite result storage + share button, HTTP streaming CLI support, embedded web assets, download page redesign, IPv4/IPv6 detection, EWMA speed smoothing, dynamic warm-up, loaded latency/bufferbloat grading, capacity-derived concurrency limits, security hardening (CORS wildcard fix, XFF rightmost-untrusted, TCP/UDP connection limits, WebSocket read limit, upload duration cap).
-
-### Pre-v0.4.0 (2026-01-16 – 2026-02-01)
-Performance optimizations (histogram, buffer pooling, atomic counters), CI/CD pipeline (GitHub Actions, GHCR, release workflow, dependabot), unified binary refactor, QUIC removal, test relocation to `test/unit/`, Playwright E2E setup, reliability fixes.
+### Pre-v0.4
+- Core performance work: histogram, pooling, concurrency limits, CI/CD foundation.

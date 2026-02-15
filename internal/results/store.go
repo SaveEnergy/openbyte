@@ -21,7 +21,10 @@ const (
 	cleanupInterval = 1 * time.Hour
 	idLength        = 8
 	idCharset       = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	idBase          = len(idCharset)
 )
+
+var ErrStoreRetryable = errors.New("results store retryable")
 
 type Result struct {
 	ID               string    `json:"id"`
@@ -120,6 +123,7 @@ func migrate(db *sql.DB) error {
 }
 
 const maxIDRetries = 5
+const maxBusyRetries = 3
 
 func (s *Store) Save(r Result) (string, error) {
 	now := time.Now().UTC()
@@ -129,21 +133,27 @@ func (s *Store) Save(r Result) (string, error) {
 			return "", fmt.Errorf("generate id: %w", err)
 		}
 
-		_, err = s.db.Exec(
-			`INSERT INTO results (id, download_mbps, upload_mbps, latency_ms, jitter_ms,
-				loaded_latency_ms, bufferbloat_grade, ipv4, ipv6, server_name, created_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			id, r.DownloadMbps, r.UploadMbps, r.LatencyMs, r.JitterMs,
-			r.LoadedLatencyMs, r.BufferbloatGrade, r.IPv4, r.IPv6, r.ServerName,
-			now,
-		)
-		if err != nil {
+		for busyAttempt := 0; busyAttempt <= maxBusyRetries; busyAttempt++ {
+			_, err = s.db.Exec(
+				`INSERT INTO results (id, download_mbps, upload_mbps, latency_ms, jitter_ms,
+					loaded_latency_ms, bufferbloat_grade, ipv4, ipv6, server_name, created_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				id, r.DownloadMbps, r.UploadMbps, r.LatencyMs, r.JitterMs,
+				r.LoadedLatencyMs, r.BufferbloatGrade, r.IPv4, r.IPv6, r.ServerName,
+				now,
+			)
+			if err == nil {
+				return id, nil
+			}
 			if isUniqueViolation(err) {
+				break
+			}
+			if isBusyError(err) && busyAttempt < maxBusyRetries {
+				time.Sleep(time.Duration(busyAttempt+1) * 25 * time.Millisecond)
 				continue
 			}
 			return "", fmt.Errorf("insert result: %w", err)
 		}
-		return id, nil
 	}
 	return "", fmt.Errorf("failed to generate unique ID after %d attempts", maxIDRetries)
 }
@@ -154,6 +164,16 @@ func isUniqueViolation(err error) bool {
 		return sqliteErr.Code() == sqlite3.SQLITE_CONSTRAINT_UNIQUE
 	}
 	return strings.Contains(err.Error(), "UNIQUE constraint")
+}
+
+func isBusyError(err error) bool {
+	var sqliteErr *sqlite.Error
+	if errors.As(err, &sqliteErr) {
+		code := sqliteErr.Code()
+		return code == sqlite3.SQLITE_BUSY || code == sqlite3.SQLITE_LOCKED
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "database is locked") || strings.Contains(msg, "sqlite_busy")
 }
 
 func (s *Store) Get(id string) (*Result, error) {
@@ -169,6 +189,9 @@ func (s *Store) Get(id string) (*Result, error) {
 		return nil, nil
 	}
 	if err != nil {
+		if isBusyError(err) {
+			return nil, fmt.Errorf("%w: query result: %w", ErrStoreRetryable, err)
+		}
 		return nil, fmt.Errorf("query result: %w", err)
 	}
 	return &r, nil
@@ -186,8 +209,11 @@ func (s *Store) cleanup() {
 	// Trim to max count, keeping newest
 	if s.maxResults > 0 {
 		res, err = s.db.Exec(
-			`DELETE FROM results WHERE id NOT IN (
-				SELECT id FROM results ORDER BY created_at DESC LIMIT ?
+			`DELETE FROM results
+			WHERE id IN (
+				SELECT id FROM results
+				ORDER BY created_at DESC, id DESC
+				LIMIT -1 OFFSET ?
 			)`, s.maxResults)
 		if err != nil {
 			logging.Warn("results cleanup (count) failed", logging.Field{Key: "error", Value: err})
@@ -231,13 +257,24 @@ func (s *Store) cleanupLoop() {
 }
 
 func generateID() (string, error) {
-	var entropy [idLength]byte
-	if _, err := rand.Read(entropy[:]); err != nil {
-		return "", err
-	}
+	const maxByte = byte(256 - (256 % idBase))
 	b := make([]byte, idLength)
-	for i, v := range entropy {
-		b[i] = idCharset[int(v)%len(idCharset)]
+	entropy := make([]byte, idLength*2)
+
+	for i := 0; i < idLength; {
+		if _, err := rand.Read(entropy); err != nil {
+			return "", err
+		}
+		for _, v := range entropy {
+			if v >= maxByte {
+				continue
+			}
+			b[i] = idCharset[int(v)%idBase]
+			i++
+			if i == idLength {
+				break
+			}
+		}
 	}
 	return string(b), nil
 }

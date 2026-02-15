@@ -1,10 +1,25 @@
 package client
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/saveenergy/openbyte/pkg/types"
 )
+
+type noopOutputFormatter struct{}
+
+func (noopOutputFormatter) FormatProgress(float64, float64, float64) {}
+func (noopOutputFormatter) FormatMetrics(*types.Metrics)             {}
+func (noopOutputFormatter) FormatComplete(*StreamResults)            {}
+func (noopOutputFormatter) FormatError(error)                        {}
 
 func TestComputePingMetricsEmpty(t *testing.T) {
 	latency, jitter := computePingMetrics(nil)
@@ -112,4 +127,56 @@ func contains(values []string, target string) bool {
 		}
 	}
 	return false
+}
+
+type formatterWithErr struct {
+	err error
+}
+
+func (f *formatterWithErr) FormatProgress(progress float64, elapsed, remaining float64) {}
+func (f *formatterWithErr) FormatMetrics(metrics *types.Metrics)                        {}
+func (f *formatterWithErr) FormatComplete(results *StreamResults)                       {}
+func (f *formatterWithErr) FormatError(err error)                                       {}
+func (f *formatterWithErr) LastError() error                                            { return f.err }
+
+func TestFormatterLastError(t *testing.T) {
+	want := errors.New("writer failed")
+	f := &formatterWithErr{err: want}
+	if got := formatterLastError(f); !errors.Is(got, want) {
+		t.Fatalf("formatterLastError = %v, want %v", got, want)
+	}
+}
+
+func TestRunCancelStreamError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/stream/start":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"stream_id":"s1","websocket_url":"ws://127.0.0.1:1","status":"running","mode":"proxy"}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/stream/s1/cancel":
+			w.WriteHeader(http.StatusInternalServerError)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	cfg := &Config{
+		Protocol:  "tcp",
+		Direction: "download",
+		Duration:  1,
+		Streams:   1,
+		ServerURL: server.URL,
+		Timeout:   2,
+	}
+
+	var streamID atomic.Value
+	err := runStream(context.Background(), cfg, noopOutputFormatter{}, &streamID)
+	if err == nil {
+		t.Fatal("expected runStream error")
+	}
+	if !strings.Contains(err.Error(), "cancel cleanup failed") {
+		t.Fatalf("error = %q, want cancel cleanup context", err.Error())
+	}
 }

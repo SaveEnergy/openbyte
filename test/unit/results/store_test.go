@@ -1,16 +1,19 @@
 package results_test
 
 import (
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"encoding/json"
 
 	"github.com/saveenergy/openbyte/internal/results"
+	_ "modernc.org/sqlite"
 )
 
 func tempStore(t *testing.T, maxResults int) (*results.Store, func()) {
@@ -133,6 +136,115 @@ func TestStoreTrimToMax(t *testing.T) {
 		if got == nil {
 			t.Errorf("expected id %s to remain, but not found", id)
 		}
+	}
+}
+
+func TestStoreTrimToMaxDeterministicWithEqualCreatedAt(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "trim-deterministic.db")
+
+	store, err := results.New(dbPath, 2)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	store.Close()
+
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	defer db.Close()
+
+	ts := time.Date(2026, 2, 15, 6, 0, 0, 0, time.UTC)
+	ids := []string{"AAAA0001", "BBBB0001", "CCCC0001"}
+	for _, id := range ids {
+		_, execErr := db.Exec(
+			`INSERT INTO results (id, download_mbps, upload_mbps, latency_ms, jitter_ms, loaded_latency_ms, bufferbloat_grade, ipv4, ipv6, server_name, created_at)
+			VALUES (?, 1, 1, 1, 0, 0, '', '', '', '', ?)`,
+			id, ts,
+		)
+		if execErr != nil {
+			t.Fatalf("insert %s: %v", id, execErr)
+		}
+	}
+
+	store2, err := results.New(dbPath, 2)
+	if err != nil {
+		t.Fatalf("Reopen: %v", err)
+	}
+	defer store2.Close()
+
+	trimmed, err := store2.Get("AAAA0001")
+	if err != nil {
+		t.Fatalf("Get trimmed id: %v", err)
+	}
+	if trimmed != nil {
+		t.Fatalf("expected AAAA0001 trimmed under deterministic tie-break")
+	}
+	keptA, err := store2.Get("BBBB0001")
+	if err != nil {
+		t.Fatalf("Get kept id BBBB0001: %v", err)
+	}
+	if keptA == nil {
+		t.Fatalf("expected BBBB0001 kept")
+	}
+	keptB, err := store2.Get("CCCC0001")
+	if err != nil {
+		t.Fatalf("Get kept id CCCC0001: %v", err)
+	}
+	if keptB == nil {
+		t.Fatalf("expected CCCC0001 kept")
+	}
+}
+
+func TestStoreSaveRetriesOnBusyError(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "busy-retry.db")
+
+	store, err := results.New(dbPath, 10)
+	if err != nil {
+		t.Fatalf("New store: %v", err)
+	}
+	defer store.Close()
+
+	lockDB, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("open lock db: %v", err)
+	}
+	defer lockDB.Close()
+
+	if _, err := lockDB.Exec("PRAGMA busy_timeout=5000"); err != nil {
+		t.Fatalf("set lock busy_timeout: %v", err)
+	}
+	if _, err := lockDB.Exec("BEGIN EXCLUSIVE"); err != nil {
+		t.Fatalf("begin exclusive: %v", err)
+	}
+	defer lockDB.Exec("ROLLBACK")
+
+	released := make(chan struct{})
+	go func() {
+		time.Sleep(7 * time.Second)
+		_, _ = lockDB.Exec("COMMIT")
+		close(released)
+	}()
+
+	start := time.Now()
+	id, saveErr := store.Save(results.Result{
+		DownloadMbps: 10,
+		UploadMbps:   5,
+		LatencyMs:    12,
+		JitterMs:     1,
+	})
+	elapsed := time.Since(start)
+	if saveErr != nil {
+		t.Fatalf("Save after busy lock: %v", saveErr)
+	}
+	if id == "" {
+		t.Fatal("expected non-empty id")
+	}
+	<-released
+	if elapsed < 5*time.Second {
+		t.Fatalf("expected busy lock to delay save, elapsed=%v", elapsed)
 	}
 }
 
@@ -294,4 +406,32 @@ func TestStoreCloseIdempotent(t *testing.T) {
 
 	store.Close()
 	store.Close()
+}
+
+func TestGenerateIDUsesValidCharset(t *testing.T) {
+	store, cleanup := tempStore(t, 10000)
+	defer cleanup()
+
+	const samples = 2000
+	const idCharset = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	seen := make(map[rune]struct{})
+
+	for i := 0; i < samples; i++ {
+		id, err := store.Save(results.Result{
+			DownloadMbps: 1, UploadMbps: 1, LatencyMs: 1, JitterMs: 1,
+		})
+		if err != nil {
+			t.Fatalf("save result: %v", err)
+		}
+		for _, ch := range id {
+			if !strings.ContainsRune(idCharset, ch) {
+				t.Fatalf("id has invalid char %q in %q", ch, id)
+			}
+			seen[ch] = struct{}{}
+		}
+	}
+
+	if len(seen) != len(idCharset) {
+		t.Fatalf("seen charset size = %d, want %d", len(seen), len(idCharset))
+	}
 }

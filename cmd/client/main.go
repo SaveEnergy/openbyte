@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -84,21 +85,31 @@ func Run(args []string, version string) int {
 	defer cancel()
 
 	var streamID atomic.Value
+	var interrupted atomic.Bool
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
 	go func() {
 		<-sigCh
+		interrupted.Store(true)
 		if id, ok := streamID.Load().(string); ok && id != "" {
-			cancelStream(config.ServerURL, id, config.APIKey)
+			if err := CancelStream(ctx, config.ServerURL, id, config.APIKey); err != nil {
+				fmt.Fprintf(os.Stderr, "openbyte client: warning: failed to cancel stream %s: %v\n", id, err)
+			}
 		}
 		cancel()
-		os.Exit(exitInterrupt)
 	}()
 
 	if err := runStream(ctx, config, formatter, &streamID); err != nil {
+		if interrupted.Load() && errors.Is(err, context.Canceled) {
+			return exitInterrupt
+		}
 		formatter.FormatError(err)
 		return exitFailure
+	}
+	if interrupted.Load() {
+		return exitInterrupt
 	}
 	return exitSuccess
 }

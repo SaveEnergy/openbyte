@@ -134,3 +134,36 @@ func TestRateLimiterConcurrentAccess(t *testing.T) {
 	wg.Wait()
 	// No panic or race detected = pass (run with -race)
 }
+
+func TestRateLimiterCleanupConcurrentAllowStress(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.GlobalRateLimit = 5000
+	cfg.RateLimitPerIP = 5000
+	rl := api.NewRateLimiter(cfg)
+	rl.SetCleanupPolicy(2*time.Millisecond, 4*time.Millisecond)
+
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	workers := 12
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(worker int) {
+			defer wg.Done()
+			n := 0
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					ip := fmt.Sprintf("10.0.%d.%d", worker, n%64)
+					rl.Allow(ip)
+					n++
+				}
+			}
+		}(i)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+	close(stop)
+	wg.Wait()
+}

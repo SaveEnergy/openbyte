@@ -32,7 +32,9 @@ func runStream(ctx context.Context, config *Config, formatter OutputFormatter, s
 	}
 
 	if err := streamMetrics(ctx, streamResp.WebSocketURL, formatter, config); err != nil {
-		cancelStream(config.ServerURL, streamResp.StreamID, config.APIKey)
+		if cancelErr := CancelStream(ctx, config.ServerURL, streamResp.StreamID, config.APIKey); cancelErr != nil {
+			return fmt.Errorf("%v (and cancel cleanup failed: %v)", err, cancelErr)
+		}
 		return err
 	}
 	return nil
@@ -88,8 +90,17 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 			lastMetrics = engine.GetMetrics()
 			results := buildResults(streamResp.StreamID, config, lastMetrics, startTime)
 			formatter.FormatComplete(results)
+			if ferr := formatterLastError(formatter); ferr != nil {
+				return fmt.Errorf("formatter output failed: %w", ferr)
+			}
 
-			completeStream(config, streamResp.StreamID, lastMetrics)
+			completeErr := completeStream(ctx, config, streamResp.StreamID, lastMetrics)
+			if completeErr != nil {
+				if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+					return fmt.Errorf("%v (and completion report failed: %v)", err, completeErr)
+				}
+				return fmt.Errorf("failed to report completion: %w", completeErr)
+			}
 
 			if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 				return err
@@ -127,10 +138,16 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 				Timestamp: time.Now(),
 			}
 			formatter.FormatMetrics(m)
+			if ferr := formatterLastError(formatter); ferr != nil {
+				cancel()
+				return fmt.Errorf("formatter output failed: %w", ferr)
+			}
 
 		case <-ctx.Done():
 			cancel()
-			cancelStream(config.ServerURL, streamResp.StreamID, config.APIKey)
+			if cancelErr := CancelStream(ctx, config.ServerURL, streamResp.StreamID, config.APIKey); cancelErr != nil {
+				return fmt.Errorf("%v (and cancel cleanup failed: %v)", ctx.Err(), cancelErr)
+			}
 			return ctx.Err()
 		}
 	}
@@ -205,6 +222,9 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 			httpConfig.PacketSize = config.ChunkSize
 			results := buildResults("http", &httpConfig, metrics, startTime)
 			formatter.FormatComplete(results)
+			if ferr := formatterLastError(formatter); ferr != nil {
+				return fmt.Errorf("formatter output failed: %w", ferr)
+			}
 
 			if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 				return err
@@ -242,12 +262,26 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 				Timestamp: time.Now(),
 			}
 			formatter.FormatMetrics(m)
+			if ferr := formatterLastError(formatter); ferr != nil {
+				cancel()
+				return fmt.Errorf("formatter output failed: %w", ferr)
+			}
 
 		case <-ctx.Done():
 			cancel()
 			return ctx.Err()
 		}
 	}
+}
+
+func formatterLastError(formatter OutputFormatter) error {
+	type formatterErr interface {
+		LastError() error
+	}
+	if fe, ok := formatter.(formatterErr); ok {
+		return fe.LastError()
+	}
+	return nil
 }
 
 func computePingMetrics(samples []time.Duration) (LatencyStats, float64) {

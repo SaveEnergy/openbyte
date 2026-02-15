@@ -7,7 +7,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strconv"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -22,18 +25,44 @@ func Run(version string) int {
 		version,
 		server.WithToolCapabilities(true),
 	)
+	registerTools(s)
 
-	// Tool: connectivity_check — quick 3-5s connectivity test
-	checkTool := mcp.NewTool("connectivity_check",
+	if err := server.ServeStdio(s); err != nil {
+		fmt.Fprintf(os.Stderr, "openbyte mcp: error: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func registerTools(s *server.MCPServer) {
+	s.AddTool(connectivityCheckTool(), handleConnectivityCheck)
+	s.AddTool(speedTestTool(), handleSpeedTest)
+	s.AddTool(diagnoseTool(), handleDiagnose)
+}
+
+// ToolDefinitions exposes MCP tool schemas for contract tests.
+func ToolDefinitions() []mcp.Tool {
+	return []mcp.Tool{
+		connectivityCheckTool(),
+		speedTestTool(),
+		diagnoseTool(),
+	}
+}
+
+func connectivityCheckTool() mcp.Tool {
+	return mcp.NewTool("connectivity_check",
 		mcp.WithDescription("Quick connectivity check (~3-5 seconds). Returns latency, rough download/upload speed, grade (A-F), and diagnostic interpretation. Use this for fast 'is the network OK?' checks."),
 		mcp.WithString("server_url",
 			mcp.Description("Speed test server URL (default: http://localhost:8080)"),
 		),
+		mcp.WithString("api_key",
+			mcp.Description("Optional bearer API key for authenticated endpoints"),
+		),
 	)
-	s.AddTool(checkTool, handleConnectivityCheck)
+}
 
-	// Tool: speed_test — full speed test
-	speedTool := mcp.NewTool("speed_test",
+func speedTestTool() mcp.Tool {
+	return mcp.NewTool("speed_test",
 		mcp.WithDescription("Full speed test with configurable duration. Returns detailed throughput, latency, jitter, and diagnostic interpretation. Use for accurate measurements."),
 		mcp.WithString("server_url",
 			mcp.Description("Speed test server URL (default: http://localhost:8080)"),
@@ -44,34 +73,36 @@ func Run(version string) int {
 		mcp.WithNumber("duration",
 			mcp.Description("Test duration in seconds, 1-60 (default: 10)"),
 		),
+		mcp.WithString("api_key",
+			mcp.Description("Optional bearer API key for authenticated endpoints"),
+		),
 	)
-	s.AddTool(speedTool, handleSpeedTest)
+}
 
-	// Tool: diagnose — latency + download + upload with full diagnostic
-	diagnoseTool := mcp.NewTool("diagnose",
+func diagnoseTool() mcp.Tool {
+	return mcp.NewTool("diagnose",
 		mcp.WithDescription("Comprehensive network diagnosis: measures latency, download speed, upload speed, and returns bufferbloat grade, suitability assessment, and concerns. Takes ~15-20 seconds."),
 		mcp.WithString("server_url",
 			mcp.Description("Speed test server URL (default: http://localhost:8080)"),
 		),
+		mcp.WithString("api_key",
+			mcp.Description("Optional bearer API key for authenticated endpoints"),
+		),
 	)
-	s.AddTool(diagnoseTool, handleDiagnose)
-
-	if err := server.ServeStdio(s); err != nil {
-		fmt.Fprintf(os.Stderr, "openbyte mcp: error: %v\n", err)
-		return 1
-	}
-	return 0
 }
 
 // --- Tool Handlers ---
 
 func handleConnectivityCheck(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	serverURL := req.GetString("server_url", "http://localhost:8080")
+	serverURL, err := ValidateServerURL(req.GetString("server_url", "http://localhost:8080"))
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Invalid server_url: %v", err)), nil
+	}
 
 	checkCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	c := client.New(serverURL)
+	c := clientFromRequest(serverURL, req)
 	result, err := c.Check(checkCtx)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Connectivity check failed: %v", err)), nil
@@ -85,24 +116,21 @@ func handleConnectivityCheck(ctx context.Context, req mcp.CallToolRequest) (*mcp
 }
 
 func handleSpeedTest(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	serverURL := req.GetString("server_url", "http://localhost:8080")
+	serverURL, err := ValidateServerURL(req.GetString("server_url", "http://localhost:8080"))
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Invalid server_url: %v", err)), nil
+	}
 	direction := req.GetString("direction", "download")
 	duration := req.GetInt("duration", 10)
 
-	if duration < 1 {
-		duration = 1
-	}
-	if duration > 60 {
-		duration = 60
-	}
-	if direction != "download" && direction != "upload" {
-		direction = "download"
+	if err := ValidateSpeedTestInput(direction, duration); err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Invalid speed_test input: %v", err)), nil
 	}
 
 	testCtx, cancel := context.WithTimeout(ctx, time.Duration(duration+15)*time.Second)
 	defer cancel()
 
-	c := client.New(serverURL)
+	c := clientFromRequest(serverURL, req)
 	result, err := c.SpeedTest(testCtx, client.SpeedTestOptions{
 		Direction: direction,
 		Duration:  duration,
@@ -119,12 +147,15 @@ func handleSpeedTest(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 }
 
 func handleDiagnose(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	serverURL := req.GetString("server_url", "http://localhost:8080")
+	serverURL, err := ValidateServerURL(req.GetString("server_url", "http://localhost:8080"))
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Invalid server_url: %v", err)), nil
+	}
 
 	diagCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	c := client.New(serverURL)
+	c := clientFromRequest(serverURL, req)
 	result, err := c.Diagnose(diagCtx)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Diagnosis failed: %v", err)), nil
@@ -135,4 +166,48 @@ func handleDiagnose(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallTool
 		return mcp.NewToolResultError(fmt.Sprintf("JSON encoding failed: %v", err)), nil
 	}
 	return mcp.NewToolResultText(string(data)), nil
+}
+
+func clientFromRequest(serverURL string, req mcp.CallToolRequest) *client.Client {
+	apiKey := strings.TrimSpace(req.GetString("api_key", ""))
+	if apiKey == "" {
+		return client.New(serverURL)
+	}
+	return client.New(serverURL, client.WithAPIKey(apiKey))
+}
+
+func ValidateServerURL(raw string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return "", err
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", fmt.Errorf("scheme must be http or https")
+	}
+	if u.Host == "" {
+		return "", fmt.Errorf("host is required")
+	}
+	if u.RawQuery != "" {
+		return "", fmt.Errorf("query is not allowed")
+	}
+	if u.Fragment != "" {
+		return "", fmt.Errorf("fragment is not allowed")
+	}
+	if port := u.Port(); port != "" {
+		n, convErr := strconv.Atoi(port)
+		if convErr != nil || n < 1 || n > 65535 {
+			return "", fmt.Errorf("port must be in range 1-65535")
+		}
+	}
+	return strings.TrimRight(u.String(), "/"), nil
+}
+
+func ValidateSpeedTestInput(direction string, duration int) error {
+	if direction != "download" && direction != "upload" {
+		return fmt.Errorf("direction must be download or upload")
+	}
+	if duration < 1 || duration > 60 {
+		return fmt.Errorf("duration must be 1-60")
+	}
+	return nil
 }

@@ -95,8 +95,44 @@ func Run(args []string, version string) int {
 
 	pprofServer := startPprofServer(cfg)
 	stopStats := startRuntimeStatsLogger(cfg)
+	cleanupOnError := true
 
-	streamServer, err := stream.NewServer(cfg)
+	var (
+		streamServer    *stream.Server
+		manager         *stream.Manager
+		resultsStore    *results.Store
+		wsServer        *websocket.Server
+		registryService *registry.Service
+		registryClient  *registry.Client
+		err             error
+	)
+	defer func() {
+		if !cleanupOnError {
+			return
+		}
+		if registryClient != nil {
+			registryClient.Stop()
+		}
+		if registryService != nil {
+			registryService.Stop()
+		}
+		if resultsStore != nil {
+			resultsStore.Close()
+		}
+		if manager != nil {
+			manager.Stop()
+		}
+		if wsServer != nil {
+			wsServer.Close()
+		}
+		if streamServer != nil {
+			_ = streamServer.Close()
+		}
+		shutdownPprofServer(pprofServer, 5*time.Second)
+		stopStats()
+	}()
+
+	streamServer, err = stream.NewServer(cfg)
 	if err != nil {
 		logging.Error("Failed to start stream server", logging.Field{Key: "error", Value: err})
 		return exitFailure
@@ -105,7 +141,7 @@ func Run(args []string, version string) int {
 		logging.Field{Key: "tcp_port", Value: cfg.TCPTestPort},
 		logging.Field{Key: "udp_port", Value: cfg.UDPTestPort})
 
-	manager := stream.NewManager(cfg.MaxConcurrentTests, cfg.MaxConcurrentPerIP)
+	manager = stream.NewManager(cfg.MaxConcurrentTests, cfg.MaxConcurrentPerIP)
 	manager.SetRetentionPeriod(cfg.TestRetentionPeriod)
 	manager.SetMetricsUpdateInterval(cfg.MetricsUpdateInterval)
 	manager.Start()
@@ -113,7 +149,7 @@ func Run(args []string, version string) int {
 	apiHandler := api.NewHandler(manager)
 	apiHandler.SetConfig(cfg)
 	apiHandler.SetVersion(version)
-	wsServer := websocket.NewServer()
+	wsServer = websocket.NewServer()
 	wsServer.SetAllowedOrigins(cfg.AllowedOrigins)
 	wsServer.SetPingInterval(cfg.WebSocketPingInterval)
 
@@ -122,7 +158,7 @@ func Run(args []string, version string) int {
 		logging.Error("Failed to create data directory", logging.Field{Key: "error", Value: err})
 		return exitFailure
 	}
-	resultsStore, err := results.New(cfg.DataDir+"/results.db", cfg.MaxStoredResults)
+	resultsStore, err = results.New(cfg.DataDir+"/results.db", cfg.MaxStoredResults)
 	if err != nil {
 		logging.Error("Failed to open results store", logging.Field{Key: "error", Value: err})
 		return exitFailure
@@ -139,7 +175,6 @@ func Run(args []string, version string) int {
 	router.SetResultsHandler(results.NewHandler(resultsStore))
 	router.SetWebRoot(cfg.WebRoot)
 
-	var registryService *registry.Service
 	var registrars []api.RegistryRegistrar
 	if cfg.RegistryMode {
 		logging.Info("Starting in registry mode")
@@ -160,7 +195,6 @@ func Run(args []string, version string) int {
 		broadcastMetrics(manager, wsServer)
 	}()
 
-	var registryClient *registry.Client
 	if cfg.RegistryEnabled && !cfg.RegistryMode {
 		logger := logging.NewLogger("registry-client")
 		registryClient = registry.NewClient(cfg, logger)
@@ -189,7 +223,13 @@ func Run(args []string, version string) int {
 			{Key: "udp_test", Value: cfg.GetUDPTestAddress()},
 		}
 		logging.Info("Server starting", fields...)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		var err error
+		if cfg.TLSCertFile != "" && cfg.TLSKeyFile != "" {
+			err = srv.ListenAndServeTLS(cfg.TLSCertFile, cfg.TLSKeyFile)
+		} else {
+			err = srv.ListenAndServe()
+		}
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			srvErrCh <- err
 		}
 	}()
@@ -225,6 +265,7 @@ func Run(args []string, version string) int {
 	broadcastWg.Wait()
 	wsServer.Close()
 	streamServer.Close()
+	cleanupOnError = false
 
 	logging.Info("Server stopped")
 	return exitCode
@@ -294,6 +335,9 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 		return out
 	}
 	parseDuration := func(key string, raw string) time.Duration {
+		if applyErr != nil {
+			return 0
+		}
 		d, err := time.ParseDuration(raw)
 		if err != nil {
 			applyErr = fmt.Errorf("invalid --%s %q: %w", key, raw, err)
@@ -302,6 +346,9 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 		return d
 	}
 	fs.Visit(func(f *flag.Flag) {
+		if applyErr != nil {
+			return
+		}
 		switch f.Name {
 		case "port":
 			cfg.Port = *fv.port

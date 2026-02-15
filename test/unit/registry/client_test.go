@@ -124,3 +124,39 @@ func TestClientHeartbeatReRegistersOnNotFound(t *testing.T) {
 	client.Stop()
 	waitFor(t, 500*time.Millisecond, func() bool { return deleteCount.Load() == 1 }, "expected deregister on stop")
 }
+
+func TestClientStartIdempotent(t *testing.T) {
+	var postCount atomic.Int64
+	var deleteCount atomic.Int64
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			postCount.Add(1)
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"status":"registered"}`))
+		case http.MethodDelete:
+			deleteCount.Add(1)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"deregistered"}`))
+		default:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		}
+	}))
+	defer srv.Close()
+
+	cfg := newRegistryClientConfig(srv.URL, time.Hour)
+	client := registry.NewClient(cfg, logging.NewLogger("test"))
+
+	if err := client.Start(func() int { return 1 }); err != nil {
+		t.Fatalf("start 1: %v", err)
+	}
+	if err := client.Start(func() int { return 1 }); err != nil {
+		t.Fatalf("start 2: %v", err)
+	}
+
+	waitFor(t, 500*time.Millisecond, func() bool { return postCount.Load() == 1 }, "expected single register call")
+	client.Stop()
+	waitFor(t, 500*time.Millisecond, func() bool { return deleteCount.Load() == 1 }, "expected single deregister call")
+}

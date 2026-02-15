@@ -12,6 +12,15 @@ import (
 	"github.com/saveenergy/openbyte/internal/stream"
 )
 
+type testRegistryRegistrar struct{}
+
+func (testRegistryRegistrar) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/registry/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+}
+
 func TestRouterAllowedOriginWildcard(t *testing.T) {
 	router := &api.Router{}
 	router.SetAllowedOrigins([]string{"*.example.com"})
@@ -239,6 +248,84 @@ func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
 	contentType := rec.Header().Get("Content-Type")
 	if !strings.Contains(contentType, "text/html") {
 		t.Fatalf("content-type = %q, want text/html", contentType)
+	}
+}
+
+func TestRegistryRoutesRateLimited(t *testing.T) {
+	manager := stream.NewManager(10, 10)
+	handler := api.NewHandler(manager)
+	cfg := config.DefaultConfig()
+	cfg.GlobalRateLimit = 1
+	cfg.RateLimitPerIP = 1
+	router := api.NewRouter(handler, cfg)
+	router.SetRateLimiter(cfg)
+	h := router.SetupRoutes(testRegistryRegistrar{})
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/registry/health", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first registry request status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/registry/health", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second registry request status = %d, want %d", rec.Code, http.StatusTooManyRequests)
+	}
+}
+
+func TestResultsPageRouteRateLimited(t *testing.T) {
+	manager := stream.NewManager(10, 10)
+	handler := api.NewHandler(manager)
+	cfg := config.DefaultConfig()
+	cfg.GlobalRateLimit = 1
+	cfg.RateLimitPerIP = 1
+	router := api.NewRouter(handler, cfg)
+	router.SetRateLimiter(cfg)
+
+	store, err := results.New(t.TempDir()+"/results.db", 10)
+	if err != nil {
+		t.Fatalf("results.New: %v", err)
+	}
+	defer store.Close()
+	router.SetResultsHandler(results.NewHandler(store))
+	h := router.SetupRoutes()
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/results/abc12345", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first results page status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "http://example.com/results/abc12345", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second results page status = %d, want %d", rec.Code, http.StatusTooManyRequests)
+	}
+}
+
+func TestRouterStaticFileServerAllowlist(t *testing.T) {
+	manager := stream.NewManager(10, 10)
+	handler := api.NewHandler(manager)
+	router := api.NewRouter(handler, config.DefaultConfig())
+	h := router.SetupRoutes()
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/embed.go", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("embed.go should be denied by allowlist, got %d", rec.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "http://example.com/skill.html", nil)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("skill.html should be served, got %d", rec.Code)
 	}
 }
 

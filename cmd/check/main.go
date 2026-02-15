@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -19,6 +20,11 @@ var (
 	exitSuccess = 0
 	exitFailure = 1
 	exitUsage   = 2
+)
+
+const (
+	minTimeoutSeconds = 1
+	maxTimeoutSeconds = 300
 )
 
 // CheckResult is the structured output of openbyte check.
@@ -61,12 +67,24 @@ func Run(args []string, version string) int {
 		return exitSuccess
 	}
 
+	if timeout < minTimeoutSeconds || timeout > maxTimeoutSeconds {
+		fmt.Fprintf(os.Stderr, "openbyte check: timeout must be between %d and %d seconds\n", minTimeoutSeconds, maxTimeoutSeconds)
+		return exitUsage
+	}
+
 	// Positional arg = server URL
 	rest := flagSet.Args()
+	if len(rest) > 1 {
+		fmt.Fprintln(os.Stderr, "openbyte check: too many positional arguments")
+		return exitUsage
+	}
 	if len(rest) > 0 {
 		arg := rest[0]
-		if strings.HasPrefix(arg, "http://") || strings.HasPrefix(arg, "https://") {
+		if isValidServerURL(arg) {
 			serverURL = arg
+		} else {
+			fmt.Fprintf(os.Stderr, "openbyte check: invalid server URL: %q\n", arg)
+			return exitUsage
 		}
 	}
 
@@ -75,7 +93,6 @@ func Run(args []string, version string) int {
 
 	start := time.Now()
 	result, err := runCheck(ctx, serverURL, apiKey)
-	result.DurationMs = time.Since(start).Milliseconds()
 
 	if err != nil {
 		if jsonOut {
@@ -93,6 +110,7 @@ func Run(args []string, version string) int {
 		}
 		return exitFailure
 	}
+	result.DurationMs = time.Since(start).Milliseconds()
 
 	if jsonOut {
 		if encErr := json.NewEncoder(os.Stdout).Encode(result); encErr != nil {
@@ -167,4 +185,18 @@ Examples:
   openbyte check https://speed.example.com    # Quick check against remote
   openbyte check --json                       # JSON output for agents
 `)
+}
+
+func isValidServerURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	if u == nil {
+		return false
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
+	return u.Host != ""
 }

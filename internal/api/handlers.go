@@ -5,6 +5,7 @@ import (
 	stdErrors "errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"strconv"
@@ -77,10 +78,12 @@ type ServersResponse struct {
 
 func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
+		drainRequestBody(r)
 		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
 		return
 	}
 	if !isJSONContentType(r) {
+		drainRequestBody(r)
 		respondJSON(w, map[string]string{"error": "Content-Type must be application/json"}, http.StatusUnsupportedMediaType)
 		return
 	}
@@ -131,12 +134,7 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.manager.StartStream(state.Config.ID); err != nil {
-		if cancelErr := h.manager.CancelStream(state.Config.ID); cancelErr != nil {
-			logging.Warn("start stream cleanup failed",
-				logging.Field{Key: "stream_id", Value: state.Config.ID},
-				logging.Field{Key: "error", Value: cancelErr})
-		}
+	if err := h.startCreatedStream(state.Config.ID); err != nil {
 		respondError(w, err, http.StatusInternalServerError)
 		return
 	}
@@ -152,10 +150,7 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if mode == "client" && h.config != nil {
-		host := normalizeHost(r.Host)
-		if h.config.PublicHost != "" {
-			host = h.config.PublicHost
-		}
+		host := responseHost(r, h.config)
 		resp.TestServerTCP = host + ":" + strconv.Itoa(h.config.TCPTestPort)
 		resp.TestServerUDP = host + ":" + strconv.Itoa(h.config.UDPTestPort)
 	}
@@ -163,13 +158,26 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, resp, http.StatusCreated)
 }
 
+func (h *Handler) startCreatedStream(streamID string) error {
+	if err := h.manager.StartStream(streamID); err != nil {
+		if cancelErr := h.manager.CancelStream(streamID); cancelErr != nil {
+			logging.Warn("start stream cleanup failed",
+				logging.Field{Key: "stream_id", Value: streamID},
+				logging.Field{Key: "error", Value: cancelErr})
+		}
+		return err
+	}
+	return nil
+}
+
 func (h *Handler) GetServers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
+		drainRequestBody(r)
 		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
 		return
 	}
 
-	host := normalizeHost(r.Host)
+	host := responseHost(r, h.config)
 
 	serverID := "default"
 	serverName := "OpenByte Server"
@@ -200,8 +208,9 @@ func (h *Handler) GetServers(w http.ResponseWriter, r *http.Request) {
 		activeTests = h.manager.ActiveCount()
 	}
 
-	scheme := requestScheme(r)
-	isProxied := r.Header.Get("X-Forwarded-Proto") != "" || r.Header.Get("X-Forwarded-For") != "" ||
+	scheme := requestScheme(r, h.config)
+	isProxied := (h.config != nil && h.config.TrustProxyHeaders &&
+		(r.Header.Get("X-Forwarded-Proto") != "" || r.Header.Get("X-Forwarded-For") != "")) ||
 		(h.config != nil && h.config.PublicHost != "")
 	apiEndpoint := scheme + "://" + host
 	if h.config != nil && !isProxied {
@@ -233,6 +242,7 @@ func (h *Handler) GetServers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
+	drainRequestBody(r)
 	version := h.version
 	if version == "" {
 		version = "dev"
@@ -242,10 +252,12 @@ func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ReportMetrics(w http.ResponseWriter, r *http.Request, streamID string) {
 	if r.Method != http.MethodPost {
+		drainRequestBody(r)
 		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
 		return
 	}
 	if !isJSONContentType(r) {
+		drainRequestBody(r)
 		respondJSON(w, map[string]string{"error": "Content-Type must be application/json"}, http.StatusUnsupportedMediaType)
 		return
 	}
@@ -253,6 +265,10 @@ func (h *Handler) ReportMetrics(w http.ResponseWriter, r *http.Request, streamID
 	var metrics types.Metrics
 	if err := decodeJSONBody(w, r, &metrics, maxJSONBodyBytes); err != nil {
 		respondJSONBodyError(w, err)
+		return
+	}
+	if err := validateMetricsPayload(metrics); err != nil {
+		respondError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -265,10 +281,12 @@ func (h *Handler) ReportMetrics(w http.ResponseWriter, r *http.Request, streamID
 
 func (h *Handler) CompleteStream(w http.ResponseWriter, r *http.Request, streamID string) {
 	if r.Method != http.MethodPost {
+		drainRequestBody(r)
 		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
 		return
 	}
 	if !isJSONContentType(r) {
+		drainRequestBody(r)
 		respondJSON(w, map[string]string{"error": "Content-Type must be application/json"}, http.StatusUnsupportedMediaType)
 		return
 	}
@@ -301,6 +319,7 @@ func (h *Handler) CompleteStream(w http.ResponseWriter, r *http.Request, streamI
 }
 
 func (h *Handler) GetStreamStatus(w http.ResponseWriter, r *http.Request, streamID string) {
+	drainRequestBody(r)
 	state, err := h.manager.GetStream(streamID)
 	if err != nil {
 		respondError(w, err, http.StatusNotFound)
@@ -311,6 +330,7 @@ func (h *Handler) GetStreamStatus(w http.ResponseWriter, r *http.Request, stream
 }
 
 func (h *Handler) GetStreamResults(w http.ResponseWriter, r *http.Request, streamID string) {
+	drainRequestBody(r)
 	state, err := h.manager.GetStream(streamID)
 	if err != nil {
 		respondError(w, err, http.StatusNotFound)
@@ -329,10 +349,7 @@ func (h *Handler) GetStreamResults(w http.ResponseWriter, r *http.Request, strea
 }
 
 func (h *Handler) CancelStream(w http.ResponseWriter, r *http.Request, streamID string) {
-	if r.Body != nil {
-		io.Copy(io.Discard, r.Body)
-		r.Body.Close()
-	}
+	drainRequestBody(r)
 	if err := h.manager.CancelStream(streamID); err != nil {
 		respondError(w, err, http.StatusNotFound)
 		return
@@ -427,13 +444,15 @@ func normalizeHost(host string) string {
 	return trimmed
 }
 
-func requestScheme(r *http.Request) string {
+func requestScheme(r *http.Request, cfg *config.Config) string {
 	if r == nil {
 		return "http"
 	}
-	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
-		if strings.EqualFold(proto, "https") {
-			return "https"
+	if cfg != nil && cfg.TrustProxyHeaders {
+		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+			if strings.EqualFold(proto, "https") {
+				return "https"
+			}
 		}
 	}
 	if r.TLS != nil {
@@ -442,11 +461,24 @@ func requestScheme(r *http.Request) string {
 	return "http"
 }
 
+func responseHost(r *http.Request, cfg *config.Config) string {
+	if cfg != nil {
+		if cfg.PublicHost != "" {
+			return cfg.PublicHost
+		}
+		if !cfg.TrustProxyHeaders {
+			return normalizeHost(cfg.BindAddress)
+		}
+	}
+	return normalizeHost(r.Host)
+}
+
 func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}, limit int64) error {
 	if limit > 0 {
 		r.Body = http.MaxBytesReader(w, r.Body, limit)
 	}
 	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(dst); err != nil {
 		io.Copy(io.Discard, r.Body)
 		return err
@@ -460,7 +492,46 @@ func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}, lim
 
 func isJSONContentType(r *http.Request) bool {
 	ct := r.Header.Get("Content-Type")
-	return ct == "" || strings.HasPrefix(ct, "application/json")
+	return strings.HasPrefix(ct, "application/json")
+}
+
+func validateMetricsPayload(m types.Metrics) error {
+	values := []float64{
+		m.ThroughputMbps, m.ThroughputAvgMbps, m.JitterMs, m.PacketLossPercent,
+		m.Latency.MinMs, m.Latency.MaxMs, m.Latency.AvgMs, m.Latency.P50Ms, m.Latency.P95Ms, m.Latency.P99Ms,
+	}
+	for _, v := range values {
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return errors.ErrInvalidConfig("metrics contain non-finite values", nil)
+		}
+	}
+	if m.ThroughputMbps < 0 || m.ThroughputAvgMbps < 0 {
+		return errors.ErrInvalidConfig("metrics throughput must be >= 0", nil)
+	}
+	if m.BytesTransferred < 0 {
+		return errors.ErrInvalidConfig("metrics bytes_transferred must be >= 0", nil)
+	}
+	if m.JitterMs < 0 {
+		return errors.ErrInvalidConfig("metrics jitter_ms must be >= 0", nil)
+	}
+	if m.PacketLossPercent < 0 || m.PacketLossPercent > 100 {
+		return errors.ErrInvalidConfig("metrics packet_loss_percent must be between 0 and 100", nil)
+	}
+	if m.Latency.MinMs < 0 || m.Latency.MaxMs < 0 || m.Latency.AvgMs < 0 || m.Latency.P50Ms < 0 || m.Latency.P95Ms < 0 || m.Latency.P99Ms < 0 {
+		return errors.ErrInvalidConfig("metrics latency values must be >= 0", nil)
+	}
+	if m.Latency.Count < 0 {
+		return errors.ErrInvalidConfig("metrics latency count must be >= 0", nil)
+	}
+	return nil
+}
+
+func drainRequestBody(r *http.Request) {
+	if r == nil || r.Body == nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, r.Body)
+	_ = r.Body.Close()
 }
 
 func respondJSONBodyError(w http.ResponseWriter, err error) {
@@ -473,10 +544,17 @@ func respondJSONBodyError(w http.ResponseWriter, err error) {
 }
 
 func respondJSON(w http.ResponseWriter, data interface{}, statusCode int) {
+	payload, err := json.Marshal(data)
+	if err != nil {
+		logging.Warn("JSON response marshal failed",
+			logging.Field{Key: "error", Value: err})
+		statusCode = http.StatusInternalServerError
+		payload = []byte(`{"error":"internal error"}` + "\n")
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		logging.Warn("JSON response encode failed",
+	if _, err := w.Write(payload); err != nil {
+		logging.Warn("JSON response write failed",
 			logging.Field{Key: "error", Value: err})
 	}
 }

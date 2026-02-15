@@ -109,6 +109,47 @@ func (e *errReader) Read(p []byte) (int, error) {
 	return 0, errors.New("read failure")
 }
 
+type trackingUploadBody struct {
+	data   []byte
+	offset int
+	reads  int
+	closed bool
+}
+
+func (tb *trackingUploadBody) Read(p []byte) (int, error) {
+	tb.reads++
+	if tb.offset >= len(tb.data) {
+		return 0, io.EOF
+	}
+	n := copy(p, tb.data[tb.offset:])
+	tb.offset += n
+	return n, nil
+}
+
+func (tb *trackingUploadBody) Close() error {
+	tb.closed = true
+	return nil
+}
+
+type failingTrackingBody struct {
+	reads  int
+	closed bool
+}
+
+func (tb *failingTrackingBody) Read(p []byte) (int, error) {
+	tb.reads++
+	if tb.reads == 1 {
+		p[0] = 'x'
+		return 1, nil
+	}
+	return 0, errors.New("read failure")
+}
+
+func (tb *failingTrackingBody) Close() error {
+	tb.closed = true
+	return nil
+}
+
 func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 	maxConcurrent := 2
 	handler := api.NewSpeedTestHandler(maxConcurrent, 300)
@@ -172,6 +213,54 @@ func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 	}
 }
 
+func TestDownloadAtCapacityDrainsBodyBefore503(t *testing.T) {
+	handler := api.NewSpeedTestHandler(0, 300)
+
+	tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 4096)}
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/download?duration=1&chunk=65536", nil)
+	req.Body = tb
+	rec := httptest.NewRecorder()
+
+	handler.Download(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+	if tb.reads == 0 {
+		t.Fatalf("expected request body to be drained before returning 503")
+	}
+	if !tb.closed {
+		t.Fatalf("expected request body to be closed")
+	}
+}
+
+func TestDownloadValidationRejectsDrainBody(t *testing.T) {
+	handler := api.NewSpeedTestHandler(10, 300)
+
+	tests := []string{
+		"http://example.com/api/v1/download?duration=0",
+		"http://example.com/api/v1/download?chunk=bad",
+	}
+	for _, u := range tests {
+		tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 1024)}
+		req := httptest.NewRequest(http.MethodGet, u, nil)
+		req.Body = tb
+		rec := httptest.NewRecorder()
+
+		handler.Download(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("url=%s status = %d, want %d", u, rec.Code, http.StatusBadRequest)
+		}
+		if tb.reads == 0 {
+			t.Fatalf("url=%s expected body to be drained", u)
+		}
+		if !tb.closed {
+			t.Fatalf("url=%s expected body to be closed", u)
+		}
+	}
+}
+
 func TestSpeedTestUploadHandlesReadError(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 
@@ -183,6 +272,26 @@ func TestSpeedTestUploadHandlesReadError(t *testing.T) {
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestSpeedTestUploadReadErrorDrainsBody(t *testing.T) {
+	handler := api.NewSpeedTestHandler(10, 300)
+	tb := &failingTrackingBody{}
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/upload", nil)
+	req.Body = tb
+	rec := httptest.NewRecorder()
+
+	handler.Upload(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+	if tb.reads == 0 {
+		t.Fatal("expected upload body to be read")
+	}
+	if !tb.closed {
+		t.Fatal("expected upload body to be closed")
 	}
 }
 
@@ -251,6 +360,27 @@ func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 	handler.Upload(recAfter, reqAfter)
 	if recAfter.Code != http.StatusOK {
 		t.Fatalf("expected 200 after cancel freed slots, got %d", recAfter.Code)
+	}
+}
+
+func TestUploadAtCapacityDrainsBodyBefore503(t *testing.T) {
+	handler := api.NewSpeedTestHandler(0, 300)
+
+	tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 4096)}
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/upload", nil)
+	req.Body = tb
+	rec := httptest.NewRecorder()
+
+	handler.Upload(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+	}
+	if tb.reads == 0 {
+		t.Fatalf("expected request body to be drained before returning 503")
+	}
+	if !tb.closed {
+		t.Fatalf("expected request body to be closed")
 	}
 }
 
@@ -343,5 +473,25 @@ func TestSpeedTestHandlerPingNilResolverFallback(t *testing.T) {
 	}
 	if ipv6, ok := resp["ipv6"].(bool); !ok || !ipv6 {
 		t.Fatalf("ipv6 = %v, want true", resp["ipv6"])
+	}
+}
+
+func TestSpeedTestHandlerPingDrainsUnexpectedBody(t *testing.T) {
+	handler := api.NewSpeedTestHandler(10, 300)
+	tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 1024)}
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/ping", nil)
+	req.Body = tb
+	rec := httptest.NewRecorder()
+
+	handler.Ping(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if tb.reads == 0 {
+		t.Fatal("expected body to be drained")
+	}
+	if !tb.closed {
+		t.Fatal("expected body to be closed")
 	}
 }

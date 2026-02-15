@@ -184,3 +184,36 @@ func TestValidateTrustedProxyCIDRsRejectsInvalidCIDR(t *testing.T) {
 		t.Fatal("invalid trusted proxy CIDR should fail validation")
 	}
 }
+
+func TestValidateRegistryIntervalWhenRegistryEnabled(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.RegistryEnabled = true
+	cfg.RegistryInterval = 0
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("registry interval <= 0 should fail when registry enabled")
+	}
+
+	cfg.RegistryInterval = 5 * time.Second
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("valid registry interval should pass: %v", err)
+	}
+}
+
+func TestValidateMaxConcurrentPerIPWithinBounds(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.MaxConcurrentTests = 10
+	cfg.MaxConcurrentPerIP = 11
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("max concurrent per IP > max concurrent tests should fail validation")
+	}
+
+	cfg.MaxConcurrentPerIP = 0
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("max concurrent per IP <= 0 should fail validation")
+	}
+
+	cfg.MaxConcurrentPerIP = 5
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("bounded max concurrent per IP should pass: %v", err)
+	}
+}
