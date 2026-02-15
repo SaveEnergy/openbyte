@@ -216,7 +216,7 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 		case "download", "results", "skill":
 			name += ".html"
 		}
-		if strings.Contains(name, "..") || !allowed[name] {
+		if strings.Contains(name, "..") || !isAllowedStaticAsset(name, allowed) {
 			http.NotFound(w, r)
 			return
 		}
@@ -233,6 +233,16 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 		}
 		http.ServeContent(w, r, name, stat.ModTime(), f)
 	})
+}
+
+func isAllowedStaticAsset(name string, allowed map[string]bool) bool {
+	if allowed[name] {
+		return true
+	}
+	if strings.HasPrefix(name, "fonts/") {
+		return strings.HasSuffix(name, ".woff2") || strings.HasSuffix(name, ".woff")
+	}
+	return false
 }
 
 // applyRateLimit wraps a handler with rate limit checking.

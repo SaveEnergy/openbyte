@@ -3,6 +3,8 @@ package api_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -326,6 +328,33 @@ func TestRouterStaticFileServerAllowlist(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("skill.html should be served, got %d", rec.Code)
+	}
+}
+
+func TestRouterStaticFileServerAllowlistServesFontsFromWebRoot(t *testing.T) {
+	manager := stream.NewManager(10, 10)
+	handler := api.NewHandler(manager)
+	router := api.NewRouter(handler, config.DefaultConfig())
+
+	webRoot := t.TempDir()
+	fontDir := filepath.Join(webRoot, "fonts")
+	if err := os.MkdirAll(fontDir, 0o755); err != nil {
+		t.Fatalf("mkdir fonts: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(webRoot, "index.html"), []byte("ok"), 0o644); err != nil {
+		t.Fatalf("write index.html: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fontDir, "dm-sans-latin.woff2"), []byte("font-bytes"), 0o644); err != nil {
+		t.Fatalf("write font: %v", err)
+	}
+	router.SetWebRoot(webRoot)
+
+	h := router.SetupRoutes()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/fonts/dm-sans-latin.woff2", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("font should be served, got %d", rec.Code)
 	}
 }
 
