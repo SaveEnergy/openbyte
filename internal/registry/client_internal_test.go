@@ -12,9 +12,9 @@ import (
 
 func TestClientDeregisterStatusCheck(t *testing.T) {
 	tests := []struct {
-		name                 string
-		status               int
-		wantRegisteredAfter  bool
+		name                string
+		status              int
+		wantRegisteredAfter bool
 	}{
 		{name: "ok", status: http.StatusOK, wantRegisteredAfter: false},
 		{name: "not found", status: http.StatusNotFound, wantRegisteredAfter: false},

@@ -1,8 +1,8 @@
 package server
 
 import (
-	"time"
 	"testing"
+	"time"
 
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/stream"

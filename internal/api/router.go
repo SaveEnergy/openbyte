@@ -190,17 +190,17 @@ func registryRateLimitMiddleware(limiter *RateLimiter, next http.Handler) http.H
 
 func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 	allowed := map[string]bool{
-		"index.html":                 true,
-		"download.html":              true,
-		"results.html":               true,
-		"skill.html":                 true,
-		"app.js":                     true,
-		"download.js":                true,
-		"results.js":                 true,
-		"skill.js":                   true,
-		"style.css":                  true,
-		"favicon.svg":                true,
-		"openbyte-wordmark-dark.svg": true,
+		"index.html":                  true,
+		"download.html":               true,
+		"results.html":                true,
+		"skill.html":                  true,
+		"app.js":                      true,
+		"download.js":                 true,
+		"results.js":                  true,
+		"skill.js":                    true,
+		"style.css":                   true,
+		"favicon.svg":                 true,
+		"openbyte-wordmark-dark.svg":  true,
 		"openbyte-wordmark-light.svg": true,
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

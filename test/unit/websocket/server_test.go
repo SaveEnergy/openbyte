@@ -10,8 +10,8 @@ import (
 	"time"
 
 	gorilla "github.com/gorilla/websocket"
-	"github.com/saveenergy/openbyte/pkg/types"
 	obytewebsocket "github.com/saveenergy/openbyte/internal/websocket"
+	"github.com/saveenergy/openbyte/pkg/types"
 )
 
 func dialWebSocket(t *testing.T, serverURL string, origin string) error {
