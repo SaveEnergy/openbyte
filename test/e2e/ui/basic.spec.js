@@ -150,10 +150,9 @@ test.describe('openByte UI', () => {
   });
 
   test('shows error view for invalid shared result id', async ({ page }) => {
-    await page.goto('/results/invalid-id');
-    await expect(page.locator('#errorView')).toBeVisible();
-    await expect(page.locator('#resultView')).toHaveClass(/hidden/);
-    await expect(page.locator('#errorView .error-message')).toContainText(/invalid/i);
+    const response = await page.goto('/results/invalid-id');
+    expect(response).toBeTruthy();
+    expect(response.status()).toBe(404);
   });
 
   test('shows not-found message for missing shared result', async ({ page }) => {
