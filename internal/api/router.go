@@ -28,6 +28,7 @@ type Router struct {
 	allowedOrigins   []string
 	clientIPResolver *ClientIPResolver
 	webFS            http.FileSystem
+	runtimeMetrics   http.HandlerFunc
 }
 
 var validResultID = regexp.MustCompile(`^[0-9a-zA-Z]{8}$`)
@@ -73,6 +74,10 @@ func (r *Router) SetWebRoot(path string) {
 	if path != "" {
 		r.webFS = http.Dir(path)
 	}
+}
+
+func (r *Router) SetRuntimeMetricsHandler(handler http.HandlerFunc) {
+	r.runtimeMetrics = handler
 }
 
 // RegistryRegistrar allows external packages to register routes on the
@@ -127,6 +132,9 @@ func (r *Router) SetupRoutes(registrars ...RegistryRegistrar) http.Handler {
 	}
 
 	mux.HandleFunc("GET /health", r.HealthCheck)
+	if r.runtimeMetrics != nil {
+		mux.HandleFunc("GET /debug/runtime-metrics", r.runtimeMetrics)
+	}
 
 	webFS := r.resolveWebFS()
 
@@ -169,6 +177,7 @@ func (r *Router) SetupRoutes(registrars ...RegistryRegistrar) http.Handler {
 	if r.limiter != nil {
 		handler = registryRateLimitMiddleware(r.limiter, handler)
 	}
+	handler = DeadlineMiddleware(handler)
 	handler = r.CORSMiddleware(handler)
 	handler = SecurityHeadersMiddleware(handler)
 	handler = r.LoggingMiddleware(handler)
@@ -432,6 +441,16 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 				"script-src 'self'; "+
 				"img-src 'self' data:; "+
 				"connect-src 'self' https: http: ws: wss:")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func DeadlineMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if deadline, ok := r.Context().Deadline(); ok {
+			controller := http.NewResponseController(w)
+			_ = controller.SetWriteDeadline(deadline.Add(5 * time.Second))
+		}
 		next.ServeHTTP(w, r)
 	})
 }

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -44,8 +45,16 @@ type HTTPTestEngine struct {
 }
 
 func NewHTTPTestEngine(cfg *HTTPTestConfig) (*HTTPTestEngine, error) {
+	dialer := &net.Dialer{
+		Timeout:   10 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
 	transport := &http.Transport{
-		DisableCompression: true,
+		DisableCompression:  true,
+		DialContext:         dialer.DialContext,
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: max(8, cfg.Streams*2),
+		IdleConnTimeout:     90 * time.Second,
 	}
 	client := &http.Client{
 		Transport: transport,
@@ -180,8 +189,8 @@ func (e *HTTPTestEngine) runUpload(ctx context.Context) error {
 		go func(delay time.Duration) {
 			defer wg.Done()
 			time.Sleep(delay)
-
-			for time.Now().Before(deadline) && ctx.Err() == nil {
+			now := time.Now()
+			for now.Before(deadline) && ctx.Err() == nil {
 				reader := bytes.NewReader(e.uploadPayload)
 				req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, reader)
 				if err != nil {
@@ -222,6 +231,7 @@ func (e *HTTPTestEngine) runUpload(ctx context.Context) error {
 
 				atomic.AddInt64(&e.bytesSent, int64(len(e.uploadPayload)))
 				e.addBytes(int64(len(e.uploadPayload)), e.elapsedSinceStart())
+				now = time.Now()
 			}
 		}(time.Duration(i) * e.config.StreamDelay)
 	}
@@ -327,7 +337,20 @@ func measureHTTPPing(ctx context.Context, serverURL string, samples int) ([]time
 		return nil, nil
 	}
 	pingURL := strings.TrimRight(serverURL, "/") + "/api/v1/ping"
-	client := &http.Client{Timeout: 10 * time.Second}
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   5 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxIdleConns:        16,
+		MaxIdleConnsPerHost: 4,
+		IdleConnTimeout:     30 * time.Second,
+	}
+	client := &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: transport,
+	}
+	defer client.CloseIdleConnections()
 	results := make([]time.Duration, 0, samples)
 
 	for range samples {

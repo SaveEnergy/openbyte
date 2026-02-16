@@ -56,6 +56,7 @@ type serverFlagValues struct {
 	pprofEnabled       *bool
 	pprofAddress       *string
 	perfStatsInterval  *string
+	runtimeMetrics     *bool
 	registryEnabled    *bool
 	registryMode       *bool
 	registryURL        *string
@@ -174,6 +175,9 @@ func Run(args []string, version string) int {
 	router.SetWebSocketHandler(wsServer.HandleStream)
 	router.SetResultsHandler(results.NewHandler(resultsStore))
 	router.SetWebRoot(cfg.WebRoot)
+	if cfg.RuntimeMetrics {
+		router.SetRuntimeMetricsHandler(runtimeMetricsHandler())
+	}
 
 	var registrars []api.RegistryRegistrar
 	if cfg.RegistryMode {
@@ -208,6 +212,9 @@ func Run(args []string, version string) int {
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		WriteTimeout:      cfg.WriteTimeout,
 		IdleTimeout:       cfg.IdleTimeout,
+		HTTP2: &http.HTTP2Config{
+			StrictMaxConcurrentRequests: true,
+		},
 	}
 
 	quit := make(chan os.Signal, 1)
@@ -306,6 +313,7 @@ func buildServerFlagSet(cfg *config.Config) (*flag.FlagSet, *serverFlagValues) {
 		pprofEnabled:       fs.Bool("pprof-enabled", cfg.PprofEnabled, "Enable pprof server (env: PPROF_ENABLED)"),
 		pprofAddress:       fs.String("pprof-addr", cfg.PprofAddress, "Pprof address (env: PPROF_ADDR)"),
 		perfStatsInterval:  fs.String("perf-stats-interval", cfg.PerfStatsInterval.String(), "Runtime stats interval, e.g. 10s (env: PERF_STATS_INTERVAL)"),
+		runtimeMetrics:     fs.Bool("runtime-metrics", cfg.RuntimeMetrics, "Enable runtime metrics endpoint /debug/runtime-metrics (env: RUNTIME_METRICS_ENABLED)"),
 		registryEnabled:    fs.Bool("registry-enabled", cfg.RegistryEnabled, "Enable registry client mode (env: REGISTRY_ENABLED)"),
 		registryMode:       fs.Bool("registry-mode", cfg.RegistryMode, "Enable registry server mode (env: REGISTRY_MODE)"),
 		registryURL:        fs.String("registry-url", cfg.RegistryURL, "Registry URL (env: REGISTRY_URL)"),
@@ -398,6 +406,8 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 			cfg.PprofAddress = *fv.pprofAddress
 		case "perf-stats-interval":
 			cfg.PerfStatsInterval = parseDuration("perf-stats-interval", *fv.perfStatsInterval)
+		case "runtime-metrics":
+			cfg.RuntimeMetrics = *fv.runtimeMetrics
 		case "registry-enabled":
 			cfg.RegistryEnabled = *fv.registryEnabled
 		case "registry-mode":

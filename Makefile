@@ -135,7 +135,7 @@ help:
 	@echo "  test-coverage - Generate coverage report"
 	@echo "  perf-bench    - Run perf benchmarks"
 	@echo "  perf-smoke    - Run perf smoke with pprof capture"
-	@echo "  perf-leakcheck- Run goroutine leak profile smoke (Go 1.26 experiment)"
+	@echo "  perf-leakcheck - Run goroutine leak profile smoke (Go 1.26 experiment)"
 	@echo "  run           - Run server (development, port 8080)"
 	@echo "  run-alt-ports - Run server with alternative ports (9090, 9081, 9082)"
 	@echo "  kill-ports    - Kill processes on ports 8080-8082"

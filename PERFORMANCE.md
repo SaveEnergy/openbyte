@@ -12,6 +12,7 @@ Endpoints:
 
 - `http://127.0.0.1:6060/debug/pprof/`
 - `http://127.0.0.1:6060/debug/pprof/profile?seconds=30`
+- `http://127.0.0.1:8080/debug/runtime-metrics` (when `RUNTIME_METRICS_ENABLED=true`)
 
 ### Go 1.26 goroutine leak profile (experimental)
 
@@ -30,6 +31,8 @@ GOEXPERIMENT=goroutineleakprofile go build -o bin/openbyte-leak ./cmd/openbyte
 PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6061 ./bin/openbyte-leak server
 curl "http://127.0.0.1:6061/debug/pprof/goroutineleak?debug=1"
 ```
+
+Nightly CI can run this smoke path by setting repository variable `LEAK_PROFILE_SMOKE=true`.
 
 ### Runtime stats logging
 

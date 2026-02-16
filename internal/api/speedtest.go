@@ -104,19 +104,29 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 	}
 
 	deadline := time.Now().Add(duration)
+	controller := http.NewResponseController(w)
+	_ = controller.SetWriteDeadline(deadline.Add(5 * time.Second))
 	writeCount := 0
 	flushInterval := 8
 	offset := 0
+	now := time.Now()
+	deadlineTicker := time.NewTicker(100 * time.Millisecond)
+	defer deadlineTicker.Stop()
 
-	for time.Now().Before(deadline) {
+	for now.Before(deadline) {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-deadlineTicker.C:
+			now = time.Now()
 		default:
 			if err := writeChunkFromSource(w, randomSource, chunkSize, &offset); err != nil {
 				return
 			}
 			writeCount++
+			if writeCount%64 == 0 {
+				now = time.Now()
+			}
 			if canFlush && writeCount%flushInterval == 0 {
 				flusher.Flush()
 			}
@@ -139,6 +149,8 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	startTime := time.Now()
 	deadline := uploadReadDeadline(startTime, h.maxDurationSec)
+	controller := http.NewResponseController(w)
+	_ = controller.SetReadDeadline(deadline)
 	readCtx, cancel := context.WithDeadline(r.Context(), deadline)
 	defer cancel()
 	var closeBodyOnce sync.Once
@@ -154,6 +166,8 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	buf := make([]byte, 256*1024)
 	var totalBytes int64
 	var readFailed bool
+	now := time.Now()
+	readIterations := 0
 	for {
 		select {
 		case <-readCtx.Done():
@@ -168,7 +182,11 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 			}
 			break
 		}
-		if time.Now().After(deadline) {
+		readIterations++
+		if readIterations%32 == 0 {
+			now = time.Now()
+		}
+		if now.After(deadline) {
 			break
 		}
 	}
@@ -185,6 +203,7 @@ done:
 	throughputMbps := float64(totalBytes*8) / elapsed.Seconds() / 1_000_000
 
 	w.Header().Set("Content-Type", "application/json")
+	_ = controller.SetWriteDeadline(time.Now().Add(2 * time.Second))
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]any{
 		"bytes":           totalBytes,

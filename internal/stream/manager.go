@@ -295,83 +295,31 @@ func (m *Manager) cleanupExpiredStreams() {
 }
 
 func (m *Manager) cleanup() {
-	m.mu.RLock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	retentionPeriod := m.retentionPeriod
-	streamIDs := make([]string, 0, len(m.streams))
-	streamStates := make([]*types.StreamState, 0, len(m.streams))
-	for streamID, state := range m.streams {
-		streamIDs = append(streamIDs, streamID)
-		streamStates = append(streamStates, state)
-	}
-	m.mu.RUnlock()
-
 	now := time.Now()
-	type cleanupAction struct {
-		streamID string
-		fail     bool
-		remove   bool
-	}
-	actions := make([]cleanupAction, 0, len(streamStates))
-
-	for i, state := range streamStates {
+	for streamID, state := range m.streams {
 		snapshot := state.GetState()
 		switch snapshot.Status {
 		case types.StreamStatusRunning, types.StreamStatusStarting:
 			maxDuration := snapshot.Config.Duration + 30*time.Second
 			if now.Sub(snapshot.StartTime) > maxDuration {
-				actions = append(actions, cleanupAction{streamID: streamIDs[i], fail: true, remove: true})
+				state.UpdateStatus(types.StreamStatusFailed)
+				m.releaseActiveStreamLocked(streamID)
+				delete(m.streams, streamID)
 			}
 		case types.StreamStatusPending:
 			// Pending streams that were never started — clean up after 30s
 			if now.Sub(snapshot.Config.StartTime) > 30*time.Second {
-				actions = append(actions, cleanupAction{streamID: streamIDs[i], fail: true, remove: true})
+				state.UpdateStatus(types.StreamStatusFailed)
+				m.releaseActiveStreamLocked(streamID)
+				delete(m.streams, streamID)
 			}
 		case types.StreamStatusCompleted, types.StreamStatusFailed, types.StreamStatusCancelled:
 			if !snapshot.EndTime.IsZero() && now.Sub(snapshot.EndTime) > retentionPeriod {
-				actions = append(actions, cleanupAction{streamID: streamIDs[i], remove: true})
-			}
-		}
-	}
-
-	if len(actions) == 0 {
-		return
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for _, action := range actions {
-		state, exists := m.streams[action.streamID]
-		if !exists {
-			continue
-		}
-		snapshot := state.GetState()
-		if action.fail {
-			switch snapshot.Status {
-			case types.StreamStatusRunning, types.StreamStatusStarting:
-				maxDuration := snapshot.Config.Duration + 30*time.Second
-				if now.Sub(snapshot.StartTime) > maxDuration {
-					state.UpdateStatus(types.StreamStatusFailed)
-					m.releaseActiveStreamLocked(action.streamID)
-					delete(m.streams, action.streamID)
-				}
-			case types.StreamStatusPending:
-				if now.Sub(snapshot.Config.StartTime) > 30*time.Second {
-					state.UpdateStatus(types.StreamStatusFailed)
-					m.releaseActiveStreamLocked(action.streamID)
-					delete(m.streams, action.streamID)
-				}
-			}
-			continue
-		}
-		if action.remove {
-			if snapshot.Status == types.StreamStatusCompleted ||
-				snapshot.Status == types.StreamStatusFailed ||
-				snapshot.Status == types.StreamStatusCancelled {
-				if !snapshot.EndTime.IsZero() && now.Sub(snapshot.EndTime) > retentionPeriod {
-					m.releaseActiveStreamLocked(action.streamID)
-					delete(m.streams, action.streamID)
-				}
+				m.releaseActiveStreamLocked(streamID)
+				delete(m.streams, streamID)
 			}
 		}
 	}

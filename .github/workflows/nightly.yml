@@ -30,3 +30,7 @@ jobs:
       - name: Perf bench (optional)
         if: ${{ vars.PERF_SMOKE == 'true' }}
         run: make perf-bench
+
+      - name: Goroutine leak profile smoke (optional)
+        if: ${{ vars.LEAK_PROFILE_SMOKE == 'true' }}
+        run: make perf-leakcheck

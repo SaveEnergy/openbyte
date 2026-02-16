@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -45,7 +46,8 @@ func startStream(ctx context.Context, config *Config) (*StreamResponse, error) {
 	if timeout <= 0 {
 		timeout = 60 * time.Second
 	}
-	client := &http.Client{Timeout: timeout}
+	client := newHTTPClient(timeout)
+	defer client.CloseIdleConnections()
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %w", err)
@@ -87,7 +89,8 @@ func CancelStream(ctx context.Context, serverURL, streamID, apiKey string) error
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := newHTTPClient(5 * time.Second)
+	defer client.CloseIdleConnections()
 	resp, err := client.Do(req)
 	if err != nil {
 		if resp != nil {
@@ -143,7 +146,8 @@ func completeStream(ctx context.Context, config *Config, streamID string, metric
 		req.Header.Set("Authorization", "Bearer "+config.APIKey)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := newHTTPClient(5 * time.Second)
+	defer client.CloseIdleConnections()
 	resp, err := client.Do(req)
 	if err != nil {
 		if resp != nil {
@@ -243,5 +247,20 @@ func streamMetrics(ctx context.Context, wsURL string, formatter OutputFormatter,
 		case "error":
 			return fmt.Errorf("test failed: %s", msg.Message)
 		}
+	}
+}
+
+func newHTTPClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   10 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			MaxIdleConns:        32,
+			MaxIdleConnsPerHost: 8,
+			IdleConnTimeout:     90 * time.Second,
+		},
 	}
 }

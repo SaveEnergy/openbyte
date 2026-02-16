@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -22,6 +23,7 @@ type Server struct {
 	stopCh         chan struct{}
 	stopOnce       sync.Once
 	wg             sync.WaitGroup
+	jsonBufPool    sync.Pool
 	mu             sync.RWMutex
 }
 
@@ -36,6 +38,11 @@ func NewServer() *Server {
 		sentStatus:   make(map[string]types.StreamStatus),
 		pingInterval: 30 * time.Second,
 		stopCh:       make(chan struct{}),
+		jsonBufPool: sync.Pool{
+			New: func() any {
+				return &bytes.Buffer{}
+			},
+		},
 	}
 	server.upgrader = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
@@ -202,13 +209,14 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 		msg.Message = state.Error.Error()
 	}
 
-	data, err := json.Marshal(msg)
+	buf, err := s.marshalMessage(msg)
 	if err != nil {
 		logging.Warn("WebSocket metrics marshal failed",
 			logging.Field{Key: "stream_id", Value: streamID},
 			logging.Field{Key: "error", Value: err})
 		return
 	}
+	data := bytes.TrimSuffix(buf.Bytes(), []byte{'\n'})
 
 	for _, client := range clientList {
 		if err := client.writeMessage(websocket.TextMessage, data); err != nil {
@@ -216,7 +224,23 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 			client.conn.Close()
 		}
 	}
+	s.jsonBufPool.Put(buf)
 
+}
+
+func (s *Server) marshalMessage(msg wsMessage) (*bytes.Buffer, error) {
+	buf, ok := s.jsonBufPool.Get().(*bytes.Buffer)
+	if !ok {
+		buf = &bytes.Buffer{}
+	}
+	buf.Reset()
+	encoder := json.NewEncoder(buf)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(msg); err != nil {
+		s.jsonBufPool.Put(buf)
+		return nil, err
+	}
+	return buf, nil
 }
 
 func (s *Server) startPingLoop() {

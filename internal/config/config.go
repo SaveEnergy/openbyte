@@ -38,6 +38,7 @@ type Config struct {
 	PprofEnabled      bool
 	PprofAddress      string
 	PerfStatsInterval time.Duration
+	RuntimeMetrics    bool
 
 	RateLimitPerIP     int
 	MaxConcurrentPerIP int
@@ -93,6 +94,7 @@ func DefaultConfig() *Config {
 		PprofEnabled:          false,
 		PprofAddress:          "127.0.0.1:6060",
 		PerfStatsInterval:     0,
+		RuntimeMetrics:        false,
 		RateLimitPerIP:        100,
 		MaxConcurrentPerIP:    10,
 		GlobalRateLimit:       1000,
@@ -200,6 +202,9 @@ func (c *Config) LoadFromEnv() error {
 			return fmt.Errorf("invalid PERF_STATS_INTERVAL %q: must be a positive duration (e.g. 10s)", interval)
 		}
 		c.PerfStatsInterval = d
+	}
+	if enabled := os.Getenv("RUNTIME_METRICS_ENABLED"); enabled == "true" || enabled == "1" {
+		c.RuntimeMetrics = true
 	}
 
 	if limit := os.Getenv("RATE_LIMIT_PER_IP"); limit != "" {

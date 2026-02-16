@@ -112,22 +112,36 @@ func (c *Collector) GetMetrics() types.Metrics {
 
 	var latencyMetrics types.LatencyMetrics
 	var jitterMs float64
-	var startTime time.Time
+	var (
+		startTime    time.Time
+		latencyCount int64
+		latencyMin   time.Duration
+		latencyMax   time.Duration
+		latencySum   time.Duration
+		jitterSum    time.Duration
+		jitterCount  int64
+	)
 	c.mu.RLock()
 	startTime = c.startTime
-	if c.latencyHistogram != nil && c.latencyCount > 0 {
+	latencyCount = c.latencyCount
+	latencyMin = c.latencyMin
+	latencyMax = c.latencyMax
+	latencySum = c.latencySum
+	jitterSum = c.jitterSum
+	jitterCount = c.jitterCount
+	c.mu.RUnlock()
+	if c.latencyHistogram != nil && latencyCount > 0 {
 		buckets, ok := c.bucketPool.Get().([]uint32)
 		if !ok || len(buckets) != c.latencyHistogram.BucketCount() {
 			buckets = make([]uint32, c.latencyHistogram.BucketCount())
 		}
 		overflow := c.latencyHistogram.CopyTo(buckets)
-		latencyMetrics = CalculateLatencyFromHistogram(buckets, overflow, c.latencyHistogram.BucketWidth(), c.latencyCount, c.latencyMin, c.latencyMax, c.latencySum)
+		latencyMetrics = CalculateLatencyFromHistogram(buckets, overflow, c.latencyHistogram.BucketWidth(), latencyCount, latencyMin, latencyMax, latencySum)
 		c.bucketPool.Put(buckets)
 	}
-	if c.jitterCount > 0 {
-		jitterMs = float64(c.jitterSum) / float64(c.jitterCount) / float64(time.Millisecond)
+	if jitterCount > 0 {
+		jitterMs = float64(jitterSum) / float64(jitterCount) / float64(time.Millisecond)
 	}
-	c.mu.RUnlock()
 
 	elapsed := time.Since(startTime)
 	totalBytes := bytesSent + bytesRecv
