@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -117,17 +118,12 @@ func TestCreateFormatterSelection(t *testing.T) {
 	}
 }
 
-func typeName(v interface{}) string {
+func typeName(v any) string {
 	return fmt.Sprintf("%T", v)
 }
 
 func contains(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(values, target)
 }
 
 type formatterWithErr struct {

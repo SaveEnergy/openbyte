@@ -38,7 +38,7 @@ type StreamConfig struct {
 	Duration   time.Duration `json:"duration"`
 	Streams    int           `json:"streams"`
 	PacketSize int           `json:"packet_size"`
-	StartTime  time.Time     `json:"start_time,omitempty"`
+	StartTime  time.Time     `json:"start_time"`
 	ClientIP   string        `json:"client_ip,omitempty"`
 }
 

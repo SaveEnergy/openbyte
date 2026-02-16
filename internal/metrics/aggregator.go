@@ -22,7 +22,7 @@ var _ CollectorInterface = (*MultiStreamAggregator)(nil)
 
 func NewMultiStreamAggregator(streamCount int) *MultiStreamAggregator {
 	collectors := make([]*Collector, streamCount)
-	for i := 0; i < streamCount; i++ {
+	for i := range streamCount {
 		collectors[i] = NewCollector()
 	}
 

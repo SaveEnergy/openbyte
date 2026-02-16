@@ -176,7 +176,7 @@ func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 	done := make(chan struct{}, maxConcurrent)
 	started := make([]chan struct{}, maxConcurrent)
 
-	for i := 0; i < maxConcurrent; i++ {
+	for i := range maxConcurrent {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancels[i] = cancel
 		started[i] = make(chan struct{})
@@ -213,7 +213,7 @@ func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 	for _, cancel := range cancels {
 		cancel()
 	}
-	for i := 0; i < maxConcurrent; i++ {
+	for range maxConcurrent {
 		<-done
 	}
 
@@ -321,7 +321,7 @@ func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 	done := make(chan struct{}, maxConcurrent)
 	started := make([]chan struct{}, maxConcurrent)
 
-	for i := 0; i < maxConcurrent; i++ {
+	for i := range maxConcurrent {
 		ctx, cancel := context.WithCancel(context.Background())
 		cancels[i] = cancel
 		started[i] = make(chan struct{})
@@ -365,7 +365,7 @@ func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 	for _, cancel := range cancels {
 		cancel()
 	}
-	for i := 0; i < maxConcurrent; i++ {
+	for range maxConcurrent {
 		<-done
 	}
 
@@ -474,7 +474,7 @@ func TestSpeedTestHandlerPingResponseShape(t *testing.T) {
 		t.Fatalf("cache-control = %q, want %q", got, "no-store")
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
@@ -500,7 +500,7 @@ func TestSpeedTestHandlerPingNilResolverFallback(t *testing.T) {
 
 	handler.Ping(rec, req)
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}

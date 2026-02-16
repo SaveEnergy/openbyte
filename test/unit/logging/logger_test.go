@@ -19,7 +19,7 @@ func TestFormatValueTypes(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		input interface{}
+		input any
 		want  string
 	}{
 		{name: "string", input: "hello", want: "hello"},

@@ -2,6 +2,8 @@
 // grades, ratings, and suitability assessments.
 package diagnostic
 
+import "strings"
+
 import "fmt"
 
 // Interpretation holds the semantic interpretation of speed test results.
@@ -203,16 +205,17 @@ func buildSummary(grade string, p Params) string {
 		parts = append(parts, fmt.Sprintf("%.0fms latency", p.LatencyMs))
 	}
 
-	summary := desc + " connection"
+	var summary strings.Builder
+	summary.WriteString(desc + " connection")
 	if len(parts) > 0 {
-		summary += ": "
+		summary.WriteString(": ")
 		for i, part := range parts {
 			if i > 0 {
-				summary += ", "
+				summary.WriteString(", ")
 			}
-			summary += part
+			summary.WriteString(part)
 		}
 	}
 
-	return summary
+	return summary.String()
 }

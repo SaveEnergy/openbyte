@@ -211,10 +211,7 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 			metrics.JitterMs = jitter
 
 			totalBytes := metrics.BytesTransferred
-			measuredElapsed := time.Since(startTime)
-			if measuredElapsed > httpCfg.Duration {
-				measuredElapsed = httpCfg.Duration
-			}
+			measuredElapsed := min(time.Since(startTime), httpCfg.Duration)
 			measuredElapsed -= graceTime
 			if measuredElapsed <= 0 {
 				measuredElapsed = 1 * time.Millisecond

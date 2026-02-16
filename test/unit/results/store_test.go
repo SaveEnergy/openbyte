@@ -96,7 +96,7 @@ func TestStoreTrimToMax(t *testing.T) {
 	}
 
 	ids := make([]string, 5)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		id, saveErr := store.Save(results.Result{
 			DownloadMbps: float64(i + 1),
 			UploadMbps:   1,
@@ -528,7 +528,7 @@ func TestGenerateIDUsesValidCharset(t *testing.T) {
 	const idCharset = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	seen := make(map[rune]struct{})
 
-	for i := 0; i < samples; i++ {
+	for range samples {
 		id, err := store.Save(results.Result{
 			DownloadMbps: 1, UploadMbps: 1, LatencyMs: 1, JitterMs: 1,
 		})

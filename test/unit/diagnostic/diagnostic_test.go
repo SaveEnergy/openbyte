@@ -1,6 +1,7 @@
 package diagnostic_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/saveenergy/openbyte/pkg/diagnostic"
@@ -458,10 +459,8 @@ func TestInterpret_ConcernsNeverNil(t *testing.T) {
 
 func assertContains(t *testing.T, slice []string, item string) {
 	t.Helper()
-	for _, s := range slice {
-		if s == item {
-			return
-		}
+	if slices.Contains(slice, item) {
+		return
 	}
 	t.Errorf("expected %v to contain %q", slice, item)
 }

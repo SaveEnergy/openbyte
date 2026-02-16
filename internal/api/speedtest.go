@@ -186,7 +186,7 @@ done:
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"bytes":           totalBytes,
 		"duration_ms":     elapsed.Milliseconds(),
 		"throughput_mbps": throughputMbps,
@@ -210,7 +210,7 @@ func (h *SpeedTestHandler) Ping(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"pong":      true,
 		"timestamp": time.Now().UnixMilli(),
 		"client_ip": clientIP,
@@ -241,10 +241,7 @@ func writeChunkFromSource(w http.ResponseWriter, source []byte, chunkSize int, o
 		}
 
 		available := len(source) - start
-		toWrite := remaining
-		if toWrite > available {
-			toWrite = available
-		}
+		toWrite := min(remaining, available)
 		if toWrite <= 0 {
 			*offset = 0
 			continue

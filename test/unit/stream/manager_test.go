@@ -291,10 +291,8 @@ func TestManagerConcurrentAccess(t *testing.T) {
 	defer m.Stop()
 
 	var wg sync.WaitGroup
-	for i := 0; i < 20; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 20 {
+		wg.Go(func() {
 			cfg := testConfig(types.DirectionDownload)
 			state, err := m.CreateStream(cfg)
 			if err != nil {
@@ -304,7 +302,7 @@ func TestManagerConcurrentAccess(t *testing.T) {
 			m.UpdateMetrics(state.Config.ID, types.Metrics{ThroughputMbps: 100})
 			m.GetActiveStreams()
 			m.CompleteStream(state.Config.ID, types.Metrics{})
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -342,7 +340,7 @@ func TestManagerMetricsChannelDropAccounting(t *testing.T) {
 	m.Start()
 	defer m.Stop()
 
-	for i := 0; i < 150; i++ {
+	for i := range 150 {
 		cfg := testConfig(types.DirectionDownload)
 		cfg.ClientIP = "10.0.0.1"
 		state, err := m.CreateStream(cfg)

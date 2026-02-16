@@ -15,7 +15,7 @@ type benchMessage struct {
 	Progress         float64       `json:"progress,omitempty"`
 	ElapsedSeconds   float64       `json:"elapsed_seconds,omitempty"`
 	RemainingSeconds float64       `json:"remaining_seconds,omitempty"`
-	Metrics          types.Metrics `json:"metrics,omitempty"`
+	Metrics          types.Metrics `json:"metrics"`
 	Time             int64         `json:"time"`
 }
 

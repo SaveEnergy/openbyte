@@ -13,6 +13,24 @@ Endpoints:
 - `http://127.0.0.1:6060/debug/pprof/`
 - `http://127.0.0.1:6060/debug/pprof/profile?seconds=30`
 
+### Go 1.26 goroutine leak profile (experimental)
+
+Go 1.26 adds an experimental goroutine leak profile (`goroutineleak`) behind a build-time experiment flag.
+
+Quick local smoke:
+
+```
+make perf-leakcheck
+```
+
+Manual build/run:
+
+```
+GOEXPERIMENT=goroutineleakprofile go build -o bin/openbyte-leak ./cmd/openbyte
+PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6061 ./bin/openbyte-leak server
+curl "http://127.0.0.1:6061/debug/pprof/goroutineleak?debug=1"
+```
+
 ### Runtime stats logging
 
 ```

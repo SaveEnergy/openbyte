@@ -19,7 +19,7 @@ func testConfig() *config.Config {
 	return config.DefaultConfig()
 }
 
-func mustStringField(t *testing.T, m map[string]interface{}, key string) string {
+func mustStringField(t *testing.T, m map[string]any, key string) string {
 	t.Helper()
 	v, ok := m[key]
 	if !ok {
@@ -39,7 +39,7 @@ func TestAPI_StartStream(t *testing.T) {
 
 	handler := api.NewHandler(manager)
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"protocol":  "tcp",
 		"direction": "download",
 		"duration":  10,
@@ -62,7 +62,7 @@ func TestAPI_StartStream(t *testing.T) {
 		return
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("Failed to parse response: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestAPI_ResultsSaveAndGet(t *testing.T) {
 		t.Fatalf("save status = %d, want %d; body=%s", saveRec.Code, http.StatusCreated, saveRec.Body.String())
 	}
 
-	var saveResp map[string]interface{}
+	var saveResp map[string]any
 	if err := json.Unmarshal(saveRec.Body.Bytes(), &saveResp); err != nil {
 		t.Fatalf("decode save response: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestAPI_ResultsSaveAndGet(t *testing.T) {
 		t.Fatalf("cache-control = %q, want %q", got, "no-store")
 	}
 
-	var gotResult map[string]interface{}
+	var gotResult map[string]any
 	if err := json.Unmarshal(getRec.Body.Bytes(), &gotResult); err != nil {
 		t.Fatalf("decode get response: %v", err)
 	}

@@ -84,7 +84,7 @@ func (h *Handler) ListServers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"servers": servers,
 		"count":   len(servers),
 	}); err != nil {
@@ -282,7 +282,7 @@ func (h *Handler) DeregisterServer(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]any{
 		"status":  "healthy",
 		"servers": h.service.Count(),
 	}); err != nil {

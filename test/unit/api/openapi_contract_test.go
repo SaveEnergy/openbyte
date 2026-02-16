@@ -12,7 +12,7 @@ import (
 )
 
 type openAPISpec struct {
-	Paths map[string]map[string]interface{} `yaml:"paths"`
+	Paths map[string]map[string]any `yaml:"paths"`
 }
 
 func TestOpenAPIRouteContract(t *testing.T) {

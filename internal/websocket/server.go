@@ -84,7 +84,7 @@ func (s *Server) HandleStream(w http.ResponseWriter, r *http.Request, streamID s
 	s.clients[streamID][conn] = client
 	s.mu.Unlock()
 
-	if err := client.writeJSON(map[string]interface{}{
+	if err := client.writeJSON(map[string]any{
 		"type":      "connected",
 		"stream_id": streamID,
 		"time":      time.Now().Unix(),
@@ -220,9 +220,7 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 }
 
 func (s *Server) startPingLoop() {
-	s.wg.Add(1)
-	go func() {
-		defer s.wg.Done()
+	s.wg.Go(func() {
 		interval := s.getPingInterval()
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
@@ -241,7 +239,7 @@ func (s *Server) startPingLoop() {
 				}
 			}
 		}
-	}()
+	})
 }
 
 func (s *Server) Close() {
@@ -332,8 +330,8 @@ func (s *Server) isAllowedOrigin(origin string, host string) bool {
 		if strings.EqualFold(allowed, origin) {
 			return true
 		}
-		if strings.HasPrefix(allowed, "*.") {
-			suffix := strings.TrimPrefix(allowed, "*.")
+		if after, ok := strings.CutPrefix(allowed, "*."); ok {
+			suffix := after
 			if originHostValue != "" && (originHostValue == suffix || strings.HasSuffix(originHostValue, "."+suffix)) {
 				return true
 			}
@@ -363,7 +361,7 @@ type wsMessage struct {
 	Progress         float64       `json:"progress,omitempty"`
 	ElapsedSeconds   float64       `json:"elapsed_seconds,omitempty"`
 	RemainingSeconds float64       `json:"remaining_seconds,omitempty"`
-	Metrics          types.Metrics `json:"metrics,omitempty"`
+	Metrics          types.Metrics `json:"metrics"`
 	Time             int64         `json:"time"`
 	Results          *wsResults    `json:"results,omitempty"`
 	Error            string        `json:"error,omitempty"`
@@ -399,7 +397,7 @@ type wsResultMetrics struct {
 	PacketsReceived   int64                `json:"packets_received"`
 }
 
-func (c *clientConn) writeJSON(v interface{}) error {
+func (c *clientConn) writeJSON(v any) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))

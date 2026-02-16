@@ -21,7 +21,7 @@ func setupHandler(apiKey string) (*registry.Handler, *http.ServeMux) {
 	return h, mux
 }
 
-func mustCountField(t *testing.T, resp map[string]interface{}) float64 {
+func mustCountField(t *testing.T, resp map[string]any) float64 {
 	t.Helper()
 	raw, ok := resp["count"]
 	if !ok {
@@ -57,7 +57,7 @@ func TestHandlerRegisterAndList(t *testing.T) {
 		t.Fatalf("list status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode list: %v", err)
 	}
@@ -244,7 +244,7 @@ func TestHandlerHealth(t *testing.T) {
 		t.Fatalf("health status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode health: %v", err)
 	}
@@ -326,7 +326,7 @@ func TestHandlerListHealthyFilter(t *testing.T) {
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode healthy filter response: %v", err)
 	}
@@ -441,7 +441,7 @@ func TestHandlerUpdateServerPreservesRequiredFields(t *testing.T) {
 		t.Fatalf("get status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	var got map[string]interface{}
+	var got map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
 		t.Fatalf("decode server: %v", err)
 	}

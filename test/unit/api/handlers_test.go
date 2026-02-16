@@ -16,7 +16,7 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
-func mustMarshalJSON(t *testing.T, v interface{}) []byte {
+func mustMarshalJSON(t *testing.T, v any) []byte {
 	t.Helper()
 	body, err := json.Marshal(v)
 	if err != nil {
@@ -60,7 +60,7 @@ func assertTrackingBodyDrained(t *testing.T, tb *trackingBody) {
 // createTestStream creates a running stream and returns its ID.
 func createTestStream(t *testing.T, handler *api.Handler) string {
 	t.Helper()
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"protocol": "tcp", "direction": "download",
 		"duration": 10, "streams": 1,
 	}
@@ -72,7 +72,7 @@ func createTestStream(t *testing.T, handler *api.Handler) string {
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("createTestStream: status = %d, body: %s", rec.Code, rec.Body.String())
 	}
-	var resp map[string]interface{}
+	var resp map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode start stream response: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestStartStreamRejectsLargeBody(t *testing.T) {
 	manager := stream.NewManager(10, 10)
 	handler := api.NewHandler(manager)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"protocol":  "tcp",
 		"direction": "download",
 		"duration":  10,
@@ -114,7 +114,7 @@ func TestStartStreamRejectsWrongContentType(t *testing.T) {
 	manager := stream.NewManager(10, 10)
 	handler := api.NewHandler(manager)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"protocol": "tcp", "direction": "download",
 		"duration": 10, "streams": 1,
 	}
@@ -134,7 +134,7 @@ func TestStartStreamRequiresContentType(t *testing.T) {
 	manager := stream.NewManager(10, 10)
 	handler := api.NewHandler(manager)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"protocol": "tcp", "direction": "download",
 		"duration": 10, "streams": 1,
 	}
@@ -168,7 +168,7 @@ func TestStartStreamRejectsWrongContentTypeDrainsBody(t *testing.T) {
 	handler := api.NewHandler(manager)
 
 	tb := &trackingBody{
-		data: mustMarshalJSON(t, map[string]interface{}{
+		data: mustMarshalJSON(t, map[string]any{
 			"protocol":  "tcp",
 			"direction": "download",
 			"duration":  10,
@@ -202,7 +202,7 @@ func TestStartStreamRespectsMaxTestDuration(t *testing.T) {
 	handler.SetConfig(cfg)
 
 	// Duration within the configured max should succeed
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"protocol":  "tcp",
 		"direction": "download",
 		"duration":  50,
@@ -242,7 +242,7 @@ func TestStartStreamRespectsMaxStreams(t *testing.T) {
 	handler.SetConfig(cfg)
 
 	// 32 streams should succeed
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"protocol":  "tcp",
 		"direction": "download",
 		"duration":  10,
@@ -429,7 +429,7 @@ func TestGetStreamStatusJSONContract(t *testing.T) {
 	defer mgr.Stop()
 
 	handler := api.NewHandler(mgr)
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"protocol":  "tcp",
 		"direction": "download",
 		"duration":  12,
@@ -443,7 +443,7 @@ func TestGetStreamStatusJSONContract(t *testing.T) {
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("start stream status = %d, want %d", rec.Code, http.StatusCreated)
 	}
-	var startResp map[string]interface{}
+	var startResp map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&startResp); err != nil {
 		t.Fatalf("decode start response: %v", err)
 	}
@@ -456,11 +456,11 @@ func TestGetStreamStatusJSONContract(t *testing.T) {
 		t.Fatalf("status code = %d, want %d", statusRec.Code, http.StatusOK)
 	}
 
-	var statusResp map[string]interface{}
+	var statusResp map[string]any
 	if err := json.NewDecoder(statusRec.Body).Decode(&statusResp); err != nil {
 		t.Fatalf("decode status response: %v", err)
 	}
-	cfg, ok := statusResp["config"].(map[string]interface{})
+	cfg, ok := statusResp["config"].(map[string]any)
 	if !ok {
 		t.Fatalf("config missing or wrong type: %T", statusResp["config"])
 	}
@@ -670,9 +670,9 @@ func TestCompleteStream(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"status":  "completed",
-		"metrics": map[string]interface{}{"throughput_mbps": 100},
+		"metrics": map[string]any{"throughput_mbps": 100},
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
@@ -693,9 +693,9 @@ func TestCompleteStreamRejectsWrongContentType(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"status":  "completed",
-		"metrics": map[string]interface{}{"throughput_mbps": 100},
+		"metrics": map[string]any{"throughput_mbps": 100},
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
@@ -716,9 +716,9 @@ func TestCompleteStreamRequiresContentType(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"status":  "completed",
-		"metrics": map[string]interface{}{"throughput_mbps": 100},
+		"metrics": map[string]any{"throughput_mbps": 100},
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
@@ -793,9 +793,9 @@ func TestCompleteStreamFailed(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"status":  "failed",
-		"metrics": map[string]interface{}{},
+		"metrics": map[string]any{},
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
@@ -816,7 +816,7 @@ func TestCompleteStreamInvalidStatus(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	payload := map[string]interface{}{"status": "invalid"}
+	payload := map[string]any{"status": "invalid"}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -836,9 +836,9 @@ func TestCompleteStreamRejectsInvalidMetrics(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"status": "completed",
-		"metrics": map[string]interface{}{
+		"metrics": map[string]any{
 			"throughput_mbps": -1,
 		},
 	}
@@ -951,9 +951,9 @@ func TestGetStreamResultsCompleted(t *testing.T) {
 	streamID := createTestStream(t, handler)
 
 	// Complete it first
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"status":  "completed",
-		"metrics": map[string]interface{}{"throughput_mbps": 250},
+		"metrics": map[string]any{"throughput_mbps": 250},
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
@@ -975,7 +975,7 @@ func TestStartStreamInvalidProtocol(t *testing.T) {
 	mgr := stream.NewManager(10, 10)
 	handler := api.NewHandler(mgr)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"protocol": "invalid", "direction": "download",
 		"duration": 10, "streams": 1,
 	}
@@ -994,7 +994,7 @@ func TestStartStreamInvalidDirection(t *testing.T) {
 	mgr := stream.NewManager(10, 10)
 	handler := api.NewHandler(mgr)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"protocol": "tcp", "direction": "sideways",
 		"duration": 10, "streams": 1,
 	}
@@ -1013,7 +1013,7 @@ func TestStartStreamInvalidMode(t *testing.T) {
 	mgr := stream.NewManager(10, 10)
 	handler := api.NewHandler(mgr)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"protocol": "tcp", "direction": "download",
 		"duration": 10, "streams": 1, "mode": "invalid",
 	}
@@ -1032,7 +1032,7 @@ func TestStartStreamInvalidPacketSize(t *testing.T) {
 	mgr := stream.NewManager(10, 10)
 	handler := api.NewHandler(mgr)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"protocol": "tcp", "direction": "download",
 		"duration": 10, "streams": 1, "packet_size": 10,
 	}
@@ -1054,7 +1054,7 @@ func TestStartStreamReturnsServiceUnavailableWhenAtCapacity(t *testing.T) {
 
 	handler := api.NewHandler(mgr)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"protocol":  "tcp",
 		"direction": "download",
 		"duration":  10,
@@ -1093,7 +1093,7 @@ func TestStartStreamClientModeIgnoresRequestHostWhenProxyUntrusted(t *testing.T)
 	cfg.UDPTestPort = 8082
 	handler.SetConfig(cfg)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"protocol":  "tcp",
 		"direction": "download",
 		"duration":  10,
@@ -1112,7 +1112,7 @@ func TestStartStreamClientModeIgnoresRequestHostWhenProxyUntrusted(t *testing.T)
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusCreated)
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}

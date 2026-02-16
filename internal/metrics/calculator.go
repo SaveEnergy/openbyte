@@ -2,7 +2,7 @@ package metrics
 
 import (
 	"math"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/saveenergy/openbyte/pkg/types"
@@ -15,9 +15,7 @@ func CalculateLatency(samples []time.Duration) types.LatencyMetrics {
 
 	sorted := make([]time.Duration, len(samples))
 	copy(sorted, samples)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i] < sorted[j]
-	})
+	slices.Sort(sorted)
 
 	min := float64(sorted[0]) / float64(time.Millisecond)
 	max := float64(sorted[len(sorted)-1]) / float64(time.Millisecond)
@@ -72,10 +70,7 @@ func percentileFromHistogram(bucketCounts []uint32, overflow uint32, bucketWidth
 		return 0
 	}
 
-	target := int64(math.Ceil(float64(count) * ratio))
-	if target < 1 {
-		target = 1
-	}
+	target := max(int64(math.Ceil(float64(count)*ratio)), 1)
 
 	var seen int64
 	for i, c := range bucketCounts {

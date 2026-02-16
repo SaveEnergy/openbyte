@@ -199,7 +199,7 @@ func TestPingEndpoint(t *testing.T) {
 		t.Fatalf("Cache-Control = %q, want %q", got, "no-store")
 	}
 
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		t.Fatalf("Failed to decode ping response: %v", err)
 	}
@@ -288,7 +288,7 @@ func TestResultsSaveAndGet(t *testing.T) {
 	ts := NewTestServer(t)
 	defer ts.Close()
 
-	saveReq := map[string]interface{}{
+	saveReq := map[string]any{
 		"download_mbps":     123.45,
 		"upload_mbps":       67.89,
 		"latency_ms":        12.3,
@@ -340,7 +340,7 @@ func TestResultsSaveAndGet(t *testing.T) {
 		t.Fatalf("get result cache-control = %q, want %q", got, "no-store")
 	}
 
-	var saved map[string]interface{}
+	var saved map[string]any
 	if err := json.NewDecoder(getResp.Body).Decode(&saved); err != nil {
 		t.Fatalf("decode get response: %v", err)
 	}
@@ -483,7 +483,7 @@ func TestAPIStartTest(t *testing.T) {
 	ts := NewTestServer(t)
 	defer ts.Close()
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"protocol":    "tcp",
 		"direction":   "download",
 		"duration":    5,
@@ -507,7 +507,7 @@ func TestAPIStartTest(t *testing.T) {
 		return
 	}
 
-	var data map[string]interface{}
+	var data map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
@@ -525,7 +525,7 @@ func TestWebSocketConnection(t *testing.T) {
 	ts := NewTestServer(t)
 	defer ts.Close()
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"protocol":  "tcp",
 		"direction": "download",
 		"duration":  3,
@@ -542,7 +542,7 @@ func TestWebSocketConnection(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	var startResp map[string]interface{}
+	var startResp map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&startResp); err != nil {
 		t.Fatalf("Failed to decode start response: %v", err)
 	}
@@ -576,7 +576,7 @@ func TestWebSocketConnection(t *testing.T) {
 
 	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
-	var msg map[string]interface{}
+	var msg map[string]any
 	if err := conn.ReadJSON(&msg); err != nil {
 		t.Fatalf("Failed to read WebSocket message: %v", err)
 	}
@@ -595,7 +595,7 @@ func TestWebSocketOriginRejected(t *testing.T) {
 	ts := NewTestServerWithOrigins(t, []string{"https://allowed.example"})
 	defer ts.Close()
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"protocol":  "tcp",
 		"direction": "download",
 		"duration":  3,
@@ -612,7 +612,7 @@ func TestWebSocketOriginRejected(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	var startResp map[string]interface{}
+	var startResp map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&startResp); err != nil {
 		t.Fatalf("Failed to decode start response: %v", err)
 	}
@@ -646,7 +646,7 @@ func TestFullFlow(t *testing.T) {
 	ts := NewTestServer(t)
 	defer ts.Close()
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"protocol":  "tcp",
 		"direction": "download",
 		"duration":  5,
@@ -668,7 +668,7 @@ func TestFullFlow(t *testing.T) {
 		t.Fatalf("Start test failed: %d. Body: %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	var startResp map[string]interface{}
+	var startResp map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&startResp); err != nil {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
@@ -710,7 +710,7 @@ func TestFullFlow(t *testing.T) {
 	conn.SetReadDeadline(deadline)
 
 	for time.Now().Before(deadline) {
-		var msg map[string]interface{}
+		var msg map[string]any
 		if err := conn.ReadJSON(&msg); err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				t.Logf("WebSocket error: %v", err)

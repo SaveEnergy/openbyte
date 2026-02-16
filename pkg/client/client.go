@@ -290,7 +290,7 @@ func (c *Client) measureLatency(ctx context.Context, samples int) (avgMs, jitter
 	pingURL := c.serverURL + "/api/v1/ping"
 	var latencies []time.Duration
 
-	for i := 0; i < samples; i++ {
+	for range samples {
 		if ctx.Err() != nil {
 			break
 		}

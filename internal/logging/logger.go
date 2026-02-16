@@ -108,7 +108,7 @@ func levelString(level Level) string {
 
 type Field struct {
 	Key   string
-	Value interface{}
+	Value any
 }
 
 func formatFields(fields []Field) string {
@@ -128,7 +128,7 @@ func formatFields(fields []Field) string {
 	return b.String()
 }
 
-func FormatValue(v interface{}) string {
+func FormatValue(v any) string {
 	switch val := v.(type) {
 	case string:
 		return val
@@ -158,7 +158,7 @@ func FormatValue(v interface{}) string {
 	}
 }
 
-func formatInt(v interface{}) string {
+func formatInt(v any) string {
 	switch val := v.(type) {
 	case int:
 		return formatInt64(int64(val))
@@ -173,7 +173,7 @@ func formatInt64(v int64) string {
 	return fmt.Sprintf("%d", v)
 }
 
-func formatUint(v interface{}) string {
+func formatUint(v any) string {
 	switch val := v.(type) {
 	case uint:
 		return formatUint64(uint64(val))

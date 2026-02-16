@@ -108,7 +108,7 @@ func TestCheckQuick_JSONSerializable(t *testing.T) {
 		t.Fatalf("JSON marshal failed: %v", err)
 	}
 
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := json.Unmarshal(data, &parsed); err != nil {
 		t.Fatalf("JSON unmarshal failed: %v", err)
 	}

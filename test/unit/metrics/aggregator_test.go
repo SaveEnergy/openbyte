@@ -36,17 +36,15 @@ func TestMultiStreamAggregatorConcurrentGetMetrics(t *testing.T) {
 	agg := metrics.NewMultiStreamAggregator(4)
 	var wg sync.WaitGroup
 
-	for i := 0; i < 8; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 200; j++ {
+	for range 8 {
+		wg.Go(func() {
+			for range 200 {
 				agg.RecordBytes(128, "sent")
 				agg.RecordBytes(128, "recv")
 				agg.RecordLatency(5 * time.Millisecond)
 				_ = agg.GetAggregatedMetrics()
 			}
-		}()
+		})
 	}
 	wg.Wait()
 

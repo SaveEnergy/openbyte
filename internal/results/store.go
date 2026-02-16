@@ -128,7 +128,7 @@ const busyRetryBackoff = 25 * time.Millisecond
 
 func (s *Store) Save(r Result) (string, error) {
 	now := time.Now().UTC()
-	for attempt := 0; attempt < maxIDRetries; attempt++ {
+	for range maxIDRetries {
 		id, err := generateID()
 		if err != nil {
 			return "", fmt.Errorf("generate id: %w", err)
@@ -241,7 +241,7 @@ func (s *Store) cleanup() {
 	}
 }
 
-func (s *Store) execWithBusyRetry(query string, args ...interface{}) (sql.Result, error) {
+func (s *Store) execWithBusyRetry(query string, args ...any) (sql.Result, error) {
 	var (
 		res sql.Result
 		err error

@@ -53,7 +53,7 @@ func TestMCP_ConnectivityCheck_ViaSDK(t *testing.T) {
 	}
 
 	// Verify it's valid JSON parseable by agents
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := json.Unmarshal(data, &parsed); err != nil {
 		t.Fatalf("JSON unmarshal failed: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestMCP_SpeedTest_ViaSDK(t *testing.T) {
 		t.Fatalf("JSON marshal failed: %v", err)
 	}
 
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	json.Unmarshal(data, &parsed)
 
 	for _, key := range []string{"direction", "throughput_mbps", "latency_ms", "interpretation"} {
@@ -178,7 +178,7 @@ func TestDiagnostic_JSONSchema(t *testing.T) {
 		t.Fatalf("marshal failed: %v", err)
 	}
 
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	json.Unmarshal(data, &parsed)
 
 	expectedKeys := []string{

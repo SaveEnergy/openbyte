@@ -1,4 +1,4 @@
-.PHONY: build openbyte loadtest test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench ci-test ci-lint
+.PHONY: build openbyte loadtest test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench perf-leakcheck ci-test ci-lint
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
@@ -108,6 +108,17 @@ perf-smoke: build loadtest
 	@kill `cat /tmp/openbyte-perf.pid` || true
 	@echo "✓ Perf smoke complete. Profile: /tmp/openbyte-cpu.pprof"
 
+perf-leakcheck:
+	@echo "Building server with goroutine leak profile experiment..."
+	@mkdir -p bin
+	@GOEXPERIMENT=goroutineleakprofile go build -ldflags "$(LDFLAGS)" -o bin/openbyte-leak ./cmd/openbyte
+	@echo "Starting leak-profile server with pprof..."
+	@PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6061 PORT=8090 TCP_TEST_PORT=8091 UDP_TEST_PORT=8092 ./bin/openbyte-leak server & echo $$! > /tmp/openbyte-leak.pid
+	@sleep 2
+	@curl -sf "http://127.0.0.1:6061/debug/pprof/goroutineleak?debug=1" -o /tmp/openbyte-goroutineleak.txt
+	@kill `cat /tmp/openbyte-leak.pid` || true
+	@echo "✓ Goroutine leak profile captured: /tmp/openbyte-goroutineleak.txt"
+
 # Help
 help:
 	@echo "openByte Makefile"
@@ -124,6 +135,7 @@ help:
 	@echo "  test-coverage - Generate coverage report"
 	@echo "  perf-bench    - Run perf benchmarks"
 	@echo "  perf-smoke    - Run perf smoke with pprof capture"
+	@echo "  perf-leakcheck- Run goroutine leak profile smoke (Go 1.26 experiment)"
 	@echo "  run           - Run server (development, port 8080)"
 	@echo "  run-alt-ports - Run server with alternative ports (9090, 9081, 9082)"
 	@echo "  kill-ports    - Kill processes on ports 8080-8082"

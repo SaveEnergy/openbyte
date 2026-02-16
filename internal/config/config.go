@@ -396,10 +396,7 @@ func (c *Config) Validate() error {
 // push ~150 Mbps on a single TCP connection, so we allow roughly
 // 8 slots per Gbps of declared capacity with a floor of 50.
 func (c *Config) MaxConcurrentHTTP() int {
-	limit := c.CapacityGbps * 8
-	if limit < 50 {
-		limit = 50
-	}
+	limit := max(c.CapacityGbps*8, 50)
 	return limit
 }
 

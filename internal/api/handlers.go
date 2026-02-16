@@ -92,8 +92,8 @@ type streamSnapshotResponse struct {
 	Progress  float64              `json:"progress"`
 	Metrics   types.Metrics        `json:"metrics"`
 	Network   *types.NetworkInfo   `json:"network,omitempty"`
-	StartTime time.Time            `json:"start_time,omitempty"`
-	EndTime   time.Time            `json:"end_time,omitempty"`
+	StartTime time.Time            `json:"start_time"`
+	EndTime   time.Time            `json:"end_time"`
 	Error     string               `json:"error,omitempty"`
 }
 
@@ -522,7 +522,7 @@ func responseHost(r *http.Request, cfg *config.Config) string {
 	return normalizeHost(r.Host)
 }
 
-func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}, limit int64) error {
+func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any, limit int64) error {
 	if limit > 0 {
 		r.Body = http.MaxBytesReader(w, r.Body, limit)
 	}
@@ -592,7 +592,7 @@ func respondJSONBodyError(w http.ResponseWriter, err error) {
 	respondJSON(w, map[string]string{"error": "invalid request body"}, http.StatusBadRequest)
 }
 
-func respondJSON(w http.ResponseWriter, data interface{}, statusCode int) {
+func respondJSON(w http.ResponseWriter, data any, statusCode int) {
 	payload, err := json.Marshal(data)
 	if err != nil {
 		logging.Warn("JSON response marshal failed",

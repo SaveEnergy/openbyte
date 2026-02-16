@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -23,7 +24,7 @@ type Router struct {
 	speedtest        *SpeedTestHandler
 	resultsHandler   *results.Handler
 	limiter          *RateLimiter
-	wsServer         interface{}
+	wsServer         any
 	allowedOrigins   []string
 	clientIPResolver *ClientIPResolver
 	webFS            http.FileSystem
@@ -341,8 +342,8 @@ func (r *Router) isAllowedOrigin(origin string) bool {
 		if strings.EqualFold(allowed, origin) {
 			return true
 		}
-		if strings.HasPrefix(allowed, "*.") {
-			suffix := strings.TrimPrefix(allowed, "*.")
+		if after, ok := strings.CutPrefix(allowed, "*."); ok {
+			suffix := after
 			if originHostValue != "" && (originHostValue == suffix || strings.HasSuffix(originHostValue, "."+suffix)) {
 				return true
 			}
@@ -356,12 +357,7 @@ func (r *Router) isAllowedOrigin(origin string) bool {
 }
 
 func (r *Router) isAllowAllOrigins() bool {
-	for _, allowed := range r.allowedOrigins {
-		if allowed == "*" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(r.allowedOrigins, "*")
 }
 
 func isValidStreamID(streamID string) bool {

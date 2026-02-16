@@ -46,7 +46,7 @@ func NewCollector() *Collector {
 		latencyHistogram: NewLatencyHistogram(latencyBucketWidth, latencyBucketCount),
 		startTime:        time.Now(),
 		bucketPool: sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				return make([]uint32, latencyBucketCount)
 			},
 		},

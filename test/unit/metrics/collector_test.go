@@ -38,7 +38,7 @@ func TestCollector_RecordBytesIgnoresNegative(t *testing.T) {
 func TestCollector_RecordPacket(t *testing.T) {
 	c := metrics.NewCollector()
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		c.RecordPacket(true)
 		c.RecordPacket(false)
 	}
@@ -69,14 +69,12 @@ func TestCollector_Concurrent(t *testing.T) {
 	c := metrics.NewCollector()
 	var wg sync.WaitGroup
 
-	for i := 0; i < 100; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 100 {
+		wg.Go(func() {
 			c.RecordBytes(100, "sent")
 			c.RecordPacket(true)
 			c.RecordLatency(10 * time.Millisecond)
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -96,11 +94,9 @@ func TestCollector_ConcurrentRecordAndRead(t *testing.T) {
 	done := make(chan struct{})
 
 	// Writers: record latency concurrently
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 1000; j++ {
+	for range 10 {
+		wg.Go(func() {
+			for j := range 1000 {
 				select {
 				case <-done:
 					return
@@ -108,15 +104,13 @@ func TestCollector_ConcurrentRecordAndRead(t *testing.T) {
 					c.RecordLatency(time.Duration(j%100) * time.Millisecond)
 				}
 			}
-		}()
+		})
 	}
 
 	// Readers: get metrics concurrently with writes
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 500; j++ {
+	for range 5 {
+		wg.Go(func() {
+			for range 500 {
 				select {
 				case <-done:
 					return
@@ -125,7 +119,7 @@ func TestCollector_ConcurrentRecordAndRead(t *testing.T) {
 					_ = m.Latency.Count
 				}
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

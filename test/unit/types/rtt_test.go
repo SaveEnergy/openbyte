@@ -120,7 +120,7 @@ func TestRTTCollectorRingBufferAvg(t *testing.T) {
 
 func TestRTTCollectorDefaultMaxSamples(t *testing.T) {
 	c := types.NewRTTCollector(0) // should default to 100
-	for i := 0; i < 150; i++ {
+	for i := range 150 {
 		c.AddSample(float64(i))
 	}
 
@@ -134,7 +134,7 @@ func TestRTTCollectorConcurrent(t *testing.T) {
 	c := types.NewRTTCollector(100)
 
 	var wg sync.WaitGroup
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		wg.Add(1)
 		go func(v float64) {
 			defer wg.Done()

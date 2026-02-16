@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"sort"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -69,7 +69,7 @@ func NewTestEngine(cfg *TestEngineConfig) *TestEngine {
 			StartTime:      time.Now(),
 		},
 		bufferPool: sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				return make([]byte, 64*1024)
 			},
 		},
@@ -471,9 +471,7 @@ func calculateClientLatency(samples []time.Duration) LatencyStats {
 
 	sorted := make([]time.Duration, len(samples))
 	copy(sorted, samples)
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i] < sorted[j]
-	})
+	slices.Sort(sorted)
 
 	var sum time.Duration
 	for _, s := range sorted {

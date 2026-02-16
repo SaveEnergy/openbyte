@@ -194,7 +194,7 @@ func (f *InteractiveFormatter) FormatError(err error) {
 // NDJSON formatter — newline-delimited JSON for streaming progress.
 
 func (f *NDJSONFormatter) FormatProgress(progress, elapsed, remaining float64) {
-	msg := map[string]interface{}{
+	msg := map[string]any{
 		"type":        "progress",
 		"percent":     progress,
 		"elapsed_s":   elapsed,
@@ -204,7 +204,7 @@ func (f *NDJSONFormatter) FormatProgress(progress, elapsed, remaining float64) {
 }
 
 func (f *NDJSONFormatter) FormatMetrics(metrics *types.Metrics) {
-	msg := map[string]interface{}{
+	msg := map[string]any{
 		"type":            "metrics",
 		"throughput_mbps": metrics.ThroughputMbps,
 		"bytes":           metrics.BytesTransferred,
@@ -215,7 +215,7 @@ func (f *NDJSONFormatter) FormatMetrics(metrics *types.Metrics) {
 }
 
 func (f *NDJSONFormatter) FormatComplete(results *StreamResults) {
-	msg := map[string]interface{}{
+	msg := map[string]any{
 		"type": "result",
 		"data": results,
 	}
@@ -238,7 +238,7 @@ func (f *NDJSONFormatter) LastError() error {
 	return f.err
 }
 
-func (f *NDJSONFormatter) encode(v interface{}) {
+func (f *NDJSONFormatter) encode(v any) {
 	if err := json.NewEncoder(f.Writer).Encode(v); err != nil {
 		fmt.Fprintf(os.Stderr, "ndjson encode error: %v\n", err)
 		f.errMu.Lock()

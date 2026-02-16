@@ -164,12 +164,10 @@ func TestBroadcastMetricsSendsTerminalStatusOnce(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	for i := 0; i < 12; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 12 {
+		wg.Go(func() {
 			server.BroadcastMetrics(streamID, snapshot)
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -181,7 +179,7 @@ func TestBroadcastMetricsSendsTerminalStatusOnce(t *testing.T) {
 			break
 		}
 
-		var msg map[string]interface{}
+		var msg map[string]any
 		if err := json.Unmarshal(data, &msg); err != nil {
 			t.Fatalf("unmarshal websocket message: %v", err)
 		}
@@ -229,7 +227,7 @@ func TestConcurrentBroadcastRemoval(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		for i := 0; i < 200; i++ {
+		for range 200 {
 			server.BroadcastMetrics(streamID, snapshot)
 		}
 	}()

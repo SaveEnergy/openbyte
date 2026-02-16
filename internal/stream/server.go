@@ -61,7 +61,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		cancel:        cancel,
 		randomData:    make([]byte, randomDataSize),
 		recvPool: sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				return make([]byte, recvBufferSize)
 			},
 		},
@@ -184,10 +184,7 @@ func (s *Server) handleTCPConnection(conn *net.TCPConn) {
 func (s *Server) handleDownload(conn *net.TCPConn) {
 	dataLen := len(s.randomData)
 	offset := 0
-	chunkSize := sendBufferSize
-	if chunkSize > dataLen {
-		chunkSize = dataLen
-	}
+	chunkSize := min(sendBufferSize, dataLen)
 	nextDeadline := time.Now().Add(1 * time.Second)
 	conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 
@@ -265,10 +262,7 @@ func (s *Server) handleBidirectional(conn *net.TCPConn) {
 	go func() {
 		defer wg.Done()
 		dataLen := len(s.randomData)
-		chunkSize := sendBufferSize
-		if chunkSize > dataLen {
-			chunkSize = dataLen
-		}
+		chunkSize := min(sendBufferSize, dataLen)
 		offset := 0
 		nextDeadline := time.Now().Add(1 * time.Second)
 		conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
@@ -438,10 +432,7 @@ func (s *Server) handleUDP() {
 
 	clients := &udpClients{m: make(map[string]*udpClientState)}
 
-	numReaders := runtime.GOMAXPROCS(0)
-	if numReaders < 2 {
-		numReaders = 2
-	}
+	numReaders := max(runtime.GOMAXPROCS(0), 2)
 	if numReaders > 4 {
 		numReaders = 4
 	}
@@ -542,10 +533,7 @@ func (s *Server) udpSender(clients *udpClients, clientKey string, client *udpCli
 	}()
 
 	packet := make([]byte, s.config.UDPBufferSize)
-	n := len(packet)
-	if n > len(s.randomData) {
-		n = len(s.randomData)
-	}
+	n := min(len(packet), len(s.randomData))
 	copy(packet, s.randomData[:n])
 
 	lastYield := time.Now()

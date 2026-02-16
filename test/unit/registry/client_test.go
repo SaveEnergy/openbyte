@@ -50,7 +50,7 @@ func TestClientStartHeartbeatAndStopLifecycle(t *testing.T) {
 		switch r.Method {
 		case http.MethodPost:
 			postCount.Add(1)
-			var body map[string]interface{}
+			var body map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			w.WriteHeader(http.StatusCreated)
 			_, _ = w.Write([]byte(`{"status":"registered"}`))

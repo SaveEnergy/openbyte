@@ -12,7 +12,7 @@ import (
 
 func drainGlobalTokens(t *testing.T, rl *api.RateLimiter, ip string, count int) {
 	t.Helper()
-	for i := 0; i < count; i++ {
+	for i := range count {
 		if !rl.Allow(ip) {
 			t.Fatalf("token %d not allowed", i)
 		}
@@ -122,11 +122,11 @@ func TestRateLimiterConcurrentAccess(t *testing.T) {
 	rl := api.NewRateLimiter(cfg)
 
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		wg.Add(1)
 		go func(ip string) {
 			defer wg.Done()
-			for j := 0; j < 100; j++ {
+			for range 100 {
 				rl.Allow(ip)
 			}
 		}(fmt.Sprintf("10.0.0.%d", i))
@@ -145,7 +145,7 @@ func TestRateLimiterCleanupConcurrentAllowStress(t *testing.T) {
 	stop := make(chan struct{})
 	var wg sync.WaitGroup
 	workers := 12
-	for i := 0; i < workers; i++ {
+	for i := range workers {
 		wg.Add(1)
 		go func(worker int) {
 			defer wg.Done()

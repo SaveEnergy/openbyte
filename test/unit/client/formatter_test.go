@@ -138,7 +138,7 @@ func TestJSONFormatComplete_SchemaVersion(t *testing.T) {
 	}
 	f.FormatComplete(results)
 
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	json.Unmarshal(buf.Bytes(), &parsed)
 	if parsed["schema_version"] != client.SchemaVersion {
 		t.Errorf("expected schema_version %s, got %v", client.SchemaVersion, parsed["schema_version"])
@@ -156,7 +156,7 @@ func TestJSONFormatComplete_InterpretationIncluded(t *testing.T) {
 	f.FormatComplete(results)
 
 	// Just verify it's valid JSON
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
 		t.Fatalf("invalid JSON output: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestNDJSONFormatProgress(t *testing.T) {
 	f := &client.NDJSONFormatter{Writer: &buf}
 	f.FormatProgress(50.0, 5.0, 5.0)
 
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
 		t.Fatalf("invalid NDJSON progress: %v\nraw: %s", err, buf.String())
 	}
@@ -192,7 +192,7 @@ func TestNDJSONFormatMetrics(t *testing.T) {
 	}
 	f.FormatMetrics(m)
 
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
 		t.Fatalf("invalid NDJSON metrics: %v", err)
 	}
@@ -214,14 +214,14 @@ func TestNDJSONFormatComplete(t *testing.T) {
 	}
 	f.FormatComplete(results)
 
-	var parsed map[string]interface{}
+	var parsed map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
 		t.Fatalf("invalid NDJSON complete: %v", err)
 	}
 	if parsed["type"] != "result" {
 		t.Errorf("expected type=result, got %v", parsed["type"])
 	}
-	data, ok := parsed["data"].(map[string]interface{})
+	data, ok := parsed["data"].(map[string]any)
 	if !ok {
 		t.Fatal("expected data field to be an object")
 	}
@@ -266,7 +266,7 @@ func TestNDJSONMultilineOutput(t *testing.T) {
 
 	// Each line should be valid JSON
 	for i, line := range lines {
-		var parsed map[string]interface{}
+		var parsed map[string]any
 		if err := json.Unmarshal(line, &parsed); err != nil {
 			t.Errorf("line %d is not valid JSON: %v", i, err)
 		}

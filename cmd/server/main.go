@@ -189,11 +189,9 @@ func Run(args []string, version string) int {
 	muxRouter := router.SetupRoutes(registrars...)
 
 	var broadcastWg sync.WaitGroup
-	broadcastWg.Add(1)
-	go func() {
-		defer broadcastWg.Done()
+	broadcastWg.Go(func() {
 		broadcastMetrics(manager, wsServer)
-	}()
+	})
 
 	if cfg.RegistryEnabled && !cfg.RegistryMode {
 		logger := logging.NewLogger("registry-client")

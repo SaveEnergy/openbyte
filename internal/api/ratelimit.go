@@ -29,10 +29,7 @@ type IPLimit struct {
 }
 
 func NewRateLimiter(cfg *config.Config) *RateLimiter {
-	maxIPEntries := cfg.GlobalRateLimit * 20
-	if maxIPEntries < 10000 {
-		maxIPEntries = 10000
-	}
+	maxIPEntries := max(cfg.GlobalRateLimit*20, 10000)
 	return &RateLimiter{
 		config:           cfg,
 		ipLimits:         make(map[string]*IPLimit),

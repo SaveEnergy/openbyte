@@ -45,7 +45,7 @@ func respondJSONError(w http.ResponseWriter, msg string, code int) {
 	writeJSON(w, code, map[string]string{"error": msg})
 }
 
-func writeJSON(w http.ResponseWriter, code int, payload interface{}) {
+func writeJSON(w http.ResponseWriter, code int, payload any) {
 	body, err := json.Marshal(payload)
 	if err != nil {
 		logging.Warn("results: marshal response failed", logging.Field{Key: "error", Value: err})

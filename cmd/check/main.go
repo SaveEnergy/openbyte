@@ -101,7 +101,7 @@ func Run(args []string, version string) int {
 
 	if err != nil {
 		if jsonOut {
-			errResp := map[string]interface{}{
+			errResp := map[string]any{
 				"schema_version": "1.0",
 				"error":          true,
 				"code":           "check_failed",

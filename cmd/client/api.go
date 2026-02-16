@@ -111,14 +111,14 @@ func completeStream(ctx context.Context, config *Config, streamID string, metric
 	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	reqBody := map[string]interface{}{
+	reqBody := map[string]any{
 		"status": "completed",
-		"metrics": map[string]interface{}{
+		"metrics": map[string]any{
 			"throughput_mbps":     metrics.ThroughputMbps,
 			"throughput_avg_mbps": metrics.ThroughputMbps,
 			"bytes_transferred":   metrics.BytesTransferred,
 			"jitter_ms":           metrics.JitterMs,
-			"latency_ms": map[string]interface{}{
+			"latency_ms": map[string]any{
 				"min_ms": metrics.Latency.MinMs,
 				"max_ms": metrics.Latency.MaxMs,
 				"avg_ms": metrics.Latency.AvgMs,

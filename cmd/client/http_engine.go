@@ -51,10 +51,7 @@ func NewHTTPTestEngine(cfg *HTTPTestConfig) (*HTTPTestEngine, error) {
 		Transport: transport,
 		Timeout:   cfg.Timeout,
 	}
-	payloadSize := cfg.ChunkSize
-	if payloadSize < 4*1024*1024 {
-		payloadSize = 4 * 1024 * 1024
-	}
+	payloadSize := max(cfg.ChunkSize, 4*1024*1024)
 	payload := make([]byte, payloadSize)
 	if _, err := rand.Read(payload); err != nil {
 		return nil, fmt.Errorf("generate upload payload: %w", err)
@@ -65,7 +62,7 @@ func NewHTTPTestEngine(cfg *HTTPTestConfig) (*HTTPTestEngine, error) {
 		client:        client,
 		uploadPayload: payload,
 		bufferPool: sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				return make([]byte, 64*1024)
 			},
 		},
@@ -325,7 +322,7 @@ func measureHTTPPing(ctx context.Context, serverURL string, samples int) ([]time
 	client := &http.Client{Timeout: 10 * time.Second}
 	results := make([]time.Duration, 0, samples)
 
-	for i := 0; i < samples; i++ {
+	for range samples {
 		start := time.Now()
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, pingURL, nil)
 		if err != nil {

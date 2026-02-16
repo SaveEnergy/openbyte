@@ -123,6 +123,9 @@
 
 ### Recent Decision Notes
 
+- Adopted Go 1.26 baseline (`go.mod` + CI/nightly/release `setup-go` pin to `1.26.x`).
+- Ran `go fix ./...` and kept behavior-neutral modernizers (e.g., `any`, built-in `min/max`, small stdlib rewrites); skipped behavior-changing `omitempty -> omitzero`.
+- Added optional leak-debug path via `make perf-leakcheck` using `GOEXPERIMENT=goroutineleakprofile` + pprof `goroutineleak` endpoint capture.
 - Used package-internal white-box tests for rollback/mapping branches hard to trigger from black-box HTTP tests.
 - Added explicit semver tag-format guard in release deploy script for fail-fast behavior in reused/manual contexts.
 - Applied rate-limit parity to registrar routes and browser results route.
