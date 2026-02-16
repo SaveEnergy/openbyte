@@ -32,7 +32,7 @@ type HTTPTestConfig struct {
 type HTTPTestEngine struct {
 	config        *HTTPTestConfig
 	client        *http.Client
-	startTime     time.Time
+	startUnixNano int64
 	totalBytes    int64
 	graceBytes    int64
 	graceDone     int32
@@ -72,7 +72,7 @@ func NewHTTPTestEngine(cfg *HTTPTestConfig) (*HTTPTestEngine, error) {
 func (e *HTTPTestEngine) Run(ctx context.Context) error {
 	atomic.StoreInt32(&e.running, 1)
 	defer atomic.StoreInt32(&e.running, 0)
-	e.startTime = time.Now()
+	atomic.StoreInt64(&e.startUnixNano, time.Now().UnixNano())
 
 	switch e.config.Direction {
 	case "download":
@@ -139,7 +139,7 @@ func (e *HTTPTestEngine) runDownload(ctx context.Context) error {
 				n, err := resp.Body.Read(buf)
 				if n > 0 {
 					atomic.AddInt64(&e.bytesReceived, int64(n))
-					e.addBytes(int64(n), time.Since(e.startTime))
+					e.addBytes(int64(n), e.elapsedSinceStart())
 				}
 				if err != nil {
 					if errors.Is(err, io.EOF) || ctx.Err() != nil {
@@ -221,7 +221,7 @@ func (e *HTTPTestEngine) runUpload(ctx context.Context) error {
 				}
 
 				atomic.AddInt64(&e.bytesSent, int64(len(e.uploadPayload)))
-				e.addBytes(int64(len(e.uploadPayload)), time.Since(e.startTime))
+				e.addBytes(int64(len(e.uploadPayload)), e.elapsedSinceStart())
 			}
 		}(time.Duration(i) * e.config.StreamDelay)
 	}
@@ -272,7 +272,7 @@ func (e *HTTPTestEngine) buildUploadURL() string {
 }
 
 func (e *HTTPTestEngine) GetMetrics() EngineMetrics {
-	elapsed := time.Since(e.startTime)
+	elapsed := e.elapsedSinceStart()
 	totalBytes := atomic.LoadInt64(&e.totalBytes)
 	bytesSent := atomic.LoadInt64(&e.bytesSent)
 	bytesRecv := atomic.LoadInt64(&e.bytesReceived)
@@ -288,6 +288,14 @@ func (e *HTTPTestEngine) GetMetrics() EngineMetrics {
 		Elapsed:          elapsed,
 		Running:          atomic.LoadInt32(&e.running) == 1,
 	}
+}
+
+func (e *HTTPTestEngine) elapsedSinceStart() time.Duration {
+	startUnixNano := atomic.LoadInt64(&e.startUnixNano)
+	if startUnixNano == 0 {
+		return 0
+	}
+	return time.Since(time.Unix(0, startUnixNano))
 }
 
 func (e *HTTPTestEngine) Close() {
