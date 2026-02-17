@@ -75,57 +75,35 @@
 
 - Treat this section as shared state for concurrent agents.
 - Use monotonic status flow only: `Planned -> Claimed -> In Progress -> Check -> Done` (or `Blocked` / `Cancelled`).
-- Keep entries attributable (`Agent`, `UTC`, `Evidence`, `Check`).
-- If overlaps happen, resolve explicitly in `Decision Notes` (no silent overwrite).
-
-### Work Item Schema
-
-- `ID`: `YYYYMMDD-<area>-<nn>`
-- `Area`: `api`, `client`, `web`, `ci`, `docs`, ...
-- `Agent`: owner tag (`A0`, `A1`, ...)
-- `Status`: allowed state
-- `Plan`: one-line intent
-- `Evidence`: concrete proof
-- `Check`: exact verification command
+- Keep entries attributable (`Agent`, `Evidence`, `Check`).
+- Resolve overlaps explicitly in `Decision Notes` (no silent overwrite).
 
 ### Live Queue (active only)
 
 | ID       | Area | Agent | Status | Plan                                                         | Evidence | Check |
 | -------- | ---- | ----- | ------ | ------------------------------------------------------------ | -------- | ----- |
-| 20260217-web-02 | web | A0 | Check | Burn down highest-open frontend static-analysis backlog in `web/results.js`, `web/app.js`, `web/download.js`. | Batch-1 implemented: `web/results.js` modernized (`var` removal, optional chaining, `window` -> `globalThis`, explicit catch handling); `web/download.js` updated for optional chaining/deprecation-safe patterns/removeChild modernizations; `web/app.js` targeted S6582/S7773/S7764 fixes (`Number.parseInt`, optional chaining, constant cleanup). | `npx prettier --check web/*.js && bunx playwright test` |
-| 20260217-go-02 | api | A0 | Check | Continue production Go hotspot reduction (`go:S3776`) in server/api/websocket/stream paths. | Batch-1: extracted download parsing/source/streaming helpers in `internal/api/speedtest.go`; split origin matching logic in `internal/websocket/server.go`. Batch-2: reduced orchestration complexity in `cmd/server/main.go` via lifecycle helpers (`startHTTPServer`, `waitForShutdown`, `shutdownHTTPServer`, `stopServerDependencies`) and collapsed repeated timeout/read-error branches in `internal/stream/server.go` (`isTimeoutError`, `isRetryableConnReadError`). | `go test -short ./cmd/server ./cmd/client ./internal/api ./internal/stream ./internal/websocket` |
-| 20260217-test-02 | test | A0 | Check | Bulk-close low-risk test-only smells (`go:S100`, `go:S1192`, `godre:S8193`) via focused cleanup sweeps. | Batch-1: `test/unit/client/sdk_test.go` centralized repeated literals (endpoint paths, content-type, common status payload, direction values, unreachable URL). Batch-2: `test/unit/diagnostic/diagnostic_test.go` centralized repeated ratings/suitability/concern literals and replaced repeated assertions with constants. Strict OPEN recheck currently still reports `422` total (`go:S100=102`, `go:S1192=102`, `godre:S8193=50`), so next step is waiting for refreshed server-side analysis before assessing net reduction. | `go test -short ./test/unit/... ./test/e2e/...` |
+| 20260217-web-02 | web | A0 | Check | Burn down frontend static-analysis backlog in `web/results.js`, `web/app.js`, `web/download.js`. | Completed modernization pass: optional chaining, `globalThis`, safer error handling, deprecated patterns removed. | `npx prettier --check web/*.js && bunx playwright test` |
+| 20260217-go-02 | api | A0 | Check | Continue production Go hotspot reduction (`go:S3776`) in server/api/websocket/stream paths. | Completed 3 refactor batches across `internal/api/speedtest.go`, `internal/websocket/server.go`, `cmd/server/main.go`, `internal/stream/server.go`, `internal/api/router.go` with behavior-preserving helper extraction. | `go test -short ./cmd/server ./cmd/client ./internal/api ./internal/stream ./internal/websocket` |
+| 20260217-test-02 | test | A0 | Check | Bulk-close low-risk test-only smells (`go:S100`, `go:S1192`, `godre:S8193`) via focused cleanup sweeps. | Completed 3 cleanup batches across `test/unit/client/sdk_test.go`, `test/unit/diagnostic/diagnostic_test.go`, `test/unit/api/handlers_test.go` with literal dedupe and assertion cleanup. | `go test -short ./test/unit/... ./test/e2e/...` |
 
 ### Sonar Snapshot (2026-02-17)
 
 - Strict OPEN filter parity maintained with Cloud:
   - Query: `projects=[SaveEnergy_openbyte]`, `issueStatuses=[OPEN]`, `ps=500`
-  - Total OPEN: `422`
-  - Current top tracked rules: `go:S3776=36`, `go:S100=102`, `go:S1192=102`, `godre:S8193=50`
+  - Total OPEN: `362` (down from `422`)
+  - Current top tracked rules: `go:S3776=33`, `go:S100=102`, `go:S1192=97`, `godre:S8193=50`
 
 ### Recently Closed IDs
 
-- `20260205-api-05`, `20260205-client-05`, `20260205-client-06`, `20260205-ci-02`, `20260205-ci-03`, `20260205-docs-02`
-- `20260215-ci-07`, `20260215-docker-03`, `20260215-check-01`, `20260215-check-02`, `20260215-check-03`, `20260215-check-04`
-- `20260215-client-09`, `20260215-sdk-01`, `20260215-config-02`, `20260215-registry-03`, `20260215-config-03`, `20260215-config-04`
-- `20260215-results-03`, `20260215-results-04`, `20260215-results-05`, `20260215-openbyte-02`, `20260215-mcp-01`, `20260215-api-06`
-- `20260215-api-07`, `20260215-loadtest-01`, `20260215-loadtest-02`, `20260215-metrics-01`, `20260215-install-01`, `20260215-client-10`
-- `20260215-mcp-02`, `20260215-diagnostic-01`
-- `20260216-ci-08`, `20260216-go-01`, `20260216-test-01`, `20260216-web-01`, `20260216-scripts-01`, `20260216-cleanup-01`
-- `20260217-ci-09`
+- Most historical IDs intentionally pruned for readability; canonical record remains in git history.
+- Recent close: `20260217-ci-09`.
 
 ### Recent Decision Notes
 
-- Adopted Go 1.26 baseline (`go.mod` + CI/nightly/release `setup-go` pin to `1.26.x`).
-- Ran `go fix ./...` and kept behavior-neutral modernizers (e.g., `any`, built-in `min/max`, small stdlib rewrites); skipped behavior-changing `omitempty -> omitzero`.
-- Added optional leak-debug path via `make perf-leakcheck` using `GOEXPERIMENT=goroutineleakprofile` + pprof `goroutineleak` endpoint capture.
-- Used package-internal white-box tests for rollback/mapping branches hard to trigger from black-box HTTP tests.
-- Added explicit semver tag-format guard in release deploy script for fail-fast behavior in reused/manual contexts.
-- Applied rate-limit parity to registrar routes and browser results route.
-- Tightened API mutation contract (explicit JSON content-type + unknown-field rejection).
-- Preferred fail-fast CLI/config validation over silent fallback behavior.
+- Adopted Go 1.26 baseline across runtime and CI/release workflows.
+- Sonar reporting uses strict OPEN parity query (`projects=SaveEnergy_openbyte`, `issueStatuses=OPEN`).
+- Prefer behavior-preserving refactors + targeted regression tests over broad rewrites.
 - Active backlog rows now keep only unresolved/externally-dependent items; completed/check work is folded into `Recently Closed IDs` to keep queue readable.
-- Sonar queue reporting now uses strict OPEN filter (`projects=SaveEnergy_openbyte`, `issueStatuses=OPEN`) to match Cloud totals.
 
 ### Verification Baseline
 

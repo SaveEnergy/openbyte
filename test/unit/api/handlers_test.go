@@ -21,9 +21,13 @@ const (
 	streamPathPrefix = "/api/v1/stream/"
 	statusSuffix     = "/status"
 	completeSuffix   = "/complete"
+	metricsSuffix    = "/metrics"
+	cancelSuffix     = "/cancel"
+	resultsSuffix    = "/results"
 
 	contentTypeHeader = "Content-Type"
 	applicationJSON   = "application/json"
+	textPlain         = "text/plain"
 	statusCodeWantFmt = "status = %d, want %d"
 )
 
@@ -131,7 +135,7 @@ func TestStartStreamRejectsWrongContentType(t *testing.T) {
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
-	req.Header.Set(contentTypeHeader, "text/plain")
+	req.Header.Set(contentTypeHeader, textPlain)
 	rec := httptest.NewRecorder()
 
 	handler.StartStream(rec, req)
@@ -188,7 +192,7 @@ func TestStartStreamRejectsWrongContentTypeDrainsBody(t *testing.T) {
 	}
 	req := httptest.NewRequest(http.MethodPost, streamStartPath, nil)
 	req.Body = tb
-	req.Header.Set(contentTypeHeader, "text/plain")
+	req.Header.Set(contentTypeHeader, textPlain)
 	rec := httptest.NewRecorder()
 
 	handler.StartStream(rec, req)
@@ -531,7 +535,7 @@ func TestReportMetrics(t *testing.T) {
 
 	metrics := types.Metrics{ThroughputMbps: 500, BytesTransferred: 1024}
 	body := mustMarshalJSON(t, metrics)
-	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+"/metrics", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+metricsSuffix, bytes.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.ReportMetrics(rec, req, streamID)
@@ -550,8 +554,8 @@ func TestReportMetricsRejectsWrongContentType(t *testing.T) {
 	streamID := createTestStream(t, handler)
 
 	body := mustMarshalJSON(t, types.Metrics{ThroughputMbps: 500})
-	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+"/metrics", bytes.NewReader(body))
-	req.Header.Set(contentTypeHeader, "text/plain")
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+metricsSuffix, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, textPlain)
 	rec := httptest.NewRecorder()
 	handler.ReportMetrics(rec, req, streamID)
 
@@ -569,7 +573,7 @@ func TestReportMetricsRequiresContentType(t *testing.T) {
 	streamID := createTestStream(t, handler)
 
 	body := mustMarshalJSON(t, types.Metrics{ThroughputMbps: 500})
-	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+"/metrics", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+metricsSuffix, bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.ReportMetrics(rec, req, streamID)
 
@@ -586,7 +590,7 @@ func TestReportMetricsRejectsUnknownFields(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+"/metrics", strings.NewReader(`{"throughput_mbps":100,"unknown":1}`))
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+metricsSuffix, strings.NewReader(`{"throughput_mbps":100,"unknown":1}`))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.ReportMetrics(rec, req, streamID)
@@ -608,7 +612,7 @@ func TestReportMetricsValidation(t *testing.T) {
 		ThroughputMbps: -1,
 	}
 	body := mustMarshalJSON(t, metrics)
-	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+"/metrics", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+metricsSuffix, bytes.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.ReportMetrics(rec, req, streamID)
@@ -632,13 +636,13 @@ func TestReportMetricsEarlyRejectsDrainBody(t *testing.T) {
 		wantStatus  int
 	}{
 		{name: "wrong method", method: http.MethodGet, contentType: applicationJSON, wantStatus: http.StatusMethodNotAllowed},
-		{name: "wrong content type", method: http.MethodPost, contentType: "text/plain", wantStatus: http.StatusUnsupportedMediaType},
+		{name: "wrong content type", method: http.MethodPost, contentType: textPlain, wantStatus: http.StatusUnsupportedMediaType},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tb := &trackingBody{data: []byte(`{"throughput_mbps":123}`)}
-			req := httptest.NewRequest(tt.method, "/api/v1/stream/any/metrics", nil)
+			req := httptest.NewRequest(tt.method, streamPathPrefix+"any"+metricsSuffix, nil)
 			req.Body = tb
 			if tt.contentType != "" {
 				req.Header.Set(contentTypeHeader, tt.contentType)
@@ -663,7 +667,7 @@ func TestReportMetricsNotFound(t *testing.T) {
 	handler := api.NewHandler(mgr)
 
 	body := mustMarshalJSON(t, types.Metrics{})
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/missing/metrics", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+"missing"+metricsSuffix, bytes.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.ReportMetrics(rec, req, "missing")
@@ -710,7 +714,7 @@ func TestCompleteStreamRejectsWrongContentType(t *testing.T) {
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+completeSuffix, bytes.NewReader(body))
-	req.Header.Set(contentTypeHeader, "text/plain")
+	req.Header.Set(contentTypeHeader, textPlain)
 	rec := httptest.NewRecorder()
 	handler.CompleteStream(rec, req, streamID)
 
@@ -773,13 +777,13 @@ func TestCompleteStreamEarlyRejectsDrainBody(t *testing.T) {
 		wantStatus  int
 	}{
 		{name: "wrong method", method: http.MethodGet, contentType: applicationJSON, wantStatus: http.StatusMethodNotAllowed},
-		{name: "wrong content type", method: http.MethodPost, contentType: "text/plain", wantStatus: http.StatusUnsupportedMediaType},
+		{name: "wrong content type", method: http.MethodPost, contentType: textPlain, wantStatus: http.StatusUnsupportedMediaType},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tb := &trackingBody{data: []byte(`{"status":"completed","metrics":{"throughput_mbps":1}}`)}
-			req := httptest.NewRequest(tt.method, "/api/v1/stream/any/complete", nil)
+			req := httptest.NewRequest(tt.method, streamPathPrefix+"any"+completeSuffix, nil)
 			req.Body = tb
 			if tt.contentType != "" {
 				req.Header.Set(contentTypeHeader, tt.contentType)
@@ -872,7 +876,7 @@ func TestCancelStream(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+"/cancel", nil)
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+cancelSuffix, nil)
 	rec := httptest.NewRecorder()
 	handler.CancelStream(rec, req, streamID)
 
@@ -889,7 +893,7 @@ func TestCancelStreamWithBody(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+"/cancel", bytes.NewReader([]byte(`{"reason":"user"}`)))
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+cancelSuffix, bytes.NewReader([]byte(`{"reason":"user"}`)))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.CancelStream(rec, req, streamID)
@@ -906,7 +910,7 @@ func TestCancelStreamNotFound(t *testing.T) {
 
 	handler := api.NewHandler(mgr)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/missing/cancel", nil)
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+"missing"+cancelSuffix, nil)
 	rec := httptest.NewRecorder()
 	handler.CancelStream(rec, req, "missing")
 
@@ -923,7 +927,7 @@ func TestGetStreamResultsNotCompleted(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	req := httptest.NewRequest(http.MethodGet, streamPathPrefix+streamID+"/results", nil)
+	req := httptest.NewRequest(http.MethodGet, streamPathPrefix+streamID+resultsSuffix, nil)
 	rec := httptest.NewRecorder()
 	handler.GetStreamResults(rec, req, streamID)
 
@@ -941,7 +945,7 @@ func TestGetStreamResultsDrainsUnexpectedBody(t *testing.T) {
 	streamID := createTestStream(t, handler)
 
 	tb := &trackingBody{data: []byte(`{"unexpected":"payload"}`)}
-	req := httptest.NewRequest(http.MethodGet, streamPathPrefix+streamID+"/results", nil)
+	req := httptest.NewRequest(http.MethodGet, streamPathPrefix+streamID+resultsSuffix, nil)
 	req.Body = tb
 	rec := httptest.NewRecorder()
 
@@ -973,7 +977,7 @@ func TestGetStreamResultsCompleted(t *testing.T) {
 	handler.CompleteStream(rec, req, streamID)
 
 	// Now get results
-	req = httptest.NewRequest(http.MethodGet, streamPathPrefix+streamID+"/results", nil)
+	req = httptest.NewRequest(http.MethodGet, streamPathPrefix+streamID+resultsSuffix, nil)
 	rec = httptest.NewRecorder()
 	handler.GetStreamResults(rec, req, streamID)
 

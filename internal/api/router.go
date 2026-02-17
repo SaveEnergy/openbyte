@@ -88,82 +88,19 @@ type RegistryRegistrar interface {
 
 func (r *Router) SetupRoutes(registrars ...RegistryRegistrar) http.Handler {
 	mux := http.NewServeMux()
+	webFS := r.resolveWebFS()
+	v1 := r.newV1Registrar(mux)
 
-	// API v1 routes (rate-limited)
-	v1 := func(method, path string, handler http.HandlerFunc) {
-		h := handler
-		if r.limiter != nil {
-			h = applyRateLimit(r.limiter, h)
-		}
-		mux.HandleFunc(method+" /api/v1"+path, h)
-	}
-
-	v1("POST", "/stream/start", r.handler.StartStream)
-	v1("GET", "/stream/{id}/status", r.HandleWithID(r.handler.GetStreamStatus))
-	v1("GET", "/stream/{id}/results", r.HandleWithID(r.handler.GetStreamResults))
-	v1("POST", "/stream/{id}/cancel", r.HandleWithID(r.handler.CancelStream))
-	v1("POST", "/stream/{id}/metrics", r.HandleWithID(r.handler.ReportMetrics))
-	v1("POST", "/stream/{id}/complete", r.HandleWithID(r.handler.CompleteStream))
-	v1("GET", "/servers", r.handler.GetServers)
-	v1("GET", "/version", r.handler.GetVersion)
-
-	// Speedtest routes
-	v1("GET", "/download", r.speedtest.Download)
-	v1("POST", "/upload", r.speedtest.Upload)
-	v1("GET", "/ping", r.speedtest.Ping)
-
-	// Saved results API
-	if r.resultsHandler != nil {
-		v1("POST", "/results", r.resultsHandler.Save)
-		v1("GET", "/results/{id}", r.resultsHandler.Get)
-	}
-
-	if r.wsServer != nil {
-		if wsHandler, ok := r.wsServer.(func(http.ResponseWriter, *http.Request, string)); ok {
-			v1("GET", "/stream/{id}/stream", func(w http.ResponseWriter, req *http.Request) {
-				streamID := req.PathValue("id")
-				if streamID == "" {
-					respondJSON(w, map[string]string{"error": "stream ID required"}, http.StatusBadRequest)
-					return
-				}
-				wsHandler(w, req, streamID)
-			})
-		}
-	}
+	r.registerCoreV1Routes(v1)
+	r.registerResultsAPIRoutes(v1)
+	r.registerWebSocketStreamRoute(v1)
 
 	mux.HandleFunc("GET /health", r.HealthCheck)
 	if r.runtimeMetrics != nil {
 		mux.HandleFunc("GET /debug/runtime-metrics", r.runtimeMetrics)
 	}
 
-	webFS := r.resolveWebFS()
-
-	// Serve results.html for /results/{id} browser requests
-	if r.resultsHandler != nil {
-		resultsPageHandler := func(w http.ResponseWriter, req *http.Request) {
-			if !validResultID.MatchString(req.PathValue("id")) {
-				http.NotFound(w, req)
-				return
-			}
-			w.Header().Set("Cache-Control", "no-store")
-			f, err := webFS.Open("results.html")
-			if err != nil {
-				http.NotFound(w, req)
-				return
-			}
-			defer f.Close()
-			stat, err := f.Stat()
-			if err != nil {
-				http.NotFound(w, req)
-				return
-			}
-			http.ServeContent(w, req, "results.html", stat.ModTime(), f)
-		}
-		if r.limiter != nil {
-			resultsPageHandler = applyRateLimit(r.limiter, resultsPageHandler)
-		}
-		mux.HandleFunc("GET /results/{id}", resultsPageHandler)
-	}
+	r.registerResultsPageRoute(mux, webFS)
 
 	mux.Handle("/", staticCacheMiddleware(newStaticAllowlistHandler(webFS)))
 
@@ -172,7 +109,89 @@ func (r *Router) SetupRoutes(registrars ...RegistryRegistrar) http.Handler {
 		reg.RegisterRoutes(mux)
 	}
 
-	// Wrap with middleware (outermost runs first)
+	return r.wrapMiddlewares(mux)
+}
+
+func (r *Router) newV1Registrar(mux *http.ServeMux) func(method, route string, handler http.HandlerFunc) {
+	return func(method, route string, handler http.HandlerFunc) {
+		h := handler
+		if r.limiter != nil {
+			h = applyRateLimit(r.limiter, h)
+		}
+		mux.HandleFunc(method+" /api/v1"+route, h)
+	}
+}
+
+func (r *Router) registerCoreV1Routes(v1 func(method, route string, handler http.HandlerFunc)) {
+	v1("POST", "/stream/start", r.handler.StartStream)
+	v1("GET", "/stream/{id}/status", r.HandleWithID(r.handler.GetStreamStatus))
+	v1("GET", "/stream/{id}/results", r.HandleWithID(r.handler.GetStreamResults))
+	v1("POST", "/stream/{id}/cancel", r.HandleWithID(r.handler.CancelStream))
+	v1("POST", "/stream/{id}/metrics", r.HandleWithID(r.handler.ReportMetrics))
+	v1("POST", "/stream/{id}/complete", r.HandleWithID(r.handler.CompleteStream))
+	v1("GET", "/servers", r.handler.GetServers)
+	v1("GET", "/version", r.handler.GetVersion)
+	v1("GET", "/download", r.speedtest.Download)
+	v1("POST", "/upload", r.speedtest.Upload)
+	v1("GET", "/ping", r.speedtest.Ping)
+}
+
+func (r *Router) registerResultsAPIRoutes(v1 func(method, route string, handler http.HandlerFunc)) {
+	if r.resultsHandler == nil {
+		return
+	}
+	v1("POST", "/results", r.resultsHandler.Save)
+	v1("GET", "/results/{id}", r.resultsHandler.Get)
+}
+
+func (r *Router) registerWebSocketStreamRoute(v1 func(method, route string, handler http.HandlerFunc)) {
+	if r.wsServer == nil {
+		return
+	}
+	wsHandler, ok := r.wsServer.(func(http.ResponseWriter, *http.Request, string))
+	if !ok {
+		return
+	}
+	v1("GET", "/stream/{id}/stream", func(w http.ResponseWriter, req *http.Request) {
+		streamID := req.PathValue("id")
+		if streamID == "" {
+			respondJSON(w, map[string]string{"error": "stream ID required"}, http.StatusBadRequest)
+			return
+		}
+		wsHandler(w, req, streamID)
+	})
+}
+
+func (r *Router) registerResultsPageRoute(mux *http.ServeMux, webFS http.FileSystem) {
+	if r.resultsHandler == nil {
+		return
+	}
+	resultsPageHandler := func(w http.ResponseWriter, req *http.Request) {
+		if !validResultID.MatchString(req.PathValue("id")) {
+			http.NotFound(w, req)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		f, err := webFS.Open("results.html")
+		if err != nil {
+			http.NotFound(w, req)
+			return
+		}
+		defer f.Close()
+		stat, err := f.Stat()
+		if err != nil {
+			http.NotFound(w, req)
+			return
+		}
+		http.ServeContent(w, req, "results.html", stat.ModTime(), f)
+	}
+	if r.limiter != nil {
+		resultsPageHandler = applyRateLimit(r.limiter, resultsPageHandler)
+	}
+	mux.HandleFunc("GET /results/{id}", resultsPageHandler)
+}
+
+func (r *Router) wrapMiddlewares(mux *http.ServeMux) http.Handler {
 	var handler http.Handler = mux
 	if r.limiter != nil {
 		handler = registryRateLimitMiddleware(r.limiter, handler)
@@ -181,7 +200,6 @@ func (r *Router) SetupRoutes(registrars ...RegistryRegistrar) http.Handler {
 	handler = r.CORSMiddleware(handler)
 	handler = SecurityHeadersMiddleware(handler)
 	handler = r.LoggingMiddleware(handler)
-
 	return handler
 }
 
@@ -341,28 +359,26 @@ func (r *Router) isAllowedOrigin(origin string) bool {
 	}
 	originHostValue := types.OriginHost(origin)
 	for _, allowed := range r.allowedOrigins {
-		allowed = strings.TrimSpace(allowed)
-		if allowed == "" {
-			continue
-		}
-		if allowed == "*" {
-			return true
-		}
-		if strings.EqualFold(allowed, origin) {
-			return true
-		}
-		if after, ok := strings.CutPrefix(allowed, "*."); ok {
-			suffix := after
-			if originHostValue != "" && (originHostValue == suffix || strings.HasSuffix(originHostValue, "."+suffix)) {
-				return true
-			}
-		}
-		allowedHost := types.OriginHost(allowed)
-		if allowedHost != "" && originHostValue != "" && strings.EqualFold(allowedHost, originHostValue) {
+		if matchesAllowedOrigin(strings.TrimSpace(allowed), origin, originHostValue) {
 			return true
 		}
 	}
 	return false
+}
+
+func matchesAllowedOrigin(allowed, origin, originHostValue string) bool {
+	if allowed == "" {
+		return false
+	}
+	if allowed == "*" || strings.EqualFold(allowed, origin) {
+		return true
+	}
+	if after, ok := strings.CutPrefix(allowed, "*."); ok {
+		return originHostValue != "" &&
+			(originHostValue == after || strings.HasSuffix(originHostValue, "."+after))
+	}
+	allowedHost := types.OriginHost(allowed)
+	return allowedHost != "" && originHostValue != "" && strings.EqualFold(allowedHost, originHostValue)
 }
 
 func (r *Router) isAllowAllOrigins() bool {
