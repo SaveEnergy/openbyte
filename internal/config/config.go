@@ -120,6 +120,71 @@ func DefaultConfig() *Config {
 }
 
 func (c *Config) LoadFromEnv() error {
+	if err := c.loadCoreEnv(); err != nil {
+		return err
+	}
+	if err := c.loadRuntimeEnv(); err != nil {
+		return err
+	}
+	if err := c.loadLimitsAndNetworkEnv(); err != nil {
+		return err
+	}
+	if err := c.loadStorageEnv(); err != nil {
+		return err
+	}
+	if err := c.loadRegistryEnv(); err != nil {
+		return err
+	}
+	c.loadTLSEnv()
+	return nil
+}
+
+func envBool(name string) bool {
+	val := os.Getenv(name)
+	return val == "true" || val == "1"
+}
+
+func envCSV(name string) []string {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return nil
+	}
+	entries := strings.Split(raw, ",")
+	out := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		value := strings.TrimSpace(entry)
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func parsePositiveIntEnv(name string) (int, bool, error) {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return 0, false, nil
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil || v <= 0 {
+		return 0, true, fmt.Errorf("invalid %s %q: must be a positive integer", name, raw)
+	}
+	return v, true, nil
+}
+
+func parseDurationEnv(name string) (time.Duration, bool, error) {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return 0, false, nil
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		return 0, true, fmt.Errorf("invalid %s %q: must be a positive duration", name, raw)
+	}
+	return d, true, nil
+}
+
+func (c *Config) loadCoreEnv() error {
 	if port := os.Getenv("PORT"); port != "" {
 		if _, err := strconv.Atoi(port); err != nil {
 			return fmt.Errorf("invalid PORT %q: must be a number", port)
@@ -129,7 +194,6 @@ func (c *Config) LoadFromEnv() error {
 	if addr := os.Getenv("BIND_ADDRESS"); addr != "" {
 		c.BindAddress = addr
 	}
-
 	if port := os.Getenv("TCP_TEST_PORT"); port != "" {
 		p, err := strconv.Atoi(port)
 		if err != nil {
@@ -144,7 +208,6 @@ func (c *Config) LoadFromEnv() error {
 		}
 		c.UDPTestPort = p
 	}
-
 	if id := os.Getenv("SERVER_ID"); id != "" {
 		c.ServerID = id
 	}
@@ -160,139 +223,115 @@ func (c *Config) LoadFromEnv() error {
 	if host := os.Getenv("PUBLIC_HOST"); host != "" {
 		c.PublicHost = host
 	}
-	if cap := os.Getenv("CAPACITY_GBPS"); cap != "" {
-		g, err := strconv.Atoi(cap)
+	if capRaw := os.Getenv("CAPACITY_GBPS"); capRaw != "" {
+		g, err := strconv.Atoi(capRaw)
 		if err != nil || g <= 0 {
-			return fmt.Errorf("invalid CAPACITY_GBPS %q: must be a positive integer", cap)
+			return fmt.Errorf("invalid CAPACITY_GBPS %q: must be a positive integer", capRaw)
 		}
 		c.CapacityGbps = g
 	}
-
-	if max := os.Getenv("MAX_CONCURRENT_TESTS"); max != "" {
-		m, err := strconv.Atoi(max)
-		if err != nil || m <= 0 {
-			return fmt.Errorf("invalid MAX_CONCURRENT_TESTS %q: must be a positive integer", max)
-		}
-		c.MaxConcurrentTests = m
+	if max, ok, err := parsePositiveIntEnv("MAX_CONCURRENT_TESTS"); err != nil {
+		return err
+	} else if ok {
+		c.MaxConcurrentTests = max
 	}
-	if max := os.Getenv("MAX_STREAMS"); max != "" {
-		m, err := strconv.Atoi(max)
+	if maxRaw := os.Getenv("MAX_STREAMS"); maxRaw != "" {
+		m, err := strconv.Atoi(maxRaw)
 		if err != nil || m <= 0 || m > 64 {
-			return fmt.Errorf("invalid MAX_STREAMS %q: must be 1-64", max)
+			return fmt.Errorf("invalid MAX_STREAMS %q: must be 1-64", maxRaw)
 		}
 		c.MaxStreams = m
 	}
-	if dur := os.Getenv("MAX_TEST_DURATION"); dur != "" {
-		d, err := time.ParseDuration(dur)
+	if durRaw := os.Getenv("MAX_TEST_DURATION"); durRaw != "" {
+		d, err := time.ParseDuration(durRaw)
 		if err != nil || d <= 0 {
-			return fmt.Errorf("invalid MAX_TEST_DURATION %q: must be a positive duration (e.g. 300s)", dur)
+			return fmt.Errorf("invalid MAX_TEST_DURATION %q: must be a positive duration (e.g. 300s)", durRaw)
 		}
 		c.MaxTestDuration = d
 	}
+	return nil
+}
 
-	if enabled := os.Getenv("PPROF_ENABLED"); enabled == "true" || enabled == "1" {
-		c.PprofEnabled = true
-	}
+func (c *Config) loadRuntimeEnv() error {
+	c.PprofEnabled = c.PprofEnabled || envBool("PPROF_ENABLED")
 	if addr := os.Getenv("PPROF_ADDR"); addr != "" {
 		c.PprofAddress = addr
 	}
-	if interval := os.Getenv("PERF_STATS_INTERVAL"); interval != "" {
-		d, err := time.ParseDuration(interval)
+	if intervalRaw := os.Getenv("PERF_STATS_INTERVAL"); intervalRaw != "" {
+		d, err := time.ParseDuration(intervalRaw)
 		if err != nil || d <= 0 {
-			return fmt.Errorf("invalid PERF_STATS_INTERVAL %q: must be a positive duration (e.g. 10s)", interval)
+			return fmt.Errorf("invalid PERF_STATS_INTERVAL %q: must be a positive duration (e.g. 10s)", intervalRaw)
 		}
 		c.PerfStatsInterval = d
 	}
-	if enabled := os.Getenv("RUNTIME_METRICS_ENABLED"); enabled == "true" || enabled == "1" {
-		c.RuntimeMetrics = true
-	}
+	c.RuntimeMetrics = c.RuntimeMetrics || envBool("RUNTIME_METRICS_ENABLED")
+	return nil
+}
 
-	if limit := os.Getenv("RATE_LIMIT_PER_IP"); limit != "" {
-		l, err := strconv.Atoi(limit)
-		if err != nil || l <= 0 {
-			return fmt.Errorf("invalid RATE_LIMIT_PER_IP %q: must be a positive integer", limit)
-		}
-		c.RateLimitPerIP = l
+func (c *Config) loadLimitsAndNetworkEnv() error {
+	if limit, ok, err := parsePositiveIntEnv("RATE_LIMIT_PER_IP"); err != nil {
+		return err
+	} else if ok {
+		c.RateLimitPerIP = limit
 	}
-	if limit := os.Getenv("GLOBAL_RATE_LIMIT"); limit != "" {
-		l, err := strconv.Atoi(limit)
-		if err != nil || l <= 0 {
-			return fmt.Errorf("invalid GLOBAL_RATE_LIMIT %q: must be a positive integer", limit)
-		}
-		c.GlobalRateLimit = l
+	if limit, ok, err := parsePositiveIntEnv("GLOBAL_RATE_LIMIT"); err != nil {
+		return err
+	} else if ok {
+		c.GlobalRateLimit = limit
 	}
-	if limit := os.Getenv("MAX_CONCURRENT_PER_IP"); limit != "" {
-		l, err := strconv.Atoi(limit)
-		if err != nil || l <= 0 {
-			return fmt.Errorf("invalid MAX_CONCURRENT_PER_IP %q: must be a positive integer", limit)
-		}
-		c.MaxConcurrentPerIP = l
+	if limit, ok, err := parsePositiveIntEnv("MAX_CONCURRENT_PER_IP"); err != nil {
+		return err
+	} else if ok {
+		c.MaxConcurrentPerIP = limit
 	}
-	if trust := os.Getenv("TRUST_PROXY_HEADERS"); trust == "true" || trust == "1" {
-		c.TrustProxyHeaders = true
+	c.TrustProxyHeaders = c.TrustProxyHeaders || envBool("TRUST_PROXY_HEADERS")
+	if cidrs := envCSV("TRUSTED_PROXY_CIDRS"); cidrs != nil {
+		c.TrustedProxyCIDRs = cidrs
 	}
-	if cidrs := os.Getenv("TRUSTED_PROXY_CIDRS"); cidrs != "" {
-		entries := strings.Split(cidrs, ",")
-		c.TrustedProxyCIDRs = make([]string, 0, len(entries))
-		for _, entry := range entries {
-			value := strings.TrimSpace(entry)
-			if value != "" {
-				c.TrustedProxyCIDRs = append(c.TrustedProxyCIDRs, value)
-			}
-		}
-	}
-	if origins := os.Getenv("ALLOWED_ORIGINS"); origins != "" {
-		entries := strings.Split(origins, ",")
-		c.AllowedOrigins = make([]string, 0, len(entries))
-		for _, entry := range entries {
-			value := strings.TrimSpace(entry)
-			if value != "" {
-				c.AllowedOrigins = append(c.AllowedOrigins, value)
-			}
-		}
+	if origins := envCSV("ALLOWED_ORIGINS"); origins != nil {
+		c.AllowedOrigins = origins
 	}
 	if webRoot := os.Getenv("WEB_ROOT"); webRoot != "" {
 		c.WebRoot = webRoot
 	}
+	return nil
+}
+
+func (c *Config) loadStorageEnv() error {
 	if dataDir := os.Getenv("DATA_DIR"); dataDir != "" {
 		c.DataDir = dataDir
 	}
-	if max := os.Getenv("MAX_STORED_RESULTS"); max != "" {
-		m, err := strconv.Atoi(max)
-		if err != nil || m <= 0 {
-			return fmt.Errorf("invalid MAX_STORED_RESULTS %q: must be a positive integer", max)
-		}
-		c.MaxStoredResults = m
+	if max, ok, err := parsePositiveIntEnv("MAX_STORED_RESULTS"); err != nil {
+		return err
+	} else if ok {
+		c.MaxStoredResults = max
 	}
+	return nil
+}
 
-	if enabled := os.Getenv("REGISTRY_ENABLED"); enabled == "true" || enabled == "1" {
-		c.RegistryEnabled = true
-	}
-	if url := os.Getenv("REGISTRY_URL"); url != "" {
-		c.RegistryURL = url
+func (c *Config) loadRegistryEnv() error {
+	c.RegistryEnabled = c.RegistryEnabled || envBool("REGISTRY_ENABLED")
+	if u := os.Getenv("REGISTRY_URL"); u != "" {
+		c.RegistryURL = u
 	}
 	if key := os.Getenv("REGISTRY_API_KEY"); key != "" {
 		c.RegistryAPIKey = key
 	}
-	if interval := os.Getenv("REGISTRY_INTERVAL"); interval != "" {
-		d, err := time.ParseDuration(interval)
-		if err != nil || d <= 0 {
-			return fmt.Errorf("invalid REGISTRY_INTERVAL %q: must be a positive duration (e.g. 30s)", interval)
-		}
+	if d, ok, err := parseDurationEnv("REGISTRY_INTERVAL"); err != nil {
+		return fmt.Errorf("%w (e.g. 30s)", err)
+	} else if ok {
 		c.RegistryInterval = d
 	}
-
-	if mode := os.Getenv("REGISTRY_MODE"); mode == "true" || mode == "1" {
-		c.RegistryMode = true
-	}
-	if ttl := os.Getenv("REGISTRY_SERVER_TTL"); ttl != "" {
-		d, err := time.ParseDuration(ttl)
-		if err != nil || d <= 0 {
-			return fmt.Errorf("invalid REGISTRY_SERVER_TTL %q: must be a positive duration (e.g. 60s)", ttl)
-		}
+	c.RegistryMode = c.RegistryMode || envBool("REGISTRY_MODE")
+	if d, ok, err := parseDurationEnv("REGISTRY_SERVER_TTL"); err != nil {
+		return fmt.Errorf("%w (e.g. 60s)", err)
+	} else if ok {
 		c.RegistryServerTTL = d
 	}
+	return nil
+}
 
+func (c *Config) loadTLSEnv() {
 	if cert := os.Getenv("TLS_CERT_FILE"); cert != "" {
 		c.TLSCertFile = cert
 	}
@@ -302,11 +341,28 @@ func (c *Config) LoadFromEnv() error {
 	if autoGen := os.Getenv("TLS_AUTO_GEN"); autoGen == "false" || autoGen == "0" {
 		c.TLSAutoGen = false
 	}
-
-	return nil
 }
 
 func (c *Config) Validate() error {
+	if err := c.validatePorts(); err != nil {
+		return err
+	}
+	if err := c.validateLimits(); err != nil {
+		return err
+	}
+	if err := c.validateProxyAndStorage(); err != nil {
+		return err
+	}
+	if err := c.validateRegistry(); err != nil {
+		return err
+	}
+	if err := c.validateTLS(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Config) validatePorts() error {
 	if c.Port == "" {
 		return fmt.Errorf("port cannot be empty")
 	}
@@ -329,6 +385,10 @@ func (c *Config) Validate() error {
 	if httpPort == c.UDPTestPort {
 		return fmt.Errorf("HTTP port (%s) and UDP test port (%d) cannot be the same", c.Port, c.UDPTestPort)
 	}
+	return nil
+}
+
+func (c *Config) validateLimits() error {
 	if c.MaxConcurrentTests <= 0 {
 		return fmt.Errorf("max concurrent tests must be > 0")
 	}
@@ -360,6 +420,10 @@ func (c *Config) Validate() error {
 	if c.MaxConcurrentPerIP > c.MaxConcurrentTests {
 		return fmt.Errorf("max concurrent per IP must be <= max concurrent tests")
 	}
+	return nil
+}
+
+func (c *Config) validateProxyAndStorage() error {
 	if c.DataDir == "" {
 		return fmt.Errorf("data directory cannot be empty")
 	}
@@ -376,12 +440,20 @@ func (c *Config) Validate() error {
 	if c.TrustProxyHeaders && len(c.TrustedProxyCIDRs) == 0 {
 		return fmt.Errorf("trusted proxy CIDRs required when trust proxy headers is enabled")
 	}
+	return nil
+}
+
+func (c *Config) validateRegistry() error {
 	if c.RegistryEnabled && c.RegistryInterval <= 0 {
 		return fmt.Errorf("registry interval must be > 0 when registry is enabled")
 	}
 	if c.RegistryEnabled && strings.TrimSpace(c.RegistryURL) == "" {
 		return fmt.Errorf("registry URL required when registry is enabled")
 	}
+	return nil
+}
+
+func (c *Config) validateTLS() error {
 	if (c.TLSCertFile == "") != (c.TLSKeyFile == "") {
 		return fmt.Errorf("TLS_CERT_FILE and TLS_KEY_FILE must both be set or both be empty")
 	}

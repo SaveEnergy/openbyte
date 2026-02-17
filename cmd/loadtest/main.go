@@ -28,6 +28,16 @@ type config struct {
 	wsURL       string
 }
 
+const (
+	modeTCPDownload      = "tcp-download"
+	modeTCPUpload        = "tcp-upload"
+	modeTCPBidirectional = "tcp-bidirectional"
+	modeUDPDownload      = "udp-download"
+	modeUDPUpload        = "udp-upload"
+	modeWS               = "ws"
+	defaultHost          = "127.0.0.1"
+)
+
 func main() {
 	cfg := parseFlags()
 	if err := validateConfig(cfg); err != nil {
@@ -61,8 +71,8 @@ func main() {
 
 func parseFlags() config {
 	var cfg config
-	flag.StringVar(&cfg.mode, "mode", "tcp-download", "Mode: tcp-download, tcp-upload, tcp-bidirectional, udp-download, udp-upload, ws")
-	flag.StringVar(&cfg.host, "host", "127.0.0.1", "Target host for TCP/UDP")
+	flag.StringVar(&cfg.mode, "mode", modeTCPDownload, "Mode: tcp-download, tcp-upload, tcp-bidirectional, udp-download, udp-upload, ws")
+	flag.StringVar(&cfg.host, "host", defaultHost, "Target host for TCP/UDP")
 	flag.IntVar(&cfg.tcpPort, "tcp-port", 8081, "TCP test port")
 	flag.IntVar(&cfg.udpPort, "udp-port", 8082, "UDP test port")
 	flag.DurationVar(&cfg.duration, "duration", 10*time.Second, "Test duration (e.g. 10s)")
@@ -81,11 +91,11 @@ func validateConfig(cfg config) error {
 		return fmt.Errorf("duration must be > 0")
 	}
 	switch cfg.mode {
-	case "tcp-download", "tcp-upload", "tcp-bidirectional", "udp-download", "udp-upload", "ws":
+	case modeTCPDownload, modeTCPUpload, modeTCPBidirectional, modeUDPDownload, modeUDPUpload, modeWS:
 	default:
 		return fmt.Errorf("invalid mode: %s", cfg.mode)
 	}
-	if cfg.mode == "ws" && cfg.wsURL == "" {
+	if cfg.mode == modeWS && cfg.wsURL == "" {
 		return fmt.Errorf("ws-url required for ws mode")
 	}
 	if cfg.tcpPort < 1 || cfg.tcpPort > 65535 {
@@ -100,7 +110,7 @@ func validateConfig(cfg config) error {
 	if cfg.packetSize > 9000 {
 		return fmt.Errorf("packet-size must be <= 9000")
 	}
-	if cfg.mode == "ws" {
+	if cfg.mode == modeWS {
 		parsed, err := url.Parse(cfg.wsURL)
 		if err != nil {
 			return fmt.Errorf("invalid ws-url: %w", err)
@@ -122,45 +132,36 @@ func runLoadtest(ctx context.Context, cfg config) (int64, int64, int64) {
 
 	var wg sync.WaitGroup
 	wg.Add(cfg.concurrency)
+	runWorker := func(worker int) (int64, int64, error) {
+		switch cfg.mode {
+		case modeTCPDownload:
+			recv, err := runTCPDownload(ctx, cfg, worker)
+			return 0, recv, err
+		case modeTCPUpload:
+			sent, err := runTCPUpload(ctx, cfg, worker)
+			return sent, 0, err
+		case modeTCPBidirectional:
+			return runTCPBidirectional(ctx, cfg, worker)
+		case modeUDPDownload:
+			recv, err := runUDPDownload(ctx, cfg, worker)
+			return 0, recv, err
+		case modeUDPUpload:
+			sent, err := runUDPUpload(ctx, cfg, worker)
+			return sent, 0, err
+		case modeWS:
+			return 0, 0, runWebSocket(ctx, cfg, worker)
+		default:
+			return 0, 0, fmt.Errorf("invalid mode: %s", cfg.mode)
+		}
+	}
 	for i := 0; i < cfg.concurrency; i++ {
 		go func(worker int) {
 			defer wg.Done()
-			switch cfg.mode {
-			case "tcp-download":
-				n, err := runTCPDownload(ctx, cfg, worker)
-				atomic.AddInt64(&bytesRecv, n)
-				if err != nil && !errors.Is(err, context.Canceled) {
-					atomic.AddInt64(&workerErrs, 1)
-				}
-			case "tcp-upload":
-				n, err := runTCPUpload(ctx, cfg, worker)
-				atomic.AddInt64(&bytesSent, n)
-				if err != nil && !errors.Is(err, context.Canceled) {
-					atomic.AddInt64(&workerErrs, 1)
-				}
-			case "tcp-bidirectional":
-				sent, recv, err := runTCPBidirectional(ctx, cfg, worker)
-				atomic.AddInt64(&bytesSent, sent)
-				atomic.AddInt64(&bytesRecv, recv)
-				if err != nil && !errors.Is(err, context.Canceled) {
-					atomic.AddInt64(&workerErrs, 1)
-				}
-			case "udp-download":
-				n, err := runUDPDownload(ctx, cfg, worker)
-				atomic.AddInt64(&bytesRecv, n)
-				if err != nil && !errors.Is(err, context.Canceled) {
-					atomic.AddInt64(&workerErrs, 1)
-				}
-			case "udp-upload":
-				n, err := runUDPUpload(ctx, cfg, worker)
-				atomic.AddInt64(&bytesSent, n)
-				if err != nil && !errors.Is(err, context.Canceled) {
-					atomic.AddInt64(&workerErrs, 1)
-				}
-			case "ws":
-				if err := runWebSocket(ctx, cfg, worker); err != nil && !errors.Is(err, context.Canceled) {
-					atomic.AddInt64(&workerErrs, 1)
-				}
+			sent, recv, err := runWorker(worker)
+			atomic.AddInt64(&bytesSent, sent)
+			atomic.AddInt64(&bytesRecv, recv)
+			if err != nil && !errors.Is(err, context.Canceled) {
+				atomic.AddInt64(&workerErrs, 1)
 			}
 		}(i)
 	}

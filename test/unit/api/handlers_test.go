@@ -16,6 +16,17 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+const (
+	streamStartPath  = "/api/v1/stream/start"
+	streamPathPrefix = "/api/v1/stream/"
+	statusSuffix     = "/status"
+	completeSuffix   = "/complete"
+
+	contentTypeHeader = "Content-Type"
+	applicationJSON   = "application/json"
+	statusCodeWantFmt = "status = %d, want %d"
+)
+
 func mustMarshalJSON(t *testing.T, v any) []byte {
 	t.Helper()
 	body, err := json.Marshal(v)
@@ -65,8 +76,8 @@ func createTestStream(t *testing.T, handler *api.Handler) string {
 		"duration": 10, "streams": 1,
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
 	if rec.Code != http.StatusCreated {
@@ -99,14 +110,14 @@ func TestStartStreamRejectsLargeBody(t *testing.T) {
 		t.Fatalf("marshal payload: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 
 	handler.StartStream(rec, req)
 
 	if rec.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusRequestEntityTooLarge)
 	}
 }
 
@@ -119,14 +130,14 @@ func TestStartStreamRejectsWrongContentType(t *testing.T) {
 		"duration": 10, "streams": 1,
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "text/plain")
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, "text/plain")
 	rec := httptest.NewRecorder()
 
 	handler.StartStream(rec, req)
 
 	if rec.Code != http.StatusUnsupportedMediaType {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnsupportedMediaType)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusUnsupportedMediaType)
 	}
 }
 
@@ -139,13 +150,13 @@ func TestStartStreamRequiresContentType(t *testing.T) {
 		"duration": 10, "streams": 1,
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 
 	handler.StartStream(rec, req)
 
 	if rec.Code != http.StatusUnsupportedMediaType {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnsupportedMediaType)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusUnsupportedMediaType)
 	}
 }
 
@@ -153,13 +164,13 @@ func TestStartStreamRejectsUnknownFields(t *testing.T) {
 	manager := stream.NewManager(10, 10)
 	handler := api.NewHandler(manager)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", strings.NewReader(`{"protocol":"tcp","direction":"download","duration":10,"streams":1,"unknown":1}`))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, strings.NewReader(`{"protocol":"tcp","direction":"download","duration":10,"streams":1,"unknown":1}`))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusBadRequest)
 	}
 }
 
@@ -175,15 +186,15 @@ func TestStartStreamRejectsWrongContentTypeDrainsBody(t *testing.T) {
 			"streams":   1,
 		}),
 	}
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", nil)
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, nil)
 	req.Body = tb
-	req.Header.Set("Content-Type", "text/plain")
+	req.Header.Set(contentTypeHeader, "text/plain")
 	rec := httptest.NewRecorder()
 
 	handler.StartStream(rec, req)
 
 	if rec.Code != http.StatusUnsupportedMediaType {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnsupportedMediaType)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusUnsupportedMediaType)
 	}
 	if tb.reads == 0 {
 		t.Fatalf("expected request body to be drained")
@@ -209,8 +220,8 @@ func TestStartStreamRespectsMaxTestDuration(t *testing.T) {
 		"streams":   1,
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
 
@@ -221,8 +232,8 @@ func TestStartStreamRespectsMaxTestDuration(t *testing.T) {
 	// Duration exceeding the configured max should be rejected
 	payload["duration"] = 120
 	body = mustMarshalJSON(t, payload)
-	req = httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req = httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec = httptest.NewRecorder()
 	handler.StartStream(rec, req)
 
@@ -249,8 +260,8 @@ func TestStartStreamRespectsMaxStreams(t *testing.T) {
 		"streams":   32,
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
 
@@ -261,8 +272,8 @@ func TestStartStreamRespectsMaxStreams(t *testing.T) {
 	// 33 streams should be rejected
 	payload["streams"] = 33
 	body = mustMarshalJSON(t, payload)
-	req = httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req = httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec = httptest.NewRecorder()
 	handler.StartStream(rec, req)
 
@@ -281,7 +292,7 @@ func TestGetVersion(t *testing.T) {
 	handler.GetVersion(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
 	}
 
 	var resp api.VersionResponse
@@ -321,7 +332,7 @@ func TestGetVersionDrainsUnexpectedBody(t *testing.T) {
 	handler.GetVersion(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
 	}
 	assertTrackingBodyDrained(t, tb)
 }
@@ -339,7 +350,7 @@ func TestGetServers(t *testing.T) {
 	handler.GetServers(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
 	}
 
 	var resp api.ServersResponse
@@ -373,7 +384,7 @@ func TestGetServersIgnoresRequestHostWhenProxyUntrusted(t *testing.T) {
 	handler.GetServers(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
 	}
 
 	var resp api.ServersResponse
@@ -400,7 +411,7 @@ func TestGetServersRejectsWrongMethodDrainsBody(t *testing.T) {
 	handler.GetServers(rec, req)
 
 	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusMethodNotAllowed)
 	}
 	assertTrackingBodyDrained(t, tb)
 }
@@ -413,7 +424,7 @@ func TestGetStreamStatus(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/stream/"+streamID+"/status", nil)
+	req := httptest.NewRequest(http.MethodGet, streamPathPrefix+streamID+statusSuffix, nil)
 	req.SetPathValue("id", streamID)
 	rec := httptest.NewRecorder()
 	handler.GetStreamStatus(rec, req, streamID)
@@ -436,8 +447,8 @@ func TestGetStreamStatusJSONContract(t *testing.T) {
 		"streams":   1,
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
 	if rec.Code != http.StatusCreated {
@@ -449,7 +460,7 @@ func TestGetStreamStatusJSONContract(t *testing.T) {
 	}
 	streamID, _ := startResp["stream_id"].(string)
 
-	statusReq := httptest.NewRequest(http.MethodGet, "/api/v1/stream/"+streamID+"/status", nil)
+	statusReq := httptest.NewRequest(http.MethodGet, streamPathPrefix+streamID+statusSuffix, nil)
 	statusRec := httptest.NewRecorder()
 	handler.GetStreamStatus(statusRec, statusReq, streamID)
 	if statusRec.Code != http.StatusOK {
@@ -482,7 +493,7 @@ func TestGetStreamStatusDrainsUnexpectedBody(t *testing.T) {
 	streamID := createTestStream(t, handler)
 
 	tb := &trackingBody{data: []byte(`{"unexpected":"payload"}`)}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/stream/"+streamID+"/status", nil)
+	req := httptest.NewRequest(http.MethodGet, streamPathPrefix+streamID+statusSuffix, nil)
 	req.Body = tb
 	rec := httptest.NewRecorder()
 
@@ -506,7 +517,7 @@ func TestGetStreamStatusNotFound(t *testing.T) {
 	handler.GetStreamStatus(rec, req, "nonexistent")
 
 	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusNotFound)
 	}
 }
 
@@ -520,8 +531,8 @@ func TestReportMetrics(t *testing.T) {
 
 	metrics := types.Metrics{ThroughputMbps: 500, BytesTransferred: 1024}
 	body := mustMarshalJSON(t, metrics)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/metrics", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+"/metrics", bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.ReportMetrics(rec, req, streamID)
 
@@ -539,13 +550,13 @@ func TestReportMetricsRejectsWrongContentType(t *testing.T) {
 	streamID := createTestStream(t, handler)
 
 	body := mustMarshalJSON(t, types.Metrics{ThroughputMbps: 500})
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/metrics", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "text/plain")
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+"/metrics", bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, "text/plain")
 	rec := httptest.NewRecorder()
 	handler.ReportMetrics(rec, req, streamID)
 
 	if rec.Code != http.StatusUnsupportedMediaType {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnsupportedMediaType)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusUnsupportedMediaType)
 	}
 }
 
@@ -558,12 +569,12 @@ func TestReportMetricsRequiresContentType(t *testing.T) {
 	streamID := createTestStream(t, handler)
 
 	body := mustMarshalJSON(t, types.Metrics{ThroughputMbps: 500})
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/metrics", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+"/metrics", bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.ReportMetrics(rec, req, streamID)
 
 	if rec.Code != http.StatusUnsupportedMediaType {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnsupportedMediaType)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusUnsupportedMediaType)
 	}
 }
 
@@ -575,13 +586,13 @@ func TestReportMetricsRejectsUnknownFields(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/metrics", strings.NewReader(`{"throughput_mbps":100,"unknown":1}`))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+"/metrics", strings.NewReader(`{"throughput_mbps":100,"unknown":1}`))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.ReportMetrics(rec, req, streamID)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusBadRequest)
 	}
 }
 
@@ -597,13 +608,13 @@ func TestReportMetricsValidation(t *testing.T) {
 		ThroughputMbps: -1,
 	}
 	body := mustMarshalJSON(t, metrics)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/metrics", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+"/metrics", bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.ReportMetrics(rec, req, streamID)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusBadRequest)
 	}
 }
 
@@ -620,7 +631,7 @@ func TestReportMetricsEarlyRejectsDrainBody(t *testing.T) {
 		contentType string
 		wantStatus  int
 	}{
-		{name: "wrong method", method: http.MethodGet, contentType: "application/json", wantStatus: http.StatusMethodNotAllowed},
+		{name: "wrong method", method: http.MethodGet, contentType: applicationJSON, wantStatus: http.StatusMethodNotAllowed},
 		{name: "wrong content type", method: http.MethodPost, contentType: "text/plain", wantStatus: http.StatusUnsupportedMediaType},
 	}
 
@@ -630,14 +641,14 @@ func TestReportMetricsEarlyRejectsDrainBody(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/api/v1/stream/any/metrics", nil)
 			req.Body = tb
 			if tt.contentType != "" {
-				req.Header.Set("Content-Type", tt.contentType)
+				req.Header.Set(contentTypeHeader, tt.contentType)
 			}
 			rec := httptest.NewRecorder()
 
 			handler.ReportMetrics(rec, req, "any")
 
 			if rec.Code != tt.wantStatus {
-				t.Fatalf("status = %d, want %d", rec.Code, tt.wantStatus)
+				t.Fatalf(statusCodeWantFmt, rec.Code, tt.wantStatus)
 			}
 			assertTrackingBodyDrained(t, tb)
 		})
@@ -653,12 +664,12 @@ func TestReportMetricsNotFound(t *testing.T) {
 
 	body := mustMarshalJSON(t, types.Metrics{})
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/missing/metrics", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.ReportMetrics(rec, req, "missing")
 
 	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusNotFound)
 	}
 }
 
@@ -675,8 +686,8 @@ func TestCompleteStream(t *testing.T) {
 		"metrics": map[string]any{"throughput_mbps": 100},
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+completeSuffix, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.CompleteStream(rec, req, streamID)
 
@@ -698,13 +709,13 @@ func TestCompleteStreamRejectsWrongContentType(t *testing.T) {
 		"metrics": map[string]any{"throughput_mbps": 100},
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "text/plain")
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+completeSuffix, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, "text/plain")
 	rec := httptest.NewRecorder()
 	handler.CompleteStream(rec, req, streamID)
 
 	if rec.Code != http.StatusUnsupportedMediaType {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnsupportedMediaType)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusUnsupportedMediaType)
 	}
 }
 
@@ -721,12 +732,12 @@ func TestCompleteStreamRequiresContentType(t *testing.T) {
 		"metrics": map[string]any{"throughput_mbps": 100},
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+completeSuffix, bytes.NewReader(body))
 	rec := httptest.NewRecorder()
 	handler.CompleteStream(rec, req, streamID)
 
 	if rec.Code != http.StatusUnsupportedMediaType {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnsupportedMediaType)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusUnsupportedMediaType)
 	}
 }
 
@@ -738,13 +749,13 @@ func TestCompleteStreamRejectsUnknownFields(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", strings.NewReader(`{"status":"completed","metrics":{"throughput_mbps":100},"unknown":1}`))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+completeSuffix, strings.NewReader(`{"status":"completed","metrics":{"throughput_mbps":100},"unknown":1}`))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.CompleteStream(rec, req, streamID)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusBadRequest)
 	}
 }
 
@@ -761,7 +772,7 @@ func TestCompleteStreamEarlyRejectsDrainBody(t *testing.T) {
 		contentType string
 		wantStatus  int
 	}{
-		{name: "wrong method", method: http.MethodGet, contentType: "application/json", wantStatus: http.StatusMethodNotAllowed},
+		{name: "wrong method", method: http.MethodGet, contentType: applicationJSON, wantStatus: http.StatusMethodNotAllowed},
 		{name: "wrong content type", method: http.MethodPost, contentType: "text/plain", wantStatus: http.StatusUnsupportedMediaType},
 	}
 
@@ -771,14 +782,14 @@ func TestCompleteStreamEarlyRejectsDrainBody(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/api/v1/stream/any/complete", nil)
 			req.Body = tb
 			if tt.contentType != "" {
-				req.Header.Set("Content-Type", tt.contentType)
+				req.Header.Set(contentTypeHeader, tt.contentType)
 			}
 			rec := httptest.NewRecorder()
 
 			handler.CompleteStream(rec, req, "any")
 
 			if rec.Code != tt.wantStatus {
-				t.Fatalf("status = %d, want %d", rec.Code, tt.wantStatus)
+				t.Fatalf(statusCodeWantFmt, rec.Code, tt.wantStatus)
 			}
 			assertTrackingBodyDrained(t, tb)
 		})
@@ -798,13 +809,13 @@ func TestCompleteStreamFailed(t *testing.T) {
 		"metrics": map[string]any{},
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+completeSuffix, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.CompleteStream(rec, req, streamID)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
 	}
 }
 
@@ -818,8 +829,8 @@ func TestCompleteStreamInvalidStatus(t *testing.T) {
 
 	payload := map[string]any{"status": "invalid"}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+completeSuffix, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.CompleteStream(rec, req, streamID)
 
@@ -843,13 +854,13 @@ func TestCompleteStreamRejectsInvalidMetrics(t *testing.T) {
 		},
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+completeSuffix, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.CompleteStream(rec, req, streamID)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusBadRequest)
 	}
 }
 
@@ -861,12 +872,12 @@ func TestCancelStream(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/cancel", nil)
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+"/cancel", nil)
 	rec := httptest.NewRecorder()
 	handler.CancelStream(rec, req, streamID)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
 	}
 }
 
@@ -878,13 +889,13 @@ func TestCancelStreamWithBody(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/cancel", bytes.NewReader([]byte(`{"reason":"user"}`)))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+"/cancel", bytes.NewReader([]byte(`{"reason":"user"}`)))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.CancelStream(rec, req, streamID)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
 	}
 }
 
@@ -900,7 +911,7 @@ func TestCancelStreamNotFound(t *testing.T) {
 	handler.CancelStream(rec, req, "missing")
 
 	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusNotFound)
 	}
 }
 
@@ -912,7 +923,7 @@ func TestGetStreamResultsNotCompleted(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	streamID := createTestStream(t, handler)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/stream/"+streamID+"/results", nil)
+	req := httptest.NewRequest(http.MethodGet, streamPathPrefix+streamID+"/results", nil)
 	rec := httptest.NewRecorder()
 	handler.GetStreamResults(rec, req, streamID)
 
@@ -930,14 +941,14 @@ func TestGetStreamResultsDrainsUnexpectedBody(t *testing.T) {
 	streamID := createTestStream(t, handler)
 
 	tb := &trackingBody{data: []byte(`{"unexpected":"payload"}`)}
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/stream/"+streamID+"/results", nil)
+	req := httptest.NewRequest(http.MethodGet, streamPathPrefix+streamID+"/results", nil)
 	req.Body = tb
 	rec := httptest.NewRecorder()
 
 	handler.GetStreamResults(rec, req, streamID)
 
 	if rec.Code != http.StatusAccepted {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusAccepted)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusAccepted)
 	}
 	assertTrackingBodyDrained(t, tb)
 }
@@ -956,18 +967,18 @@ func TestGetStreamResultsCompleted(t *testing.T) {
 		"metrics": map[string]any{"throughput_mbps": 250},
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/"+streamID+"/complete", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+completeSuffix, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.CompleteStream(rec, req, streamID)
 
 	// Now get results
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/stream/"+streamID+"/results", nil)
+	req = httptest.NewRequest(http.MethodGet, streamPathPrefix+streamID+"/results", nil)
 	rec = httptest.NewRecorder()
 	handler.GetStreamResults(rec, req, streamID)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
 	}
 }
 
@@ -980,8 +991,8 @@ func TestStartStreamInvalidProtocol(t *testing.T) {
 		"duration": 10, "streams": 1,
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
 
@@ -999,8 +1010,8 @@ func TestStartStreamInvalidDirection(t *testing.T) {
 		"duration": 10, "streams": 1,
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
 
@@ -1018,8 +1029,8 @@ func TestStartStreamInvalidMode(t *testing.T) {
 		"duration": 10, "streams": 1, "mode": "invalid",
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
 
@@ -1037,8 +1048,8 @@ func TestStartStreamInvalidPacketSize(t *testing.T) {
 		"duration": 10, "streams": 1, "packet_size": 10,
 	}
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
 
@@ -1062,8 +1073,8 @@ func TestStartStreamReturnsServiceUnavailableWhenAtCapacity(t *testing.T) {
 	}
 
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
 	if rec.Code != http.StatusCreated {
@@ -1071,8 +1082,8 @@ func TestStartStreamReturnsServiceUnavailableWhenAtCapacity(t *testing.T) {
 	}
 
 	body = mustMarshalJSON(t, payload)
-	req = httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req = httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec = httptest.NewRecorder()
 	handler.StartStream(rec, req)
 	if rec.Code != http.StatusServiceUnavailable {
@@ -1102,14 +1113,14 @@ func TestStartStreamClientModeIgnoresRequestHostWhenProxyUntrusted(t *testing.T)
 	}
 
 	body := mustMarshalJSON(t, payload)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	req.Host = "evil.example:8888"
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
 
 	if rec.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusCreated)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusCreated)
 	}
 
 	var resp map[string]any

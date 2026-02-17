@@ -325,7 +325,6 @@ func buildServerFlagSet(cfg *config.Config) (*flag.FlagSet, *serverFlagValues) {
 }
 
 func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFlagValues) error {
-	var applyErr error
 	applyCSV := func(raw string) []string {
 		if strings.TrimSpace(raw) == "" {
 			return nil
@@ -340,86 +339,88 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 		}
 		return out
 	}
-	parseDuration := func(key string, raw string) time.Duration {
-		if applyErr != nil {
-			return 0
-		}
+	parseDuration := func(key string, raw string) (time.Duration, error) {
 		d, err := time.ParseDuration(raw)
 		if err != nil {
-			applyErr = fmt.Errorf("invalid --%s %q: %w", key, raw, err)
-			return 0
+			return 0, fmt.Errorf("invalid --%s %q: %w", key, raw, err)
 		}
-		return d
+		return d, nil
 	}
+
+	overrides := map[string]func() error{
+		"port":                  func() error { cfg.Port = *fv.port; return nil },
+		"bind-address":          func() error { cfg.BindAddress = *fv.bindAddress; return nil },
+		"tcp-test-port":         func() error { cfg.TCPTestPort = *fv.tcpTestPort; return nil },
+		"udp-test-port":         func() error { cfg.UDPTestPort = *fv.udpTestPort; return nil },
+		"server-id":             func() error { cfg.ServerID = *fv.serverID; return nil },
+		"server-name":           func() error { cfg.ServerName = *fv.serverName; return nil },
+		"server-location":       func() error { cfg.ServerLocation = *fv.serverLocation; return nil },
+		"server-region":         func() error { cfg.ServerRegion = *fv.serverRegion; return nil },
+		"public-host":           func() error { cfg.PublicHost = *fv.publicHost; return nil },
+		"capacity-gbps":         func() error { cfg.CapacityGbps = *fv.capacityGbps; return nil },
+		"max-concurrent-tests":  func() error { cfg.MaxConcurrentTests = *fv.maxConcurrentTests; return nil },
+		"max-concurrent-per-ip": func() error { cfg.MaxConcurrentPerIP = *fv.maxConcurrentPerIP; return nil },
+		"max-streams":           func() error { cfg.MaxStreams = *fv.maxStreams; return nil },
+		"max-test-duration": func() error {
+			d, err := parseDuration("max-test-duration", *fv.maxTestDuration)
+			if err != nil {
+				return err
+			}
+			cfg.MaxTestDuration = d
+			return nil
+		},
+		"rate-limit-per-ip":   func() error { cfg.RateLimitPerIP = *fv.rateLimitPerIP; return nil },
+		"global-rate-limit":   func() error { cfg.GlobalRateLimit = *fv.globalRateLimit; return nil },
+		"allowed-origins":     func() error { cfg.AllowedOrigins = applyCSV(*fv.allowedOrigins); return nil },
+		"trust-proxy-headers": func() error { cfg.TrustProxyHeaders = *fv.trustProxyHeaders; return nil },
+		"trusted-proxy-cidrs": func() error { cfg.TrustedProxyCIDRs = applyCSV(*fv.trustedProxyCIDRs); return nil },
+		"data-dir":            func() error { cfg.DataDir = *fv.dataDir; return nil },
+		"max-stored-results":  func() error { cfg.MaxStoredResults = *fv.maxStoredResults; return nil },
+		"web-root":            func() error { cfg.WebRoot = *fv.webRoot; return nil },
+		"pprof-enabled":       func() error { cfg.PprofEnabled = *fv.pprofEnabled; return nil },
+		"pprof-addr":          func() error { cfg.PprofAddress = *fv.pprofAddress; return nil },
+		"perf-stats-interval": func() error {
+			d, err := parseDuration("perf-stats-interval", *fv.perfStatsInterval)
+			if err != nil {
+				return err
+			}
+			cfg.PerfStatsInterval = d
+			return nil
+		},
+		"runtime-metrics":  func() error { cfg.RuntimeMetrics = *fv.runtimeMetrics; return nil },
+		"registry-enabled": func() error { cfg.RegistryEnabled = *fv.registryEnabled; return nil },
+		"registry-mode":    func() error { cfg.RegistryMode = *fv.registryMode; return nil },
+		"registry-url":     func() error { cfg.RegistryURL = *fv.registryURL; return nil },
+		"registry-api-key": func() error { cfg.RegistryAPIKey = *fv.registryAPIKey; return nil },
+		"registry-interval": func() error {
+			d, err := parseDuration("registry-interval", *fv.registryInterval)
+			if err != nil {
+				return err
+			}
+			cfg.RegistryInterval = d
+			return nil
+		},
+		"registry-server-ttl": func() error {
+			d, err := parseDuration("registry-server-ttl", *fv.registryServerTTL)
+			if err != nil {
+				return err
+			}
+			cfg.RegistryServerTTL = d
+			return nil
+		},
+	}
+
+	var applyErr error
 	fs.Visit(func(f *flag.Flag) {
 		if applyErr != nil {
 			return
 		}
-		switch f.Name {
-		case "port":
-			cfg.Port = *fv.port
-		case "bind-address":
-			cfg.BindAddress = *fv.bindAddress
-		case "tcp-test-port":
-			cfg.TCPTestPort = *fv.tcpTestPort
-		case "udp-test-port":
-			cfg.UDPTestPort = *fv.udpTestPort
-		case "server-id":
-			cfg.ServerID = *fv.serverID
-		case "server-name":
-			cfg.ServerName = *fv.serverName
-		case "server-location":
-			cfg.ServerLocation = *fv.serverLocation
-		case "server-region":
-			cfg.ServerRegion = *fv.serverRegion
-		case "public-host":
-			cfg.PublicHost = *fv.publicHost
-		case "capacity-gbps":
-			cfg.CapacityGbps = *fv.capacityGbps
-		case "max-concurrent-tests":
-			cfg.MaxConcurrentTests = *fv.maxConcurrentTests
-		case "max-concurrent-per-ip":
-			cfg.MaxConcurrentPerIP = *fv.maxConcurrentPerIP
-		case "max-streams":
-			cfg.MaxStreams = *fv.maxStreams
-		case "max-test-duration":
-			cfg.MaxTestDuration = parseDuration("max-test-duration", *fv.maxTestDuration)
-		case "rate-limit-per-ip":
-			cfg.RateLimitPerIP = *fv.rateLimitPerIP
-		case "global-rate-limit":
-			cfg.GlobalRateLimit = *fv.globalRateLimit
-		case "allowed-origins":
-			cfg.AllowedOrigins = applyCSV(*fv.allowedOrigins)
-		case "trust-proxy-headers":
-			cfg.TrustProxyHeaders = *fv.trustProxyHeaders
-		case "trusted-proxy-cidrs":
-			cfg.TrustedProxyCIDRs = applyCSV(*fv.trustedProxyCIDRs)
-		case "data-dir":
-			cfg.DataDir = *fv.dataDir
-		case "max-stored-results":
-			cfg.MaxStoredResults = *fv.maxStoredResults
-		case "web-root":
-			cfg.WebRoot = *fv.webRoot
-		case "pprof-enabled":
-			cfg.PprofEnabled = *fv.pprofEnabled
-		case "pprof-addr":
-			cfg.PprofAddress = *fv.pprofAddress
-		case "perf-stats-interval":
-			cfg.PerfStatsInterval = parseDuration("perf-stats-interval", *fv.perfStatsInterval)
-		case "runtime-metrics":
-			cfg.RuntimeMetrics = *fv.runtimeMetrics
-		case "registry-enabled":
-			cfg.RegistryEnabled = *fv.registryEnabled
-		case "registry-mode":
-			cfg.RegistryMode = *fv.registryMode
-		case "registry-url":
-			cfg.RegistryURL = *fv.registryURL
-		case "registry-api-key":
-			cfg.RegistryAPIKey = *fv.registryAPIKey
-		case "registry-interval":
-			cfg.RegistryInterval = parseDuration("registry-interval", *fv.registryInterval)
-		case "registry-server-ttl":
-			cfg.RegistryServerTTL = parseDuration("registry-server-ttl", *fv.registryServerTTL)
+		override, ok := overrides[f.Name]
+		if !ok {
+			return
+		}
+		if err := override(); err != nil {
+			applyErr = err
 		}
 	})
 	if applyErr != nil {

@@ -102,78 +102,68 @@ func (e *HTTPTestEngine) runDownload(ctx context.Context) error {
 		wg.Add(1)
 		go func(delay time.Duration) {
 			defer wg.Done()
-			time.Sleep(delay)
-
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
-			if err != nil {
+			if err := e.runDownloadStream(ctx, reqURL, delay); err != nil {
 				errCh <- err
-				return
-			}
-			req.Header.Set("Accept-Encoding", "identity")
-			if e.config.APIKey != "" {
-				req.Header.Set("Authorization", "Bearer "+e.config.APIKey)
-			}
-
-			resp, err := e.client.Do(req)
-			if err != nil {
-				if resp != nil {
-					io.Copy(io.Discard, resp.Body)
-					resp.Body.Close()
-				}
-				errCh <- err
-				return
-			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusOK {
-				if resp.StatusCode == http.StatusTooManyRequests {
-					wait := parseRetryAfter(resp.Header.Get("Retry-After"), time.Second)
-					select {
-					case <-time.After(wait):
-					case <-ctx.Done():
-					}
-				}
-				io.Copy(io.Discard, resp.Body)
-				errCh <- fmt.Errorf("download failed: %s", resp.Status)
-				return
-			}
-
-			buf, ok := e.bufferPool.Get().([]byte)
-			if !ok {
-				buf = make([]byte, 64*1024)
-			}
-			defer e.bufferPool.Put(buf)
-
-			for {
-				n, err := resp.Body.Read(buf)
-				if n > 0 {
-					atomic.AddInt64(&e.bytesReceived, int64(n))
-					e.addBytes(int64(n), e.elapsedSinceStart())
-				}
-				if err != nil {
-					if errors.Is(err, io.EOF) || ctx.Err() != nil {
-						return
-					}
-					errCh <- err
-					return
-				}
 			}
 		}(time.Duration(i) * e.config.StreamDelay)
 	}
 
 	wg.Wait()
-	var errs []error
-	for {
-		select {
-		case err := <-errCh:
-			if err != nil {
-				errs = append(errs, err)
+	close(errCh)
+	return joinStreamErrors("download", errCh)
+}
+
+func (e *HTTPTestEngine) runDownloadStream(ctx context.Context, reqURL string, delay time.Duration) error {
+	time.Sleep(delay)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept-Encoding", "identity")
+	if e.config.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+e.config.APIKey)
+	}
+
+	resp, err := e.client.Do(req)
+	if err != nil {
+		if resp != nil {
+			io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+		}
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusTooManyRequests {
+			wait := parseRetryAfter(resp.Header.Get("Retry-After"), time.Second)
+			select {
+			case <-time.After(wait):
+			case <-ctx.Done():
 			}
-		default:
-			if len(errs) == 0 {
+		}
+		io.Copy(io.Discard, resp.Body)
+		return fmt.Errorf("download failed: %s", resp.Status)
+	}
+
+	buf, ok := e.bufferPool.Get().([]byte)
+	if !ok {
+		buf = make([]byte, 64*1024)
+	}
+	defer e.bufferPool.Put(buf)
+
+	for {
+		n, readErr := resp.Body.Read(buf)
+		if n > 0 {
+			atomic.AddInt64(&e.bytesReceived, int64(n))
+			e.addBytes(int64(n), e.elapsedSinceStart())
+		}
+		if readErr != nil {
+			if errors.Is(readErr, io.EOF) || ctx.Err() != nil {
 				return nil
 			}
-			return fmt.Errorf("download streams failed: %w", errors.Join(errs...))
+			return readErr
 		}
 	}
 }
@@ -188,69 +178,74 @@ func (e *HTTPTestEngine) runUpload(ctx context.Context) error {
 		wg.Add(1)
 		go func(delay time.Duration) {
 			defer wg.Done()
-			time.Sleep(delay)
-			now := time.Now()
-			for now.Before(deadline) && ctx.Err() == nil {
-				reader := bytes.NewReader(e.uploadPayload)
-				req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, reader)
-				if err != nil {
-					errCh <- err
-					return
-				}
-				req.Header.Set("Content-Type", "application/octet-stream")
-				if e.config.APIKey != "" {
-					req.Header.Set("Authorization", "Bearer "+e.config.APIKey)
-				}
-
-				resp, err := e.client.Do(req)
-				if err != nil {
-					if resp != nil {
-						io.Copy(io.Discard, resp.Body)
-						resp.Body.Close()
-					}
-					if ctx.Err() != nil {
-						return
-					}
-					errCh <- err
-					return
-				}
-				io.Copy(io.Discard, resp.Body)
-				resp.Body.Close()
-
-				if resp.StatusCode != http.StatusOK {
-					if resp.StatusCode == http.StatusTooManyRequests {
-						wait := parseRetryAfter(resp.Header.Get("Retry-After"), time.Second)
-						select {
-						case <-time.After(wait):
-						case <-ctx.Done():
-						}
-					}
-					errCh <- fmt.Errorf("upload failed: %s", resp.Status)
-					return
-				}
-
-				atomic.AddInt64(&e.bytesSent, int64(len(e.uploadPayload)))
-				e.addBytes(int64(len(e.uploadPayload)), e.elapsedSinceStart())
-				now = time.Now()
+			if err := e.runUploadStream(ctx, reqURL, deadline, delay); err != nil {
+				errCh <- err
 			}
 		}(time.Duration(i) * e.config.StreamDelay)
 	}
 
 	wg.Wait()
-	var errs []error
-	for {
-		select {
-		case err := <-errCh:
-			if err != nil {
-				errs = append(errs, err)
+	close(errCh)
+	return joinStreamErrors("upload", errCh)
+}
+
+func (e *HTTPTestEngine) runUploadStream(ctx context.Context, reqURL string, deadline time.Time, delay time.Duration) error {
+	time.Sleep(delay)
+	now := time.Now()
+	for now.Before(deadline) && ctx.Err() == nil {
+		reader := bytes.NewReader(e.uploadPayload)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, reader)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Type", "application/octet-stream")
+		if e.config.APIKey != "" {
+			req.Header.Set("Authorization", "Bearer "+e.config.APIKey)
+		}
+
+		resp, err := e.client.Do(req)
+		if err != nil {
+			if resp != nil {
+				io.Copy(io.Discard, resp.Body)
+				resp.Body.Close()
 			}
-		default:
-			if len(errs) == 0 {
+			if ctx.Err() != nil {
 				return nil
 			}
-			return fmt.Errorf("upload streams failed: %w", errors.Join(errs...))
+			return err
+		}
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			if resp.StatusCode == http.StatusTooManyRequests {
+				wait := parseRetryAfter(resp.Header.Get("Retry-After"), time.Second)
+				select {
+				case <-time.After(wait):
+				case <-ctx.Done():
+				}
+			}
+			return fmt.Errorf("upload failed: %s", resp.Status)
+		}
+
+		atomic.AddInt64(&e.bytesSent, int64(len(e.uploadPayload)))
+		e.addBytes(int64(len(e.uploadPayload)), e.elapsedSinceStart())
+		now = time.Now()
+	}
+	return nil
+}
+
+func joinStreamErrors(direction string, errCh <-chan error) error {
+	var errs []error
+	for err := range errCh {
+		if err != nil {
+			errs = append(errs, err)
 		}
 	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%s streams failed: %w", direction, errors.Join(errs...))
 }
 
 func (e *HTTPTestEngine) addBytes(n int64, elapsed time.Duration) {

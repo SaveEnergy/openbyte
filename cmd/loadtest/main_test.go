@@ -10,10 +10,12 @@ import (
 	"github.com/saveenergy/openbyte/internal/stream"
 )
 
+const testLocalhost = "127.0.0.1"
+
 func TestValidateConfig(t *testing.T) {
 	valid := config{
-		mode:        "tcp-download",
-		host:        "127.0.0.1",
+		mode:        modeTCPDownload,
+		host:        testLocalhost,
 		tcpPort:     8081,
 		udpPort:     8082,
 		duration:    1 * time.Second,
@@ -54,8 +56,8 @@ func TestValidateConfig(t *testing.T) {
 
 func TestValidateConfigRejectsInvalidPortsAndOversizedPackets(t *testing.T) {
 	cfg := config{
-		mode:        "tcp-download",
-		host:        "127.0.0.1",
+		mode:        modeTCPDownload,
+		host:        testLocalhost,
 		tcpPort:     8081,
 		udpPort:     8082,
 		duration:    1 * time.Second,
@@ -81,8 +83,8 @@ func TestValidateConfigRejectsInvalidPortsAndOversizedPackets(t *testing.T) {
 
 func TestLoadtestReportsWorkerErrors(t *testing.T) {
 	cfg := config{
-		mode:        "tcp-download",
-		host:        "127.0.0.1",
+		mode:        modeTCPDownload,
+		host:        testLocalhost,
 		tcpPort:     1,
 		udpPort:     8082,
 		duration:    100 * time.Millisecond,
@@ -108,7 +110,7 @@ func TestRunTCPDownloadTransfersBytes(t *testing.T) {
 	defer cancel()
 
 	cfg := config{
-		host:    "127.0.0.1",
+		host:    testLocalhost,
 		tcpPort: tcpPort,
 	}
 	n, err := runTCPDownload(ctx, cfg, 0)
@@ -130,7 +132,7 @@ func TestRunUDPDownloadTransfersBytes(t *testing.T) {
 	defer cancel()
 
 	cfg := config{
-		host:       "127.0.0.1",
+		host:       testLocalhost,
 		udpPort:    udpPort,
 		packetSize: 1200,
 	}
@@ -146,7 +148,7 @@ func TestRunUDPDownloadTransfersBytes(t *testing.T) {
 func startTestStreamServer(t *testing.T, tcpPort, udpPort int) *stream.Server {
 	t.Helper()
 	serverCfg := icfg.DefaultConfig()
-	serverCfg.BindAddress = "127.0.0.1"
+	serverCfg.BindAddress = testLocalhost
 	serverCfg.TCPTestPort = tcpPort
 	serverCfg.UDPTestPort = udpPort
 
@@ -159,7 +161,7 @@ func startTestStreamServer(t *testing.T, tcpPort, udpPort int) *stream.Server {
 
 func reserveTCPPort(t *testing.T) int {
 	t.Helper()
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := net.Listen("tcp", testLocalhost+":0")
 	if err != nil {
 		t.Fatalf("reserve tcp port: %v", err)
 	}
@@ -169,7 +171,7 @@ func reserveTCPPort(t *testing.T) int {
 
 func reserveUDPPort(t *testing.T) int {
 	t.Helper()
-	addr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0}
+	addr := &net.UDPAddr{IP: net.ParseIP(testLocalhost), Port: 0}
 	l, err := net.ListenUDP("udp", addr)
 	if err != nil {
 		t.Fatalf("reserve udp port: %v", err)

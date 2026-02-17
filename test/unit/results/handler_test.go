@@ -20,6 +20,18 @@ type failingResponseWriter struct {
 	writes int
 }
 
+const (
+	resultsPath         = "/api/v1/results"
+	resultsDBName       = "results.db"
+	newStoreFmt         = "new store: %v"
+	contentTypeHeader   = "Content-Type"
+	applicationJSON     = "application/json"
+	cacheControlHeader  = "Cache-Control"
+	cacheNoStore        = "no-store"
+	statusCodeWantFmt   = "status = %d, want %d"
+	cacheControlWantFmt = "cache-control = %q, want %q"
+)
+
 func (fw *failingResponseWriter) Header() http.Header {
 	if fw.header == nil {
 		fw.header = make(http.Header)
@@ -62,11 +74,11 @@ func TestSaveReturnsInternalErrorWhenStoreFails(t *testing.T) {
 	t.Helper()
 
 	tempDir := t.TempDir()
-	dbPath := filepath.Join(tempDir, "results.db")
+	dbPath := filepath.Join(tempDir, resultsDBName)
 
 	store, err := results.New(dbPath, 100)
 	if err != nil {
-		t.Fatalf("new store: %v", err)
+		t.Fatalf(newStoreFmt, err)
 	}
 
 	// Force save path to fail by closing DB before handler call.
@@ -86,14 +98,14 @@ func TestSaveReturnsInternalErrorWhenStoreFails(t *testing.T) {
 		"server_name": "test"
 	}`
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/results", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 
 	h.Save(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusInternalServerError)
 	}
 
 	var resp map[string]string
@@ -109,11 +121,11 @@ func TestSaveReturnsInternalErrorWhenStoreFails(t *testing.T) {
 
 func TestGetReturnsNoStoreForSavedResult(t *testing.T) {
 	tempDir := t.TempDir()
-	dbPath := filepath.Join(tempDir, "results.db")
+	dbPath := filepath.Join(tempDir, resultsDBName)
 
 	store, err := results.New(dbPath, 100)
 	if err != nil {
-		t.Fatalf("new store: %v", err)
+		t.Fatalf(newStoreFmt, err)
 	}
 	defer store.Close()
 
@@ -138,20 +150,20 @@ func TestGetReturnsNoStoreForSavedResult(t *testing.T) {
 	h.Get(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
 	}
-	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("cache-control = %q, want %q", got, "no-store")
+	if got := rec.Header().Get(cacheControlHeader); got != cacheNoStore {
+		t.Fatalf(cacheControlWantFmt, got, cacheNoStore)
 	}
 }
 
 func TestGetReturnsNotFoundForMissingResult(t *testing.T) {
 	tempDir := t.TempDir()
-	dbPath := filepath.Join(tempDir, "results.db")
+	dbPath := filepath.Join(tempDir, resultsDBName)
 
 	store, err := results.New(dbPath, 100)
 	if err != nil {
-		t.Fatalf("new store: %v", err)
+		t.Fatalf(newStoreFmt, err)
 	}
 	defer store.Close()
 
@@ -162,17 +174,17 @@ func TestGetReturnsNotFoundForMissingResult(t *testing.T) {
 	h.Get(rec, req)
 
 	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusNotFound)
 	}
 }
 
 func TestGetRejectsInvalidResultID(t *testing.T) {
 	tempDir := t.TempDir()
-	dbPath := filepath.Join(tempDir, "results.db")
+	dbPath := filepath.Join(tempDir, resultsDBName)
 
 	store, err := results.New(dbPath, 100)
 	if err != nil {
-		t.Fatalf("new store: %v", err)
+		t.Fatalf(newStoreFmt, err)
 	}
 	defer store.Close()
 
@@ -183,17 +195,17 @@ func TestGetRejectsInvalidResultID(t *testing.T) {
 	h.Get(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusBadRequest)
 	}
 }
 
 func TestSaveSucceedsReturns201WithIDAndURL(t *testing.T) {
 	tempDir := t.TempDir()
-	dbPath := filepath.Join(tempDir, "results.db")
+	dbPath := filepath.Join(tempDir, resultsDBName)
 
 	store, err := results.New(dbPath, 100)
 	if err != nil {
-		t.Fatalf("new store: %v", err)
+		t.Fatalf(newStoreFmt, err)
 	}
 	defer store.Close()
 
@@ -209,13 +221,13 @@ func TestSaveSucceedsReturns201WithIDAndURL(t *testing.T) {
 		"ipv6": "",
 		"server_name": "test"
 	}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/results", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	h.Save(rec, req)
 
 	if rec.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusCreated)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusCreated)
 	}
 	var resp map[string]string
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
@@ -229,31 +241,31 @@ func TestSaveSucceedsReturns201WithIDAndURL(t *testing.T) {
 	if url != "/results/"+id {
 		t.Fatalf("url = %q, want %q", url, "/results/"+id)
 	}
-	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("cache-control = %q, want %q", got, "no-store")
+	if got := rec.Header().Get(cacheControlHeader); got != cacheNoStore {
+		t.Fatalf(cacheControlWantFmt, got, cacheNoStore)
 	}
 }
 
 func TestHandlerSaveRejectsWrongContentTypeDrainsBody(t *testing.T) {
 	tempDir := t.TempDir()
-	dbPath := filepath.Join(tempDir, "results.db")
+	dbPath := filepath.Join(tempDir, resultsDBName)
 	store, err := results.New(dbPath, 100)
 	if err != nil {
-		t.Fatalf("new store: %v", err)
+		t.Fatalf(newStoreFmt, err)
 	}
 	defer store.Close()
 
 	h := results.NewHandler(store)
 	tb := &trackingBody{data: []byte(`{"download_mbps":1}`)}
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/results", nil)
+	req := httptest.NewRequest(http.MethodPost, resultsPath, nil)
 	req.Body = tb
-	req.Header.Set("Content-Type", "text/plain")
+	req.Header.Set(contentTypeHeader, "text/plain")
 	rec := httptest.NewRecorder()
 
 	h.Save(rec, req)
 
 	if rec.Code != http.StatusUnsupportedMediaType {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnsupportedMediaType)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusUnsupportedMediaType)
 	}
 	if tb.reads == 0 {
 		t.Fatal("expected body to be drained")
@@ -265,11 +277,11 @@ func TestHandlerSaveRejectsWrongContentTypeDrainsBody(t *testing.T) {
 
 func TestGetReturnsInternalErrorWhenStoreFails(t *testing.T) {
 	tempDir := t.TempDir()
-	dbPath := filepath.Join(tempDir, "results.db")
+	dbPath := filepath.Join(tempDir, resultsDBName)
 
 	store, err := results.New(dbPath, 100)
 	if err != nil {
-		t.Fatalf("new store: %v", err)
+		t.Fatalf(newStoreFmt, err)
 	}
 	store.Close()
 
@@ -280,7 +292,7 @@ func TestGetReturnsInternalErrorWhenStoreFails(t *testing.T) {
 	h.Get(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusInternalServerError)
 	}
 	var resp map[string]string
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
@@ -293,15 +305,15 @@ func TestGetReturnsInternalErrorWhenStoreFails(t *testing.T) {
 
 func TestSaveWithWriteFailureStillSetsCreatedStatus(t *testing.T) {
 	tempDir := t.TempDir()
-	dbPath := filepath.Join(tempDir, "results.db")
+	dbPath := filepath.Join(tempDir, resultsDBName)
 	store, err := results.New(dbPath, 100)
 	if err != nil {
-		t.Fatalf("new store: %v", err)
+		t.Fatalf(newStoreFmt, err)
 	}
 	defer store.Close()
 
 	h := results.NewHandler(store)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/results", strings.NewReader(`{
+	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(`{
 		"download_mbps": 100,
 		"upload_mbps": 50,
 		"latency_ms": 10,
@@ -312,12 +324,12 @@ func TestSaveWithWriteFailureStillSetsCreatedStatus(t *testing.T) {
 		"ipv6": "",
 		"server_name": "test"
 	}`))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	fw := &failingResponseWriter{}
 
 	h.Save(fw, req)
 	if fw.status != http.StatusCreated {
-		t.Fatalf("status = %d, want %d", fw.status, http.StatusCreated)
+		t.Fatalf(statusCodeWantFmt, fw.status, http.StatusCreated)
 	}
 	if fw.writes == 0 {
 		t.Fatal("expected write to be attempted")
@@ -326,10 +338,10 @@ func TestSaveWithWriteFailureStillSetsCreatedStatus(t *testing.T) {
 
 func TestHandlerSaveBodyTooLarge(t *testing.T) {
 	tempDir := t.TempDir()
-	dbPath := filepath.Join(tempDir, "results.db")
+	dbPath := filepath.Join(tempDir, resultsDBName)
 	store, err := results.New(dbPath, 100)
 	if err != nil {
-		t.Fatalf("new store: %v", err)
+		t.Fatalf(newStoreFmt, err)
 	}
 	defer store.Close()
 
@@ -337,14 +349,14 @@ func TestHandlerSaveBodyTooLarge(t *testing.T) {
 	large := strings.Repeat("x", 5000)
 	body := `{"download_mbps":1,"upload_mbps":1,"latency_ms":1,"jitter_ms":1,"loaded_latency_ms":1,"bufferbloat_grade":"A","ipv4":"203.0.113.10","ipv6":"","server_name":"` + large + `"}`
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/results", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 
 	h.Save(rec, req)
 
 	if rec.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusRequestEntityTooLarge)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusRequestEntityTooLarge)
 	}
 	var resp map[string]string
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
@@ -357,10 +369,10 @@ func TestHandlerSaveBodyTooLarge(t *testing.T) {
 
 func TestHandlerSaveRejectsUnknownFields(t *testing.T) {
 	tempDir := t.TempDir()
-	dbPath := filepath.Join(tempDir, "results.db")
+	dbPath := filepath.Join(tempDir, resultsDBName)
 	store, err := results.New(dbPath, 100)
 	if err != nil {
-		t.Fatalf("new store: %v", err)
+		t.Fatalf(newStoreFmt, err)
 	}
 	defer store.Close()
 
@@ -378,31 +390,31 @@ func TestHandlerSaveRejectsUnknownFields(t *testing.T) {
 		"unknown": 1
 	}`
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/results", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	h.Save(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusBadRequest)
 	}
-	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("cache-control = %q, want %q", got, "no-store")
+	if got := rec.Header().Get(cacheControlHeader); got != cacheNoStore {
+		t.Fatalf(cacheControlWantFmt, got, cacheNoStore)
 	}
 }
 
 func TestResultsResponsesSetNoStore(t *testing.T) {
 	tempDir := t.TempDir()
-	dbPath := filepath.Join(tempDir, "results.db")
+	dbPath := filepath.Join(tempDir, resultsDBName)
 	store, err := results.New(dbPath, 100)
 	if err != nil {
-		t.Fatalf("new store: %v", err)
+		t.Fatalf(newStoreFmt, err)
 	}
 	defer store.Close()
 
 	h := results.NewHandler(store)
 
-	saveReq := httptest.NewRequest(http.MethodPost, "/api/v1/results", strings.NewReader(`{
+	saveReq := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(`{
 		"download_mbps": 100,
 		"upload_mbps": 50,
 		"latency_ms": 10,
@@ -413,18 +425,18 @@ func TestResultsResponsesSetNoStore(t *testing.T) {
 		"ipv6": "",
 		"server_name": "test"
 	}`))
-	saveReq.Header.Set("Content-Type", "application/json")
+	saveReq.Header.Set(contentTypeHeader, applicationJSON)
 	saveRec := httptest.NewRecorder()
 	h.Save(saveRec, saveReq)
-	if saveRec.Header().Get("Cache-Control") != "no-store" {
-		t.Fatalf("save cache-control = %q, want %q", saveRec.Header().Get("Cache-Control"), "no-store")
+	if saveRec.Header().Get(cacheControlHeader) != cacheNoStore {
+		t.Fatalf("save cache-control = %q, want %q", saveRec.Header().Get(cacheControlHeader), cacheNoStore)
 	}
 
 	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/results/missing1", nil)
 	getReq.SetPathValue("id", "missing1")
 	getRec := httptest.NewRecorder()
 	h.Get(getRec, getReq)
-	if getRec.Header().Get("Cache-Control") != "no-store" {
-		t.Fatalf("get cache-control = %q, want %q", getRec.Header().Get("Cache-Control"), "no-store")
+	if getRec.Header().Get(cacheControlHeader) != cacheNoStore {
+		t.Fatalf("get cache-control = %q, want %q", getRec.Header().Get(cacheControlHeader), cacheNoStore)
 	}
 }

@@ -72,7 +72,7 @@ let toastTimer = null;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const retryAfterMs = (response, fallbackMs = 1000) => {
-  if (!response || !response.headers) return fallbackMs;
+  if (!response?.headers) return fallbackMs;
   const value = response.headers.get("Retry-After");
   if (!value) return fallbackMs;
   const seconds = Number.parseInt(value, 10);
@@ -91,6 +91,13 @@ const isNetworkError = (err) => {
     message.includes("http2")
   );
 };
+
+const parseJSONOrThrow = (res) =>
+  res.ok
+    ? res.json()
+    : res.text().then(() => {
+        throw new Error(`HTTP ${res.status}`);
+      });
 
 document.addEventListener("DOMContentLoaded", () => {
   loadSettings();
@@ -204,9 +211,7 @@ function saveSettings() {
 function detectNetworkInfo() {
   // Main ping — captures whichever address family the browser chose
   const mainPing = fetch(`${apiBase}/ping`)
-    .then((res) =>
-      res.ok ? res.json() : res.text().then(() => Promise.reject()),
-    )
+    .then((res) => parseJSONOrThrow(res))
     .then((data) => {
       if (data.client_ip) {
         if (data.ipv6) {
@@ -219,7 +224,7 @@ function detectNetworkInfo() {
     .catch(() => {});
 
   // Dedicated probes — A-only / AAAA-only subdomains force address family
-  const hostname = window.location.hostname;
+  const hostname = globalThis.location.hostname;
   const canProbe =
     hostname &&
     hostname !== "localhost" &&
@@ -229,13 +234,11 @@ function detectNetworkInfo() {
     !hostname.match(/^\d/);
 
   const probeOpts = { cache: "no-store", credentials: "omit", mode: "cors" };
-  const proto = window.location.protocol;
+  const proto = globalThis.location.protocol;
 
   const v4Ping = canProbe
     ? fetch(`${proto}//v4.${hostname}/api/v1/ping`, probeOpts)
-        .then((res) =>
-          res.ok ? res.json() : res.text().then(() => Promise.reject()),
-        )
+        .then((res) => parseJSONOrThrow(res))
         .then((data) => {
           if (!data.ipv6 && data.client_ip) {
             state.networkInfo.ipv4 = data.client_ip;
@@ -246,9 +249,7 @@ function detectNetworkInfo() {
 
   const v6Ping = canProbe
     ? fetch(`${proto}//v6.${hostname}/api/v1/ping`, probeOpts)
-        .then((res) =>
-          res.ok ? res.json() : res.text().then(() => Promise.reject()),
-        )
+        .then((res) => parseJSONOrThrow(res))
         .then((data) => {
           if (data.ipv6 && data.client_ip) {
             state.networkInfo.ipv6 = data.client_ip;
@@ -305,8 +306,8 @@ function detectOverheadFactor() {
 
 function isSameOriginURL(url) {
   try {
-    const parsed = new URL(url, window.location.origin);
-    return parsed.origin === window.location.origin;
+    const parsed = new URL(url, globalThis.location.origin);
+    return parsed.origin === globalThis.location.origin;
   } catch (e) {
     return false;
   }
@@ -371,7 +372,7 @@ function getHealthURL(server) {
     try {
       const apiURL = new URL(server.api_endpoint);
       if (
-        window.location.protocol === "https:" &&
+        globalThis.location.protocol === "https:" &&
         apiURL.protocol === "http:"
       ) {
         apiURL.protocol = "https:";
@@ -382,7 +383,7 @@ function getHealthURL(server) {
       return `${server.api_endpoint}/health`;
     }
   }
-  const protocol = window.location.protocol || "http:";
+  const protocol = globalThis.location.protocol || "http:";
   return `${protocol}//${server.host}/health`;
 }
 
@@ -398,7 +399,7 @@ async function loadServers() {
       data = await res.json();
     } catch (err) {
       state.servers = [];
-      throw new Error("Failed to parse servers response");
+      throw new Error("Failed to parse servers response", { cause: err });
     }
     state.servers = Array.isArray(data.servers) ? data.servers : [];
 
@@ -586,8 +587,8 @@ async function checkServer() {
     if (state.selectedServer) {
       if (elements.serverText)
         elements.serverText.textContent = state.selectedServer.name || "Ready";
-    } else {
-      if (elements.serverText) elements.serverText.textContent = "Ready";
+    } else if (elements.serverText) {
+      elements.serverText.textContent = "Ready";
     }
 
     if (elements.serverStatus) {
@@ -595,6 +596,7 @@ async function checkServer() {
       elements.serverStatus.className = "server-status connected";
     }
   } catch (e) {
+    console.debug("Server health check failed:", e);
     if (elements.serverDot) {
       elements.serverDot.classList.remove("connected", "warning");
       elements.serverDot.classList.add("error");
@@ -1443,7 +1445,7 @@ async function handleShare() {
   }
   if (!resultId) return;
 
-  const url = window.location.origin + "/results/" + resultId;
+  const url = globalThis.location.origin + "/results/" + resultId;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard
       .writeText(url)
@@ -1464,7 +1466,7 @@ function promptShareUrl(url) {
       .share({ title: "openByte Speed Test Result", url })
       .catch(() => {});
   } else {
-    window.prompt("Copy this link:", url);
+    globalThis.prompt("Copy this link:", url);
   }
 }
 

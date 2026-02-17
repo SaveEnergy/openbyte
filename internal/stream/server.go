@@ -182,6 +182,10 @@ func (s *Server) handleTCPConnection(conn *net.TCPConn) {
 }
 
 func (s *Server) handleDownload(conn *net.TCPConn) {
+	s.writeDownloadLoop(conn)
+}
+
+func (s *Server) writeDownloadLoop(conn *net.TCPConn) {
 	dataLen := len(s.randomData)
 	offset := 0
 	chunkSize := min(sendBufferSize, dataLen)
@@ -229,10 +233,14 @@ func (s *Server) handleDownload(conn *net.TCPConn) {
 }
 
 func (s *Server) handleUpload(conn *net.TCPConn) {
+	s.readDiscardLoop(conn, 5*time.Second)
+}
+
+func (s *Server) readDiscardLoop(conn *net.TCPConn, deadline time.Duration) {
 	buf := s.getRecvBuffer()
 	defer s.recvPool.Put(buf)
 	readsSinceDeadline := 0
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(deadline))
 
 	for {
 		select {
@@ -240,7 +248,7 @@ func (s *Server) handleUpload(conn *net.TCPConn) {
 			return
 		default:
 			if readsSinceDeadline >= 128 {
-				conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+				conn.SetReadDeadline(time.Now().Add(deadline))
 				readsSinceDeadline = 0
 			}
 			_, err := conn.Read(buf)
@@ -265,82 +273,12 @@ func (s *Server) handleBidirectional(conn *net.TCPConn) {
 
 	go func() {
 		defer wg.Done()
-		dataLen := len(s.randomData)
-		chunkSize := min(sendBufferSize, dataLen)
-		offset := 0
-		writesSinceDeadline := 0
-		conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-
-		for {
-			select {
-			case <-s.ctx.Done():
-				return
-			default:
-				if writesSinceDeadline >= 128 {
-					conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-					writesSinceDeadline = 0
-				}
-				if offset+chunkSize <= dataLen {
-					if _, err := conn.Write(s.randomData[offset : offset+chunkSize]); err != nil {
-						return
-					}
-					writesSinceDeadline++
-					offset += chunkSize
-					if offset == dataLen {
-						offset = 0
-					}
-					continue
-				}
-				first := s.randomData[offset:]
-				if _, err := conn.Write(first); err != nil {
-					return
-				}
-				writesSinceDeadline++
-				remaining := chunkSize - len(first)
-				if remaining > 0 {
-					if _, err := conn.Write(s.randomData[:remaining]); err != nil {
-						return
-					}
-					writesSinceDeadline++
-				}
-				offset = remaining
-				if offset >= dataLen {
-					offset = 0
-				}
-			}
-		}
+		s.writeDownloadLoop(conn)
 	}()
 
 	go func() {
 		defer wg.Done()
-		buf := s.getRecvBuffer()
-		defer s.recvPool.Put(buf)
-		readsSinceDeadline := 0
-		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-
-		for {
-			select {
-			case <-s.ctx.Done():
-				return
-			default:
-				if readsSinceDeadline >= 128 {
-					conn.SetReadDeadline(time.Now().Add(5 * time.Second))
-					readsSinceDeadline = 0
-				}
-				_, err := conn.Read(buf)
-				if err != nil {
-					if errors.Is(err, io.EOF) {
-						return
-					}
-					var netErr net.Error
-					if errors.As(err, &netErr) && netErr.Timeout() {
-						continue
-					}
-					return
-				}
-				readsSinceDeadline++
-			}
-		}
+		s.readDiscardLoop(conn, 5*time.Second)
 	}()
 
 	wg.Wait()

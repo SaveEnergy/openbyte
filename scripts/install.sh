@@ -8,7 +8,7 @@ INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 BINARY_NAME="openbyte"
 
 if [ -z "${INSTALL_DIR}" ]; then
-    echo "Error: INSTALL_DIR must be non-empty"
+    echo "Error: INSTALL_DIR must be non-empty" >&2
     exit 1
 fi
 
@@ -18,8 +18,8 @@ case "$OS" in
     linux)  OS="linux" ;;
     darwin) OS="darwin" ;;
     *)
-        echo "Error: unsupported OS: $OS"
-        echo "Supported: linux, darwin (macOS)"
+        echo "Error: unsupported OS: $OS" >&2
+        echo "Supported: linux, darwin (macOS)" >&2
         exit 1
         ;;
 esac
@@ -30,8 +30,8 @@ case "$ARCH" in
     x86_64|amd64)   ARCH="amd64" ;;
     aarch64|arm64)   ARCH="arm64" ;;
     *)
-        echo "Error: unsupported architecture: $ARCH"
-        echo "Supported: amd64, arm64"
+        echo "Error: unsupported architecture: $ARCH" >&2
+        echo "Supported: amd64, arm64" >&2
         exit 1
         ;;
 esac
@@ -46,11 +46,11 @@ else
     LATEST="$(printf '%s' "$release_json" | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | cut -d '"' -f4)"
 fi
 if [ -z "$LATEST" ]; then
-    echo "Error: could not determine latest release"
+    echo "Error: could not determine latest release" >&2
     exit 1
 fi
 if ! echo "$LATEST" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$'; then
-    echo "Error: unexpected release tag format: ${LATEST}"
+    echo "Error: unexpected release tag format: ${LATEST}" >&2
     exit 1
 fi
 echo "Latest version: ${LATEST}"
@@ -71,7 +71,7 @@ echo "Downloading checksums..."
 curl -fsSL --connect-timeout 10 --max-time 60 "$CHECKSUMS_URL" -o "${TMPDIR}/checksums.txt"
 
 if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
-    echo "Error: sha256sum or shasum required for checksum verification"
+    echo "Error: sha256sum or shasum required for checksum verification" >&2
     exit 1
 fi
 
@@ -98,11 +98,11 @@ EXPECTED_SUM="$(
     ' "${TMPDIR}/checksums.txt" 2>/dev/null || true
 )"
 if [ -z "$EXPECTED_SUM" ]; then
-    echo "Error: checksum entry missing for ${ARCHIVE}"
+    echo "Error: checksum entry missing for ${ARCHIVE}" >&2
     exit 1
 fi
 if [ "$ACTUAL_SUM" != "$EXPECTED_SUM" ]; then
-    echo "Error: checksum mismatch for ${ARCHIVE}"
+    echo "Error: checksum mismatch for ${ARCHIVE}" >&2
     exit 1
 fi
 
@@ -120,7 +120,7 @@ if [ ! -d "$INSTALL_DIR" ]; then
 fi
 
 if [ ! -f "${TMPDIR}/${BINARY_NAME}" ]; then
-    echo "Error: extracted archive did not contain ${BINARY_NAME}"
+    echo "Error: extracted archive did not contain ${BINARY_NAME}" >&2
     exit 1
 fi
 

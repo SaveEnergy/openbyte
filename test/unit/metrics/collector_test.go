@@ -23,7 +23,7 @@ func TestCollector_RecordBytes(t *testing.T) {
 	}
 }
 
-func TestCollector_RecordBytesIgnoresNegative(t *testing.T) {
+func TestCollectorRecordBytesIgnoresNegative(t *testing.T) {
 	c := metrics.NewCollector()
 	c.RecordBytes(100, "sent")
 	c.RecordBytes(-50, "sent")

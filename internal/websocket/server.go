@@ -91,11 +91,11 @@ func (s *Server) HandleStream(w http.ResponseWriter, r *http.Request, streamID s
 	s.clients[streamID][conn] = client
 	s.mu.Unlock()
 
-	if err := client.writeJSON(map[string]any{
+	if client.writeJSON(map[string]any{
 		"type":      "connected",
 		"stream_id": streamID,
 		"time":      time.Now().Unix(),
-	}); err != nil {
+	}) != nil {
 		s.removeClient(streamID, conn)
 		return
 	}

@@ -16,13 +16,20 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const (
+	storeNewFmt            = "New store: %v"
+	storeOpenLockDBFmt     = "open lock db: %v"
+	storeSetBusyTimeoutFmt = "set lock busy_timeout: %v"
+	storeBeginExclusiveFmt = "begin exclusive: %v"
+)
+
 func tempStore(t *testing.T, maxResults int) (*results.Store, func()) {
 	t.Helper()
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "test.db")
 	s, err := results.New(dbPath, maxResults)
 	if err != nil {
-		t.Fatalf("New store: %v", err)
+		t.Fatalf(storeNewFmt, err)
 	}
 	return s, func() { s.Close(); os.RemoveAll(dir) }
 }
@@ -203,21 +210,21 @@ func TestStoreSaveRetriesOnBusyError(t *testing.T) {
 
 	store, err := results.New(dbPath, 10)
 	if err != nil {
-		t.Fatalf("New store: %v", err)
+		t.Fatalf(storeNewFmt, err)
 	}
 	defer store.Close()
 
 	lockDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		t.Fatalf("open lock db: %v", err)
+		t.Fatalf(storeOpenLockDBFmt, err)
 	}
 	defer lockDB.Close()
 
 	if _, err := lockDB.Exec("PRAGMA busy_timeout=5000"); err != nil {
-		t.Fatalf("set lock busy_timeout: %v", err)
+		t.Fatalf(storeSetBusyTimeoutFmt, err)
 	}
 	if _, err := lockDB.Exec("BEGIN EXCLUSIVE"); err != nil {
-		t.Fatalf("begin exclusive: %v", err)
+		t.Fatalf(storeBeginExclusiveFmt, err)
 	}
 	defer lockDB.Exec("ROLLBACK")
 
@@ -254,7 +261,7 @@ func TestStoreGetRetriesOnBusyError(t *testing.T) {
 
 	store, err := results.New(dbPath, 10)
 	if err != nil {
-		t.Fatalf("New store: %v", err)
+		t.Fatalf(storeNewFmt, err)
 	}
 	defer store.Close()
 
@@ -265,14 +272,14 @@ func TestStoreGetRetriesOnBusyError(t *testing.T) {
 
 	lockDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		t.Fatalf("open lock db: %v", err)
+		t.Fatalf(storeOpenLockDBFmt, err)
 	}
 	defer lockDB.Close()
 	if _, err := lockDB.Exec("PRAGMA busy_timeout=5000"); err != nil {
-		t.Fatalf("set lock busy_timeout: %v", err)
+		t.Fatalf(storeSetBusyTimeoutFmt, err)
 	}
 	if _, err := lockDB.Exec("BEGIN EXCLUSIVE"); err != nil {
-		t.Fatalf("begin exclusive: %v", err)
+		t.Fatalf(storeBeginExclusiveFmt, err)
 	}
 	defer lockDB.Exec("ROLLBACK")
 
@@ -301,7 +308,7 @@ func TestStoreCleanupRetriesOnBusyError(t *testing.T) {
 
 	store, err := results.New(dbPath, 10)
 	if err != nil {
-		t.Fatalf("New store: %v", err)
+		t.Fatalf(storeNewFmt, err)
 	}
 
 	id, err := store.Save(results.Result{DownloadMbps: 10, UploadMbps: 5, LatencyMs: 12, JitterMs: 1})
@@ -322,14 +329,14 @@ func TestStoreCleanupRetriesOnBusyError(t *testing.T) {
 
 	lockDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		t.Fatalf("open lock db: %v", err)
+		t.Fatalf(storeOpenLockDBFmt, err)
 	}
 	defer lockDB.Close()
 	if _, err := lockDB.Exec("PRAGMA busy_timeout=5000"); err != nil {
-		t.Fatalf("set lock busy_timeout: %v", err)
+		t.Fatalf(storeSetBusyTimeoutFmt, err)
 	}
 	if _, err := lockDB.Exec("BEGIN EXCLUSIVE"); err != nil {
-		t.Fatalf("begin exclusive: %v", err)
+		t.Fatalf(storeBeginExclusiveFmt, err)
 	}
 	defer lockDB.Exec("ROLLBACK")
 
