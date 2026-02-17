@@ -7,67 +7,94 @@ import (
 	"github.com/saveenergy/openbyte/pkg/diagnostic"
 )
 
+const (
+	ratingExcellent = "excellent"
+	ratingGood      = "good"
+	ratingFair      = "fair"
+	ratingPoor      = "poor"
+	ratingUnknown   = "unknown"
+	ratingFast      = "fast"
+	ratingModerate  = "moderate"
+	ratingSlow      = "slow"
+	ratingStable    = "stable"
+	ratingDegraded  = "degraded"
+	ratingUnstable  = "unstable"
+
+	useWebBrowsing       = "web_browsing"
+	useVideoConferencing = "video_conferencing"
+	useStreamingHD       = "streaming_hd"
+	useStreaming4K       = "streaming_4k"
+	useGaming            = "gaming"
+	useLargeTransfers    = "large_transfers"
+
+	concernHighLatency = "high_latency"
+	concernHighJitter  = "high_jitter"
+	concernPacketLoss  = "packet_loss"
+	concernSlowDown    = "slow_download"
+	concernSlowUp      = "slow_upload"
+)
+
 // --- rateLatency ---
 
 func TestRateLatency_Excellent(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 10, DownloadMbps: 100})
-	if interp.LatencyRating != "excellent" {
+	if interp.LatencyRating != ratingExcellent {
 		t.Errorf("expected excellent, got %s", interp.LatencyRating)
 	}
 }
 
 func TestRateLatency_Good(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 35, DownloadMbps: 100})
-	if interp.LatencyRating != "good" {
+	if interp.LatencyRating != ratingGood {
 		t.Errorf("expected good, got %s", interp.LatencyRating)
 	}
 }
 
 func TestRateLatency_Fair(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 75, DownloadMbps: 100})
-	if interp.LatencyRating != "fair" {
+	if interp.LatencyRating != ratingFair {
 		t.Errorf("expected fair, got %s", interp.LatencyRating)
 	}
 }
 
 func TestRateLatency_Poor(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 200, DownloadMbps: 100})
-	if interp.LatencyRating != "poor" {
+	if interp.LatencyRating != ratingPoor {
 		t.Errorf("expected poor, got %s", interp.LatencyRating)
 	}
 }
 
 func TestRateLatency_Unknown_Zero(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 0, DownloadMbps: 100})
-	if interp.LatencyRating != "unknown" {
+	if interp.LatencyRating != ratingUnknown {
 		t.Errorf("expected unknown for 0ms, got %s", interp.LatencyRating)
 	}
 }
 
 func TestRateLatency_Unknown_Negative(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: -5, DownloadMbps: 100})
-	if interp.LatencyRating != "unknown" {
+	if interp.LatencyRating != ratingUnknown {
 		t.Errorf("expected unknown for negative, got %s", interp.LatencyRating)
 	}
 }
 
 func TestRateLatency_Boundary_20(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 20, DownloadMbps: 100})
-	if interp.LatencyRating != "excellent" {
+	if interp.LatencyRating != ratingExcellent {
 		t.Errorf("expected excellent at boundary 20ms, got %s", interp.LatencyRating)
 	}
 }
 
 func TestRateLatency_Boundary_50(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 50, DownloadMbps: 100})
-	if interp.LatencyRating != "good" {
+	if interp.LatencyRating != ratingGood {
 		t.Errorf("expected good at boundary 50ms, got %s", interp.LatencyRating)
 	}
 }
 
 func TestRateLatency_Boundary_100(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 100, DownloadMbps: 100})
-	if interp.LatencyRating != "fair" {
+	if interp.LatencyRating != ratingFair {
 		t.Errorf("expected fair at boundary 100ms, got %s", interp.LatencyRating)
 	}
 }
@@ -76,63 +103,63 @@ func TestRateLatency_Boundary_100(t *testing.T) {
 
 func TestRateSpeed_Fast(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 500, LatencyMs: 10})
-	if interp.SpeedRating != "fast" {
+	if interp.SpeedRating != ratingFast {
 		t.Errorf("expected fast, got %s", interp.SpeedRating)
 	}
 }
 
 func TestRateSpeed_Good(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 50, LatencyMs: 10})
-	if interp.SpeedRating != "good" {
+	if interp.SpeedRating != ratingGood {
 		t.Errorf("expected good, got %s", interp.SpeedRating)
 	}
 }
 
 func TestRateSpeed_Moderate(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 10, LatencyMs: 10})
-	if interp.SpeedRating != "moderate" {
+	if interp.SpeedRating != ratingModerate {
 		t.Errorf("expected moderate, got %s", interp.SpeedRating)
 	}
 }
 
 func TestRateSpeed_Slow(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 2, LatencyMs: 10})
-	if interp.SpeedRating != "slow" {
+	if interp.SpeedRating != ratingSlow {
 		t.Errorf("expected slow, got %s", interp.SpeedRating)
 	}
 }
 
 func TestRateSpeed_Unknown(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 10})
-	if interp.SpeedRating != "unknown" {
+	if interp.SpeedRating != ratingUnknown {
 		t.Errorf("expected unknown, got %s", interp.SpeedRating)
 	}
 }
 
 func TestRateSpeed_FallbackToUpload(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{UploadMbps: 200, LatencyMs: 10})
-	if interp.SpeedRating != "fast" {
+	if interp.SpeedRating != ratingFast {
 		t.Errorf("expected fast from upload fallback, got %s", interp.SpeedRating)
 	}
 }
 
 func TestRateSpeed_Boundary_100(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10})
-	if interp.SpeedRating != "fast" {
+	if interp.SpeedRating != ratingFast {
 		t.Errorf("expected fast at boundary 100, got %s", interp.SpeedRating)
 	}
 }
 
 func TestRateSpeed_Boundary_25(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 25, LatencyMs: 10})
-	if interp.SpeedRating != "good" {
+	if interp.SpeedRating != ratingGood {
 		t.Errorf("expected good at boundary 25, got %s", interp.SpeedRating)
 	}
 }
 
 func TestRateSpeed_Boundary_5(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 5, LatencyMs: 10})
-	if interp.SpeedRating != "moderate" {
+	if interp.SpeedRating != ratingModerate {
 		t.Errorf("expected moderate at boundary 5, got %s", interp.SpeedRating)
 	}
 }
@@ -141,42 +168,42 @@ func TestRateSpeed_Boundary_5(t *testing.T) {
 
 func TestRateStability_Stable_NoData(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10})
-	if interp.StabilityRating != "stable" {
+	if interp.StabilityRating != ratingStable {
 		t.Errorf("expected stable with no jitter/loss data, got %s", interp.StabilityRating)
 	}
 }
 
 func TestRateStability_Stable_LowJitter(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10, JitterMs: 5})
-	if interp.StabilityRating != "stable" {
+	if interp.StabilityRating != ratingStable {
 		t.Errorf("expected stable, got %s", interp.StabilityRating)
 	}
 }
 
 func TestRateStability_Fair(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10, JitterMs: 20})
-	if interp.StabilityRating != "fair" {
+	if interp.StabilityRating != ratingFair {
 		t.Errorf("expected fair, got %s", interp.StabilityRating)
 	}
 }
 
 func TestRateStability_Degraded_HighJitter(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10, JitterMs: 35})
-	if interp.StabilityRating != "degraded" {
+	if interp.StabilityRating != ratingDegraded {
 		t.Errorf("expected degraded, got %s", interp.StabilityRating)
 	}
 }
 
 func TestRateStability_Degraded_PacketLoss(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10, PacketLoss: 1.0})
-	if interp.StabilityRating != "degraded" {
+	if interp.StabilityRating != ratingDegraded {
 		t.Errorf("expected degraded, got %s", interp.StabilityRating)
 	}
 }
 
 func TestRateStability_Unstable(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10, PacketLoss: 5})
-	if interp.StabilityRating != "unstable" {
+	if interp.StabilityRating != ratingUnstable {
 		t.Errorf("expected unstable, got %s", interp.StabilityRating)
 	}
 }
@@ -238,11 +265,11 @@ func TestSuitability_AllWorkloads(t *testing.T) {
 		DownloadMbps: 500, UploadMbps: 100, LatencyMs: 5, JitterMs: 1,
 	})
 	expected := map[string]bool{
-		"web_browsing":       true,
-		"video_conferencing": true,
-		"streaming_4k":       true,
-		"gaming":             true,
-		"large_transfers":    true,
+		useWebBrowsing:       true,
+		useVideoConferencing: true,
+		useStreaming4K:       true,
+		useGaming:            true,
+		useLargeTransfers:    true,
 	}
 	got := make(map[string]bool)
 	for _, s := range interp.SuitableFor {
@@ -261,10 +288,10 @@ func TestSuitability_BrowsingOnly(t *testing.T) {
 	})
 	found := false
 	for _, s := range interp.SuitableFor {
-		if s == "web_browsing" {
+		if s == useWebBrowsing {
 			found = true
 		}
-		if s == "video_conferencing" || s == "streaming_4k" || s == "gaming" {
+		if s == useVideoConferencing || s == useStreaming4K || s == useGaming {
 			t.Errorf("unexpected suitability %s for slow connection", s)
 		}
 	}
@@ -279,10 +306,10 @@ func TestSuitability_StreamingHD(t *testing.T) {
 	})
 	found := false
 	for _, s := range interp.SuitableFor {
-		if s == "streaming_hd" {
+		if s == useStreamingHD {
 			found = true
 		}
-		if s == "streaming_4k" {
+		if s == useStreaming4K {
 			t.Error("should not include streaming_4k for 15 Mbps")
 		}
 	}
@@ -296,7 +323,7 @@ func TestSuitability_NoGaming_HighLatency(t *testing.T) {
 		DownloadMbps: 500, LatencyMs: 80, JitterMs: 5,
 	})
 	for _, s := range interp.SuitableFor {
-		if s == "gaming" {
+		if s == useGaming {
 			t.Error("should not include gaming with 80ms latency")
 		}
 	}
@@ -307,7 +334,7 @@ func TestSuitability_NoGaming_HighJitter(t *testing.T) {
 		DownloadMbps: 500, LatencyMs: 10, JitterMs: 20,
 	})
 	for _, s := range interp.SuitableFor {
-		if s == "gaming" {
+		if s == useGaming {
 			t.Error("should not include gaming with 20ms jitter")
 		}
 	}
@@ -318,7 +345,7 @@ func TestSuitability_NoBrowsing_HighLatency(t *testing.T) {
 		DownloadMbps: 100, LatencyMs: 250,
 	})
 	for _, s := range interp.SuitableFor {
-		if s == "web_browsing" {
+		if s == useWebBrowsing {
 			t.Error("should not include browsing with 250ms latency")
 		}
 	}
@@ -337,7 +364,7 @@ func TestSuitability_Gaming_ZeroMetrics(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 10})
 	found := false
 	for _, s := range interp.SuitableFor {
-		if s == "gaming" {
+		if s == useGaming {
 			found = true
 		}
 	}
@@ -361,46 +388,46 @@ func TestConcerns_HighLatency(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 100, LatencyMs: 150,
 	})
-	assertContains(t, interp.Concerns, "high_latency")
+	assertContains(t, interp.Concerns, concernHighLatency)
 }
 
 func TestConcerns_HighJitter(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 100, LatencyMs: 10, JitterMs: 50,
 	})
-	assertContains(t, interp.Concerns, "high_jitter")
+	assertContains(t, interp.Concerns, concernHighJitter)
 }
 
 func TestConcerns_PacketLoss(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 100, LatencyMs: 10, PacketLoss: 3,
 	})
-	assertContains(t, interp.Concerns, "packet_loss")
+	assertContains(t, interp.Concerns, concernPacketLoss)
 }
 
 func TestConcerns_SlowDownload(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 3, LatencyMs: 10,
 	})
-	assertContains(t, interp.Concerns, "slow_download")
+	assertContains(t, interp.Concerns, concernSlowDown)
 }
 
 func TestConcerns_SlowUpload(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		UploadMbps: 1, LatencyMs: 10,
 	})
-	assertContains(t, interp.Concerns, "slow_upload")
+	assertContains(t, interp.Concerns, concernSlowUp)
 }
 
 func TestConcerns_Multiple(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 2, UploadMbps: 1, LatencyMs: 200, JitterMs: 50, PacketLoss: 3,
 	})
-	assertContains(t, interp.Concerns, "high_latency")
-	assertContains(t, interp.Concerns, "high_jitter")
-	assertContains(t, interp.Concerns, "packet_loss")
-	assertContains(t, interp.Concerns, "slow_download")
-	assertContains(t, interp.Concerns, "slow_upload")
+	assertContains(t, interp.Concerns, concernHighLatency)
+	assertContains(t, interp.Concerns, concernHighJitter)
+	assertContains(t, interp.Concerns, concernPacketLoss)
+	assertContains(t, interp.Concerns, concernSlowDown)
+	assertContains(t, interp.Concerns, concernSlowUp)
 }
 
 // --- Summary ---

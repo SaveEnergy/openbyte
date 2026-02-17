@@ -122,8 +122,7 @@ func (s *Server) acceptTCP() {
 			s.tcpListener.SetDeadline(time.Now().Add(100 * time.Millisecond))
 			conn, err := s.tcpListener.AcceptTCP()
 			if err != nil {
-				var netErr net.Error
-				if errors.As(err, &netErr) && netErr.Timeout() {
+				if isTimeoutError(err) {
 					continue
 				}
 				if s.ctx.Err() != nil {
@@ -264,11 +263,7 @@ func (s *Server) readDiscardLoop(conn *net.TCPConn, deadline time.Duration) {
 			}
 			_, err := conn.Read(buf)
 			if err != nil {
-				if errors.Is(err, io.EOF) {
-					return
-				}
-				var netErr net.Error
-				if errors.As(err, &netErr) && netErr.Timeout() {
+				if isRetryableConnReadError(err) {
 					continue
 				}
 				return
@@ -312,11 +307,7 @@ func (s *Server) handleEcho(conn *net.TCPConn) {
 			}
 			n, err := conn.Read(buf)
 			if err != nil {
-				if errors.Is(err, io.EOF) {
-					return
-				}
-				var netErr net.Error
-				if errors.As(err, &netErr) && netErr.Timeout() {
+				if isRetryableConnReadError(err) {
 					continue
 				}
 				return
@@ -427,8 +418,7 @@ func (s *Server) udpReader(clients *udpClients, wg *sync.WaitGroup) {
 			if s.ctx.Err() != nil {
 				return
 			}
-			var netErr net.Error
-			if errors.As(err, &netErr) && netErr.Timeout() {
+			if isTimeoutError(err) {
 				continue
 			}
 			logging.Warn("UDP read error", logging.Field{Key: "error", Value: err})
@@ -469,6 +459,18 @@ func (s *Server) udpReader(clients *udpClients, wg *sync.WaitGroup) {
 			}
 		}
 	}
+}
+
+func isTimeoutError(err error) bool {
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+func isRetryableConnReadError(err error) bool {
+	if errors.Is(err, io.EOF) {
+		return false
+	}
+	return isTimeoutError(err)
 }
 
 type udpClientState struct {

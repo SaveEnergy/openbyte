@@ -220,7 +220,20 @@ func Run(args []string, version string) int {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	srvErrCh := make(chan error, 1)
+	startHTTPServer(cfg, srv, srvErrCh)
+	exitCode := waitForShutdown(quit, srvErrCh)
+	shutdownHTTPServer(srv, 30*time.Second)
 
+	shutdownPprofServer(pprofServer, 5*time.Second)
+	stopStats()
+	stopServerDependencies(registryClient, registryService, resultsStore, manager, &broadcastWg, wsServer, streamServer)
+	cleanupOnError = false
+
+	logging.Info("Server stopped")
+	return exitCode
+}
+
+func startHTTPServer(cfg *config.Config, srv *http.Server, srvErrCh chan<- error) {
 	go func() {
 		fields := []logging.Field{
 			{Key: "address", Value: cfg.BindAddress + ":" + cfg.Port},
@@ -238,42 +251,57 @@ func Run(args []string, version string) int {
 			srvErrCh <- err
 		}
 	}()
+}
 
-	exitCode := exitSuccess
+func waitForShutdown(quit <-chan os.Signal, srvErrCh <-chan error) int {
 	select {
 	case sig := <-quit:
 		logging.Info("Shutting down server...", logging.Field{Key: "signal", Value: sig.String()})
+		return exitSuccess
 	case err := <-srvErrCh:
 		logging.Error("Server failed", logging.Field{Key: "error", Value: err})
-		exitCode = exitFailure
+		return exitFailure
 	}
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+func shutdownHTTPServer(srv *http.Server, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-
 	if err := srv.Shutdown(ctx); err != nil {
 		logging.Error("Server shutdown error", logging.Field{Key: "error", Value: err})
 	}
+}
 
-	shutdownPprofServer(pprofServer, 5*time.Second)
-	stopStats()
-
+func stopServerDependencies(
+	registryClient *registry.Client,
+	registryService *registry.Service,
+	resultsStore *results.Store,
+	manager *stream.Manager,
+	broadcastWg *sync.WaitGroup,
+	wsServer *websocket.Server,
+	streamServer *stream.Server,
+) {
 	if registryClient != nil {
 		registryClient.Stop()
 	}
 	if registryService != nil {
 		registryService.Stop()
 	}
-
-	resultsStore.Close()
-	manager.Stop()
-	broadcastWg.Wait()
-	wsServer.Close()
-	streamServer.Close()
-	cleanupOnError = false
-
-	logging.Info("Server stopped")
-	return exitCode
+	if resultsStore != nil {
+		resultsStore.Close()
+	}
+	if manager != nil {
+		manager.Stop()
+	}
+	if broadcastWg != nil {
+		broadcastWg.Wait()
+	}
+	if wsServer != nil {
+		wsServer.Close()
+	}
+	if streamServer != nil {
+		_ = streamServer.Close()
+	}
 }
 
 func buildServerFlagSet(cfg *config.Config) (*flag.FlagSet, *serverFlagValues) {

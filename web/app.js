@@ -200,8 +200,8 @@ function loadSettings() {
 
 function saveSettings() {
   if (!elements.duration || !elements.streams) return;
-  const d = parseInt(elements.duration.value, 10);
-  const s = parseInt(elements.streams.value, 10);
+  const d = Number.parseInt(elements.duration.value, 10);
+  const s = Number.parseInt(elements.streams.value, 10);
   if (Number.isFinite(d) && d > 0) state.settings.duration = d;
   if (Number.isFinite(s) && s > 0) state.settings.streams = s;
   localStorage.setItem("obyte-settings", JSON.stringify(state.settings));
@@ -293,7 +293,7 @@ function detectOverheadFactor() {
       if (e.name && e.name.includes("/api/v1/") && e.nextHopProtocol) {
         if (e.nextHopProtocol === "h2" || e.nextHopProtocol === "h3") {
           // HTTP/2: ~9 bytes frame header per chunk — negligible
-          return 1.0;
+          return 1;
         }
         // HTTP/1.1: chunked encoding + headers overhead
         return 1.02;
@@ -360,7 +360,7 @@ function updateServerName() {
 
 function setSelectedServer(server) {
   state.selectedServer = server || null;
-  if (state.selectedServer && state.selectedServer.api_endpoint) {
+  if (state.selectedServer?.api_endpoint) {
     apiBase = `${state.selectedServer.api_endpoint}/api/v1`;
   } else {
     apiBase = "/api/v1";
@@ -1446,7 +1446,7 @@ async function handleShare() {
   if (!resultId) return;
 
   const url = globalThis.location.origin + "/results/" + resultId;
-  if (navigator.clipboard && navigator.clipboard.writeText) {
+  if (navigator.clipboard?.writeText) {
     navigator.clipboard
       .writeText(url)
       .then(() => {

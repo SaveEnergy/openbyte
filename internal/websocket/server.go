@@ -327,15 +327,7 @@ func (s *Server) isAllowedOrigin(origin string, host string) bool {
 	s.mu.RUnlock()
 
 	if origin == "" {
-		if len(allowedOrigins) == 0 {
-			return true
-		}
-		for _, allowed := range allowedOrigins {
-			if strings.TrimSpace(allowed) == "*" {
-				return true
-			}
-		}
-		return false
+		return allowEmptyOrigin(allowedOrigins)
 	}
 
 	if len(allowedOrigins) == 0 {
@@ -344,28 +336,38 @@ func (s *Server) isAllowedOrigin(origin string, host string) bool {
 
 	originHostValue := types.OriginHost(origin)
 	for _, allowed := range allowedOrigins {
-		allowed = strings.TrimSpace(allowed)
-		if allowed == "" {
-			continue
-		}
-		if allowed == "*" {
-			return true
-		}
-		if strings.EqualFold(allowed, origin) {
-			return true
-		}
-		if after, ok := strings.CutPrefix(allowed, "*."); ok {
-			suffix := after
-			if originHostValue != "" && (originHostValue == suffix || strings.HasSuffix(originHostValue, "."+suffix)) {
-				return true
-			}
-		}
-		allowedHost := types.OriginHost(allowed)
-		if allowedHost != "" && originHostValue != "" && strings.EqualFold(allowedHost, originHostValue) {
+		if matchesAllowedOrigin(strings.TrimSpace(allowed), origin, originHostValue) {
 			return true
 		}
 	}
 	return false
+}
+
+func allowEmptyOrigin(allowedOrigins []string) bool {
+	if len(allowedOrigins) == 0 {
+		return true
+	}
+	for _, allowed := range allowedOrigins {
+		if strings.TrimSpace(allowed) == "*" {
+			return true
+		}
+	}
+	return false
+}
+
+func matchesAllowedOrigin(allowed, origin, originHostValue string) bool {
+	if allowed == "" {
+		return false
+	}
+	if allowed == "*" || strings.EqualFold(allowed, origin) {
+		return true
+	}
+	if after, ok := strings.CutPrefix(allowed, "*."); ok {
+		suffix := after
+		return originHostValue != "" && (originHostValue == suffix || strings.HasSuffix(originHostValue, "."+suffix))
+	}
+	allowedHost := types.OriginHost(allowed)
+	return allowedHost != "" && originHostValue != "" && strings.EqualFold(allowedHost, originHostValue)
 }
 
 func sameOrigin(origin string, host string) bool {

@@ -65,76 +65,24 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 	}
 	defer atomic.AddInt64(&h.activeDownloads, -1)
 
-	durationStr := r.URL.Query().Get("duration")
-	duration := 10 * time.Second
-	if durationStr != "" {
-		d, err := strconv.Atoi(durationStr)
-		if err != nil || d < 1 || d > h.maxDurationSec {
-			drainRequestBody(r)
-			respondSpeedtestError(w, "duration must be 1-"+strconv.Itoa(h.maxDurationSec), http.StatusBadRequest)
-			return
-		}
-		duration = time.Duration(d) * time.Second
-	}
-
-	chunkSize := 1048576
-	if cs := r.URL.Query().Get("chunk"); cs != "" {
-		c, err := strconv.Atoi(cs)
-		if err != nil || c < 65536 || c > 4194304 {
-			drainRequestBody(r)
-			respondSpeedtestError(w, "chunk must be 65536-4194304", http.StatusBadRequest)
-			return
-		}
-		chunkSize = c
+	duration, chunkSize, parseErr := parseDownloadParams(r, h.maxDurationSec)
+	if parseErr != nil {
+		drainRequestBody(r)
+		respondSpeedtestError(w, parseErr.Error(), http.StatusBadRequest)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Cache-Control", "no-store")
 
-	flusher, canFlush := w.(http.Flusher)
-	randomSource := h.randomData
-	if len(randomSource) == 0 {
-		// Keep fallback allocation bounded; stream logic handles chunk expansion.
-		randomSource = make([]byte, 64*1024)
-		if _, err := rand.Read(randomSource); err != nil {
-			drainRequestBody(r)
-			respondSpeedtestError(w, "failed to generate random data", http.StatusInternalServerError)
-			return
-		}
+	randomSource, err := h.resolveRandomSource()
+	if err != nil {
+		drainRequestBody(r)
+		respondSpeedtestError(w, "failed to generate random data", http.StatusInternalServerError)
+		return
 	}
 
-	deadline := time.Now().Add(duration)
-	controller := http.NewResponseController(w)
-	_ = controller.SetWriteDeadline(deadline.Add(5 * time.Second))
-	writeCount := 0
-	flushInterval := 8
-	offset := 0
-	now := time.Now()
-	deadlineTicker := time.NewTicker(100 * time.Millisecond)
-	defer deadlineTicker.Stop()
-
-	for now.Before(deadline) {
-		select {
-		case <-r.Context().Done():
-			return
-		case <-deadlineTicker.C:
-			now = time.Now()
-		default:
-			if err := writeChunkFromSource(w, randomSource, chunkSize, &offset); err != nil {
-				return
-			}
-			writeCount++
-			if writeCount%64 == 0 {
-				now = time.Now()
-			}
-			if canFlush && writeCount%flushInterval == 0 {
-				flusher.Flush()
-			}
-		}
-	}
-	if canFlush {
-		flusher.Flush()
-	}
+	streamDownload(w, r, randomSource, chunkSize, duration)
 }
 
 func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
@@ -219,6 +167,76 @@ func uploadReadDeadline(start time.Time, maxDurationSec int) time.Time {
 		maxDurationSec = 300
 	}
 	return start.Add(time.Duration(maxDurationSec) * time.Second)
+}
+
+func parseDownloadParams(r *http.Request, maxDurationSec int) (time.Duration, int, error) {
+	duration := 10 * time.Second
+	if durationStr := r.URL.Query().Get("duration"); durationStr != "" {
+		d, err := strconv.Atoi(durationStr)
+		if err != nil || d < 1 || d > maxDurationSec {
+			return 0, 0, errors.New("duration must be 1-" + strconv.Itoa(maxDurationSec))
+		}
+		duration = time.Duration(d) * time.Second
+	}
+
+	chunkSize := 1048576
+	if cs := r.URL.Query().Get("chunk"); cs != "" {
+		c, err := strconv.Atoi(cs)
+		if err != nil || c < 65536 || c > 4194304 {
+			return 0, 0, errors.New("chunk must be 65536-4194304")
+		}
+		chunkSize = c
+	}
+	return duration, chunkSize, nil
+}
+
+func (h *SpeedTestHandler) resolveRandomSource() ([]byte, error) {
+	randomSource := h.randomData
+	if len(randomSource) != 0 {
+		return randomSource, nil
+	}
+	// Keep fallback allocation bounded; stream logic handles chunk expansion.
+	randomSource = make([]byte, 64*1024)
+	if _, err := rand.Read(randomSource); err != nil {
+		return nil, err
+	}
+	return randomSource, nil
+}
+
+func streamDownload(w http.ResponseWriter, r *http.Request, randomSource []byte, chunkSize int, duration time.Duration) {
+	flusher, canFlush := w.(http.Flusher)
+	deadline := time.Now().Add(duration)
+	controller := http.NewResponseController(w)
+	_ = controller.SetWriteDeadline(deadline.Add(5 * time.Second))
+	writeCount := 0
+	flushInterval := 8
+	offset := 0
+	now := time.Now()
+	deadlineTicker := time.NewTicker(100 * time.Millisecond)
+	defer deadlineTicker.Stop()
+
+	for now.Before(deadline) {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-deadlineTicker.C:
+			now = time.Now()
+		default:
+			if err := writeChunkFromSource(w, randomSource, chunkSize, &offset); err != nil {
+				return
+			}
+			writeCount++
+			if writeCount%64 == 0 {
+				now = time.Now()
+			}
+			if canFlush && writeCount%flushInterval == 0 {
+				flusher.Flush()
+			}
+		}
+	}
+	if canFlush {
+		flusher.Flush()
+	}
 }
 
 func (h *SpeedTestHandler) Ping(w http.ResponseWriter, r *http.Request) {
