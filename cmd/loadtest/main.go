@@ -38,6 +38,15 @@ const (
 	defaultHost          = "127.0.0.1"
 )
 
+var validModes = map[string]struct{}{
+	modeTCPDownload:      {},
+	modeTCPUpload:        {},
+	modeTCPBidirectional: {},
+	modeUDPDownload:      {},
+	modeUDPUpload:        {},
+	modeWS:               {},
+}
+
 func main() {
 	cfg := parseFlags()
 	if err := validateConfig(cfg); err != nil {
@@ -90,9 +99,7 @@ func validateConfig(cfg config) error {
 	if cfg.duration <= 0 {
 		return fmt.Errorf("duration must be > 0")
 	}
-	switch cfg.mode {
-	case modeTCPDownload, modeTCPUpload, modeTCPBidirectional, modeUDPDownload, modeUDPUpload, modeWS:
-	default:
+	if _, ok := validModes[cfg.mode]; !ok {
 		return fmt.Errorf("invalid mode: %s", cfg.mode)
 	}
 	if cfg.mode == modeWS && cfg.wsURL == "" {
@@ -110,19 +117,7 @@ func validateConfig(cfg config) error {
 	if cfg.packetSize > 9000 {
 		return fmt.Errorf("packet-size must be <= 9000")
 	}
-	if cfg.mode == modeWS {
-		parsed, err := url.Parse(cfg.wsURL)
-		if err != nil {
-			return fmt.Errorf("invalid ws-url: %w", err)
-		}
-		if parsed.Scheme != "ws" && parsed.Scheme != "wss" {
-			return fmt.Errorf("ws-url scheme must be ws or wss")
-		}
-		if parsed.Host == "" {
-			return fmt.Errorf("ws-url host is required")
-		}
-	}
-	return nil
+	return validateWebSocketConfig(cfg)
 }
 
 func runLoadtest(ctx context.Context, cfg config) (int64, int64, int64) {
@@ -132,32 +127,10 @@ func runLoadtest(ctx context.Context, cfg config) (int64, int64, int64) {
 
 	var wg sync.WaitGroup
 	wg.Add(cfg.concurrency)
-	runWorker := func(worker int) (int64, int64, error) {
-		switch cfg.mode {
-		case modeTCPDownload:
-			recv, err := runTCPDownload(ctx, cfg, worker)
-			return 0, recv, err
-		case modeTCPUpload:
-			sent, err := runTCPUpload(ctx, cfg, worker)
-			return sent, 0, err
-		case modeTCPBidirectional:
-			return runTCPBidirectional(ctx, cfg, worker)
-		case modeUDPDownload:
-			recv, err := runUDPDownload(ctx, cfg, worker)
-			return 0, recv, err
-		case modeUDPUpload:
-			sent, err := runUDPUpload(ctx, cfg, worker)
-			return sent, 0, err
-		case modeWS:
-			return 0, 0, runWebSocket(ctx, cfg, worker)
-		default:
-			return 0, 0, fmt.Errorf("invalid mode: %s", cfg.mode)
-		}
-	}
 	for i := 0; i < cfg.concurrency; i++ {
 		go func(worker int) {
 			defer wg.Done()
-			sent, recv, err := runWorker(worker)
+			sent, recv, err := runLoadtestWorker(ctx, cfg, worker)
 			atomic.AddInt64(&bytesSent, sent)
 			atomic.AddInt64(&bytesRecv, recv)
 			if err != nil && !errors.Is(err, context.Canceled) {
@@ -167,6 +140,46 @@ func runLoadtest(ctx context.Context, cfg config) (int64, int64, int64) {
 	}
 	wg.Wait()
 	return atomic.LoadInt64(&bytesSent), atomic.LoadInt64(&bytesRecv), atomic.LoadInt64(&workerErrs)
+}
+
+func validateWebSocketConfig(cfg config) error {
+	if cfg.mode != modeWS {
+		return nil
+	}
+	parsed, err := url.Parse(cfg.wsURL)
+	if err != nil {
+		return fmt.Errorf("invalid ws-url: %w", err)
+	}
+	if parsed.Scheme != "ws" && parsed.Scheme != "wss" {
+		return fmt.Errorf("ws-url scheme must be ws or wss")
+	}
+	if parsed.Host == "" {
+		return fmt.Errorf("ws-url host is required")
+	}
+	return nil
+}
+
+func runLoadtestWorker(ctx context.Context, cfg config, worker int) (int64, int64, error) {
+	switch cfg.mode {
+	case modeTCPDownload:
+		recv, err := runTCPDownload(ctx, cfg, worker)
+		return 0, recv, err
+	case modeTCPUpload:
+		sent, err := runTCPUpload(ctx, cfg, worker)
+		return sent, 0, err
+	case modeTCPBidirectional:
+		return runTCPBidirectional(ctx, cfg, worker)
+	case modeUDPDownload:
+		recv, err := runUDPDownload(ctx, cfg, worker)
+		return 0, recv, err
+	case modeUDPUpload:
+		sent, err := runUDPUpload(ctx, cfg, worker)
+		return sent, 0, err
+	case modeWS:
+		return 0, 0, runWebSocket(ctx, cfg, worker)
+	default:
+		return 0, 0, fmt.Errorf("invalid mode: %s", cfg.mode)
+	}
 }
 
 func runTCPDownload(ctx context.Context, cfg config, worker int) (int64, error) {

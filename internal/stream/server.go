@@ -201,35 +201,46 @@ func (s *Server) writeDownloadLoop(conn *net.TCPConn) {
 				conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 				writesSinceDeadline = 0
 			}
-			if offset+chunkSize <= dataLen {
-				if _, err := conn.Write(s.randomData[offset : offset+chunkSize]); err != nil {
-					return
-				}
-				writesSinceDeadline++
-				offset += chunkSize
-				if offset == dataLen {
-					offset = 0
-				}
-				continue
-			}
-			first := s.randomData[offset:]
-			if _, err := conn.Write(first); err != nil {
+			writes, nextOffset, err := s.writeRandomChunk(conn, offset, chunkSize)
+			if err != nil {
 				return
 			}
-			writesSinceDeadline++
-			remaining := chunkSize - len(first)
-			if remaining > 0 {
-				if _, err := conn.Write(s.randomData[:remaining]); err != nil {
-					return
-				}
-				writesSinceDeadline++
-			}
-			offset = remaining
-			if offset >= dataLen {
-				offset = 0
-			}
+			writesSinceDeadline += writes
+			offset = nextOffset
 		}
 	}
+}
+
+func (s *Server) writeRandomChunk(conn *net.TCPConn, offset, chunkSize int) (int, int, error) {
+	dataLen := len(s.randomData)
+	if offset+chunkSize <= dataLen {
+		if _, err := conn.Write(s.randomData[offset : offset+chunkSize]); err != nil {
+			return 0, offset, err
+		}
+		nextOffset := offset + chunkSize
+		if nextOffset >= dataLen {
+			nextOffset = 0
+		}
+		return 1, nextOffset, nil
+	}
+
+	first := s.randomData[offset:]
+	if _, err := conn.Write(first); err != nil {
+		return 0, offset, err
+	}
+	writes := 1
+	remaining := chunkSize - len(first)
+	if remaining > 0 {
+		if _, err := conn.Write(s.randomData[:remaining]); err != nil {
+			return writes, offset, err
+		}
+		writes++
+	}
+	nextOffset := remaining
+	if nextOffset >= dataLen {
+		nextOffset = 0
+	}
+	return writes, nextOffset, nil
 }
 
 func (s *Server) handleUpload(conn *net.TCPConn) {

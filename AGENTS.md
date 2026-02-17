@@ -92,12 +92,7 @@
 
 | ID       | Area | Agent | Status | Plan                                                         | Evidence | Check |
 | -------- | ---- | ----- | ------ | ------------------------------------------------------------ | -------- | ----- |
-| 20260216-ci-08 | ci | A0 | Done | Import SonarQube issue feed into dynamic backlog with severity and ownership buckets. | MCP pull succeeded for `SaveEnergy_openbyte`; first page `100` issues, Sonar total `487` (`67 CRITICAL`, `13 MAJOR`, `20 MINOR` on page 1). | `CallMcpTool(server=user-sonarqube-mcp-server, tool=search_sonar_issues_in_projects)` |
-| 20260216-go-01 | api | A0 | Check | Reduce cognitive complexity hotspots (`go:S3776`) in production Go paths (server/router/speedtest/config/stream/client). | Completed refactor slices: table-driven flag overrides (`cmd/server/main.go`), helperized env/validation flow (`internal/config/config.go`), loadtest worker dispatch consolidation (`cmd/loadtest/main.go`), stream read/write loop extraction (`internal/stream/server.go`), and HTTP engine stream-loop extraction (`cmd/client/http_engine.go`). | `go test -short ./cmd/server ./cmd/client ./internal/api ./internal/config ./internal/stream ./cmd/loadtest` |
-| 20260216-test-01 | test | A0 | Check | De-duplicate repeated literals in test suites (`go:S1192`) via local constants/helpers. | Added constant-based dedup in `test/unit/api/handlers_test.go`, `test/unit/results/handler_test.go`, `test/unit/results/store_test.go`, and `test/unit/registry/handler_test.go`; resolved `go:S100` naming issue in metrics tests. | `go test -short ./test/unit/...` |
-| 20260216-web-01 | web | A0 | Check | Address `web/app.js` Sonar findings (complexity, Promise rejection style, optional chaining, window/globalThis cleanup). | Implemented targeted fixes: added `parseJSONOrThrow`, replaced `Promise.reject()` branches with `Error` throws, switched `window` references to `globalThis`, simplified `else-if` structure, and added debug handling in health-check catch path. | `npx prettier --check web/app.js && bunx playwright test` |
-| 20260216-scripts-01 | ci | A0 | Done | Fix shell diagnostic routing in installer script (`shelldre:S7677`) by sending error messages to stderr. | Updated installer error-path messages to stderr (`>&2`) including lines previously flagged (`74`, `101`, `105`) and related error branches for consistency. | `shellcheck scripts/install.sh` |
-| 20260216-cleanup-01 | docs | A0 | Check | Sweep low-risk readability nits (`godre:S8193`, `go:S100`) after high-severity backlog drains. | Applied `godre:S8193` style cleanup in `internal/websocket/server.go` connected-message write condition and resolved `go:S100` naming nit (`TestCollectorRecordBytesIgnoresNegative`) in metrics collector tests. | `go test -short ./...` |
+| 20260217-ci-09 | ci | A0 | In Progress | Reconcile Sonar backlog against fresh server-side analysis on latest `main` commit. | Latest MCP query still reports pre-fix profile (`495` open issues; page-1 mix `68 CRITICAL`, `13 MAJOR`, `19 MINOR`), so closure decisions are pending Sonar reanalysis refresh. | `CallMcpTool(server=user-sonarqube-mcp-server, tool=search_sonar_issues_in_projects)` |
 
 ### Analysis Snapshot (2026-02-15)
 
@@ -125,6 +120,7 @@
 - `20260215-results-03`, `20260215-results-04`, `20260215-results-05`, `20260215-openbyte-02`, `20260215-mcp-01`, `20260215-api-06`
 - `20260215-api-07`, `20260215-loadtest-01`, `20260215-loadtest-02`, `20260215-metrics-01`, `20260215-install-01`, `20260215-client-10`
 - `20260215-mcp-02`, `20260215-diagnostic-01`
+- `20260216-ci-08`, `20260216-go-01`, `20260216-test-01`, `20260216-web-01`, `20260216-scripts-01`, `20260216-cleanup-01`
 
 ### Recent Decision Notes
 
@@ -136,6 +132,7 @@
 - Applied rate-limit parity to registrar routes and browser results route.
 - Tightened API mutation contract (explicit JSON content-type + unknown-field rejection).
 - Preferred fail-fast CLI/config validation over silent fallback behavior.
+- Active backlog rows now keep only unresolved/externally-dependent items; completed/check work is folded into `Recently Closed IDs` to keep queue readable.
 
 ### Archive Note
 

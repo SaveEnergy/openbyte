@@ -127,24 +127,13 @@ func (e *HTTPTestEngine) runDownloadStream(ctx context.Context, reqURL string, d
 
 	resp, err := e.client.Do(req)
 	if err != nil {
-		if resp != nil {
-			io.Copy(io.Discard, resp.Body)
-			resp.Body.Close()
-		}
+		drainAndClose(resp)
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusTooManyRequests {
-			wait := parseRetryAfter(resp.Header.Get("Retry-After"), time.Second)
-			select {
-			case <-time.After(wait):
-			case <-ctx.Done():
-			}
-		}
-		io.Copy(io.Discard, resp.Body)
-		return fmt.Errorf("download failed: %s", resp.Status)
+		return e.handleNonOKResponse(ctx, "download", resp)
 	}
 
 	buf, ok := e.bufferPool.Get().([]byte)
@@ -205,28 +194,17 @@ func (e *HTTPTestEngine) runUploadStream(ctx context.Context, reqURL string, dea
 
 		resp, err := e.client.Do(req)
 		if err != nil {
-			if resp != nil {
-				io.Copy(io.Discard, resp.Body)
-				resp.Body.Close()
-			}
+			drainAndClose(resp)
 			if ctx.Err() != nil {
 				return nil
 			}
 			return err
 		}
-		io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			if resp.StatusCode == http.StatusTooManyRequests {
-				wait := parseRetryAfter(resp.Header.Get("Retry-After"), time.Second)
-				select {
-				case <-time.After(wait):
-				case <-ctx.Done():
-				}
-			}
-			return fmt.Errorf("upload failed: %s", resp.Status)
+			return e.handleNonOKResponse(ctx, "upload", resp)
 		}
+		drainAndClose(resp)
 
 		atomic.AddInt64(&e.bytesSent, int64(len(e.uploadPayload)))
 		e.addBytes(int64(len(e.uploadPayload)), e.elapsedSinceStart())
@@ -246,6 +224,26 @@ func joinStreamErrors(direction string, errCh <-chan error) error {
 		return nil
 	}
 	return fmt.Errorf("%s streams failed: %w", direction, errors.Join(errs...))
+}
+
+func drainAndClose(resp *http.Response) {
+	if resp == nil {
+		return
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+}
+
+func (e *HTTPTestEngine) handleNonOKResponse(ctx context.Context, direction string, resp *http.Response) error {
+	if resp.StatusCode == http.StatusTooManyRequests {
+		wait := parseRetryAfter(resp.Header.Get("Retry-After"), time.Second)
+		select {
+		case <-time.After(wait):
+		case <-ctx.Done():
+		}
+	}
+	drainAndClose(resp)
+	return fmt.Errorf("%s failed: %s", direction, resp.Status)
 }
 
 func (e *HTTPTestEngine) addBytes(n int64, elapsed time.Duration) {
