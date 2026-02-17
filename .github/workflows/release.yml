@@ -5,13 +5,12 @@ on:
     tags:
       - "v*.*.*"
 
-permissions:
-  contents: write
-  packages: write
-
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     outputs:
       image_pushed: ${{ steps.push.outcome == 'success' }}
     steps:
@@ -142,6 +141,8 @@ jobs:
     needs: release
     if: vars.SSH_HOST != '' && vars.SSH_USER != '' && vars.REMOTE_DIR != '' && vars.GHCR_USERNAME != '' && needs.release.outputs.image_pushed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       SSH_HOST: ${{ vars.SSH_HOST }}
       SSH_USER: ${{ vars.SSH_USER }}

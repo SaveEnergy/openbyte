@@ -60,7 +60,7 @@ func Run(args []string, version string) int {
 	help := flagSet.Bool("help", false, "Show help")
 	flagSet.BoolVar(help, "h", false, "Show help (short)")
 
-	if err := flagSet.Parse(args); err != nil {
+	if flagSet.Parse(args) != nil {
 		return exitUsage
 	}
 

@@ -19,6 +19,11 @@ const (
 	exampleBaseURL    = "http://example.com"
 	resultsPagePath   = "/results/abc12345"
 	registryHealthAPI = "/api/v1/registry/health"
+	versionAPIPath    = "/api/v1/version"
+	pingAPIPath       = "/api/v1/ping"
+	downloadAPIPath   = "/api/v1/download"
+	uploadAPIPath     = "/api/v1/upload"
+	streamWSAPIPath   = "/api/v1/stream/550e8400-e29b-41d4-a716-446655440000/stream"
 )
 
 type testRegistryRegistrar struct{}
@@ -143,7 +148,7 @@ func TestStaticJSDoesNotForceNoStore(t *testing.T) {
 	router := api.NewRouter(handler, config.DefaultConfig())
 
 	h := router.SetupRoutes()
-	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/app.js", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/openbyte.js", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -193,28 +198,28 @@ func TestRateLimitSkipPathsAndStreamPathBehavior(t *testing.T) {
 	})
 	h := router.SetupRoutes()
 
-	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/api/v1/version", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+versionAPIPath, nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("first version request "+statusWantFmt, rec.Code, http.StatusOK)
 	}
 
-	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+"/api/v1/ping", nil)
+	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+pingAPIPath, nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code == http.StatusTooManyRequests {
 		t.Fatalf("ping endpoint should bypass rate limit")
 	}
 
-	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+"/api/v1/download", nil)
+	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+downloadAPIPath, nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code == http.StatusTooManyRequests {
 		t.Fatalf("download endpoint should bypass rate limit")
 	}
 
-	req = httptest.NewRequest(http.MethodPost, exampleBaseURL+"/api/v1/upload", strings.NewReader("x"))
+	req = httptest.NewRequest(http.MethodPost, exampleBaseURL+uploadAPIPath, strings.NewReader("x"))
 	req.Header.Set("Content-Type", "application/octet-stream")
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -222,7 +227,7 @@ func TestRateLimitSkipPathsAndStreamPathBehavior(t *testing.T) {
 		t.Fatalf("upload endpoint should bypass rate limit")
 	}
 
-	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+"/api/v1/stream/550e8400-e29b-41d4-a716-446655440000/stream", nil)
+	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+streamWSAPIPath, nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusTooManyRequests {
@@ -399,8 +404,8 @@ func TestCriticalRoutesRespondOK(t *testing.T) {
 		path   string
 	}{
 		{name: "health", method: http.MethodGet, path: "/health"},
-		{name: "version", method: http.MethodGet, path: "/api/v1/version"},
-		{name: "ping", method: http.MethodGet, path: "/api/v1/ping"},
+		{name: "version", method: http.MethodGet, path: versionAPIPath},
+		{name: "ping", method: http.MethodGet, path: pingAPIPath},
 	}
 
 	for _, tt := range tests {

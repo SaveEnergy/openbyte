@@ -35,6 +35,16 @@ type TestServer struct {
 	udpTestAddr  string
 }
 
+const (
+	jsonContentType = "application/json"
+	noStoreValue    = "no-store"
+	streamStartAPI  = "/api/v1/stream/start"
+	httpPrefix      = "http://"
+	httpsPrefix     = "https://"
+	wsPrefix        = "ws://"
+	wssPrefix       = "wss://"
+)
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 	os.Exit(m.Run())
@@ -304,7 +314,7 @@ func TestResultsSaveAndGet(t *testing.T) {
 		t.Fatalf("marshal save request: %v", err)
 	}
 
-	resp, err := http.Post(ts.baseURL+"/api/v1/results", "application/json", bytes.NewReader(body))
+	resp, err := http.Post(ts.baseURL+"/api/v1/results", jsonContentType, bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("save result request failed: %v", err)
 	}
@@ -336,8 +346,8 @@ func TestResultsSaveAndGet(t *testing.T) {
 		data, _ := io.ReadAll(getResp.Body)
 		t.Fatalf("get result status = %d, want %d, body=%s", getResp.StatusCode, http.StatusOK, string(data))
 	}
-	if got := getResp.Header.Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("get result cache-control = %q, want %q", got, "no-store")
+	if got := getResp.Header.Get("Cache-Control"); got != noStoreValue {
+		t.Fatalf("get result cache-control = %q, want %q", got, noStoreValue)
 	}
 
 	var saved map[string]any
@@ -374,7 +384,7 @@ func TestFrontendLoads(t *testing.T) {
 	checks := []string{
 		"<title>openByte",
 		"openByte",
-		"app.js",
+		"openbyte.js",
 		"style.css",
 	}
 
@@ -391,7 +401,7 @@ func TestStaticFiles(t *testing.T) {
 	defer ts.Close()
 
 	files := []string{
-		"/app.js",
+		"/openbyte.js",
 		"/style.css",
 	}
 
@@ -410,7 +420,7 @@ func TestStaticFiles(t *testing.T) {
 		}
 
 		contentType := resp.Header.Get("Content-Type")
-		if file == "/app.js" && !strings.Contains(contentType, "javascript") {
+		if file == "/openbyte.js" && !strings.Contains(contentType, "javascript") {
 			t.Errorf("%s content-type = %s, want javascript", file, contentType)
 		}
 		if file == "/style.css" && !strings.Contains(contentType, "css") {
@@ -427,19 +437,19 @@ func TestJavaScriptFunctions(t *testing.T) {
 	ts := NewTestServer(t)
 	defer ts.Close()
 
-	resp, err := http.Get(ts.baseURL + "/app.js")
+	resp, err := http.Get(ts.baseURL + "/openbyte.js")
 	if err != nil {
-		t.Fatalf("Failed to load app.js: %v", err)
+		t.Fatalf("Failed to load openbyte.js: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("app.js status = %d, want %d", resp.StatusCode, http.StatusOK)
+		t.Fatalf("openbyte.js status = %d, want %d", resp.StatusCode, http.StatusOK)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		t.Fatalf("Failed to read app.js: %v", err)
+		t.Fatalf("Failed to read openbyte.js: %v", err)
 	}
 
 	js := string(body)
@@ -495,7 +505,7 @@ func TestAPIStartTest(t *testing.T) {
 		t.Fatalf("Failed to marshal request: %v", err)
 	}
 
-	resp, err := http.Post(ts.baseURL+"/api/v1/stream/start", "application/json", bytes.NewReader(body))
+	resp, err := http.Post(ts.baseURL+streamStartAPI, jsonContentType, bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("API request failed: %v", err)
 	}
@@ -562,10 +572,10 @@ func TestWebSocketConnection(t *testing.T) {
 	}
 
 	if strings.HasPrefix(wsURL, "/") {
-		wsURL = strings.Replace(ts.baseURL, "http://", "ws://", 1) + wsURL
+		wsURL = strings.Replace(ts.baseURL, httpPrefix, wsPrefix, 1) + wsURL
 	} else {
-		wsURL = strings.Replace(wsURL, "http://", "ws://", 1)
-		wsURL = strings.Replace(wsURL, "https://", "wss://", 1)
+		wsURL = strings.Replace(wsURL, httpPrefix, wsPrefix, 1)
+		wsURL = strings.Replace(wsURL, httpsPrefix, wssPrefix, 1)
 	}
 
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
@@ -606,7 +616,7 @@ func TestWebSocketOriginRejected(t *testing.T) {
 		t.Fatalf("Failed to marshal request: %v", err)
 	}
 
-	resp, err := http.Post(ts.baseURL+"/api/v1/stream/start", "application/json", bytes.NewReader(body))
+	resp, err := http.Post(ts.baseURL+streamStartAPI, jsonContentType, bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("Failed to start test: %v", err)
 	}
@@ -623,10 +633,10 @@ func TestWebSocketOriginRejected(t *testing.T) {
 	}
 
 	if strings.HasPrefix(wsURL, "/") {
-		wsURL = strings.Replace(ts.baseURL, "http://", "ws://", 1) + wsURL
+		wsURL = strings.Replace(ts.baseURL, httpPrefix, wsPrefix, 1) + wsURL
 	} else {
-		wsURL = strings.Replace(wsURL, "http://", "ws://", 1)
-		wsURL = strings.Replace(wsURL, "https://", "wss://", 1)
+		wsURL = strings.Replace(wsURL, httpPrefix, wsPrefix, 1)
+		wsURL = strings.Replace(wsURL, httpsPrefix, wssPrefix, 1)
 	}
 
 	headers := http.Header{}
@@ -657,7 +667,7 @@ func TestFullFlow(t *testing.T) {
 		t.Fatalf("Failed to marshal request: %v", err)
 	}
 
-	resp, err := http.Post(ts.baseURL+"/api/v1/stream/start", "application/json", bytes.NewReader(body))
+	resp, err := http.Post(ts.baseURL+streamStartAPI, jsonContentType, bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("Failed to start test: %v", err)
 	}
@@ -693,10 +703,10 @@ func TestFullFlow(t *testing.T) {
 		t.Fatalf("websocket_url missing or invalid in response: %#v", startResp["websocket_url"])
 	}
 	if strings.HasPrefix(wsURL, "/") {
-		wsURL = strings.Replace(ts.baseURL, "http://", "ws://", 1) + wsURL
+		wsURL = strings.Replace(ts.baseURL, httpPrefix, wsPrefix, 1) + wsURL
 	} else {
-		wsURL = strings.Replace(wsURL, "http://", "ws://", 1)
-		wsURL = strings.Replace(wsURL, "https://", "wss://", 1)
+		wsURL = strings.Replace(wsURL, httpPrefix, wsPrefix, 1)
+		wsURL = strings.Replace(wsURL, httpsPrefix, wssPrefix, 1)
 	}
 
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)

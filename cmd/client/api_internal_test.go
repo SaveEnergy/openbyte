@@ -14,10 +14,20 @@ import (
 
 type noopFormatter struct{}
 
-func (noopFormatter) FormatProgress(float64, float64, float64) {}
-func (noopFormatter) FormatMetrics(*types.Metrics)             {}
-func (noopFormatter) FormatComplete(*StreamResults)            {}
-func (noopFormatter) FormatError(error)                        {}
+func (noopFormatter) FormatProgress(progress, elapsed, remaining float64) {
+	_ = progress
+	_ = elapsed
+	_ = remaining
+}
+func (noopFormatter) FormatMetrics(metrics *types.Metrics) {
+	_ = metrics
+}
+func (noopFormatter) FormatComplete(results *StreamResults) {
+	_ = results
+}
+func (noopFormatter) FormatError(err error) {
+	_ = err
+}
 
 func TestCompleteStreamHonorsCanceledContext(t *testing.T) {
 	called := make(chan struct{}, 1)

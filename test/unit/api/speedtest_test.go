@@ -18,6 +18,8 @@ import (
 const (
 	speedtestStatusFmt   = "status = %d, want %d"
 	octetStreamType      = "application/octet-stream"
+	jsonContentType      = "application/json"
+	noStoreCacheControl  = "no-store"
 	downloadEndpointBase = "http://example.com/api/v1/download"
 	uploadEndpoint       = "http://example.com/api/v1/upload"
 	pingEndpoint         = "http://example.com/api/v1/ping"
@@ -464,11 +466,11 @@ func TestSpeedTestHandlerPingResponseShape(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusOK)
 	}
-	if got := rec.Header().Get("Content-Type"); got != "application/json" {
-		t.Fatalf("content-type = %q, want %q", got, "application/json")
+	if got := rec.Header().Get("Content-Type"); got != jsonContentType {
+		t.Fatalf("content-type = %q, want %q", got, jsonContentType)
 	}
-	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("cache-control = %q, want %q", got, "no-store")
+	if got := rec.Header().Get("Cache-Control"); got != noStoreCacheControl {
+		t.Fatalf("cache-control = %q, want %q", got, noStoreCacheControl)
 	}
 
 	var resp map[string]any

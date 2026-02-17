@@ -89,7 +89,7 @@ func TestWebSocketEmptyOriginWithConfiguredOrigins(t *testing.T) {
 	}))
 	t.Cleanup(testServer.Close)
 
-	if err := dialWebSocket(t, testServer.URL, ""); err == nil {
+	if dialWebSocket(t, testServer.URL, "") == nil {
 		t.Fatal("expected empty origin to be rejected when explicit allow-list is configured")
 	}
 }

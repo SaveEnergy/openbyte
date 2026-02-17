@@ -111,39 +111,51 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	buf := make([]byte, 256*1024)
-	var totalBytes int64
-	var readFailed bool
-	now := time.Now()
-	readIterations := 0
-	for {
-		select {
-		case <-readCtx.Done():
-			goto done
-		default:
-		}
-		n, err := r.Body.Read(buf)
-		totalBytes += int64(n)
-		if err != nil {
-			if !errors.Is(err, io.EOF) {
-				readFailed = true
-			}
-			break
-		}
-		readIterations++
-		if readIterations%32 == 0 {
-			now = time.Now()
-		}
-		if now.After(deadline) {
-			break
-		}
-	}
-done:
+	totalBytes, readFailed := readUploadBody(readCtx, r.Body, deadline)
 	if readFailed {
 		respondSpeedtestError(w, "upload failed", http.StatusInternalServerError)
 		return
 	}
 
+	writeUploadResponse(w, controller, totalBytes, startTime)
+}
+
+func uploadReadDeadline(start time.Time, maxDurationSec int) time.Time {
+	if maxDurationSec <= 0 {
+		maxDurationSec = 300
+	}
+	return start.Add(time.Duration(maxDurationSec) * time.Second)
+}
+
+func readUploadBody(readCtx context.Context, body io.Reader, deadline time.Time) (totalBytes int64, readFailed bool) {
+	buf := make([]byte, 256*1024)
+	now := time.Now()
+	readIterations := 0
+
+	for {
+		select {
+		case <-readCtx.Done():
+			return totalBytes, false
+		default:
+		}
+
+		n, err := body.Read(buf)
+		totalBytes += int64(n)
+		if err != nil {
+			return totalBytes, !errors.Is(err, io.EOF)
+		}
+
+		readIterations++
+		if readIterations%32 == 0 {
+			now = time.Now()
+		}
+		if now.After(deadline) {
+			return totalBytes, false
+		}
+	}
+}
+
+func writeUploadResponse(w http.ResponseWriter, controller *http.ResponseController, totalBytes int64, startTime time.Time) {
 	elapsed := time.Since(startTime)
 	if elapsed <= 0 {
 		elapsed = time.Millisecond
@@ -160,13 +172,6 @@ done:
 	}); err != nil {
 		logging.Warn("speedtest: encode upload response", logging.Field{Key: "error", Value: err})
 	}
-}
-
-func uploadReadDeadline(start time.Time, maxDurationSec int) time.Time {
-	if maxDurationSec <= 0 {
-		maxDurationSec = 300
-	}
-	return start.Add(time.Duration(maxDurationSec) * time.Second)
 }
 
 func parseDownloadParams(r *http.Request, maxDurationSec int) (time.Duration, int, error) {
@@ -222,7 +227,7 @@ func streamDownload(w http.ResponseWriter, r *http.Request, randomSource []byte,
 		case <-deadlineTicker.C:
 			now = time.Now()
 		default:
-			if err := writeChunkFromSource(w, randomSource, chunkSize, &offset); err != nil {
+			if writeChunkFromSource(w, randomSource, chunkSize, &offset) != nil {
 				return
 			}
 			writeCount++

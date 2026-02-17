@@ -21,7 +21,7 @@ func TestClientRejectsInvalidServerURLs(t *testing.T) {
 	cfg := &ConfigFile{
 		ServerURL: "https://example.com#frag",
 	}
-	if err := validateConfigFile(cfg); err == nil {
+	if validateConfigFile(cfg) == nil {
 		t.Fatal("expected config server_url with fragment to be rejected")
 	}
 }

@@ -66,17 +66,17 @@ func TestValidateConfigRejectsInvalidPortsAndOversizedPackets(t *testing.T) {
 	}
 
 	cfg.tcpPort = 0
-	if err := validateConfig(cfg); err == nil {
+	if validateConfig(cfg) == nil {
 		t.Fatal("expected tcp-port validation failure")
 	}
 	cfg.tcpPort = 8081
 	cfg.udpPort = 70000
-	if err := validateConfig(cfg); err == nil {
+	if validateConfig(cfg) == nil {
 		t.Fatal("expected udp-port validation failure")
 	}
 	cfg.udpPort = 8082
 	cfg.packetSize = 9001
-	if err := validateConfig(cfg); err == nil {
+	if validateConfig(cfg) == nil {
 		t.Fatal("expected packet-size upper-bound validation failure")
 	}
 }

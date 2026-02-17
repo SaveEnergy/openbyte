@@ -48,7 +48,9 @@ func shutdownPprofServer(srv *http.Server, timeout time.Duration) {
 
 func startRuntimeStatsLogger(cfg *config.Config) func() {
 	if cfg == nil || cfg.PerfStatsInterval <= 0 {
-		return func() {}
+		return func() {
+			_ = cfg
+		}
 	}
 
 	interval := cfg.PerfStatsInterval

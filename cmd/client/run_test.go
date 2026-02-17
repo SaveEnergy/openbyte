@@ -18,10 +18,20 @@ import (
 
 type noopOutputFormatter struct{}
 
-func (noopOutputFormatter) FormatProgress(float64, float64, float64) {}
-func (noopOutputFormatter) FormatMetrics(*types.Metrics)             {}
-func (noopOutputFormatter) FormatComplete(*StreamResults)            {}
-func (noopOutputFormatter) FormatError(error)                        {}
+func (noopOutputFormatter) FormatProgress(progress, elapsed, remaining float64) {
+	_ = progress
+	_ = elapsed
+	_ = remaining
+}
+func (noopOutputFormatter) FormatMetrics(metrics *types.Metrics) {
+	_ = metrics
+}
+func (noopOutputFormatter) FormatComplete(results *StreamResults) {
+	_ = results
+}
+func (noopOutputFormatter) FormatError(err error) {
+	_ = err
+}
 
 func TestComputePingMetricsEmpty(t *testing.T) {
 	latency, jitter := computePingMetrics(nil)
@@ -130,11 +140,21 @@ type formatterWithErr struct {
 	err error
 }
 
-func (f *formatterWithErr) FormatProgress(progress float64, elapsed, remaining float64) {}
-func (f *formatterWithErr) FormatMetrics(metrics *types.Metrics)                        {}
-func (f *formatterWithErr) FormatComplete(results *StreamResults)                       {}
-func (f *formatterWithErr) FormatError(err error)                                       {}
-func (f *formatterWithErr) LastError() error                                            { return f.err }
+func (f *formatterWithErr) FormatProgress(progress float64, elapsed, remaining float64) {
+	_ = progress
+	_ = elapsed
+	_ = remaining
+}
+func (f *formatterWithErr) FormatMetrics(metrics *types.Metrics) {
+	_ = metrics
+}
+func (f *formatterWithErr) FormatComplete(results *StreamResults) {
+	_ = results
+}
+func (f *formatterWithErr) FormatError(err error) {
+	_ = err
+}
+func (f *formatterWithErr) LastError() error { return f.err }
 
 func TestFormatterLastError(t *testing.T) {
 	want := errors.New("writer failed")

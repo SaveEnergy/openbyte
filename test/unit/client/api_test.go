@@ -62,7 +62,7 @@ func TestCancelStreamServerError(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if err := client.CancelStream(ctx, server.URL, "stream-id", ""); err == nil {
+	if client.CancelStream(ctx, server.URL, "stream-id", "") == nil {
 		t.Fatal("expected error on non-2xx cancel response")
 	}
 }

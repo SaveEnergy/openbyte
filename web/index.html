@@ -1,171 +1,213 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Open-source internet speed test. Measure download, upload, latency, jitter, and bufferbloat.">
-  <meta property="og:title" content="openByte — Speed Test">
-  <meta property="og:description" content="Open-source internet speed test. Measure download, upload, latency, jitter, and bufferbloat.">
-  <meta property="og:type" content="website">
-  <title>openByte</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <div class="app">
-    <!-- Minimal Header -->
-    <header class="header">
-      <div class="brand">
-        <div class="logo">open<span class="logo-accent">Byte</span></div>
-        <div class="server-name" id="serverName">OpenByte Server</div>
-      </div>
-      <div class="server-info" id="serverInfo">
-        <span class="server-dot"></span>
-        <span class="server-text">Connecting...</span>
-      </div>
-    </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Open-source internet speed test. Measure download, upload, latency, jitter, and bufferbloat."
+    />
+    <meta property="og:title" content="openByte — Speed Test" />
+    <meta
+      property="og:description"
+      content="Open-source internet speed test. Measure download, upload, latency, jitter, and bufferbloat."
+    />
+    <meta property="og:type" content="website" />
+    <title>openByte</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- Minimal Header -->
+      <header class="header">
+        <div class="brand">
+          <div class="logo">open<span class="logo-accent">Byte</span></div>
+          <div class="server-name" id="serverName">OpenByte Server</div>
+        </div>
+        <div class="server-info" id="serverInfo">
+          <span class="server-dot"></span>
+          <span class="server-text">Connecting...</span>
+        </div>
+      </header>
 
-    <!-- Main Speed Display -->
-    <main class="main">
-      <!-- Idle State: Start Button -->
-      <section class="speed-section" id="idleState">
-        <button class="start-btn" id="startBtn" aria-label="Start speed test">
-          <span class="start-btn-text">GO</span>
-          <span class="start-btn-hint">Click to test your speed</span>
-        </button>
-      </section>
+      <!-- Main Speed Display -->
+      <main class="main">
+        <!-- Idle State: Start Button -->
+        <section class="speed-section" id="idleState">
+          <button class="start-btn" id="startBtn" aria-label="Start speed test">
+            <span class="start-btn-text">GO</span>
+            <span class="start-btn-hint">Click to test your speed</span>
+          </button>
+        </section>
 
-      <!-- Testing State: Speed Counter -->
-      <section class="speed-section hidden" id="testingState">
-        <div class="speed-display">
-          <div class="speed-number" id="speedNumber">0</div>
-          <div class="speed-unit" id="speedUnit">Mbps</div>
-        </div>
-        <div class="test-type" id="testType">↓ Download</div>
-        <div class="progress-ring-container">
-          <svg class="progress-ring" viewBox="0 0 200 200">
-            <circle class="progress-ring-bg" cx="100" cy="100" r="90"/>
-            <circle class="progress-ring-fill" id="progressRing" cx="100" cy="100" r="90"/>
-          </svg>
-        </div>
-        <button class="cancel-btn" id="cancelBtn">Cancel</button>
-      </section>
+        <!-- Testing State: Speed Counter -->
+        <section class="speed-section hidden" id="testingState">
+          <div class="speed-display">
+            <div class="speed-number" id="speedNumber">0</div>
+            <div class="speed-unit" id="speedUnit">Mbps</div>
+          </div>
+          <div class="test-type" id="testType">↓ Download</div>
+          <div class="progress-ring-container">
+            <svg class="progress-ring" viewBox="0 0 200 200">
+              <circle class="progress-ring-bg" cx="100" cy="100" r="90" />
+              <circle
+                class="progress-ring-fill"
+                id="progressRing"
+                cx="100"
+                cy="100"
+                r="90"
+              />
+            </svg>
+          </div>
+          <button class="cancel-btn" id="cancelBtn">Cancel</button>
+        </section>
 
-      <!-- Results State -->
-      <section class="speed-section hidden" id="resultsState">
-        <div class="results-main">
-          <div class="result-card result-primary">
-            <div class="result-icon">↓</div>
-            <div class="result-value" id="downloadResult">0</div>
-            <div class="result-label">Download</div>
-            <div class="result-unit">Mbps</div>
+        <!-- Results State -->
+        <section class="speed-section hidden" id="resultsState">
+          <div class="results-main">
+            <div class="result-card result-primary">
+              <div class="result-icon">↓</div>
+              <div class="result-value" id="downloadResult">0</div>
+              <div class="result-label">Download</div>
+              <div class="result-unit">Mbps</div>
+            </div>
+            <div class="result-card result-secondary">
+              <div class="result-icon">↑</div>
+              <div class="result-value" id="uploadResult">0</div>
+              <div class="result-label">Upload</div>
+              <div class="result-unit">Mbps</div>
+            </div>
           </div>
-          <div class="result-card result-secondary">
-            <div class="result-icon">↑</div>
-            <div class="result-value" id="uploadResult">0</div>
-            <div class="result-label">Upload</div>
-            <div class="result-unit">Mbps</div>
+          <div class="results-extra">
+            <div class="extra-stat">
+              <span class="extra-label">Idle Latency</span>
+              <span class="extra-value" id="latencyResult">0 ms</span>
+            </div>
+            <div class="extra-stat">
+              <span class="extra-label">Jitter</span>
+              <span class="extra-value" id="jitterResult">0 ms</span>
+            </div>
+            <div class="extra-stat">
+              <span class="extra-label">Loaded Latency</span>
+              <span class="extra-value" id="loadedLatencyResult">0 ms</span>
+            </div>
+            <div class="extra-stat">
+              <span class="extra-label">Bufferbloat</span>
+              <span class="extra-value" id="bufferbloatResult">-</span>
+            </div>
           </div>
-        </div>
-        <div class="results-extra">
-          <div class="extra-stat">
-            <span class="extra-label">Idle Latency</span>
-            <span class="extra-value" id="latencyResult">0 ms</span>
-          </div>
-          <div class="extra-stat">
-            <span class="extra-label">Jitter</span>
-            <span class="extra-value" id="jitterResult">0 ms</span>
-          </div>
-          <div class="extra-stat">
-            <span class="extra-label">Loaded Latency</span>
-            <span class="extra-value" id="loadedLatencyResult">0 ms</span>
-          </div>
-          <div class="extra-stat">
-            <span class="extra-label">Bufferbloat</span>
-            <span class="extra-value" id="bufferbloatResult">-</span>
-          </div>
-        </div>
-        <div class="results-details" id="resultsDetails">
-          <div class="detail-section">
-            <h3 class="detail-title">Network Information</h3>
-            <div class="detail-grid">
-              <div class="detail-item">
-                <span class="detail-label">IPv4</span>
-                <span class="detail-value" id="networkIPv4">-</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">IPv6</span>
-                <span class="detail-value" id="networkIPv6">-</span>
+          <div class="results-details" id="resultsDetails">
+            <div class="detail-section">
+              <h3 class="detail-title">Network Information</h3>
+              <div class="detail-grid">
+                <div class="detail-item">
+                  <span class="detail-label">IPv4</span>
+                  <span class="detail-value" id="networkIPv4">-</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">IPv6</span>
+                  <span class="detail-value" id="networkIPv6">-</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        <div class="results-actions">
-          <button class="restart-btn" id="restartBtn">Test Again</button>
-          <button class="share-btn hidden" id="shareBtn">Share</button>
-        </div>
-      </section>
-    </main>
+          <div class="results-actions">
+            <button class="restart-btn" id="restartBtn">Test Again</button>
+            <button class="share-btn hidden" id="shareBtn">Share</button>
+          </div>
+        </section>
+      </main>
 
-    <!-- Minimal Footer -->
-    <footer class="footer">
-      <div class="footer-links">
-        <button class="footer-link" id="showSettings">Settings</button>
-        <span class="footer-divider">·</span>
-        <a class="footer-link" href="/download.html">Download</a>
-        <span class="footer-divider">·</span>
-        <a class="footer-link" href="/skill.html">Skill</a>
-        <span class="footer-divider">·</span>
-        <a class="footer-link" href="https://github.com/saveenergy/openbyte" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <!-- Minimal Footer -->
+      <footer class="footer">
+        <div class="footer-links">
+          <button class="footer-link" id="showSettings">Settings</button>
+          <span class="footer-divider">·</span>
+          <a class="footer-link" href="/download.html">Download</a>
+          <span class="footer-divider">·</span>
+          <a class="footer-link" href="/skill.html">Skill</a>
+          <span class="footer-divider">·</span>
+          <a
+            class="footer-link"
+            href="https://github.com/saveenergy/openbyte"
+            target="_blank"
+            rel="noopener noreferrer"
+            >GitHub</a
+          >
+        </div>
+      </footer>
+
+      <!-- Settings Modal (hidden by default, opened via showModal()) -->
+      <dialog class="modal" id="settingsModal" aria-labelledby="settingsTitle">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 id="settingsTitle">Settings</h2>
+            <button
+              class="modal-close"
+              id="closeSettings"
+              type="button"
+              aria-label="Close settings"
+            >
+              ×
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="setting-group">
+              <label class="setting-label" for="duration">Test Duration</label>
+              <select class="setting-input" id="duration">
+                <option value="5">5 seconds (quick)</option>
+                <option value="10">10 seconds</option>
+                <option value="20">20 seconds</option>
+                <option value="30" selected>30 seconds</option>
+              </select>
+            </div>
+            <div class="setting-group">
+              <label class="setting-label" for="streams">
+                <span>Parallel Connections</span>
+                <span class="setting-hint" id="streamsHint"
+                  >(more = higher max speed)</span
+                >
+              </label>
+              <select
+                class="setting-input"
+                id="streams"
+                aria-describedby="streamsHint"
+              >
+                <option value="1">1 stream (~150 Mbps)</option>
+                <option value="4" selected>4 streams (~600 Mbps)</option>
+                <option value="8">8 streams (~1 Gbps)</option>
+                <option value="16">16 streams (~2 Gbps+)</option>
+                <option value="32">32 streams (~5 Gbps+)</option>
+              </select>
+            </div>
+            <div
+              class="setting-group"
+              id="serverSelectGroup"
+              style="display: none"
+            >
+              <label class="setting-label" for="serverSelect"
+                >Test Server</label
+              >
+              <select class="setting-input" id="serverSelect"></select>
+              <span class="server-status" id="serverStatus"></span>
+            </div>
+          </div>
+        </div>
+      </dialog>
+
+      <!-- Error Toast -->
+      <div
+        class="toast hidden"
+        id="errorToast"
+        role="alert"
+        aria-live="assertive"
+      >
+        <span class="toast-icon">⚠</span>
+        <span class="toast-message" id="errorMessage">Error</span>
       </div>
-    </footer>
-
-    <!-- Settings Modal (hidden by default, opened via showModal()) -->
-    <dialog class="modal" id="settingsModal" aria-labelledby="settingsTitle">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 id="settingsTitle">Settings</h2>
-          <button class="modal-close" id="closeSettings" type="button" aria-label="Close settings">×</button>
-        </div>
-        <div class="modal-body">
-          <div class="setting-group">
-            <label class="setting-label" for="duration">Test Duration</label>
-            <select class="setting-input" id="duration">
-              <option value="5">5 seconds (quick)</option>
-              <option value="10">10 seconds</option>
-              <option value="20">20 seconds</option>
-              <option value="30" selected>30 seconds</option>
-            </select>
-          </div>
-          <div class="setting-group">
-            <label class="setting-label" for="streams">
-              <span>Parallel Connections</span>
-              <span class="setting-hint" id="streamsHint">(more = higher max speed)</span>
-            </label>
-            <select class="setting-input" id="streams" aria-describedby="streamsHint">
-              <option value="1">1 stream (~150 Mbps)</option>
-              <option value="4" selected>4 streams (~600 Mbps)</option>
-              <option value="8">8 streams (~1 Gbps)</option>
-              <option value="16">16 streams (~2 Gbps+)</option>
-              <option value="32">32 streams (~5 Gbps+)</option>
-            </select>
-          </div>
-          <div class="setting-group" id="serverSelectGroup" style="display: none;">
-            <label class="setting-label" for="serverSelect">Test Server</label>
-            <select class="setting-input" id="serverSelect"></select>
-            <span class="server-status" id="serverStatus"></span>
-          </div>
-        </div>
-      </div>
-    </dialog>
-
-    <!-- Error Toast -->
-    <div class="toast hidden" id="errorToast" role="alert" aria-live="assertive">
-      <span class="toast-icon">⚠</span>
-      <span class="toast-message" id="errorMessage">Error</span>
     </div>
-  </div>
 
-  <script src="app.js"></script>
-</body>
+    <script src="openbyte.js"></script>
+  </body>
 </html>

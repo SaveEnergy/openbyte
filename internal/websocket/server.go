@@ -219,7 +219,7 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 	data := bytes.TrimSuffix(buf.Bytes(), []byte{'\n'})
 
 	for _, client := range clientList {
-		if err := client.writeMessage(websocket.TextMessage, data); err != nil {
+		if client.writeMessage(websocket.TextMessage, data) != nil {
 			s.removeClient(streamID, client.conn)
 			client.conn.Close()
 		}
@@ -300,7 +300,7 @@ func (s *Server) pingClients() {
 	s.mu.RUnlock()
 
 	for _, ref := range refs {
-		if err := ref.client.writeMessage(websocket.PingMessage, nil); err != nil {
+		if ref.client.writeMessage(websocket.PingMessage, nil) != nil {
 			s.removeClient(ref.streamID, ref.client.conn)
 			ref.client.conn.Close()
 		}

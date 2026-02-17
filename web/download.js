@@ -277,6 +277,48 @@
     if (parts.length && el) el.textContent = " · " + parts.join(" · ");
   }
 
+  async function fetchLatestRelease() {
+    const res = await fetch(releaseUrl);
+    if (!res.ok) {
+      const reason =
+        res.status === 403
+          ? "GitHub API rate limited"
+          : "GitHub API error " + res.status;
+      try {
+        await res.text();
+      } catch (err) {
+        console.debug("download page: failed to read release error body", err);
+      }
+      throw new Error(reason);
+    }
+    return res.json();
+  }
+
+  function applyGithubFallback(err) {
+    const btn = document.getElementById("recommendedBtn");
+    const label = document.getElementById("recommendedLabel");
+    const platform = document.getElementById("recommendedPlatform");
+    if (btn) {
+      btn.href = releasePage;
+      btn.style.pointerEvents = "";
+      btn.style.opacity = "";
+    }
+    if (label) label.textContent = "View on GitHub";
+    if (platform) {
+      platform.textContent = err?.message || "Could not load release data";
+    }
+    document.querySelectorAll(".download-links").forEach(function (c) {
+      while (c.firstChild) c.firstChild.remove();
+      const link = document.createElement("a");
+      link.className = "download-link";
+      link.href = releasePage;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "View release";
+      c.appendChild(link);
+    });
+  }
+
   function fallbackCopy(text) {
     const ta = document.createElement("textarea");
     ta.value = text;
@@ -285,14 +327,13 @@
     ta.style.left = "-9999px";
     document.body.appendChild(ta);
     ta.select();
-    let ok = false;
-    document.body.removeChild(ta);
+    ta.remove();
     // deprecated fallback intentionally dropped; clipboard API handles supported browsers
-    return ok;
+    return false;
   }
 
   function copyText(text, onSuccess, onFailure) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
+    if (navigator.clipboard?.writeText) {
       navigator.clipboard
         .writeText(text)
         .then(onSuccess)
@@ -350,27 +391,7 @@
 
   const detected = detectPlatform();
 
-  fetch(releaseUrl)
-    .then(function (res) {
-      if (!res.ok) {
-        const reason =
-          res.status === 403
-            ? "GitHub API rate limited"
-            : "GitHub API error " + res.status;
-        return res
-          .text()
-          .catch(function (err) {
-            console.debug(
-              "download page: failed to read release error body",
-              err,
-            );
-          })
-          .then(function () {
-            throw new Error(reason);
-          });
-      }
-      return res.json();
-    })
+  fetchLatestRelease()
     .then(function (data) {
       const assets = Array.isArray(data.assets) ? data.assets : [];
       renderVersion(data);
@@ -380,27 +401,6 @@
     })
     .catch(function (err) {
       console.warn("Release fetch failed:", err);
-      const btn = document.getElementById("recommendedBtn");
-      const label = document.getElementById("recommendedLabel");
-      const platform = document.getElementById("recommendedPlatform");
-      if (btn) {
-        btn.href = releasePage;
-        btn.style.pointerEvents = "";
-        btn.style.opacity = "";
-      }
-      if (label) label.textContent = "View on GitHub";
-      if (platform) {
-        platform.textContent = err?.message || "Could not load release data";
-      }
-      document.querySelectorAll(".download-links").forEach(function (c) {
-        while (c.firstChild) c.firstChild.remove();
-        const link = document.createElement("a");
-        link.className = "download-link";
-        link.href = releasePage;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.textContent = "View release";
-        c.appendChild(link);
-      });
+      applyGithubFallback(err);
     });
 })();

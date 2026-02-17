@@ -28,7 +28,7 @@ func TestStartCreatedStreamCleanupFailure(t *testing.T) {
 		t.Fatalf("complete stream: %v", err)
 	}
 
-	if err := handler.startCreatedStream(cfg.ID); err == nil {
+	if handler.startCreatedStream(cfg.ID) == nil {
 		t.Fatal("expected startCreatedStream error for terminal stream")
 	}
 

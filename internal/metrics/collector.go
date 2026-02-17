@@ -193,7 +193,12 @@ func (c *Collector) Reset() {
 	c.startTime = time.Now()
 }
 
-func (c *Collector) Close() {}
+func (c *Collector) Close() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.latencyHistogram = nil
+	c.bucketPool = sync.Pool{}
+}
 
 // LatencySnapshot holds a point-in-time copy of latency statistics.
 type LatencySnapshot struct {

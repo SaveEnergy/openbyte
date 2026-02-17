@@ -32,29 +32,7 @@
     timeoutController.abort();
   }, 20000);
 
-  fetch("/api/v1/results/" + id, { signal: timeoutController.signal })
-    .then(function (res) {
-      if (!res.ok) {
-        let message = "Unable to load result.";
-        if (res.status === 404) {
-          message = "Result not found or has expired.";
-        } else if (res.status >= 500) {
-          message = "Server error while loading result.";
-        }
-        return res
-          .text()
-          .catch(function (err) {
-            console.debug(
-              "results page: failed to read error response body",
-              err,
-            );
-          })
-          .then(function () {
-            throw userError(message);
-          });
-      }
-      return res.json();
-    })
+  loadResult(id, timeoutController.signal)
     .then(function (data) {
       clearTimeout(timeoutHandle);
       loadingView.classList.add("hidden");
@@ -98,6 +76,71 @@
       : "-";
   }
 
+  async function consumeErrorBody(res) {
+    try {
+      await res.text();
+    } catch (err) {
+      console.debug("results page: failed to read error response body", err);
+    }
+  }
+
+  function resultErrorMessage(statusCode) {
+    if (statusCode === 404) {
+      return "Result not found or has expired.";
+    }
+    if (statusCode >= 500) {
+      return "Server error while loading result.";
+    }
+    return "Unable to load result.";
+  }
+
+  async function loadResult(resultID, signal) {
+    const res = await fetch("/api/v1/results/" + resultID, { signal });
+    if (!res.ok) {
+      await consumeErrorBody(res);
+      throw userError(resultErrorMessage(res.status));
+    }
+    return res.json();
+  }
+
+  function setText(el, text) {
+    if (el) {
+      el.textContent = text;
+    }
+  }
+
+  function formatLatencyValue(v) {
+    return typeof v === "number" && v > 0 ? safeFixed(v, 1) + " ms" : "-";
+  }
+
+  function updateServerDetails(d, refs) {
+    if (!d.server_name) {
+      return;
+    }
+    if (refs.serverLabelEl && refs.serverItemEl && refs.serverValueEl) {
+      refs.serverLabelEl.style.display = "";
+      refs.serverItemEl.style.display = "";
+      refs.serverValueEl.textContent =
+        typeof d.server_name === "string"
+          ? d.server_name
+          : String(d.server_name);
+    }
+  }
+
+  function updateCreatedAt(createdAt, testedAtEl) {
+    if (!createdAt || !testedAtEl) {
+      return;
+    }
+    try {
+      const date = new Date(createdAt);
+      if (Number.isFinite(date.getTime())) {
+        testedAtEl.textContent = date.toLocaleString();
+      }
+    } catch (err) {
+      console.debug("results page: failed to parse created_at", err);
+    }
+  }
+
   function renderResult(d) {
     if (!d || typeof d !== "object") {
       showError("Invalid result payload.");
@@ -118,39 +161,23 @@
       const testedAtEl = document.getElementById("testedAt");
 
       const dl = formatSpeed(
-        typeof d.download_mbps === "number" && Number.isFinite(d.download_mbps)
-          ? d.download_mbps
-          : 0,
+        Number.isFinite(d.download_mbps) ? d.download_mbps : 0,
       );
       const ul = formatSpeed(
-        typeof d.upload_mbps === "number" && Number.isFinite(d.upload_mbps)
-          ? d.upload_mbps
-          : 0,
+        Number.isFinite(d.upload_mbps) ? d.upload_mbps : 0,
       );
 
-      if (downloadEl) downloadEl.textContent = dl.value;
-      if (uploadEl) uploadEl.textContent = ul.value;
+      setText(downloadEl, dl.value);
+      setText(uploadEl, ul.value);
 
       const dlUnit = document.querySelector(".result-primary .result-unit");
       const ulUnit = document.querySelector(".result-secondary .result-unit");
-      if (dlUnit) dlUnit.textContent = dl.unit;
-      if (ulUnit) ulUnit.textContent = ul.unit;
+      setText(dlUnit, dl.unit);
+      setText(ulUnit, ul.unit);
 
-      if (latencyEl)
-        latencyEl.textContent =
-          typeof d.latency_ms === "number" && d.latency_ms > 0
-            ? safeFixed(d.latency_ms, 1) + " ms"
-            : "-";
-      if (jitterEl)
-        jitterEl.textContent =
-          typeof d.jitter_ms === "number" && d.jitter_ms > 0
-            ? safeFixed(d.jitter_ms, 1) + " ms"
-            : "-";
-      if (loadedLatencyEl)
-        loadedLatencyEl.textContent =
-          typeof d.loaded_latency_ms === "number" && d.loaded_latency_ms > 0
-            ? safeFixed(d.loaded_latency_ms, 1) + " ms"
-            : "-";
+      setText(latencyEl, formatLatencyValue(d.latency_ms));
+      setText(jitterEl, formatLatencyValue(d.jitter_ms));
+      setText(loadedLatencyEl, formatLatencyValue(d.loaded_latency_ms));
       if (bufferbloatEl) {
         bufferbloatEl.textContent =
           typeof d.bufferbloat_grade === "string" && d.bufferbloat_grade
@@ -158,28 +185,10 @@
             : "-";
       }
 
-      if (ipv4El) ipv4El.textContent = d.ipv4 || "-";
-      if (ipv6El) ipv6El.textContent = d.ipv6 || "-";
-
-      if (d.server_name && serverLabelEl && serverItemEl && serverValueEl) {
-        serverLabelEl.style.display = "";
-        serverItemEl.style.display = "";
-        serverValueEl.textContent =
-          typeof d.server_name === "string"
-            ? d.server_name
-            : String(d.server_name);
-      }
-
-      if (d.created_at && testedAtEl) {
-        try {
-          const date = new Date(d.created_at);
-          if (Number.isFinite(date.getTime())) {
-            testedAtEl.textContent = date.toLocaleString();
-          }
-        } catch (err) {
-          console.debug("results page: failed to parse created_at", err);
-        }
-      }
+      setText(ipv4El, d.ipv4 || "-");
+      setText(ipv6El, d.ipv6 || "-");
+      updateServerDetails(d, { serverLabelEl, serverItemEl, serverValueEl });
+      updateCreatedAt(d.created_at, testedAtEl);
 
       document.title =
         "openByte — " +

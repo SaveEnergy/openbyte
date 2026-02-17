@@ -229,7 +229,7 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 		"download.html":               true,
 		"results.html":                true,
 		"skill.html":                  true,
-		"app.js":                      true,
+		"openbyte.js":                 true,
 		"download.js":                 true,
 		"results.js":                  true,
 		"skill.js":                    true,

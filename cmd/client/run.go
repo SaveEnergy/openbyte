@@ -32,10 +32,7 @@ func runStream(ctx context.Context, config *Config, formatter OutputFormatter, s
 	}
 
 	if err := streamMetrics(ctx, streamResp.WebSocketURL, formatter, config); err != nil {
-		if cancelErr := CancelStream(ctx, config.ServerURL, streamResp.StreamID, config.APIKey); cancelErr != nil {
-			return fmt.Errorf("%v (and cancel cleanup failed: %v)", err, cancelErr)
-		}
-		return err
+		return cancelStreamWithCleanup(ctx, config, streamResp.StreamID, err)
 	}
 	return nil
 }
@@ -92,29 +89,21 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 		case <-metricsTicker.C:
 			lastMetrics = engine.GetMetrics()
 			elapsed := time.Since(startTime)
-			progress := (elapsed.Seconds() / totalRunTime) * 100
-			if progress > 100 {
-				progress = 100
-			}
-			remaining := totalRunTime - elapsed.Seconds()
-			if remaining < 0 {
-				remaining = 0
-			}
-
-			formatter.FormatProgress(progress, elapsed.Seconds(), remaining)
-
-			formatter.FormatMetrics(engineMetricsToTypesMetrics(lastMetrics))
-			if ferr := formatterLastError(formatter); ferr != nil {
+			progress, remaining := computeProgress(elapsed, totalRunTime)
+			if err := emitProgressAndMetrics(
+				formatter,
+				engineMetricsToTypesMetrics(lastMetrics),
+				progress,
+				elapsed.Seconds(),
+				remaining,
+			); err != nil {
 				cancel()
-				return fmt.Errorf("formatter output failed: %w", ferr)
+				return err
 			}
 
 		case <-ctx.Done():
 			cancel()
-			if cancelErr := CancelStream(ctx, config.ServerURL, streamResp.StreamID, config.APIKey); cancelErr != nil {
-				return fmt.Errorf("%v (and cancel cleanup failed: %v)", ctx.Err(), cancelErr)
-			}
-			return ctx.Err()
+			return cancelStreamWithCleanup(ctx, config, streamResp.StreamID, ctx.Err())
 		}
 	}
 }
@@ -201,50 +190,21 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 	for {
 		select {
 		case err := <-doneCh:
-			metrics := engine.GetMetrics()
-			metrics.Latency = latencyStats
-			metrics.JitterMs = jitter
-
-			totalBytes := metrics.BytesTransferred
-			measuredElapsed := min(time.Since(startTime), httpCfg.Duration)
-			measuredElapsed -= graceTime
-			if measuredElapsed <= 0 {
-				measuredElapsed = 1 * time.Millisecond
-			}
-			avgSpeed := float64(totalBytes*8) / measuredElapsed.Seconds() / 1_000_000 * httpCfg.OverheadFactor
-			metrics.ThroughputMbps = avgSpeed
-
-			httpConfig := *config
-			httpConfig.PacketSize = config.ChunkSize
-			results := buildResults("http", &httpConfig, metrics, startTime)
-			formatter.FormatComplete(results)
-			if ferr := formatterLastError(formatter); ferr != nil {
-				return fmt.Errorf("formatter output failed: %w", ferr)
-			}
-
-			if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
-				return err
-			}
-			return nil
+			return finalizeHTTPStreamRun(config, httpCfg, formatter, engine, startTime, graceTime, latencyStats, jitter, err)
 
 		case <-metricsTicker.C:
 			metrics := engine.GetMetrics()
 			elapsed := time.Since(startTime)
-			progress := (elapsed.Seconds() / float64(config.Duration)) * 100
-			if progress > 100 {
-				progress = 100
-			}
-			remaining := float64(config.Duration) - elapsed.Seconds()
-			if remaining < 0 {
-				remaining = 0
-			}
-
-			formatter.FormatProgress(progress, elapsed.Seconds(), remaining)
-
-			formatter.FormatMetrics(engineMetricsToTypesMetrics(metrics))
-			if ferr := formatterLastError(formatter); ferr != nil {
+			progress, remaining := computeProgress(elapsed, float64(config.Duration))
+			if err := emitProgressAndMetrics(
+				formatter,
+				engineMetricsToTypesMetrics(metrics),
+				progress,
+				elapsed.Seconds(),
+				remaining,
+			); err != nil {
 				cancel()
-				return fmt.Errorf("formatter output failed: %w", ferr)
+				return err
 			}
 
 		case <-ctx.Done():
@@ -252,6 +212,79 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 			return ctx.Err()
 		}
 	}
+}
+
+func cancelStreamWithCleanup(ctx context.Context, config *Config, streamID string, rootErr error) error {
+	cancelErr := CancelStream(ctx, config.ServerURL, streamID, config.APIKey)
+	if cancelErr != nil {
+		return fmt.Errorf("%v (and cancel cleanup failed: %v)", rootErr, cancelErr)
+	}
+	return rootErr
+}
+
+func computeProgress(elapsed time.Duration, totalSeconds float64) (progress, remaining float64) {
+	progress = (elapsed.Seconds() / totalSeconds) * 100
+	if progress > 100 {
+		progress = 100
+	}
+	remaining = totalSeconds - elapsed.Seconds()
+	if remaining < 0 {
+		remaining = 0
+	}
+	return progress, remaining
+}
+
+func emitProgressAndMetrics(
+	formatter OutputFormatter,
+	metrics *types.Metrics,
+	progress float64,
+	elapsedSeconds float64,
+	remaining float64,
+) error {
+	formatter.FormatProgress(progress, elapsedSeconds, remaining)
+	formatter.FormatMetrics(metrics)
+	if ferr := formatterLastError(formatter); ferr != nil {
+		return fmt.Errorf("formatter output failed: %w", ferr)
+	}
+	return nil
+}
+
+func finalizeHTTPStreamRun(
+	config *Config,
+	httpCfg *HTTPTestConfig,
+	formatter OutputFormatter,
+	engine *HTTPTestEngine,
+	startTime time.Time,
+	graceTime time.Duration,
+	latencyStats LatencyStats,
+	jitter float64,
+	runErr error,
+) error {
+	metrics := engine.GetMetrics()
+	metrics.Latency = latencyStats
+	metrics.JitterMs = jitter
+
+	totalBytes := metrics.BytesTransferred
+	measuredElapsed := min(time.Since(startTime), httpCfg.Duration)
+	measuredElapsed -= graceTime
+	if measuredElapsed <= 0 {
+		measuredElapsed = 1 * time.Millisecond
+	}
+	avgSpeed := float64(totalBytes*8) / measuredElapsed.Seconds() / 1_000_000 * httpCfg.OverheadFactor
+	metrics.ThroughputMbps = avgSpeed
+
+	httpConfig := *config
+	httpConfig.PacketSize = config.ChunkSize
+	results := buildResults("http", &httpConfig, metrics, startTime)
+	formatter.FormatComplete(results)
+	if ferr := formatterLastError(formatter); ferr != nil {
+		return fmt.Errorf("formatter output failed: %w", ferr)
+	}
+
+	if runErr != nil && !errors.Is(runErr, context.DeadlineExceeded) && !errors.Is(runErr, context.Canceled) {
+		return runErr
+	}
+	return nil
 }
 
 func engineMetricsToTypesMetrics(metrics EngineMetrics) *types.Metrics {

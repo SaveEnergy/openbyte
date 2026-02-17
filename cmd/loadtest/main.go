@@ -417,7 +417,7 @@ func runWebSocket(ctx context.Context, cfg config, worker int) error {
 	}
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 10 * time.Second,
-		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig:  &tls.Config{},
 	}
 	conn, _, err := dialer.DialContext(ctx, parsed.String(), nil)
 	if err != nil {

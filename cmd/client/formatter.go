@@ -56,9 +56,15 @@ func classifyErrorCode(err error) string {
 	}
 }
 
-func (f *JSONFormatter) FormatProgress(progress, elapsed, remaining float64) {}
+func (f *JSONFormatter) FormatProgress(progress, elapsed, remaining float64) {
+	_ = progress
+	_ = elapsed
+	_ = remaining
+}
 
-func (f *JSONFormatter) FormatMetrics(metrics *types.Metrics) {}
+func (f *JSONFormatter) FormatMetrics(metrics *types.Metrics) {
+	_ = metrics
+}
 
 func (f *JSONFormatter) FormatComplete(results *StreamResults) {
 	if err := json.NewEncoder(f.Writer).Encode(results); err != nil {
@@ -78,9 +84,15 @@ func (f *JSONFormatter) FormatError(err error) {
 	}
 }
 
-func (f *PlainFormatter) FormatProgress(progress, elapsed, remaining float64) {}
+func (f *PlainFormatter) FormatProgress(progress, elapsed, remaining float64) {
+	_ = progress
+	_ = elapsed
+	_ = remaining
+}
 
-func (f *PlainFormatter) FormatMetrics(metrics *types.Metrics) {}
+func (f *PlainFormatter) FormatMetrics(metrics *types.Metrics) {
+	_ = metrics
+}
 
 func (f *PlainFormatter) FormatComplete(results *StreamResults) {
 	if results.Config != nil {

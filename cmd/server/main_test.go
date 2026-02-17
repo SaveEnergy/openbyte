@@ -50,7 +50,7 @@ func TestApplyServerFlagOverridesInvalidDuration(t *testing.T) {
 		t.Fatalf("parse flags: %v", err)
 	}
 
-	if err := applyServerFlagOverrides(cfg, fs, fv); err == nil {
+	if applyServerFlagOverrides(cfg, fs, fv) == nil {
 		t.Fatal("expected error for invalid max-test-duration")
 	}
 }
@@ -67,7 +67,7 @@ func TestApplyServerFlagOverridesFailsFastOnInvalidDuration(t *testing.T) {
 		t.Fatalf("parse flags: %v", err)
 	}
 
-	if err := applyServerFlagOverrides(cfg, fs, fv); err == nil {
+	if applyServerFlagOverrides(cfg, fs, fv) == nil {
 		t.Fatal("expected error for invalid duration")
 	}
 	if cfg.RegistryInterval != 30*time.Second {
@@ -122,7 +122,7 @@ func TestCapacityGbpsFlagBypassValidation(t *testing.T) {
 	if err := applyServerFlagOverrides(cfg, fs, fv); err != nil {
 		t.Fatalf("apply overrides: %v", err)
 	}
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("expected validation error for capacity-gbps=0")
 	}
 }
