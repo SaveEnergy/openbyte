@@ -21,6 +21,9 @@ const (
 	storeOpenLockDBFmt     = "open lock db: %v"
 	storeSetBusyTimeoutFmt = "set lock busy_timeout: %v"
 	storeBeginExclusiveFmt = "begin exclusive: %v"
+	resultsAPIPath         = "/api/v1/results"
+	resultsAPIBasePath     = "/api/v1/results/"
+	jsonContentType        = "application/json"
 )
 
 func tempStore(t *testing.T, maxResults int) (*results.Store, func()) {
@@ -391,8 +394,8 @@ func TestHandlerSaveValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("POST", "/api/v1/results", strings.NewReader(tt.body))
-			req.Header.Set("Content-Type", "application/json")
+			req := httptest.NewRequest("POST", resultsAPIPath, strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", jsonContentType)
 			rec := httptest.NewRecorder()
 			router.ServeHTTP(rec, req)
 			if rec.Code != tt.status {
@@ -423,7 +426,7 @@ func TestHandlerGetInvalidID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/api/v1/results/"+tt.id, nil)
+			req := httptest.NewRequest("GET", resultsAPIBasePath+tt.id, nil)
 			rec := httptest.NewRecorder()
 			router.ServeHTTP(rec, req)
 			if rec.Code != tt.status {
@@ -442,7 +445,7 @@ func TestHandlerSaveRejectsWrongContentType(t *testing.T) {
 	router.HandleFunc("POST /api/v1/results", handler.Save)
 
 	body := `{"download_mbps":100,"upload_mbps":50,"latency_ms":10,"jitter_ms":1}`
-	req := httptest.NewRequest("POST", "/api/v1/results", strings.NewReader(body))
+	req := httptest.NewRequest("POST", resultsAPIPath, strings.NewReader(body))
 	req.Header.Set("Content-Type", "text/plain")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -472,8 +475,8 @@ func TestHandlerRoundTrip(t *testing.T) {
 
 	// Save
 	body := `{"download_mbps":500.5,"upload_mbps":100.2,"latency_ms":8.1,"jitter_ms":0.5,"loaded_latency_ms":15.3,"bufferbloat_grade":"B","ipv4":"203.0.113.1","ipv6":"2001:db8::1","server_name":"Test"}`
-	req := httptest.NewRequest("POST", "/api/v1/results", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest("POST", resultsAPIPath, strings.NewReader(body))
+	req.Header.Set("Content-Type", jsonContentType)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -496,7 +499,7 @@ func TestHandlerRoundTrip(t *testing.T) {
 	}
 
 	// Fetch
-	req = httptest.NewRequest("GET", "/api/v1/results/"+saveResp.ID, nil)
+	req = httptest.NewRequest("GET", resultsAPIBasePath+saveResp.ID, nil)
 	rec = httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 

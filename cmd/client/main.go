@@ -49,28 +49,11 @@ func Run(args []string, version string) int {
 
 	config := mergeConfig(flagConfig, configFile, flagsSet)
 
-	// Create formatter early so pre-test errors are structured when --json is set.
-	if !config.JSON && !config.NDJSON && !config.Plain {
-		if !term.IsTerminal(int(os.Stdout.Fd())) {
-			config.Plain = true
-		}
-	}
+	ensureTTYFormatterDefaults(config)
 	formatter := createFormatter(config)
 
-	if config.Auto {
-		fastest, selectErr := selectFastestServer(configFile, config.Verbose)
-		if selectErr != nil {
-			formatter.FormatError(selectErr)
-			return exitFailure
-		}
-		config.ServerURL = fastest.URL
-		if !config.Quiet {
-			name := fastest.Name
-			if name == "" {
-				name = fastest.Alias
-			}
-			fmt.Printf("Auto-selected: %s (%dms)\n\n", name, fastest.Latency.Milliseconds())
-		}
+	if err := applyAutoServerSelection(config, configFile, formatter); err != nil {
+		return err.code
 	}
 
 	if err := validateConfig(config); err != nil {
@@ -112,4 +95,34 @@ func Run(args []string, version string) int {
 		return exitInterrupt
 	}
 	return exitSuccess
+}
+
+func ensureTTYFormatterDefaults(config *Config) {
+	if !config.JSON && !config.NDJSON && !config.Plain && !term.IsTerminal(int(os.Stdout.Fd())) {
+		config.Plain = true
+	}
+}
+
+type runFailure struct {
+	code int
+}
+
+func applyAutoServerSelection(config *Config, configFile *ConfigFile, formatter OutputFormatter) *runFailure {
+	if !config.Auto {
+		return nil
+	}
+	fastest, selectErr := selectFastestServer(configFile, config.Verbose)
+	if selectErr != nil {
+		formatter.FormatError(selectErr)
+		return &runFailure{code: exitFailure}
+	}
+	config.ServerURL = fastest.URL
+	if !config.Quiet {
+		name := fastest.Name
+		if name == "" {
+			name = fastest.Alias
+		}
+		fmt.Printf("Auto-selected: %s (%dms)\n\n", name, fastest.Latency.Milliseconds())
+	}
+	return nil
 }

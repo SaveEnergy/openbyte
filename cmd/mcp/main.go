@@ -17,6 +17,17 @@ import (
 	"github.com/saveenergy/openbyte/pkg/client"
 )
 
+const (
+	defaultServerURL      = "http://localhost:8080"
+	optionalAPIKeyDesc    = "Optional bearer API key for authenticated endpoints"
+	invalidServerURLFmt   = "Invalid server_url: %v"
+	jsonEncodingFailedFmt = "JSON encoding failed: %v"
+	connectivityFailedFmt = "Connectivity check failed: %v"
+	speedTestInputFailed  = "Invalid speed_test input: %v"
+	speedTestFailedFmt    = "Speed test failed: %v"
+	diagnosisFailedFmt    = "Diagnosis failed: %v"
+)
+
 // Run starts the MCP stdio server. Blocks until stdin closes or signal received.
 func Run(version string) int {
 	s := server.NewMCPServer(
@@ -52,10 +63,10 @@ func connectivityCheckTool() mcp.Tool {
 	return mcp.NewTool("connectivity_check",
 		mcp.WithDescription("Quick connectivity check (~3-5 seconds). Returns latency, rough download/upload speed, grade (A-F), and diagnostic interpretation. Use this for fast 'is the network OK?' checks."),
 		mcp.WithString("server_url",
-			mcp.Description("Speed test server URL (default: http://localhost:8080)"),
+			mcp.Description("Speed test server URL (default: "+defaultServerURL+")"),
 		),
 		mcp.WithString("api_key",
-			mcp.Description("Optional bearer API key for authenticated endpoints"),
+			mcp.Description(optionalAPIKeyDesc),
 		),
 	)
 }
@@ -64,7 +75,7 @@ func speedTestTool() mcp.Tool {
 	return mcp.NewTool("speed_test",
 		mcp.WithDescription("Full speed test with configurable duration. Returns detailed throughput, latency, jitter, and diagnostic interpretation. Use for accurate measurements."),
 		mcp.WithString("server_url",
-			mcp.Description("Speed test server URL (default: http://localhost:8080)"),
+			mcp.Description("Speed test server URL (default: "+defaultServerURL+")"),
 		),
 		mcp.WithString("direction",
 			mcp.Description("Test direction: download or upload (default: download)"),
@@ -73,7 +84,7 @@ func speedTestTool() mcp.Tool {
 			mcp.Description("Test duration in seconds, 1-300 (default: 10)"),
 		),
 		mcp.WithString("api_key",
-			mcp.Description("Optional bearer API key for authenticated endpoints"),
+			mcp.Description(optionalAPIKeyDesc),
 		),
 	)
 }
@@ -82,10 +93,10 @@ func diagnoseTool() mcp.Tool {
 	return mcp.NewTool("diagnose",
 		mcp.WithDescription("Comprehensive network diagnosis: measures latency, download speed, upload speed, and returns bufferbloat grade, suitability assessment, and concerns. Takes ~15-20 seconds."),
 		mcp.WithString("server_url",
-			mcp.Description("Speed test server URL (default: http://localhost:8080)"),
+			mcp.Description("Speed test server URL (default: "+defaultServerURL+")"),
 		),
 		mcp.WithString("api_key",
-			mcp.Description("Optional bearer API key for authenticated endpoints"),
+			mcp.Description(optionalAPIKeyDesc),
 		),
 	)
 }
@@ -93,34 +104,34 @@ func diagnoseTool() mcp.Tool {
 // --- Tool Handlers ---
 
 func handleConnectivityCheck(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	serverURL, err := ValidateServerURL(req.GetString("server_url", "http://localhost:8080"))
+	serverURL, err := ValidateServerURL(req.GetString("server_url", defaultServerURL))
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Invalid server_url: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf(invalidServerURLFmt, err)), nil
 	}
 
 	c := clientFromRequest(serverURL, req)
 	result, err := c.Check(ctx)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Connectivity check failed: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf(connectivityFailedFmt, err)), nil
 	}
 
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("JSON encoding failed: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf(jsonEncodingFailedFmt, err)), nil
 	}
 	return mcp.NewToolResultText(string(data)), nil
 }
 
 func handleSpeedTest(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	serverURL, err := ValidateServerURL(req.GetString("server_url", "http://localhost:8080"))
+	serverURL, err := ValidateServerURL(req.GetString("server_url", defaultServerURL))
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Invalid server_url: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf(invalidServerURLFmt, err)), nil
 	}
 	direction := req.GetString("direction", "download")
 	duration := req.GetInt("duration", 10)
 
 	if err := ValidateSpeedTestInput(direction, duration); err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Invalid speed_test input: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf(speedTestInputFailed, err)), nil
 	}
 
 	c := clientFromRequest(serverURL, req)
@@ -129,31 +140,31 @@ func handleSpeedTest(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 		Duration:  duration,
 	})
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Speed test failed: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf(speedTestFailedFmt, err)), nil
 	}
 
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("JSON encoding failed: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf(jsonEncodingFailedFmt, err)), nil
 	}
 	return mcp.NewToolResultText(string(data)), nil
 }
 
 func handleDiagnose(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	serverURL, err := ValidateServerURL(req.GetString("server_url", "http://localhost:8080"))
+	serverURL, err := ValidateServerURL(req.GetString("server_url", defaultServerURL))
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Invalid server_url: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf(invalidServerURLFmt, err)), nil
 	}
 
 	c := clientFromRequest(serverURL, req)
 	result, err := c.Diagnose(ctx)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Diagnosis failed: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf(diagnosisFailedFmt, err)), nil
 	}
 
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("JSON encoding failed: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf(jsonEncodingFailedFmt, err)), nil
 	}
 	return mcp.NewToolResultText(string(data)), nil
 }

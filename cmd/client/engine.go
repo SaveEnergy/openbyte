@@ -98,17 +98,7 @@ func (e *TestEngine) Run(ctx context.Context) error {
 	// measureStart is set immediately; it is updated when warm-up ends.
 	e.measureStart = e.startTime
 
-	if len(e.connections) > 0 {
-		if tcpConn, ok := e.connections[0].(*net.TCPConn); ok {
-			if addr := tcpConn.RemoteAddr(); addr != nil {
-				e.networkInfo.SetServerIP(addr.String())
-			}
-			if addr := tcpConn.LocalAddr(); addr != nil {
-				localIP := addr.String()
-				e.networkInfo.DetectNAT(localIP, e.networkInfo.ClientIP)
-			}
-		}
-	}
+	e.captureConnectionNetworkInfo()
 
 	var wg sync.WaitGroup
 	errCh := make(chan error, e.config.Streams)
@@ -120,15 +110,7 @@ func (e *TestEngine) Run(ctx context.Context) error {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			var err error
-			switch e.config.Direction {
-			case "download":
-				err = e.runDownload(testCtx, e.connections[idx])
-			case "upload":
-				err = e.runUpload(testCtx, e.connections[idx])
-			case "bidirectional":
-				err = e.runBidirectional(testCtx, e.connections[idx])
-			}
+			err := e.runStreamWorker(testCtx, e.connections[idx])
 			if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 				select {
 				case errCh <- err:
@@ -148,38 +130,77 @@ func (e *TestEngine) Run(ctx context.Context) error {
 	}
 }
 
+func (e *TestEngine) captureConnectionNetworkInfo() {
+	if len(e.connections) == 0 {
+		return
+	}
+	tcpConn, ok := e.connections[0].(*net.TCPConn)
+	if !ok {
+		return
+	}
+	if addr := tcpConn.RemoteAddr(); addr != nil {
+		e.networkInfo.SetServerIP(addr.String())
+	}
+	if addr := tcpConn.LocalAddr(); addr != nil {
+		e.networkInfo.DetectNAT(addr.String(), e.networkInfo.ClientIP)
+	}
+}
+
+func (e *TestEngine) runStreamWorker(ctx context.Context, conn net.Conn) error {
+	switch e.config.Direction {
+	case "download":
+		return e.runDownload(ctx, conn)
+	case "upload":
+		return e.runUpload(ctx, conn)
+	case "bidirectional":
+		return e.runBidirectional(ctx, conn)
+	default:
+		return nil
+	}
+}
+
 func (e *TestEngine) createConnections() error {
 	for i := 0; i < e.config.Streams; i++ {
-		var conn net.Conn
-		var err error
-
-		if e.config.Protocol == "udp" {
-			udpAddr, err := net.ResolveUDPAddr("udp", e.config.ServerAddr)
-			if err != nil {
-				e.closeConnections()
-				return fmt.Errorf("resolve UDP: %w", err)
-			}
-			conn, err = net.DialUDP("udp", nil, udpAddr)
-			if err != nil {
-				e.closeConnections()
-				return fmt.Errorf("dial UDP: %w", err)
-			}
-		} else {
-			conn, err = net.DialTimeout("tcp", e.config.ServerAddr, 10*time.Second)
-			if err != nil {
-				e.closeConnections()
-				return fmt.Errorf("dial TCP: %w", err)
-			}
-			if tcpConn, ok := conn.(*net.TCPConn); ok {
-				tcpConn.SetNoDelay(true)
-				tcpConn.SetReadBuffer(256 * 1024)
-				tcpConn.SetWriteBuffer(256 * 1024)
-			}
+		conn, err := e.dialConnection()
+		if err != nil {
+			e.closeConnections()
+			return err
 		}
-
 		e.connections = append(e.connections, conn)
 	}
 	return nil
+}
+
+func (e *TestEngine) dialConnection() (net.Conn, error) {
+	if e.config.Protocol == "udp" {
+		return dialUDPConnection(e.config.ServerAddr)
+	}
+	return dialTCPConnection(e.config.ServerAddr)
+}
+
+func dialUDPConnection(serverAddr string) (net.Conn, error) {
+	udpAddr, err := net.ResolveUDPAddr("udp", serverAddr)
+	if err != nil {
+		return nil, fmt.Errorf("resolve UDP: %w", err)
+	}
+	conn, err := net.DialUDP("udp", nil, udpAddr)
+	if err != nil {
+		return nil, fmt.Errorf("dial UDP: %w", err)
+	}
+	return conn, nil
+}
+
+func dialTCPConnection(serverAddr string) (net.Conn, error) {
+	conn, err := net.DialTimeout("tcp", serverAddr, 10*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("dial TCP: %w", err)
+	}
+	if tcpConn, ok := conn.(*net.TCPConn); ok {
+		tcpConn.SetNoDelay(true)
+		tcpConn.SetReadBuffer(256 * 1024)
+		tcpConn.SetWriteBuffer(256 * 1024)
+	}
+	return conn, nil
 }
 
 func (e *TestEngine) closeConnections() {
@@ -296,74 +317,86 @@ func (e *TestEngine) runBidirectional(ctx context.Context, conn net.Conn) error 
 
 	go func() {
 		defer wg.Done()
-		buf, ok := e.bufferPool.Get().([]byte)
-		if !ok {
-			buf = make([]byte, 64*1024)
-		}
-		defer e.bufferPool.Put(buf)
-		lastRTTSample := time.Now()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
-				readStart := time.Now()
-				n, err := conn.Read(buf)
-				readDuration := time.Since(readStart)
-				if err != nil {
-					var netErr net.Error
-					if errors.As(err, &netErr) && netErr.Timeout() {
-						continue
-					}
-					return
-				}
-				if n > 0 {
-					atomic.AddInt64(&e.metrics.BytesReceived, int64(n))
-					e.addBytes(int64(n))
-					if e.pastWarmUp() {
-						e.recordLatency(readDuration)
-						if time.Since(lastRTTSample) > 500*time.Millisecond {
-							e.rttCollector.AddSample(readDuration.Seconds() * 1000)
-							lastRTTSample = time.Now()
-						}
-					}
-				}
-			}
-		}
+		e.runBidirectionalReadLoop(ctx, conn)
 	}()
 
 	go func() {
 		defer wg.Done()
-		buf, ok := e.bufferPool.Get().([]byte)
-		if !ok {
-			buf = make([]byte, 64*1024)
-		}
-		defer e.bufferPool.Put(buf)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				conn.SetWriteDeadline(time.Now().Add(500 * time.Millisecond))
-				n, err := conn.Write(buf)
-				if err != nil {
-					var netErr net.Error
-					if errors.As(err, &netErr) && netErr.Timeout() {
-						continue
-					}
-					return
-				}
-				if n > 0 {
-					atomic.AddInt64(&e.metrics.BytesSent, int64(n))
-					e.addBytes(int64(n))
-				}
-			}
-		}
+		e.runBidirectionalWriteLoop(ctx, conn)
 	}()
 
 	wg.Wait()
 	return nil
+}
+
+func (e *TestEngine) runBidirectionalReadLoop(ctx context.Context, conn net.Conn) {
+	buf, ok := e.bufferPool.Get().([]byte)
+	if !ok {
+		buf = make([]byte, 64*1024)
+	}
+	defer e.bufferPool.Put(buf)
+	lastRTTSample := time.Now()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+			readStart := time.Now()
+			n, err := conn.Read(buf)
+			readDuration := time.Since(readStart)
+			if err != nil {
+				if isTimeoutError(err) {
+					continue
+				}
+				return
+			}
+			if n <= 0 {
+				continue
+			}
+			atomic.AddInt64(&e.metrics.BytesReceived, int64(n))
+			e.addBytes(int64(n))
+			if e.pastWarmUp() {
+				e.recordLatency(readDuration)
+				if time.Since(lastRTTSample) > 500*time.Millisecond {
+					e.rttCollector.AddSample(readDuration.Seconds() * 1000)
+					lastRTTSample = time.Now()
+				}
+			}
+		}
+	}
+}
+
+func (e *TestEngine) runBidirectionalWriteLoop(ctx context.Context, conn net.Conn) {
+	buf, ok := e.bufferPool.Get().([]byte)
+	if !ok {
+		buf = make([]byte, 64*1024)
+	}
+	defer e.bufferPool.Put(buf)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			conn.SetWriteDeadline(time.Now().Add(500 * time.Millisecond))
+			n, err := conn.Write(buf)
+			if err != nil {
+				if isTimeoutError(err) {
+					continue
+				}
+				return
+			}
+			if n > 0 {
+				atomic.AddInt64(&e.metrics.BytesSent, int64(n))
+				e.addBytes(int64(n))
+			}
+		}
+	}
+}
+
+func isTimeoutError(err error) bool {
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
 // addBytes gates byte recording on warm-up. During the first WarmUp seconds,

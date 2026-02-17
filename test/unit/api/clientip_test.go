@@ -8,7 +8,7 @@ import (
 	"github.com/saveenergy/openbyte/internal/config"
 )
 
-func TestClientIPResolver_TrustedProxy(t *testing.T) {
+func TestClientIPResolverTrustedProxy(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.TrustProxyHeaders = true
 	cfg.TrustedProxyCIDRs = []string{"127.0.0.0/8", "10.0.0.0/8"}
@@ -25,7 +25,7 @@ func TestClientIPResolver_TrustedProxy(t *testing.T) {
 	}
 }
 
-func TestClientIPResolver_RightmostUntrusted(t *testing.T) {
+func TestClientIPResolverRightmostUntrusted(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.TrustProxyHeaders = true
 	cfg.TrustedProxyCIDRs = []string{"127.0.0.0/8"}
@@ -42,7 +42,7 @@ func TestClientIPResolver_RightmostUntrusted(t *testing.T) {
 	}
 }
 
-func TestClientIPResolver_UntrustedProxy(t *testing.T) {
+func TestClientIPResolverUntrustedProxy(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.TrustProxyHeaders = true
 	cfg.TrustedProxyCIDRs = []string{"10.0.0.0/8"}
@@ -58,7 +58,7 @@ func TestClientIPResolver_UntrustedProxy(t *testing.T) {
 	}
 }
 
-func TestClientIPResolver_FallbackToRealIP(t *testing.T) {
+func TestClientIPResolverFallbackToRealIP(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.TrustProxyHeaders = true
 	cfg.TrustedProxyCIDRs = []string{"127.0.0.0/8"}

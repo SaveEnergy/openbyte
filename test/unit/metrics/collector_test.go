@@ -8,7 +8,7 @@ import (
 	"github.com/saveenergy/openbyte/internal/metrics"
 )
 
-func TestCollector_RecordBytes(t *testing.T) {
+func TestCollectorRecordBytes(t *testing.T) {
 	c := metrics.NewCollector()
 
 	c.RecordBytes(1000, "sent")
@@ -35,7 +35,7 @@ func TestCollectorRecordBytesIgnoresNegative(t *testing.T) {
 	}
 }
 
-func TestCollector_RecordPacket(t *testing.T) {
+func TestCollectorRecordPacket(t *testing.T) {
 	c := metrics.NewCollector()
 
 	for range 10 {
@@ -52,7 +52,7 @@ func TestCollector_RecordPacket(t *testing.T) {
 	}
 }
 
-func TestCollector_RecordLatency(t *testing.T) {
+func TestCollectorRecordLatency(t *testing.T) {
 	c := metrics.NewCollector()
 
 	c.RecordLatency(10 * time.Millisecond)
@@ -65,7 +65,7 @@ func TestCollector_RecordLatency(t *testing.T) {
 	}
 }
 
-func TestCollector_Concurrent(t *testing.T) {
+func TestCollectorConcurrent(t *testing.T) {
 	c := metrics.NewCollector()
 	var wg sync.WaitGroup
 
@@ -88,7 +88,7 @@ func TestCollector_Concurrent(t *testing.T) {
 	}
 }
 
-func TestCollector_ConcurrentRecordAndRead(t *testing.T) {
+func TestCollectorConcurrentRecordAndRead(t *testing.T) {
 	c := metrics.NewCollector()
 	var wg sync.WaitGroup
 	done := make(chan struct{})
@@ -131,7 +131,7 @@ func TestCollector_ConcurrentRecordAndRead(t *testing.T) {
 	}
 }
 
-func TestCollector_Reset(t *testing.T) {
+func TestCollectorReset(t *testing.T) {
 	c := metrics.NewCollector()
 
 	c.RecordBytes(1000, "sent")

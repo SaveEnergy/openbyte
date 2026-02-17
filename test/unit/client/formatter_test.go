@@ -21,7 +21,7 @@ func (failingWriter) Write(_ []byte) (int, error) {
 
 // --- JSONFormatter.FormatError ---
 
-func TestJSONFormatError_StructuredOutput(t *testing.T) {
+func TestJSONFormatErrorStructuredOutput(t *testing.T) {
 	var buf bytes.Buffer
 	f := &client.JSONFormatter{Writer: &buf}
 	f.FormatError(fmt.Errorf("connection refused"))
@@ -41,7 +41,7 @@ func TestJSONFormatError_StructuredOutput(t *testing.T) {
 	}
 }
 
-func TestJSONFormatError_Timeout(t *testing.T) {
+func TestJSONFormatErrorTimeout(t *testing.T) {
 	var buf bytes.Buffer
 	f := &client.JSONFormatter{Writer: &buf}
 	f.FormatError(context.DeadlineExceeded)
@@ -53,7 +53,7 @@ func TestJSONFormatError_Timeout(t *testing.T) {
 	}
 }
 
-func TestJSONFormatError_Cancelled(t *testing.T) {
+func TestJSONFormatErrorCancelled(t *testing.T) {
 	var buf bytes.Buffer
 	f := &client.JSONFormatter{Writer: &buf}
 	f.FormatError(context.Canceled)
@@ -65,7 +65,7 @@ func TestJSONFormatError_Cancelled(t *testing.T) {
 	}
 }
 
-func TestJSONFormatError_RateLimited(t *testing.T) {
+func TestJSONFormatErrorRateLimited(t *testing.T) {
 	var buf bytes.Buffer
 	f := &client.JSONFormatter{Writer: &buf}
 	f.FormatError(fmt.Errorf("server returned 429 too many requests"))
@@ -77,7 +77,7 @@ func TestJSONFormatError_RateLimited(t *testing.T) {
 	}
 }
 
-func TestJSONFormatError_ServerUnavailable(t *testing.T) {
+func TestJSONFormatErrorServerUnavailable(t *testing.T) {
 	var buf bytes.Buffer
 	f := &client.JSONFormatter{Writer: &buf}
 	f.FormatError(fmt.Errorf("no such host"))
@@ -89,7 +89,7 @@ func TestJSONFormatError_ServerUnavailable(t *testing.T) {
 	}
 }
 
-func TestJSONFormatError_InvalidConfig(t *testing.T) {
+func TestJSONFormatErrorInvalidConfig(t *testing.T) {
 	var buf bytes.Buffer
 	f := &client.JSONFormatter{Writer: &buf}
 	f.FormatError(fmt.Errorf("invalid protocol: quic"))
@@ -101,7 +101,7 @@ func TestJSONFormatError_InvalidConfig(t *testing.T) {
 	}
 }
 
-func TestJSONFormatError_NetOpError_Dial(t *testing.T) {
+func TestJSONFormatErrorNetOpErrorDial(t *testing.T) {
 	var buf bytes.Buffer
 	f := &client.JSONFormatter{Writer: &buf}
 	opErr := &net.OpError{Op: "dial", Err: fmt.Errorf("connection refused")}
@@ -114,7 +114,7 @@ func TestJSONFormatError_NetOpError_Dial(t *testing.T) {
 	}
 }
 
-func TestJSONFormatError_Unknown(t *testing.T) {
+func TestJSONFormatErrorUnknown(t *testing.T) {
 	var buf bytes.Buffer
 	f := &client.JSONFormatter{Writer: &buf}
 	f.FormatError(fmt.Errorf("something unexpected happened"))
@@ -128,7 +128,7 @@ func TestJSONFormatError_Unknown(t *testing.T) {
 
 // --- JSONFormatter.FormatComplete ---
 
-func TestJSONFormatComplete_SchemaVersion(t *testing.T) {
+func TestJSONFormatCompleteSchemaVersion(t *testing.T) {
 	var buf bytes.Buffer
 	f := &client.JSONFormatter{Writer: &buf}
 	results := &client.StreamResults{
@@ -145,7 +145,7 @@ func TestJSONFormatComplete_SchemaVersion(t *testing.T) {
 	}
 }
 
-func TestJSONFormatComplete_InterpretationIncluded(t *testing.T) {
+func TestJSONFormatCompleteInterpretationIncluded(t *testing.T) {
 	var buf bytes.Buffer
 	f := &client.JSONFormatter{Writer: &buf}
 	results := &client.StreamResults{
@@ -276,14 +276,14 @@ func TestNDJSONMultilineOutput(t *testing.T) {
 func TestNDJSONFormatterCapturesWriteError(t *testing.T) {
 	f := &client.NDJSONFormatter{Writer: failingWriter{}}
 	f.FormatProgress(10, 1, 9)
-	if err := f.LastError(); err == nil {
+	if f.LastError() == nil {
 		t.Fatal("expected LastError after failed write")
 	}
 }
 
 // --- SchemaVersion constant ---
 
-func TestSchemaVersion_Format(t *testing.T) {
+func TestSchemaVersionFormat(t *testing.T) {
 	if client.SchemaVersion != "1.0" {
 		t.Errorf("expected SchemaVersion 1.0, got %s", client.SchemaVersion)
 	}

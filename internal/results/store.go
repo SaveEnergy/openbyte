@@ -134,32 +134,44 @@ func (s *Store) Save(r Result) (string, error) {
 			return "", fmt.Errorf("generate id: %w", err)
 		}
 
-		for busyAttempt := 0; busyAttempt <= maxBusyRetries; busyAttempt++ {
-			_, err = s.db.Exec(
-				`INSERT INTO results (id, download_mbps, upload_mbps, latency_ms, jitter_ms,
-					loaded_latency_ms, bufferbloat_grade, ipv4, ipv6, server_name, created_at)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				id, r.DownloadMbps, r.UploadMbps, r.LatencyMs, r.JitterMs,
-				r.LoadedLatencyMs, r.BufferbloatGrade, r.IPv4, r.IPv6, r.ServerName,
-				now,
-			)
-			if err == nil {
-				return id, nil
-			}
-			if isUniqueViolation(err) {
-				break
-			}
-			if isBusyError(err) && busyAttempt < maxBusyRetries {
-				time.Sleep(time.Duration(busyAttempt+1) * busyRetryBackoff)
-				continue
-			}
-			if isBusyError(err) {
-				return "", fmt.Errorf("%w: insert result: %w", ErrStoreRetryable, err)
-			}
-			return "", fmt.Errorf("insert result: %w", err)
+		uniqueConflict, insertErr := s.insertResultWithRetry(id, r, now)
+		if insertErr == nil {
+			return id, nil
 		}
+		if uniqueConflict {
+			continue
+		}
+		return "", insertErr
 	}
 	return "", fmt.Errorf("failed to generate unique ID after %d attempts", maxIDRetries)
+}
+
+func (s *Store) insertResultWithRetry(id string, r Result, now time.Time) (uniqueConflict bool, err error) {
+	for busyAttempt := 0; busyAttempt <= maxBusyRetries; busyAttempt++ {
+		_, err = s.db.Exec(
+			`INSERT INTO results (id, download_mbps, upload_mbps, latency_ms, jitter_ms,
+				loaded_latency_ms, bufferbloat_grade, ipv4, ipv6, server_name, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			id, r.DownloadMbps, r.UploadMbps, r.LatencyMs, r.JitterMs,
+			r.LoadedLatencyMs, r.BufferbloatGrade, r.IPv4, r.IPv6, r.ServerName,
+			now,
+		)
+		if err == nil {
+			return false, nil
+		}
+		if isUniqueViolation(err) {
+			return true, nil
+		}
+		if isBusyError(err) && busyAttempt < maxBusyRetries {
+			time.Sleep(time.Duration(busyAttempt+1) * busyRetryBackoff)
+			continue
+		}
+		if isBusyError(err) {
+			return false, fmt.Errorf("%w: insert result: %w", ErrStoreRetryable, err)
+		}
+		return false, fmt.Errorf("insert result: %w", err)
+	}
+	return false, err
 }
 
 func isUniqueViolation(err error) bool {

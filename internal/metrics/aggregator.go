@@ -76,29 +76,14 @@ func (m *MultiStreamAggregator) GetAggregatedMetrics() types.Metrics {
 		totalBytesRecv += atomic.LoadInt64(&collector.bytesRecv)
 		totalPacketsSent += atomic.LoadInt64(&collector.packetsSent)
 		totalPacketsRecv += atomic.LoadInt64(&collector.packetsRecv)
-		if len(bucketScratch) > 0 {
-			for i := range bucketScratch {
-				bucketScratch[i] = 0
-			}
-			snap := collector.SnapshotLatencyStats(bucketScratch)
-			overflow += snap.Overflow
-			totalLatencyCount += snap.Count
-			totalLatencySum += snap.Sum
-			if snap.Count > 0 {
-				if !hasLatency || snap.Min < totalLatencyMin {
-					totalLatencyMin = snap.Min
-				}
-				if !hasLatency || snap.Max > totalLatencyMax {
-					totalLatencyMax = snap.Max
-				}
-				hasLatency = true
-			}
-			totalJitterSum += snap.JitterSum
-			totalJitterCount += snap.JitterCount
-			for i, v := range bucketScratch {
-				bucketCounts[i] += v
-			}
+		if len(bucketScratch) == 0 {
+			continue
 		}
+		for i := range bucketScratch {
+			bucketScratch[i] = 0
+		}
+		snap := collector.SnapshotLatencyStats(bucketScratch)
+		mergeLatencySnapshot(bucketCounts, bucketScratch, snap, &overflow, &totalLatencyCount, &totalLatencySum, &totalLatencyMin, &totalLatencyMax, &hasLatency, &totalJitterSum, &totalJitterCount)
 	}
 
 	elapsed := time.Since(startTime)
@@ -136,6 +121,37 @@ func (m *MultiStreamAggregator) GetAggregatedMetrics() types.Metrics {
 		PacketsReceived:   totalPacketsRecv,
 		Timestamp:         time.Now(),
 		StreamCount:       len(collectors),
+	}
+}
+
+func mergeLatencySnapshot(
+	bucketCounts, bucketScratch []uint32,
+	snap LatencySnapshot,
+	overflow *uint32,
+	totalLatencyCount *int64,
+	totalLatencySum *time.Duration,
+	totalLatencyMin *time.Duration,
+	totalLatencyMax *time.Duration,
+	hasLatency *bool,
+	totalJitterSum *time.Duration,
+	totalJitterCount *int64,
+) {
+	*overflow += snap.Overflow
+	*totalLatencyCount += snap.Count
+	*totalLatencySum += snap.Sum
+	if snap.Count > 0 {
+		if !*hasLatency || snap.Min < *totalLatencyMin {
+			*totalLatencyMin = snap.Min
+		}
+		if !*hasLatency || snap.Max > *totalLatencyMax {
+			*totalLatencyMax = snap.Max
+		}
+		*hasLatency = true
+	}
+	*totalJitterSum += snap.JitterSum
+	*totalJitterCount += snap.JitterCount
+	for i, v := range bucketScratch {
+		bucketCounts[i] += v
 	}
 }
 

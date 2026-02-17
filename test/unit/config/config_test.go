@@ -13,7 +13,7 @@ func TestConfigValidateGlobalRateLimit(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.GlobalRateLimit = 0
 
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatalf("expected error for global rate limit <= 0")
 	}
 }
@@ -23,7 +23,7 @@ func TestConfigValidateGlobalRateLimitLessThanPerIP(t *testing.T) {
 	cfg.RateLimitPerIP = 200
 	cfg.GlobalRateLimit = 100
 
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatalf("expected error for global rate limit < rate limit per IP")
 	}
 }
@@ -32,7 +32,7 @@ func TestConfigValidateMaxTestDuration(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.MaxTestDuration = 0
 
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatalf("expected error for max test duration <= 0")
 	}
 }
@@ -54,7 +54,7 @@ func TestConfigLoadGlobalRateLimitEnvInvalid(t *testing.T) {
 	t.Setenv("GLOBAL_RATE_LIMIT", "not-a-number")
 
 	cfg := config.DefaultConfig()
-	if err := cfg.LoadFromEnv(); err == nil {
+	if cfg.LoadFromEnv() == nil {
 		t.Fatal("expected error for non-numeric GLOBAL_RATE_LIMIT")
 	}
 }
@@ -63,7 +63,7 @@ func TestConfigLoadGlobalRateLimitEnvNonPositive(t *testing.T) {
 	t.Setenv("GLOBAL_RATE_LIMIT", "-5")
 
 	cfg := config.DefaultConfig()
-	if err := cfg.LoadFromEnv(); err == nil {
+	if cfg.LoadFromEnv() == nil {
 		t.Fatal("expected error for negative GLOBAL_RATE_LIMIT")
 	}
 }
@@ -88,19 +88,19 @@ func TestConfigValidatePortRange(t *testing.T) {
 
 	// Port 0 — invalid
 	cfg.Port = "0"
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("port 0 should be invalid")
 	}
 
 	// Port too high
 	cfg.Port = "99999"
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("port 99999 should be invalid")
 	}
 
 	// Non-numeric port (already caught by LoadFromEnv, but Validate should also catch)
 	cfg.Port = "abc"
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("port 'abc' should be invalid")
 	}
 }
@@ -136,7 +136,7 @@ func TestMaxStreamsValidation(t *testing.T) {
 		t.Fatalf("MaxStreams=64 should be valid: %v", err)
 	}
 	cfg.MaxStreams = 65
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatalf("MaxStreams=65 should be invalid")
 	}
 }
@@ -144,7 +144,7 @@ func TestMaxStreamsValidation(t *testing.T) {
 func TestDataDirValidation(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.DataDir = ""
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("empty DataDir should be invalid")
 	}
 	cfg.DataDir = "/tmp/test"
@@ -156,11 +156,11 @@ func TestDataDirValidation(t *testing.T) {
 func TestMaxStoredResultsValidation(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.MaxStoredResults = 0
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("MaxStoredResults=0 should be invalid")
 	}
 	cfg.MaxStoredResults = -1
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("MaxStoredResults=-1 should be invalid")
 	}
 	cfg.MaxStoredResults = 100
@@ -182,7 +182,7 @@ func TestValidateTrustedProxyCIDRsRejectsInvalidCIDR(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.TrustProxyHeaders = false
 	cfg.TrustedProxyCIDRs = []string{"not-a-cidr"}
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("invalid trusted proxy CIDR should fail validation")
 	}
 }
@@ -192,7 +192,7 @@ func TestValidateRegistryIntervalWhenRegistryEnabled(t *testing.T) {
 	cfg.RegistryEnabled = true
 	cfg.RegistryURL = "https://registry.example.com"
 	cfg.RegistryInterval = 0
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("registry interval <= 0 should fail when registry enabled")
 	}
 
@@ -206,7 +206,7 @@ func TestValidateTrustProxyHeadersRequiresTrustedCIDRs(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.TrustProxyHeaders = true
 	cfg.TrustedProxyCIDRs = nil
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("expected error when trust proxy headers enabled without trusted CIDRs")
 	}
 
@@ -221,7 +221,7 @@ func TestConfigValidateRegistryURLRequired(t *testing.T) {
 	cfg.RegistryEnabled = true
 	cfg.RegistryInterval = 5 * time.Second
 	cfg.RegistryURL = ""
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("expected error when registry enabled without URL")
 	}
 }
@@ -230,7 +230,7 @@ func TestConfigValidateTLS(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.TLSCertFile = "/tmp/cert.pem"
 	cfg.TLSKeyFile = ""
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("expected error when only one TLS file is set")
 	}
 
@@ -253,7 +253,7 @@ func TestConfigValidateTLS(t *testing.T) {
 	cfg = config.DefaultConfig()
 	cfg.TLSCertFile = certPath
 	cfg.TLSKeyFile = filepath.Join(dir, "missing-key.pem")
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("expected error for missing TLS key file")
 	}
 }
@@ -261,7 +261,7 @@ func TestConfigValidateTLS(t *testing.T) {
 func TestConfigValidateCapacityGbpsPositive(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.CapacityGbps = 0
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("expected error for non-positive capacity gbps")
 	}
 }
@@ -270,12 +270,12 @@ func TestValidateMaxConcurrentPerIPWithinBounds(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.MaxConcurrentTests = 10
 	cfg.MaxConcurrentPerIP = 11
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("max concurrent per IP > max concurrent tests should fail validation")
 	}
 
 	cfg.MaxConcurrentPerIP = 0
-	if err := cfg.Validate(); err == nil {
+	if cfg.Validate() == nil {
 		t.Fatal("max concurrent per IP <= 0 should fail validation")
 	}
 

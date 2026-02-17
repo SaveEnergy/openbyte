@@ -13,7 +13,7 @@ import (
 )
 
 // TestCheckQuick_HealthyServer verifies Check returns results against a real httptest server.
-func TestCheckQuick_HealthyServer(t *testing.T) {
+func TestCheckQuickHealthyServer(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +53,7 @@ func TestCheckQuick_HealthyServer(t *testing.T) {
 }
 
 // TestCheckQuick_UnreachableServer verifies Check returns error for bad server.
-func TestCheckQuick_UnreachableServer(t *testing.T) {
+func TestCheckQuickUnreachableServer(t *testing.T) {
 	c := pkgclient.New("http://127.0.0.1:1") // port 1 — unreachable
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -65,7 +65,7 @@ func TestCheckQuick_UnreachableServer(t *testing.T) {
 }
 
 // TestCheckQuick_UnhealthyServer verifies Check returns error when health returns non-200.
-func TestCheckQuick_UnhealthyServer(t *testing.T) {
+func TestCheckQuickUnhealthyServer(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
@@ -82,7 +82,7 @@ func TestCheckQuick_UnhealthyServer(t *testing.T) {
 }
 
 // TestCheckQuick_JSONSerializable verifies the result can be marshaled to JSON.
-func TestCheckQuick_JSONSerializable(t *testing.T) {
+func TestCheckQuickJSONSerializable(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {

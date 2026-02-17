@@ -58,28 +58,7 @@ func parseFlags(args []string, version string) (*Config, map[string]bool, int, e
 
 	flagSet.Visit(func(f *flag.Flag) {
 		flagsSet[f.Name] = true
-		switch f.Name {
-		case "p":
-			flagsSet["protocol"] = true
-		case "d":
-			flagsSet["direction"] = true
-		case "t":
-			flagsSet["duration"] = true
-		case "s":
-			flagsSet["streams"] = true
-		case "chunk-size":
-			flagsSet["chunk-size"] = true
-		case "S":
-			flagsSet["server"] = true
-		case "v":
-			flagsSet["verbose"] = true
-		case "q":
-			flagsSet["quiet"] = true
-		case "h":
-			flagsSet["help"] = true
-		case "a":
-			flagsSet["auto"] = true
-		}
+		applyFlagAlias(flagsSet, f.Name)
 	})
 
 	if *servers {
@@ -98,25 +77,58 @@ func parseFlags(args []string, version string) (*Config, map[string]bool, int, e
 	}
 
 	rest := flagSet.Args()
-	if len(rest) > 1 {
-		return nil, nil, exitUsage, fmt.Errorf("too many positional arguments")
-	}
-	if len(rest) > 0 {
-		server := rest[0]
-		if strings.HasPrefix(server, "http://") || strings.HasPrefix(server, "https://") {
-			normalized, err := normalizeAndValidateServerURL(server)
-			if err != nil {
-				return nil, nil, exitUsage, fmt.Errorf("invalid server URL: %w", err)
-			}
-			config.ServerURL = normalized
-			flagsSet["server-url"] = true
-		} else {
-			config.Server = server
-			flagsSet["server"] = true
-		}
+	if err := applyPositionalServerArg(config, flagsSet, rest); err != nil {
+		return nil, nil, exitUsage, err
 	}
 
 	return config, flagsSet, 0, nil
+}
+
+func applyFlagAlias(flagsSet map[string]bool, name string) {
+	switch name {
+	case "p":
+		flagsSet["protocol"] = true
+	case "d":
+		flagsSet["direction"] = true
+	case "t":
+		flagsSet["duration"] = true
+	case "s":
+		flagsSet["streams"] = true
+	case "chunk-size":
+		flagsSet["chunk-size"] = true
+	case "S":
+		flagsSet["server"] = true
+	case "v":
+		flagsSet["verbose"] = true
+	case "q":
+		flagsSet["quiet"] = true
+	case "h":
+		flagsSet["help"] = true
+	case "a":
+		flagsSet["auto"] = true
+	}
+}
+
+func applyPositionalServerArg(config *Config, flagsSet map[string]bool, rest []string) error {
+	if len(rest) > 1 {
+		return fmt.Errorf("too many positional arguments")
+	}
+	if len(rest) == 0 {
+		return nil
+	}
+	server := rest[0]
+	if strings.HasPrefix(server, "http://") || strings.HasPrefix(server, "https://") {
+		normalized, err := normalizeAndValidateServerURL(server)
+		if err != nil {
+			return fmt.Errorf("invalid server URL: %w", err)
+		}
+		config.ServerURL = normalized
+		flagsSet["server-url"] = true
+		return nil
+	}
+	config.Server = server
+	flagsSet["server"] = true
+	return nil
 }
 
 func listServers() {

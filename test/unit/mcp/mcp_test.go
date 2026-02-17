@@ -35,7 +35,7 @@ func newMCPTestServer(t *testing.T) *httptest.Server {
 // logic via the pkg/client SDK (which the MCP handlers should use in production).
 // These tests validate that the SDK produces results suitable for MCP tool responses.
 
-func TestMCP_ConnectivityCheck_ViaSDK(t *testing.T) {
+func TestMCPConnectivityCheckViaSDK(t *testing.T) {
 	srv := newMCPTestServer(t)
 	c := pkgclient.New(srv.URL)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -66,7 +66,7 @@ func TestMCP_ConnectivityCheck_ViaSDK(t *testing.T) {
 	}
 }
 
-func TestMCP_SpeedTest_ViaSDK(t *testing.T) {
+func TestMCPSpeedTestViaSDK(t *testing.T) {
 	srv := newMCPTestServer(t)
 	c := pkgclient.New(srv.URL)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -95,7 +95,7 @@ func TestMCP_SpeedTest_ViaSDK(t *testing.T) {
 	}
 }
 
-func TestMCP_Diagnose_ViaSDK(t *testing.T) {
+func TestMCPDiagnoseViaSDK(t *testing.T) {
 	srv := newMCPTestServer(t)
 	c := pkgclient.New(srv.URL)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -125,7 +125,7 @@ func TestMCP_Diagnose_ViaSDK(t *testing.T) {
 	}
 }
 
-func TestMCP_ErrorResult_AgentReadable(t *testing.T) {
+func TestMCPErrorResultAgentReadable(t *testing.T) {
 	// Simulate what MCP handler does on error: return tool error text
 	c := pkgclient.New("http://127.0.0.1:1")
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -145,7 +145,7 @@ func TestMCP_ErrorResult_AgentReadable(t *testing.T) {
 
 // --- Diagnostic integration tests ---
 
-func TestDiagnostic_InterpretAllGrades(t *testing.T) {
+func TestDiagnosticInterpretAllGrades(t *testing.T) {
 	tests := []struct {
 		name  string
 		p     diagnostic.Params
@@ -168,7 +168,7 @@ func TestDiagnostic_InterpretAllGrades(t *testing.T) {
 	}
 }
 
-func TestDiagnostic_JSONSchema(t *testing.T) {
+func TestDiagnosticJSONSchema(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 100, UploadMbps: 50, LatencyMs: 10, JitterMs: 2,
 	})

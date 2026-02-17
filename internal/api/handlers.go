@@ -109,25 +109,8 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req StartStreamRequest
-	if err := decodeJSONBody(w, r, &req, maxJSONBodyBytes); err != nil {
-		respondJSONBodyError(w, err)
-		return
-	}
-
-	if req.Duration == 0 {
-		req.Duration = defaultStreamDurationSec
-	}
-	if req.Streams == 0 {
-		req.Streams = defaultStreamCount
-	}
-
-	mode := req.Mode
-	if mode == "" {
-		mode = "proxy"
-	}
-	if mode != "client" && mode != "proxy" {
-		respondError(w, errors.ErrInvalidConfig("mode must be 'client' or 'proxy'", nil), http.StatusBadRequest)
+	req, mode, ok := decodeAndValidateStartRequest(w, r)
+	if !ok {
 		return
 	}
 
@@ -160,23 +143,47 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	streamID := state.Config.ID
-	wsURL := "/api/v1/stream/" + streamID + "/stream"
+	resp := h.buildStartStreamResponse(r, state, mode)
+	respondJSON(w, resp, http.StatusCreated)
+}
 
+func decodeAndValidateStartRequest(w http.ResponseWriter, r *http.Request) (StartStreamRequest, string, bool) {
+	var req StartStreamRequest
+	if err := decodeJSONBody(w, r, &req, maxJSONBodyBytes); err != nil {
+		respondJSONBodyError(w, err)
+		return StartStreamRequest{}, "", false
+	}
+	if req.Duration == 0 {
+		req.Duration = defaultStreamDurationSec
+	}
+	if req.Streams == 0 {
+		req.Streams = defaultStreamCount
+	}
+	mode := req.Mode
+	if mode == "" {
+		mode = "proxy"
+	}
+	if mode != "client" && mode != "proxy" {
+		respondError(w, errors.ErrInvalidConfig("mode must be 'client' or 'proxy'", nil), http.StatusBadRequest)
+		return StartStreamRequest{}, "", false
+	}
+	return req, mode, true
+}
+
+func (h *Handler) buildStartStreamResponse(r *http.Request, state *types.StreamState, mode string) StartStreamResponse {
+	streamID := state.Config.ID
 	resp := StartStreamResponse{
 		StreamID:     streamID,
-		WebSocketURL: wsURL,
+		WebSocketURL: "/api/v1/stream/" + streamID + "/stream",
 		Status:       string(state.Status),
 		Mode:         mode,
 	}
-
 	if mode == "client" && h.config != nil {
 		host := responseHost(r, h.config)
 		resp.TestServerTCP = host + ":" + strconv.Itoa(h.config.TCPTestPort)
 		resp.TestServerUDP = host + ":" + strconv.Itoa(h.config.UDPTestPort)
 	}
-
-	respondJSON(w, resp, http.StatusCreated)
+	return resp
 }
 
 func (h *Handler) startCreatedStream(streamID string) error {

@@ -44,7 +44,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 
 // --- Healthy ---
 
-func TestSDK_Healthy_OK(t *testing.T) {
+func TestSDKHealthyOK(t *testing.T) {
 	srv := newTestServer(t)
 	c := pkgclient.New(srv.URL)
 	if err := c.Healthy(context.Background()); err != nil {
@@ -52,30 +52,30 @@ func TestSDK_Healthy_OK(t *testing.T) {
 	}
 }
 
-func TestSDK_Healthy_Unreachable(t *testing.T) {
+func TestSDKHealthyUnreachable(t *testing.T) {
 	c := pkgclient.New(unreachableBaseURL)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if err := c.Healthy(ctx); err == nil {
+	if c.Healthy(ctx) == nil {
 		t.Error("expected error for unreachable server")
 	}
 }
 
-func TestSDK_Healthy_Unhealthy(t *testing.T) {
+func TestSDKHealthyUnhealthy(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	t.Cleanup(srv.Close)
 
 	c := pkgclient.New(srv.URL)
-	if err := c.Healthy(context.Background()); err == nil {
+	if c.Healthy(context.Background()) == nil {
 		t.Error("expected error for unhealthy server")
 	}
 }
 
 // --- SpeedTest ---
 
-func TestSDK_SpeedTest_Download(t *testing.T) {
+func TestSDKSpeedTestDownload(t *testing.T) {
 	srv := newTestServer(t)
 	c := pkgclient.New(srv.URL)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -100,7 +100,7 @@ func TestSDK_SpeedTest_Download(t *testing.T) {
 	}
 }
 
-func TestSDK_SpeedTest_Upload(t *testing.T) {
+func TestSDKSpeedTestUpload(t *testing.T) {
 	srv := newTestServer(t)
 	c := pkgclient.New(srv.URL)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -122,7 +122,7 @@ func TestSDK_SpeedTest_Upload(t *testing.T) {
 	}
 }
 
-func TestSDK_SpeedTest_DefaultDirection(t *testing.T) {
+func TestSDKSpeedTestDefaultDirection(t *testing.T) {
 	srv := newTestServer(t)
 	c := pkgclient.New(srv.URL)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -137,7 +137,7 @@ func TestSDK_SpeedTest_DefaultDirection(t *testing.T) {
 	}
 }
 
-func TestSDK_SpeedTest_InvalidDirection(t *testing.T) {
+func TestSDKSpeedTestInvalidDirection(t *testing.T) {
 	srv := newTestServer(t)
 	c := pkgclient.New(srv.URL)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -149,7 +149,7 @@ func TestSDK_SpeedTest_InvalidDirection(t *testing.T) {
 	}
 }
 
-func TestSDK_SpeedTest_DurationClamped(t *testing.T) {
+func TestSDKSpeedTestDurationClamped(t *testing.T) {
 	srv := newTestServer(t)
 	c := pkgclient.New(srv.URL)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -165,7 +165,7 @@ func TestSDK_SpeedTest_DurationClamped(t *testing.T) {
 	}
 }
 
-func TestSDK_SpeedTest_UnreachableServer(t *testing.T) {
+func TestSDKSpeedTestUnreachableServer(t *testing.T) {
 	c := pkgclient.New(unreachableBaseURL)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -178,7 +178,7 @@ func TestSDK_SpeedTest_UnreachableServer(t *testing.T) {
 
 // --- WithAPIKey ---
 
-func TestSDK_WithAPIKey(t *testing.T) {
+func TestSDKWithAPIKey(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", jsonContentType)
 		w.Write([]byte(statusOKBody))
@@ -196,7 +196,7 @@ func TestSDK_WithAPIKey(t *testing.T) {
 
 // --- Check ---
 
-func TestSDK_Check_HasInterpretation(t *testing.T) {
+func TestSDKCheckHasInterpretation(t *testing.T) {
 	srv := newTestServer(t)
 	c := pkgclient.New(srv.URL)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -223,7 +223,7 @@ func TestSDK_Check_HasInterpretation(t *testing.T) {
 	}
 }
 
-func TestSDK_Check_ReturnsLatencyMeasurementErrorWhenPingFails(t *testing.T) {
+func TestSDKCheckReturnsLatencyMeasurementErrorWhenPingFails(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc(healthPath, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", jsonContentType)
@@ -250,7 +250,7 @@ func TestSDK_Check_ReturnsLatencyMeasurementErrorWhenPingFails(t *testing.T) {
 	}
 }
 
-func TestSDK_SpeedTest_ReturnsDownloadMeasurementErrorWhenDownloadFails(t *testing.T) {
+func TestSDKSpeedTestReturnsDownloadMeasurementErrorWhenDownloadFails(t *testing.T) {
 	mux := http.NewServeMux()
 	handler := api.NewSpeedTestHandler(10, 300)
 	mux.HandleFunc(healthPath, func(w http.ResponseWriter, r *http.Request) {
@@ -276,7 +276,7 @@ func TestSDK_SpeedTest_ReturnsDownloadMeasurementErrorWhenDownloadFails(t *testi
 	}
 }
 
-func TestSDK_SpeedTest_DownloadUnexpectedEOF(t *testing.T) {
+func TestSDKSpeedTestDownloadUnexpectedEOF(t *testing.T) {
 	mux := http.NewServeMux()
 	handler := api.NewSpeedTestHandler(10, 300)
 	mux.HandleFunc(healthPath, func(w http.ResponseWriter, r *http.Request) {
@@ -304,7 +304,7 @@ func TestSDK_SpeedTest_DownloadUnexpectedEOF(t *testing.T) {
 	}
 }
 
-func TestSDK_SpeedTest_UploadDurationImpactsWorkload(t *testing.T) {
+func TestSDKSpeedTestUploadDurationImpactsWorkload(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc(healthPath, func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(statusOKBody))
@@ -342,7 +342,7 @@ func TestSDK_SpeedTest_UploadDurationImpactsWorkload(t *testing.T) {
 	}
 }
 
-func TestSDK_MeasureLatency_MinimumSamplesForJitter(t *testing.T) {
+func TestSDKMeasureLatencyMinimumSamplesForJitter(t *testing.T) {
 	var pingCount int
 	mux := http.NewServeMux()
 	mux.HandleFunc(healthPath, func(w http.ResponseWriter, r *http.Request) {

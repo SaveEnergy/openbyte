@@ -9,6 +9,12 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+const (
+	streamMissingID = "missing"
+	testIPPrimary   = "10.0.0.1"
+	testIPSecondary = "10.0.0.2"
+)
+
 func newTestManager() *stream.Manager {
 	m := stream.NewManager(10, 5)
 	m.Start()
@@ -58,7 +64,7 @@ func TestManagerStartStreamNotFound(t *testing.T) {
 	m := newTestManager()
 	defer m.Stop()
 
-	if err := m.StartStream("nonexistent"); err == nil {
+	if m.StartStream("nonexistent") == nil {
 		t.Fatal("expected error for nonexistent stream")
 	}
 }
@@ -81,7 +87,7 @@ func TestManagerGetStreamNotFound(t *testing.T) {
 	m := newTestManager()
 	defer m.Stop()
 
-	_, err := m.GetStream("missing")
+	_, err := m.GetStream(streamMissingID)
 	if err == nil {
 		t.Fatal("expected error for missing stream")
 	}
@@ -112,7 +118,7 @@ func TestManagerCancelStreamNotFound(t *testing.T) {
 	m := newTestManager()
 	defer m.Stop()
 
-	if err := m.CancelStream("missing"); err == nil {
+	if m.CancelStream(streamMissingID) == nil {
 		t.Fatal("expected error for missing stream")
 	}
 }
@@ -146,7 +152,7 @@ func TestManagerCompleteStreamNotFound(t *testing.T) {
 	m := newTestManager()
 	defer m.Stop()
 
-	err := m.CompleteStream("missing", types.Metrics{})
+	err := m.CompleteStream(streamMissingID, types.Metrics{})
 	if err == nil {
 		t.Fatal("expected error for missing stream")
 	}
@@ -196,7 +202,7 @@ func TestManagerUpdateMetricsNotFound(t *testing.T) {
 	m := newTestManager()
 	defer m.Stop()
 
-	if err := m.UpdateMetrics("missing", types.Metrics{}); err == nil {
+	if m.UpdateMetrics(streamMissingID, types.Metrics{}) == nil {
 		t.Fatal("expected error for missing stream")
 	}
 }
@@ -227,7 +233,7 @@ func TestManagerMaxStreamsPerIP(t *testing.T) {
 	defer m.Stop()
 
 	cfg := testConfig(types.DirectionDownload)
-	cfg.ClientIP = "10.0.0.1"
+	cfg.ClientIP = testIPPrimary
 
 	_, _ = m.CreateStream(cfg)
 	_, _ = m.CreateStream(cfg)
@@ -238,7 +244,7 @@ func TestManagerMaxStreamsPerIP(t *testing.T) {
 	}
 
 	// Different IP should still work
-	cfg.ClientIP = "10.0.0.2"
+	cfg.ClientIP = testIPSecondary
 	_, err = m.CreateStream(cfg)
 	if err != nil {
 		t.Fatalf("different IP should succeed: %v", err)
@@ -342,7 +348,7 @@ func TestManagerMetricsChannelDropAccounting(t *testing.T) {
 
 	for i := range 150 {
 		cfg := testConfig(types.DirectionDownload)
-		cfg.ClientIP = "10.0.0.1"
+		cfg.ClientIP = testIPPrimary
 		state, err := m.CreateStream(cfg)
 		if err != nil {
 			t.Fatalf("create stream %d: %v", i, err)
@@ -369,7 +375,7 @@ func TestManagerStartStreamDoesNotOverrideTerminalStatus(t *testing.T) {
 	if err := m.CancelStream(state.Config.ID); err != nil {
 		t.Fatalf("CancelStream: %v", err)
 	}
-	if err := m.StartStream(state.Config.ID); err == nil {
+	if m.StartStream(state.Config.ID) == nil {
 		t.Fatal("expected error when starting terminal stream")
 	}
 
@@ -390,7 +396,7 @@ func TestManagerUpdateMetricsRejectedAfterTerminal(t *testing.T) {
 	if err := m.CompleteStream(state.Config.ID, types.Metrics{ThroughputMbps: 111}); err != nil {
 		t.Fatalf("CompleteStream: %v", err)
 	}
-	if err := m.UpdateMetrics(state.Config.ID, types.Metrics{ThroughputMbps: 999}); err == nil {
+	if m.UpdateMetrics(state.Config.ID, types.Metrics{ThroughputMbps: 999}) == nil {
 		t.Fatal("expected error when updating terminal stream metrics")
 	}
 

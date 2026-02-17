@@ -80,23 +80,22 @@
 
 ### Live Queue (active only)
 
-| ID       | Area | Agent | Status | Plan                                                         | Evidence | Check |
-| -------- | ---- | ----- | ------ | ------------------------------------------------------------ | -------- | ----- |
-| 20260217-web-02 | web | A0 | Check | Burn down frontend static-analysis backlog in `web/results.js`, `web/app.js`, `web/download.js`. | Completed modernization pass: optional chaining, `globalThis`, safer error handling, deprecated patterns removed. | `npx prettier --check web/*.js && bunx playwright test` |
-| 20260217-go-02 | api | A0 | Check | Continue production Go hotspot reduction (`go:S3776`) in server/api/websocket/stream paths. | Completed 3 refactor batches across `internal/api/speedtest.go`, `internal/websocket/server.go`, `cmd/server/main.go`, `internal/stream/server.go`, `internal/api/router.go` with behavior-preserving helper extraction. | `go test -short ./cmd/server ./cmd/client ./internal/api ./internal/stream ./internal/websocket` |
-| 20260217-test-02 | test | A0 | Check | Bulk-close low-risk test-only smells (`go:S100`, `go:S1192`, `godre:S8193`) via focused cleanup sweeps. | Completed 3 cleanup batches across `test/unit/client/sdk_test.go`, `test/unit/diagnostic/diagnostic_test.go`, `test/unit/api/handlers_test.go` with literal dedupe and assertion cleanup. | `go test -short ./test/unit/... ./test/e2e/...` |
+No active items. All `20260217-*` tasks reached `Done` and were removed from the live queue.
 
 ### Sonar Snapshot (2026-02-17)
 
 - Strict OPEN filter parity maintained with Cloud:
   - Query: `projects=[SaveEnergy_openbyte]`, `issueStatuses=[OPEN]`, `ps=500`
-  - Total OPEN: `362` (down from `422`)
-  - Current top tracked rules: `go:S3776=33`, `go:S100=102`, `go:S1192=97`, `godre:S8193=50`
+  - Total OPEN: `357` (down from `422`)
+  - Current top tracked rules: `go:S3776=31`, `go:S100=102`, `go:S1192=94`, `godre:S8193=50`
 
 ### Recently Closed IDs
 
 - Most historical IDs intentionally pruned for readability; canonical record remains in git history.
 - Recent close: `20260217-ci-09`.
+- Latest completed wave (moved `Check -> Done -> removed`):
+  - `20260217-web-02`, `20260217-go-02`, `20260217-go-03`, `20260217-go-04`, `20260217-go-05`, `20260217-go-06`, `20260217-go-07`, `20260217-go-08`, `20260217-go-09`
+  - `20260217-test-02`, `20260217-test-03`, `20260217-test-04`, `20260217-test-05`, `20260217-test-06`, `20260217-test-07`
 
 ### Recent Decision Notes
 

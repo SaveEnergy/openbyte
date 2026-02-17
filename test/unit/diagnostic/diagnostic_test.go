@@ -36,63 +36,63 @@ const (
 
 // --- rateLatency ---
 
-func TestRateLatency_Excellent(t *testing.T) {
+func TestRateLatencyExcellent(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 10, DownloadMbps: 100})
 	if interp.LatencyRating != ratingExcellent {
 		t.Errorf("expected excellent, got %s", interp.LatencyRating)
 	}
 }
 
-func TestRateLatency_Good(t *testing.T) {
+func TestRateLatencyGood(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 35, DownloadMbps: 100})
 	if interp.LatencyRating != ratingGood {
 		t.Errorf("expected good, got %s", interp.LatencyRating)
 	}
 }
 
-func TestRateLatency_Fair(t *testing.T) {
+func TestRateLatencyFair(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 75, DownloadMbps: 100})
 	if interp.LatencyRating != ratingFair {
 		t.Errorf("expected fair, got %s", interp.LatencyRating)
 	}
 }
 
-func TestRateLatency_Poor(t *testing.T) {
+func TestRateLatencyPoor(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 200, DownloadMbps: 100})
 	if interp.LatencyRating != ratingPoor {
 		t.Errorf("expected poor, got %s", interp.LatencyRating)
 	}
 }
 
-func TestRateLatency_Unknown_Zero(t *testing.T) {
+func TestRateLatencyUnknownZero(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 0, DownloadMbps: 100})
 	if interp.LatencyRating != ratingUnknown {
 		t.Errorf("expected unknown for 0ms, got %s", interp.LatencyRating)
 	}
 }
 
-func TestRateLatency_Unknown_Negative(t *testing.T) {
+func TestRateLatencyUnknownNegative(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: -5, DownloadMbps: 100})
 	if interp.LatencyRating != ratingUnknown {
 		t.Errorf("expected unknown for negative, got %s", interp.LatencyRating)
 	}
 }
 
-func TestRateLatency_Boundary_20(t *testing.T) {
+func TestRateLatencyBoundary20(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 20, DownloadMbps: 100})
 	if interp.LatencyRating != ratingExcellent {
 		t.Errorf("expected excellent at boundary 20ms, got %s", interp.LatencyRating)
 	}
 }
 
-func TestRateLatency_Boundary_50(t *testing.T) {
+func TestRateLatencyBoundary50(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 50, DownloadMbps: 100})
 	if interp.LatencyRating != ratingGood {
 		t.Errorf("expected good at boundary 50ms, got %s", interp.LatencyRating)
 	}
 }
 
-func TestRateLatency_Boundary_100(t *testing.T) {
+func TestRateLatencyBoundary100(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 100, DownloadMbps: 100})
 	if interp.LatencyRating != ratingFair {
 		t.Errorf("expected fair at boundary 100ms, got %s", interp.LatencyRating)
@@ -101,63 +101,63 @@ func TestRateLatency_Boundary_100(t *testing.T) {
 
 // --- rateSpeed ---
 
-func TestRateSpeed_Fast(t *testing.T) {
+func TestRateSpeedFast(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 500, LatencyMs: 10})
 	if interp.SpeedRating != ratingFast {
 		t.Errorf("expected fast, got %s", interp.SpeedRating)
 	}
 }
 
-func TestRateSpeed_Good(t *testing.T) {
+func TestRateSpeedGood(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 50, LatencyMs: 10})
 	if interp.SpeedRating != ratingGood {
 		t.Errorf("expected good, got %s", interp.SpeedRating)
 	}
 }
 
-func TestRateSpeed_Moderate(t *testing.T) {
+func TestRateSpeedModerate(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 10, LatencyMs: 10})
 	if interp.SpeedRating != ratingModerate {
 		t.Errorf("expected moderate, got %s", interp.SpeedRating)
 	}
 }
 
-func TestRateSpeed_Slow(t *testing.T) {
+func TestRateSpeedSlow(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 2, LatencyMs: 10})
 	if interp.SpeedRating != ratingSlow {
 		t.Errorf("expected slow, got %s", interp.SpeedRating)
 	}
 }
 
-func TestRateSpeed_Unknown(t *testing.T) {
+func TestRateSpeedUnknown(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 10})
 	if interp.SpeedRating != ratingUnknown {
 		t.Errorf("expected unknown, got %s", interp.SpeedRating)
 	}
 }
 
-func TestRateSpeed_FallbackToUpload(t *testing.T) {
+func TestRateSpeedFallbackToUpload(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{UploadMbps: 200, LatencyMs: 10})
 	if interp.SpeedRating != ratingFast {
 		t.Errorf("expected fast from upload fallback, got %s", interp.SpeedRating)
 	}
 }
 
-func TestRateSpeed_Boundary_100(t *testing.T) {
+func TestRateSpeedBoundary100(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10})
 	if interp.SpeedRating != ratingFast {
 		t.Errorf("expected fast at boundary 100, got %s", interp.SpeedRating)
 	}
 }
 
-func TestRateSpeed_Boundary_25(t *testing.T) {
+func TestRateSpeedBoundary25(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 25, LatencyMs: 10})
 	if interp.SpeedRating != ratingGood {
 		t.Errorf("expected good at boundary 25, got %s", interp.SpeedRating)
 	}
 }
 
-func TestRateSpeed_Boundary_5(t *testing.T) {
+func TestRateSpeedBoundary5(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 5, LatencyMs: 10})
 	if interp.SpeedRating != ratingModerate {
 		t.Errorf("expected moderate at boundary 5, got %s", interp.SpeedRating)
@@ -166,42 +166,42 @@ func TestRateSpeed_Boundary_5(t *testing.T) {
 
 // --- rateStability ---
 
-func TestRateStability_Stable_NoData(t *testing.T) {
+func TestRateStabilityStableNoData(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10})
 	if interp.StabilityRating != ratingStable {
 		t.Errorf("expected stable with no jitter/loss data, got %s", interp.StabilityRating)
 	}
 }
 
-func TestRateStability_Stable_LowJitter(t *testing.T) {
+func TestRateStabilityStableLowJitter(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10, JitterMs: 5})
 	if interp.StabilityRating != ratingStable {
 		t.Errorf("expected stable, got %s", interp.StabilityRating)
 	}
 }
 
-func TestRateStability_Fair(t *testing.T) {
+func TestRateStabilityFair(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10, JitterMs: 20})
 	if interp.StabilityRating != ratingFair {
 		t.Errorf("expected fair, got %s", interp.StabilityRating)
 	}
 }
 
-func TestRateStability_Degraded_HighJitter(t *testing.T) {
+func TestRateStabilityDegradedHighJitter(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10, JitterMs: 35})
 	if interp.StabilityRating != ratingDegraded {
 		t.Errorf("expected degraded, got %s", interp.StabilityRating)
 	}
 }
 
-func TestRateStability_Degraded_PacketLoss(t *testing.T) {
+func TestRateStabilityDegradedPacketLoss(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10, PacketLoss: 1.0})
 	if interp.StabilityRating != ratingDegraded {
 		t.Errorf("expected degraded, got %s", interp.StabilityRating)
 	}
 }
 
-func TestRateStability_Unstable(t *testing.T) {
+func TestRateStabilityUnstable(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10, PacketLoss: 5})
 	if interp.StabilityRating != ratingUnstable {
 		t.Errorf("expected unstable, got %s", interp.StabilityRating)
@@ -210,7 +210,7 @@ func TestRateStability_Unstable(t *testing.T) {
 
 // --- Grade computation ---
 
-func TestGrade_A_ExcellentAll(t *testing.T) {
+func TestGradeAExcellentAll(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 500, UploadMbps: 100, LatencyMs: 5, JitterMs: 1,
 	})
@@ -219,7 +219,7 @@ func TestGrade_A_ExcellentAll(t *testing.T) {
 	}
 }
 
-func TestGrade_B_GoodConnection(t *testing.T) {
+func TestGradeBGoodConnection(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 50, UploadMbps: 10, LatencyMs: 30, JitterMs: 5,
 	})
@@ -229,7 +229,7 @@ func TestGrade_B_GoodConnection(t *testing.T) {
 	}
 }
 
-func TestGrade_C_FairConnection(t *testing.T) {
+func TestGradeCFairConnection(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 10, LatencyMs: 80, JitterMs: 20,
 	})
@@ -238,7 +238,7 @@ func TestGrade_C_FairConnection(t *testing.T) {
 	}
 }
 
-func TestGrade_D_PoorConnection(t *testing.T) {
+func TestGradeDPoorConnection(t *testing.T) {
 	// Score: fair(2) + slow(0) + fair(2) = 4 → D
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 3, LatencyMs: 75, JitterMs: 15,
@@ -249,7 +249,7 @@ func TestGrade_D_PoorConnection(t *testing.T) {
 	}
 }
 
-func TestGrade_F_VeryPoor(t *testing.T) {
+func TestGradeFVeryPoor(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 1, LatencyMs: 500, PacketLoss: 10,
 	})
@@ -260,7 +260,7 @@ func TestGrade_F_VeryPoor(t *testing.T) {
 
 // --- Suitability ---
 
-func TestSuitability_AllWorkloads(t *testing.T) {
+func TestSuitabilityAllWorkloads(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 500, UploadMbps: 100, LatencyMs: 5, JitterMs: 1,
 	})
@@ -282,7 +282,7 @@ func TestSuitability_AllWorkloads(t *testing.T) {
 	}
 }
 
-func TestSuitability_BrowsingOnly(t *testing.T) {
+func TestSuitabilityBrowsingOnly(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 2, LatencyMs: 50, JitterMs: 20,
 	})
@@ -300,7 +300,7 @@ func TestSuitability_BrowsingOnly(t *testing.T) {
 	}
 }
 
-func TestSuitability_StreamingHD(t *testing.T) {
+func TestSuitabilityStreamingHD(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 15, LatencyMs: 30,
 	})
@@ -318,7 +318,7 @@ func TestSuitability_StreamingHD(t *testing.T) {
 	}
 }
 
-func TestSuitability_NoGaming_HighLatency(t *testing.T) {
+func TestSuitabilityNoGamingHighLatency(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 500, LatencyMs: 80, JitterMs: 5,
 	})
@@ -329,7 +329,7 @@ func TestSuitability_NoGaming_HighLatency(t *testing.T) {
 	}
 }
 
-func TestSuitability_NoGaming_HighJitter(t *testing.T) {
+func TestSuitabilityNoGamingHighJitter(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 500, LatencyMs: 10, JitterMs: 20,
 	})
@@ -340,7 +340,7 @@ func TestSuitability_NoGaming_HighJitter(t *testing.T) {
 	}
 }
 
-func TestSuitability_NoBrowsing_HighLatency(t *testing.T) {
+func TestSuitabilityNoBrowsingHighLatency(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 100, LatencyMs: 250,
 	})
@@ -351,7 +351,7 @@ func TestSuitability_NoBrowsing_HighLatency(t *testing.T) {
 	}
 }
 
-func TestSuitability_Empty_HighLatency(t *testing.T) {
+func TestSuitabilityEmptyHighLatency(t *testing.T) {
 	// With 200ms+ latency and no speed, nothing qualifies
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 250})
 	if len(interp.SuitableFor) != 0 {
@@ -359,7 +359,7 @@ func TestSuitability_Empty_HighLatency(t *testing.T) {
 	}
 }
 
-func TestSuitability_Gaming_ZeroMetrics(t *testing.T) {
+func TestSuitabilityGamingZeroMetrics(t *testing.T) {
 	// Gaming qualifies with all-zero metrics (0 < 50, 0 < 15, 0 < 1)
 	interp := diagnostic.Interpret(diagnostic.Params{LatencyMs: 10})
 	found := false
@@ -375,7 +375,7 @@ func TestSuitability_Gaming_ZeroMetrics(t *testing.T) {
 
 // --- Concerns ---
 
-func TestConcerns_NoConcerns(t *testing.T) {
+func TestConcernsNoConcerns(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 100, UploadMbps: 50, LatencyMs: 10, JitterMs: 2,
 	})
@@ -384,42 +384,42 @@ func TestConcerns_NoConcerns(t *testing.T) {
 	}
 }
 
-func TestConcerns_HighLatency(t *testing.T) {
+func TestConcernsHighLatency(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 100, LatencyMs: 150,
 	})
 	assertContains(t, interp.Concerns, concernHighLatency)
 }
 
-func TestConcerns_HighJitter(t *testing.T) {
+func TestConcernsHighJitter(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 100, LatencyMs: 10, JitterMs: 50,
 	})
 	assertContains(t, interp.Concerns, concernHighJitter)
 }
 
-func TestConcerns_PacketLoss(t *testing.T) {
+func TestConcernsPacketLoss(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 100, LatencyMs: 10, PacketLoss: 3,
 	})
 	assertContains(t, interp.Concerns, concernPacketLoss)
 }
 
-func TestConcerns_SlowDownload(t *testing.T) {
+func TestConcernsSlowDownload(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 3, LatencyMs: 10,
 	})
 	assertContains(t, interp.Concerns, concernSlowDown)
 }
 
-func TestConcerns_SlowUpload(t *testing.T) {
+func TestConcernsSlowUpload(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		UploadMbps: 1, LatencyMs: 10,
 	})
 	assertContains(t, interp.Concerns, concernSlowUp)
 }
 
-func TestConcerns_Multiple(t *testing.T) {
+func TestConcernsMultiple(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 2, UploadMbps: 1, LatencyMs: 200, JitterMs: 50, PacketLoss: 3,
 	})
@@ -432,7 +432,7 @@ func TestConcerns_Multiple(t *testing.T) {
 
 // --- Summary ---
 
-func TestSummary_IncludesGradeDesc(t *testing.T) {
+func TestSummaryIncludesGradeDesc(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 500, LatencyMs: 5,
 	})
@@ -444,7 +444,7 @@ func TestSummary_IncludesGradeDesc(t *testing.T) {
 	}
 }
 
-func TestSummary_ContainsMetrics(t *testing.T) {
+func TestSummaryContainsMetrics(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: 450, UploadMbps: 50, LatencyMs: 12,
 	})
@@ -459,7 +459,7 @@ func TestSummary_ContainsMetrics(t *testing.T) {
 	}
 }
 
-func TestSummary_OmitsZeroMetrics(t *testing.T) {
+func TestSummaryOmitsZeroMetrics(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{DownloadMbps: 100, LatencyMs: 10})
 	if containsStr(interp.Summary, "up") {
 		t.Errorf("summary should not contain upload when 0, got %s", interp.Summary)
@@ -468,14 +468,14 @@ func TestSummary_OmitsZeroMetrics(t *testing.T) {
 
 // --- Interpret non-nil fields ---
 
-func TestInterpret_SuitableForNeverNil(t *testing.T) {
+func TestInterpretSuitableForNeverNil(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{})
 	if interp.SuitableFor == nil {
 		t.Error("SuitableFor should never be nil")
 	}
 }
 
-func TestInterpret_ConcernsNeverNil(t *testing.T) {
+func TestInterpretConcernsNeverNil(t *testing.T) {
 	interp := diagnostic.Interpret(diagnostic.Params{})
 	if interp.Concerns == nil {
 		t.Error("Concerns should never be nil")

@@ -10,6 +10,12 @@ import (
 	"github.com/saveenergy/openbyte/internal/config"
 )
 
+const (
+	loopbackIP  = "127.0.0.1"
+	ipPrimary   = "10.0.0.1"
+	ipSecondary = "10.0.0.2"
+)
+
 func drainGlobalTokens(t *testing.T, rl *api.RateLimiter, ip string, count int) {
 	t.Helper()
 	for i := range count {
@@ -25,7 +31,7 @@ func TestRateLimiterGlobalRefillLowRate(t *testing.T) {
 	cfg.RateLimitPerIP = 1000
 	rl := api.NewRateLimiter(cfg)
 
-	ip := "127.0.0.1"
+	ip := loopbackIP
 	drainGlobalTokens(t, rl, ip, cfg.GlobalRateLimit)
 
 	time.Sleep(2 * time.Second)
@@ -41,7 +47,7 @@ func TestRateLimiterGlobalRefillVeryLowRate(t *testing.T) {
 	cfg.RateLimitPerIP = 1000
 	rl := api.NewRateLimiter(cfg)
 
-	ip := "127.0.0.1"
+	ip := loopbackIP
 	drainGlobalTokens(t, rl, ip, cfg.GlobalRateLimit)
 
 	time.Sleep(6 * time.Second)
@@ -57,8 +63,8 @@ func TestRateLimiterIPRefillLowRate(t *testing.T) {
 	cfg.RateLimitPerIP = 30
 	rl := api.NewRateLimiter(cfg)
 
-	ip := "127.0.0.1"
-	for i := 0; i < cfg.RateLimitPerIP; i++ {
+	ip := loopbackIP
+	for i := range cfg.RateLimitPerIP {
 		if !rl.Allow(ip) {
 			t.Fatalf("token %d not allowed", i)
 		}
@@ -78,17 +84,17 @@ func TestRateLimiterIndependentIPs(t *testing.T) {
 	rl := api.NewRateLimiter(cfg)
 
 	// Drain IP-A
-	for i := 0; i < cfg.RateLimitPerIP; i++ {
-		if !rl.Allow("10.0.0.1") {
+	for i := range cfg.RateLimitPerIP {
+		if !rl.Allow(ipPrimary) {
 			t.Fatalf("IP-A token %d not allowed", i)
 		}
 	}
 	// IP-A exhausted
-	if rl.Allow("10.0.0.1") {
+	if rl.Allow(ipPrimary) {
 		t.Fatal("IP-A should be exhausted")
 	}
 	// IP-B should still have full bucket
-	if !rl.Allow("10.0.0.2") {
+	if !rl.Allow(ipSecondary) {
 		t.Fatal("IP-B should be independent and allowed")
 	}
 }
@@ -110,7 +116,7 @@ func TestRateLimiterCleanupRemovesExpired(t *testing.T) {
 	rl.Allow("10.0.0.1")
 
 	// Original IP should have full bucket (entry cleaned, fresh on next access)
-	for i := 0; i < cfg.RateLimitPerIP; i++ {
+	for i := range cfg.RateLimitPerIP {
 		if !rl.Allow("10.0.0.99") {
 			t.Fatalf("token %d not allowed after cleanup", i)
 		}
@@ -192,14 +198,14 @@ func TestRateLimiterNoGlobalBurnOnIPReject(t *testing.T) {
 	cfg.RateLimitPerIP = 1
 	rl := api.NewRateLimiter(cfg)
 
-	if !rl.Allow("10.0.0.1") {
+	if !rl.Allow(ipPrimary) {
 		t.Fatal("first request should pass")
 	}
-	if rl.Allow("10.0.0.1") {
+	if rl.Allow(ipPrimary) {
 		t.Fatal("second request from same IP should fail per-IP limit")
 	}
 	// If global token was not refunded on IP reject, this request would fail.
-	if !rl.Allow("10.0.0.2") {
+	if !rl.Allow(ipSecondary) {
 		t.Fatal("global token should be available for different IP")
 	}
 }

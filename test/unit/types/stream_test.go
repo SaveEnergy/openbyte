@@ -49,7 +49,7 @@ func TestOriginHost(t *testing.T) {
 	}
 }
 
-func TestStreamState_UpdateStatus(t *testing.T) {
+func TestStreamStateUpdateStatus(t *testing.T) {
 	state := &types.StreamState{
 		Config: types.StreamConfig{
 			Duration: 30 * time.Second,
@@ -79,7 +79,7 @@ func TestStreamState_UpdateStatus(t *testing.T) {
 	}
 }
 
-func TestStreamState_UpdateMetrics(t *testing.T) {
+func TestStreamStateUpdateMetrics(t *testing.T) {
 	state := &types.StreamState{
 		Config: types.StreamConfig{
 			Duration: 30 * time.Second,
@@ -104,7 +104,7 @@ func TestStreamState_UpdateMetrics(t *testing.T) {
 	}
 }
 
-func TestStreamState_GetState(t *testing.T) {
+func TestStreamStateGetState(t *testing.T) {
 	state := &types.StreamState{
 		Config: types.StreamConfig{
 			ID:       "stream-123",

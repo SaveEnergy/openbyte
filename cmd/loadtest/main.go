@@ -105,12 +105,23 @@ func validateConfig(cfg config) error {
 	if cfg.mode == modeWS && cfg.wsURL == "" {
 		return fmt.Errorf("ws-url required for ws mode")
 	}
-	if cfg.tcpPort < 1 || cfg.tcpPort > 65535 {
-		return fmt.Errorf("tcp-port must be 1-65535")
+	if err := validatePortRange("tcp-port", cfg.tcpPort); err != nil {
+		return err
 	}
-	if cfg.udpPort < 1 || cfg.udpPort > 65535 {
-		return fmt.Errorf("udp-port must be 1-65535")
+	if err := validatePortRange("udp-port", cfg.udpPort); err != nil {
+		return err
 	}
+	return validatePacketAndWebsocket(cfg)
+}
+
+func validatePortRange(name string, port int) error {
+	if port < 1 || port > 65535 {
+		return fmt.Errorf("%s must be 1-65535", name)
+	}
+	return nil
+}
+
+func validatePacketAndWebsocket(cfg config) error {
 	if cfg.packetSize < 64 {
 		return fmt.Errorf("packet-size must be >= 64")
 	}
@@ -272,48 +283,56 @@ func runTCPBidirectional(ctx context.Context, cfg config, worker int) (int64, in
 
 	go func() {
 		defer wg.Done()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				_ = conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
-				n, err := conn.Write(writeBuf)
-				if n > 0 {
-					atomic.AddInt64(&sent, int64(n))
-				}
-				if err != nil {
-					return
-				}
-			}
-		}
+		runTCPBidirectionalWriteLoop(ctx, conn, writeBuf, &sent)
 	}()
 
 	go func() {
 		defer wg.Done()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
-				n, err := conn.Read(readBuf)
-				if n > 0 {
-					atomic.AddInt64(&recv, int64(n))
-				}
-				if err != nil {
-					var netErr net.Error
-					if errors.As(err, &netErr) && netErr.Timeout() {
-						continue
-					}
-					return
-				}
-			}
-		}
+		runTCPBidirectionalReadLoop(ctx, conn, readBuf, &recv)
 	}()
 
 	wg.Wait()
 	return sent, recv, nil
+}
+
+func runTCPBidirectionalWriteLoop(ctx context.Context, conn net.Conn, writeBuf []byte, sent *int64) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			_ = conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
+			n, err := conn.Write(writeBuf)
+			if n > 0 {
+				atomic.AddInt64(sent, int64(n))
+			}
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+func runTCPBidirectionalReadLoop(ctx context.Context, conn net.Conn, readBuf []byte, recv *int64) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+			n, err := conn.Read(readBuf)
+			if n > 0 {
+				atomic.AddInt64(recv, int64(n))
+			}
+			if err != nil {
+				var netErr net.Error
+				if errors.As(err, &netErr) && netErr.Timeout() {
+					continue
+				}
+				return
+			}
+		}
+	}
 }
 
 func runUDPDownload(ctx context.Context, cfg config, worker int) (int64, error) {

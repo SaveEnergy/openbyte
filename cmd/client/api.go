@@ -165,28 +165,11 @@ func completeStream(ctx context.Context, config *Config, streamID string, metric
 }
 
 func streamMetrics(ctx context.Context, wsURL string, formatter OutputFormatter, config *Config) error {
-	if strings.HasPrefix(wsURL, "/") {
-		serverURL, err := url.Parse(config.ServerURL)
-		if err != nil {
-			return fmt.Errorf("parse server URL: %w", err)
-		}
-		wsScheme := "ws"
-		if serverURL.Scheme == "https" {
-			wsScheme = "wss"
-		}
-		wsURL = fmt.Sprintf("%s://%s%s", wsScheme, serverURL.Host, wsURL)
-	} else {
-		u, err := url.Parse(wsURL)
-		if err != nil {
-			return fmt.Errorf("parse websocket URL: %w", err)
-		}
-		if u.Scheme == "http" {
-			u.Scheme = "ws"
-		} else if u.Scheme == "https" {
-			u.Scheme = "wss"
-		}
-		wsURL = u.String()
+	normalizedURL, err := normalizeWebSocketURL(config.ServerURL, wsURL)
+	if err != nil {
+		return err
 	}
+	wsURL = normalizedURL
 
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 10 * time.Second,
@@ -215,39 +198,78 @@ func streamMetrics(ctx context.Context, wsURL string, formatter OutputFormatter,
 
 		var msg WebSocketMessage
 		if err := conn.ReadJSON(&msg); err != nil {
-			if ctx.Err() != nil {
-				return ctx.Err()
-			}
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				if receivedComplete {
-					return nil
-				}
-				return fmt.Errorf("websocket closed before completion message")
-			}
-			var netErr interface{ Timeout() bool }
-			if errors.As(err, &netErr) && netErr.Timeout() {
-				return fmt.Errorf("websocket read timeout: %w", err)
-			}
-			return fmt.Errorf("read message: %w", err)
+			return handleWebSocketReadError(ctx, err, receivedComplete)
 		}
 
-		switch msg.Type {
-		case "progress":
-			formatter.FormatProgress(msg.Progress, msg.ElapsedSeconds, msg.RemainingSeconds)
-		case "metrics":
-			if msg.Metrics != nil {
-				formatter.FormatMetrics(msg.Metrics)
-			}
-		case "complete":
-			receivedComplete = true
-			if msg.Results != nil {
-				formatter.FormatComplete(msg.Results)
-				return nil
-			}
-		case "error":
-			return fmt.Errorf("test failed: %s", msg.Message)
+		done, processErr := processWebSocketMessage(formatter, &msg, &receivedComplete)
+		if processErr != nil {
+			return processErr
+		}
+		if done {
+			return nil
 		}
 	}
+}
+
+func normalizeWebSocketURL(serverRaw, wsURL string) (string, error) {
+	if strings.HasPrefix(wsURL, "/") {
+		serverURL, err := url.Parse(serverRaw)
+		if err != nil {
+			return "", fmt.Errorf("parse server URL: %w", err)
+		}
+		wsScheme := "ws"
+		if serverURL.Scheme == "https" {
+			wsScheme = "wss"
+		}
+		return fmt.Sprintf("%s://%s%s", wsScheme, serverURL.Host, wsURL), nil
+	}
+	u, err := url.Parse(wsURL)
+	if err != nil {
+		return "", fmt.Errorf("parse websocket URL: %w", err)
+	}
+	if u.Scheme == "http" {
+		u.Scheme = "ws"
+	} else if u.Scheme == "https" {
+		u.Scheme = "wss"
+	}
+	return u.String(), nil
+}
+
+func handleWebSocketReadError(ctx context.Context, err error, receivedComplete bool) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+		if receivedComplete {
+			return nil
+		}
+		return fmt.Errorf("websocket closed before completion message")
+	}
+	var netErr interface{ Timeout() bool }
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return fmt.Errorf("websocket read timeout: %w", err)
+	}
+	return fmt.Errorf("read message: %w", err)
+}
+
+func processWebSocketMessage(formatter OutputFormatter, msg *WebSocketMessage, receivedComplete *bool) (bool, error) {
+	switch msg.Type {
+	case "progress":
+		formatter.FormatProgress(msg.Progress, msg.ElapsedSeconds, msg.RemainingSeconds)
+	case "metrics":
+		if msg.Metrics != nil {
+			formatter.FormatMetrics(msg.Metrics)
+		}
+	case "complete":
+		*receivedComplete = true
+		if msg.Results != nil {
+			formatter.FormatComplete(msg.Results)
+			return true, nil
+		}
+	case "error":
+		return false, fmt.Errorf("test failed: %s", msg.Message)
+	}
+	return false, nil
 }
 
 func newHTTPClient(timeout time.Duration) *http.Client {

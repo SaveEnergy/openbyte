@@ -14,6 +14,13 @@ import (
 	"github.com/saveenergy/openbyte/internal/stream"
 )
 
+const (
+	statusWantFmt     = "status = %d, want %d"
+	exampleBaseURL    = "http://example.com"
+	resultsPagePath   = "/results/abc12345"
+	registryHealthAPI = "/api/v1/registry/health"
+)
+
 type testRegistryRegistrar struct{}
 
 func (testRegistryRegistrar) RegisterRoutes(mux *http.ServeMux) {
@@ -27,7 +34,7 @@ func TestRouterAllowedOriginWildcard(t *testing.T) {
 	router := &api.Router{}
 	router.SetAllowedOrigins([]string{"*.example.com"})
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL, nil)
 	req.Header.Set("Origin", "https://foo.example.com")
 	rec := httptest.NewRecorder()
 
@@ -37,7 +44,7 @@ func TestRouterAllowedOriginWildcard(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(statusWantFmt, rec.Code, http.StatusOK)
 	}
 	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://foo.example.com" {
 		t.Fatalf("allow origin = %q, want %q", got, "https://foo.example.com")
@@ -48,7 +55,7 @@ func TestRouterAllowedOriginHostMatch(t *testing.T) {
 	router := &api.Router{}
 	router.SetAllowedOrigins([]string{"foo.example.com"})
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL, nil)
 	req.Header.Set("Origin", "https://foo.example.com:8443")
 	rec := httptest.NewRecorder()
 
@@ -58,7 +65,7 @@ func TestRouterAllowedOriginHostMatch(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(statusWantFmt, rec.Code, http.StatusOK)
 	}
 	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://foo.example.com:8443" {
 		t.Fatalf("allow origin = %q, want %q", got, "https://foo.example.com:8443")
@@ -69,7 +76,7 @@ func TestRouterRejectsWildcardBypassOrigin(t *testing.T) {
 	router := &api.Router{}
 	router.SetAllowedOrigins([]string{"*.example.com"})
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL, nil)
 	req.Header.Set("Origin", "https://evilexample.com")
 	rec := httptest.NewRecorder()
 
@@ -92,14 +99,14 @@ func TestRouterRejectsInvalidStreamID(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/stream/bad/status", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/api/v1/stream/bad/status", nil)
 	req.SetPathValue("id", "bad")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf(statusWantFmt, rec.Code, http.StatusBadRequest)
 	}
 	if called {
 		t.Fatalf("handler should not be called for invalid stream id")
@@ -113,7 +120,7 @@ func TestStaticHTMLUsesNoStoreCacheControl(t *testing.T) {
 
 	h := router.SetupRoutes()
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -121,7 +128,7 @@ func TestStaticHTMLUsesNoStoreCacheControl(t *testing.T) {
 		t.Fatalf("cache-control for / = %q, want %q", got, "no-store")
 	}
 
-	req = httptest.NewRequest(http.MethodGet, "http://example.com/download.html", nil)
+	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+"/download.html", nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -136,7 +143,7 @@ func TestStaticJSDoesNotForceNoStore(t *testing.T) {
 	router := api.NewRouter(handler, config.DefaultConfig())
 
 	h := router.SetupRoutes()
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/app.js", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/app.js", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -150,12 +157,12 @@ func TestSecurityHeadersMiddlewareSetsCSP(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(statusWantFmt, rec.Code, http.StatusOK)
 	}
 
 	csp := rec.Header().Get("Content-Security-Policy")
@@ -186,28 +193,28 @@ func TestRateLimitSkipPathsAndStreamPathBehavior(t *testing.T) {
 	})
 	h := router.SetupRoutes()
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/version", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/api/v1/version", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("first version request status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf("first version request "+statusWantFmt, rec.Code, http.StatusOK)
 	}
 
-	req = httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/ping", nil)
+	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+"/api/v1/ping", nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code == http.StatusTooManyRequests {
 		t.Fatalf("ping endpoint should bypass rate limit")
 	}
 
-	req = httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/download", nil)
+	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+"/api/v1/download", nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code == http.StatusTooManyRequests {
 		t.Fatalf("download endpoint should bypass rate limit")
 	}
 
-	req = httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/upload", strings.NewReader("x"))
+	req = httptest.NewRequest(http.MethodPost, exampleBaseURL+"/api/v1/upload", strings.NewReader("x"))
 	req.Header.Set("Content-Type", "application/octet-stream")
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -215,7 +222,7 @@ func TestRateLimitSkipPathsAndStreamPathBehavior(t *testing.T) {
 		t.Fatalf("upload endpoint should bypass rate limit")
 	}
 
-	req = httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/stream/550e8400-e29b-41d4-a716-446655440000/stream", nil)
+	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+"/api/v1/stream/550e8400-e29b-41d4-a716-446655440000/stream", nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusTooManyRequests {
@@ -237,12 +244,12 @@ func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
 
 	h := router.SetupRoutes()
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/results/abc12345", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+resultsPagePath, nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(statusWantFmt, rec.Code, http.StatusOK)
 	}
 	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
 		t.Fatalf("cache-control = %q, want %q", got, "no-store")
@@ -266,12 +273,12 @@ func TestResultsPageRouteRejectsInvalidID(t *testing.T) {
 	router.SetResultsHandler(results.NewHandler(store))
 
 	h := router.SetupRoutes()
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/results/not-valid-id", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/results/not-valid-id", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+		t.Fatalf(statusWantFmt, rec.Code, http.StatusNotFound)
 	}
 }
 
@@ -285,18 +292,18 @@ func TestRegistryRoutesRateLimited(t *testing.T) {
 	router.SetRateLimiter(cfg)
 	h := router.SetupRoutes(testRegistryRegistrar{})
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/registry/health", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+registryHealthAPI, nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("first registry request status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf("first registry request "+statusWantFmt, rec.Code, http.StatusOK)
 	}
 
-	req = httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/registry/health", nil)
+	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+registryHealthAPI, nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusTooManyRequests {
-		t.Fatalf("second registry request status = %d, want %d", rec.Code, http.StatusTooManyRequests)
+		t.Fatalf("second registry request "+statusWantFmt, rec.Code, http.StatusTooManyRequests)
 	}
 }
 
@@ -317,18 +324,18 @@ func TestResultsPageRouteRateLimited(t *testing.T) {
 	router.SetResultsHandler(results.NewHandler(store))
 	h := router.SetupRoutes()
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/results/abc12345", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+resultsPagePath, nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("first results page status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf("first results page "+statusWantFmt, rec.Code, http.StatusOK)
 	}
 
-	req = httptest.NewRequest(http.MethodGet, "http://example.com/results/abc12345", nil)
+	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+resultsPagePath, nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusTooManyRequests {
-		t.Fatalf("second results page status = %d, want %d", rec.Code, http.StatusTooManyRequests)
+		t.Fatalf("second results page "+statusWantFmt, rec.Code, http.StatusTooManyRequests)
 	}
 }
 
@@ -338,14 +345,14 @@ func TestRouterStaticFileServerAllowlist(t *testing.T) {
 	router := api.NewRouter(handler, config.DefaultConfig())
 	h := router.SetupRoutes()
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/embed.go", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/embed.go", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("embed.go should be denied by allowlist, got %d", rec.Code)
 	}
 
-	req = httptest.NewRequest(http.MethodGet, "http://example.com/skill.html", nil)
+	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+"/skill.html", nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -372,7 +379,7 @@ func TestRouterStaticFileServerAllowlistServesFontsFromWebRoot(t *testing.T) {
 	router.SetWebRoot(webRoot)
 
 	h := router.SetupRoutes()
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/fonts/dm-sans-latin.woff2", nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/fonts/dm-sans-latin.woff2", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -398,11 +405,11 @@ func TestCriticalRoutesRespondOK(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, "http://example.com"+tt.path, nil)
+			req := httptest.NewRequest(tt.method, exampleBaseURL+tt.path, nil)
 			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, req)
 			if rec.Code != http.StatusOK {
-				t.Fatalf("%s %s status = %d, want %d", tt.method, tt.path, rec.Code, http.StatusOK)
+				t.Fatalf("%s %s "+statusWantFmt, tt.method, tt.path, rec.Code, http.StatusOK)
 			}
 		})
 	}

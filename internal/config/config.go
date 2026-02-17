@@ -370,20 +370,31 @@ func (c *Config) validatePorts() error {
 	if err != nil || httpPort < 1 || httpPort > 65535 {
 		return fmt.Errorf("invalid port %q: must be 1-65535", c.Port)
 	}
-	if c.TCPTestPort <= 0 || c.TCPTestPort > 65535 {
-		return fmt.Errorf("invalid TCP test port: %d", c.TCPTestPort)
+	if err := validateTestPort("TCP", c.TCPTestPort); err != nil {
+		return err
 	}
-	if c.UDPTestPort <= 0 || c.UDPTestPort > 65535 {
-		return fmt.Errorf("invalid UDP test port: %d", c.UDPTestPort)
+	if err := validateTestPort("UDP", c.UDPTestPort); err != nil {
+		return err
 	}
-	if c.TCPTestPort == c.UDPTestPort {
+	return validatePortCollisions(c.Port, httpPort, c.TCPTestPort, c.UDPTestPort)
+}
+
+func validateTestPort(name string, port int) error {
+	if port <= 0 || port > 65535 {
+		return fmt.Errorf("invalid %s test port: %d", name, port)
+	}
+	return nil
+}
+
+func validatePortCollisions(httpPortRaw string, httpPort, tcpPort, udpPort int) error {
+	if tcpPort == udpPort {
 		return fmt.Errorf("TCP and UDP test ports cannot be the same")
 	}
-	if httpPort == c.TCPTestPort {
-		return fmt.Errorf("HTTP port (%s) and TCP test port (%d) cannot be the same", c.Port, c.TCPTestPort)
+	if httpPort == tcpPort {
+		return fmt.Errorf("HTTP port (%s) and TCP test port (%d) cannot be the same", httpPortRaw, tcpPort)
 	}
-	if httpPort == c.UDPTestPort {
-		return fmt.Errorf("HTTP port (%s) and UDP test port (%d) cannot be the same", c.Port, c.UDPTestPort)
+	if httpPort == udpPort {
+		return fmt.Errorf("HTTP port (%s) and UDP test port (%d) cannot be the same", httpPortRaw, udpPort)
 	}
 	return nil
 }

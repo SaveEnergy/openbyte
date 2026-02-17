@@ -15,6 +15,14 @@ import (
 	"github.com/saveenergy/openbyte/internal/api"
 )
 
+const (
+	speedtestStatusFmt   = "status = %d, want %d"
+	octetStreamType      = "application/octet-stream"
+	downloadEndpointBase = "http://example.com/api/v1/download"
+	uploadEndpoint       = "http://example.com/api/v1/upload"
+	pingEndpoint         = "http://example.com/api/v1/ping"
+)
+
 // signalWriter wraps httptest.ResponseRecorder and signals a channel on first Write,
 // indicating the handler has started (and incremented its concurrency counter).
 type signalWriter struct {
@@ -51,17 +59,17 @@ func TestSpeedTestDownloadWritesData(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	t.Cleanup(cancel)
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/download?duration=1&chunk=65536", nil)
+	req := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?duration=1&chunk=65536", nil)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
 	handler.Download(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusOK)
 	}
-	if got := rec.Header().Get("Content-Type"); got != "application/octet-stream" {
-		t.Fatalf("content-type = %q, want %q", got, "application/octet-stream")
+	if got := rec.Header().Get("Content-Type"); got != octetStreamType {
+		t.Fatalf("content-type = %q, want %q", got, octetStreamType)
 	}
 	if got := rec.Header().Get("Cache-Control"); got == "" {
 		t.Fatalf("cache-control header missing")
@@ -75,14 +83,14 @@ func TestSpeedTestUploadReportsBytes(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 
 	payload := bytes.Repeat([]byte("a"), 256*1024)
-	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/upload", bytes.NewReader(payload))
-	req.Header.Set("Content-Type", "application/octet-stream")
+	req := httptest.NewRequest(http.MethodPost, uploadEndpoint, bytes.NewReader(payload))
+	req.Header.Set("Content-Type", octetStreamType)
 	rec := httptest.NewRecorder()
 
 	handler.Upload(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusOK)
 	}
 
 	var resp struct {
@@ -183,8 +191,7 @@ func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 
 		go func(ch chan struct{}) {
 			defer func() { done <- struct{}{} }()
-			req := httptest.NewRequest(http.MethodGet,
-				"http://example.com/api/v1/download?duration=60&chunk=65536", nil)
+			req := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?duration=60&chunk=65536", nil)
 			req = req.WithContext(ctx)
 			sw := &signalWriter{ResponseRecorder: httptest.NewRecorder(), started: ch}
 			handler.Download(sw, req)
@@ -201,8 +208,7 @@ func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 	}
 
 	// New download should get 503
-	reqOver := httptest.NewRequest(http.MethodGet,
-		"http://example.com/api/v1/download?duration=1&chunk=65536", nil)
+	reqOver := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?duration=1&chunk=65536", nil)
 	recOver := httptest.NewRecorder()
 	handler.Download(recOver, reqOver)
 	if recOver.Code != http.StatusServiceUnavailable {
@@ -220,8 +226,7 @@ func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 	// After cancellation, new download should succeed
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	t.Cleanup(cancel)
-	reqAfter := httptest.NewRequest(http.MethodGet,
-		"http://example.com/api/v1/download?duration=1&chunk=65536", nil)
+	reqAfter := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?duration=1&chunk=65536", nil)
 	reqAfter = reqAfter.WithContext(ctx)
 	recAfter := httptest.NewRecorder()
 	handler.Download(recAfter, reqAfter)
@@ -234,14 +239,14 @@ func TestDownloadAtCapacityDrainsBodyBefore503(t *testing.T) {
 	handler := api.NewSpeedTestHandler(0, 300)
 
 	tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 4096)}
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/download?duration=1&chunk=65536", nil)
+	req := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?duration=1&chunk=65536", nil)
 	req.Body = tb
 	rec := httptest.NewRecorder()
 
 	handler.Download(rec, req)
 
 	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusServiceUnavailable)
 	}
 	if tb.reads == 0 {
 		t.Fatalf("expected request body to be drained before returning 503")
@@ -255,8 +260,8 @@ func TestDownloadValidationRejectsDrainBody(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 
 	tests := []string{
-		"http://example.com/api/v1/download?duration=0",
-		"http://example.com/api/v1/download?chunk=bad",
+		downloadEndpointBase + "?duration=0",
+		downloadEndpointBase + "?chunk=bad",
 	}
 	for _, u := range tests {
 		tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 1024)}
@@ -281,28 +286,28 @@ func TestDownloadValidationRejectsDrainBody(t *testing.T) {
 func TestSpeedTestUploadHandlesReadError(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 
-	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/upload", nil)
+	req := httptest.NewRequest(http.MethodPost, uploadEndpoint, nil)
 	req.Body = io.NopCloser(&errReader{})
 	rec := httptest.NewRecorder()
 
 	handler.Upload(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusInternalServerError)
 	}
 }
 
 func TestSpeedTestUploadReadErrorDrainsBody(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 	tb := &failingTrackingBody{}
-	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/upload", nil)
+	req := httptest.NewRequest(http.MethodPost, uploadEndpoint, nil)
 	req.Body = tb
 	rec := httptest.NewRecorder()
 
 	handler.Upload(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusInternalServerError)
 	}
 	if tb.reads == 0 {
 		t.Fatal("expected upload body to be read")
@@ -335,8 +340,7 @@ func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 				pw.Close()
 			}()
 			body := &signalReader{ReadCloser: io.NopCloser(pr), started: ch}
-			req := httptest.NewRequest(http.MethodPost,
-				"http://example.com/api/v1/upload", body)
+			req := httptest.NewRequest(http.MethodPost, uploadEndpoint, body)
 			rec := httptest.NewRecorder()
 			handler.Upload(rec, req)
 		}(started[i])
@@ -352,9 +356,7 @@ func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 	}
 
 	// New upload should get 503
-	reqOver := httptest.NewRequest(http.MethodPost,
-		"http://example.com/api/v1/upload",
-		bytes.NewReader([]byte("data")))
+	reqOver := httptest.NewRequest(http.MethodPost, uploadEndpoint, bytes.NewReader([]byte("data")))
 	recOver := httptest.NewRecorder()
 	handler.Upload(recOver, reqOver)
 	if recOver.Code != http.StatusServiceUnavailable {
@@ -370,9 +372,7 @@ func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 	}
 
 	// After cancellation, new upload should succeed
-	reqAfter := httptest.NewRequest(http.MethodPost,
-		"http://example.com/api/v1/upload",
-		bytes.NewReader(bytes.Repeat([]byte("x"), 1024)))
+	reqAfter := httptest.NewRequest(http.MethodPost, uploadEndpoint, bytes.NewReader(bytes.Repeat([]byte("x"), 1024)))
 	recAfter := httptest.NewRecorder()
 	handler.Upload(recAfter, reqAfter)
 	if recAfter.Code != http.StatusOK {
@@ -384,14 +384,14 @@ func TestUploadAtCapacityDrainsBodyBefore503(t *testing.T) {
 	handler := api.NewSpeedTestHandler(0, 300)
 
 	tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 4096)}
-	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/upload", nil)
+	req := httptest.NewRequest(http.MethodPost, uploadEndpoint, nil)
 	req.Body = tb
 	rec := httptest.NewRecorder()
 
 	handler.Upload(rec, req)
 
 	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
+		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusServiceUnavailable)
 	}
 	if tb.reads == 0 {
 		t.Fatalf("expected request body to be drained before returning 503")
@@ -404,7 +404,7 @@ func TestUploadAtCapacityDrainsBodyBefore503(t *testing.T) {
 func TestUploadRespectsReadDeadlineWhenBodyStalls(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 1)
 	body := &blockingUploadBody{closed: make(chan struct{})}
-	req := httptest.NewRequest(http.MethodPost, "http://example.com/api/v1/upload", nil)
+	req := httptest.NewRequest(http.MethodPost, uploadEndpoint, nil)
 	req.Body = body
 	rec := httptest.NewRecorder()
 
@@ -413,7 +413,7 @@ func TestUploadRespectsReadDeadlineWhenBodyStalls(t *testing.T) {
 	elapsed := time.Since(start)
 
 	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusInternalServerError)
 	}
 	if elapsed > 2*time.Second {
 		t.Fatalf("upload read deadline not enforced, elapsed=%v", elapsed)
@@ -428,8 +428,7 @@ func TestDownloadRespectsMaxDuration(t *testing.T) {
 	t.Cleanup(cancel)
 
 	// duration=5 (within max) should be accepted
-	req := httptest.NewRequest(http.MethodGet,
-		"http://example.com/api/v1/download?duration=5&chunk=65536", nil)
+	req := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?duration=5&chunk=65536", nil)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 	handler.Download(rec, req)
@@ -438,8 +437,7 @@ func TestDownloadRespectsMaxDuration(t *testing.T) {
 	}
 
 	// duration=10 (above max=5) should be rejected with 400
-	req2 := httptest.NewRequest(http.MethodGet,
-		"http://example.com/api/v1/download?duration=10&chunk=65536", nil)
+	req2 := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?duration=10&chunk=65536", nil)
 	rec2 := httptest.NewRecorder()
 	handler.Download(rec2, req2)
 	if rec2.Code != http.StatusBadRequest {
@@ -447,8 +445,7 @@ func TestDownloadRespectsMaxDuration(t *testing.T) {
 	}
 
 	// invalid chunk should be rejected with 400
-	req3 := httptest.NewRequest(http.MethodGet,
-		"http://example.com/api/v1/download?chunk=abc", nil)
+	req3 := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?chunk=abc", nil)
 	rec3 := httptest.NewRecorder()
 	handler.Download(rec3, req3)
 	if rec3.Code != http.StatusBadRequest {
@@ -458,14 +455,14 @@ func TestDownloadRespectsMaxDuration(t *testing.T) {
 
 func TestSpeedTestHandlerPingResponseShape(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/ping", nil)
+	req := httptest.NewRequest(http.MethodGet, pingEndpoint, nil)
 	req.RemoteAddr = "203.0.113.10:12345"
 	rec := httptest.NewRecorder()
 
 	handler.Ping(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusOK)
 	}
 	if got := rec.Header().Get("Content-Type"); got != "application/json" {
 		t.Fatalf("content-type = %q, want %q", got, "application/json")
@@ -494,7 +491,7 @@ func TestSpeedTestHandlerPingResponseShape(t *testing.T) {
 
 func TestSpeedTestHandlerPingNilResolverFallback(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/ping", nil)
+	req := httptest.NewRequest(http.MethodGet, pingEndpoint, nil)
 	req.RemoteAddr = "[2001:db8::1]:4242"
 	rec := httptest.NewRecorder()
 
@@ -515,14 +512,14 @@ func TestSpeedTestHandlerPingNilResolverFallback(t *testing.T) {
 func TestSpeedTestHandlerPingDrainsUnexpectedBody(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 	tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 1024)}
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/api/v1/ping", nil)
+	req := httptest.NewRequest(http.MethodGet, pingEndpoint, nil)
 	req.Body = tb
 	rec := httptest.NewRecorder()
 
 	handler.Ping(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusOK)
 	}
 	if tb.reads == 0 {
 		t.Fatal("expected body to be drained")

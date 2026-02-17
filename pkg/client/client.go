@@ -133,17 +133,9 @@ type SpeedTestResult struct {
 
 // SpeedTest runs a full speed test with configurable duration and direction.
 func (c *Client) SpeedTest(ctx context.Context, opts SpeedTestOptions) (*SpeedTestResult, error) {
-	if opts.Direction == "" {
-		opts.Direction = "download"
-	}
-	if opts.Duration < 1 {
-		opts.Duration = 10
-	}
-	if opts.Duration > 300 {
-		opts.Duration = 300
-	}
-	if opts.Direction != "download" && opts.Direction != "upload" {
-		return nil, fmt.Errorf("invalid direction: %s (must be download or upload)", opts.Direction)
+	opts, err := normalizeSpeedTestOptions(opts)
+	if err != nil {
+		return nil, err
 	}
 
 	testCtx, cancel := context.WithTimeout(ctx, time.Duration(opts.Duration+15)*time.Second)
@@ -162,12 +154,7 @@ func (c *Client) SpeedTest(ctx context.Context, opts SpeedTestOptions) (*SpeedTe
 	var throughput float64
 	var totalBytes int64
 
-	var throughputOK bool
-	if opts.Direction == "download" {
-		throughput, totalBytes, throughputOK = c.downloadMeasured(testCtx, opts.Duration)
-	} else {
-		throughput, totalBytes, throughputOK = c.uploadMeasured(testCtx, opts.Duration)
-	}
+	throughput, totalBytes, throughputOK := c.measureThroughput(testCtx, opts)
 	if !throughputOK {
 		if opts.Direction == "download" {
 			return nil, ErrDownloadMeasurementFailed
@@ -176,12 +163,7 @@ func (c *Client) SpeedTest(ctx context.Context, opts SpeedTestOptions) (*SpeedTe
 	}
 	elapsed := time.Since(start)
 
-	var downMbps, upMbps float64
-	if opts.Direction == "download" {
-		downMbps = throughput
-	} else {
-		upMbps = throughput
-	}
+	downMbps, upMbps := splitThroughputByDirection(opts.Direction, throughput)
 
 	interp := diagnostic.Interpret(diagnostic.Params{
 		DownloadMbps: downMbps,
@@ -201,6 +183,36 @@ func (c *Client) SpeedTest(ctx context.Context, opts SpeedTestOptions) (*SpeedTe
 		DurationSec:    elapsed.Seconds(),
 		Interpretation: interp,
 	}, nil
+}
+
+func normalizeSpeedTestOptions(opts SpeedTestOptions) (SpeedTestOptions, error) {
+	if opts.Direction == "" {
+		opts.Direction = "download"
+	}
+	if opts.Duration < 1 {
+		opts.Duration = 10
+	}
+	if opts.Duration > 300 {
+		opts.Duration = 300
+	}
+	if opts.Direction != "download" && opts.Direction != "upload" {
+		return SpeedTestOptions{}, fmt.Errorf("invalid direction: %s (must be download or upload)", opts.Direction)
+	}
+	return opts, nil
+}
+
+func (c *Client) measureThroughput(ctx context.Context, opts SpeedTestOptions) (float64, int64, bool) {
+	if opts.Direction == "download" {
+		return c.downloadMeasured(ctx, opts.Duration)
+	}
+	return c.uploadMeasured(ctx, opts.Duration)
+}
+
+func splitThroughputByDirection(direction string, throughput float64) (downMbps, upMbps float64) {
+	if direction == "download" {
+		return throughput, 0
+	}
+	return 0, throughput
 }
 
 // DiagnoseResult is the output of a comprehensive network diagnosis.
@@ -302,16 +314,11 @@ func (c *Client) measureLatency(ctx context.Context, samples int) (avgMs, jitter
 		if c.apiKey != "" {
 			req.Header.Set("Authorization", "Bearer "+c.apiKey)
 		}
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
+		latency, sampleOK := c.latencySample(req, start)
+		if !sampleOK {
 			continue
 		}
-		io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			continue
-		}
-		latencies = append(latencies, time.Since(start))
+		latencies = append(latencies, latency)
 	}
 
 	if len(latencies) < 2 {
@@ -337,6 +344,19 @@ func (c *Client) measureLatency(ctx context.Context, samples int) (avgMs, jitter
 	}
 
 	return avgMs, jitterMs, true
+}
+
+func (c *Client) latencySample(req *http.Request, start time.Time) (time.Duration, bool) {
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, false
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return 0, false
+	}
+	return time.Since(start), true
 }
 
 func (c *Client) downloadBurst(ctx context.Context, durationSec int) (float64, bool) {

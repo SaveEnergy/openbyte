@@ -84,27 +84,33 @@ func (rl *RateLimiter) allowGlobal() bool {
 	defer rl.globalMu.Unlock()
 
 	now := time.Now()
+	rl.refillGlobalTokens(now)
+	return rl.consumeGlobalToken()
+}
+
+func (rl *RateLimiter) refillGlobalTokens(now time.Time) {
 	elapsed := now.Sub(rl.globalLastRefill)
-
-	if elapsed >= time.Second {
-		tokensToAdd := int(elapsed.Seconds() * float64(rl.config.GlobalRateLimit) / 60.0)
-		if tokensToAdd > 0 {
-			rl.globalTokens += tokensToAdd
-			if rl.globalTokens > rl.config.GlobalRateLimit {
-				rl.globalTokens = rl.config.GlobalRateLimit
-			}
-			// Advance only by time consumed to preserve fractional remainder
-			consumed := time.Duration(float64(tokensToAdd) / float64(rl.config.GlobalRateLimit) * 60.0 * float64(time.Second))
-			rl.globalLastRefill = rl.globalLastRefill.Add(consumed)
-		}
+	if elapsed < time.Second {
+		return
 	}
-
-	if rl.globalTokens > 0 {
-		rl.globalTokens--
-		return true
+	tokensToAdd := int(elapsed.Seconds() * float64(rl.config.GlobalRateLimit) / 60.0)
+	if tokensToAdd <= 0 {
+		return
 	}
+	rl.globalTokens += tokensToAdd
+	if rl.globalTokens > rl.config.GlobalRateLimit {
+		rl.globalTokens = rl.config.GlobalRateLimit
+	}
+	consumed := time.Duration(float64(tokensToAdd) / float64(rl.config.GlobalRateLimit) * 60.0 * float64(time.Second))
+	rl.globalLastRefill = rl.globalLastRefill.Add(consumed)
+}
 
-	return false
+func (rl *RateLimiter) consumeGlobalToken() bool {
+	if rl.globalTokens <= 0 {
+		return false
+	}
+	rl.globalTokens--
+	return true
 }
 
 func (rl *RateLimiter) refundGlobal() {
@@ -117,6 +123,25 @@ func (rl *RateLimiter) refundGlobal() {
 
 func (rl *RateLimiter) allowIP(ip string) bool {
 	now := time.Now()
+	limit, shouldCleanup, ok := rl.getOrCreateIPLimit(ip, now)
+	if !ok {
+		return false
+	}
+	if shouldCleanup {
+		rl.cleanupExpiredIPLimits(now)
+	}
+
+	limit.mu.Lock()
+	defer limit.mu.Unlock()
+	rl.refillIPTokens(limit, now)
+	if limit.tokens <= 0 {
+		return false
+	}
+	limit.tokens--
+	return true
+}
+
+func (rl *RateLimiter) getOrCreateIPLimit(ip string, now time.Time) (*IPLimit, bool, bool) {
 	shouldCleanup := false
 	rl.ipMu.Lock()
 	if rl.cleanupInterval > 0 && rl.ipLimitTTL > 0 && now.Sub(rl.lastCleanup) >= rl.cleanupInterval {
@@ -130,7 +155,7 @@ func (rl *RateLimiter) allowIP(ip string) bool {
 			if shouldCleanup {
 				rl.cleanupExpiredIPLimits(now)
 			}
-			return false
+			return nil, shouldCleanup, false
 		}
 		limit = &IPLimit{
 			tokens:     rl.config.RateLimitPerIP,
@@ -139,33 +164,24 @@ func (rl *RateLimiter) allowIP(ip string) bool {
 		rl.ipLimits[ip] = limit
 	}
 	rl.ipMu.Unlock()
-	if shouldCleanup {
-		rl.cleanupExpiredIPLimits(now)
-	}
+	return limit, shouldCleanup, true
+}
 
-	limit.mu.Lock()
-	defer limit.mu.Unlock()
-
+func (rl *RateLimiter) refillIPTokens(limit *IPLimit, now time.Time) {
 	elapsed := now.Sub(limit.lastRefill)
-
-	if elapsed >= time.Second {
-		tokensToAdd := int(elapsed.Seconds() * float64(rl.config.RateLimitPerIP) / 60.0)
-		if tokensToAdd > 0 {
-			limit.tokens += tokensToAdd
-			if limit.tokens > rl.config.RateLimitPerIP {
-				limit.tokens = rl.config.RateLimitPerIP
-			}
-			consumed := time.Duration(float64(tokensToAdd) / float64(rl.config.RateLimitPerIP) * 60.0 * float64(time.Second))
-			limit.lastRefill = limit.lastRefill.Add(consumed)
-		}
+	if elapsed < time.Second {
+		return
 	}
-
-	if limit.tokens > 0 {
-		limit.tokens--
-		return true
+	tokensToAdd := int(elapsed.Seconds() * float64(rl.config.RateLimitPerIP) / 60.0)
+	if tokensToAdd <= 0 {
+		return
 	}
-
-	return false
+	limit.tokens += tokensToAdd
+	if limit.tokens > rl.config.RateLimitPerIP {
+		limit.tokens = rl.config.RateLimitPerIP
+	}
+	consumed := time.Duration(float64(tokensToAdd) / float64(rl.config.RateLimitPerIP) * 60.0 * float64(time.Second))
+	limit.lastRefill = limit.lastRefill.Add(consumed)
 }
 
 func (rl *RateLimiter) cleanupExpiredIPLimits(now time.Time) {

@@ -87,25 +87,7 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 	for {
 		select {
 		case err := <-doneCh:
-			lastMetrics = engine.GetMetrics()
-			results := buildResults(streamResp.StreamID, config, lastMetrics, startTime)
-			formatter.FormatComplete(results)
-			if ferr := formatterLastError(formatter); ferr != nil {
-				return fmt.Errorf("formatter output failed: %w", ferr)
-			}
-
-			completeErr := completeStream(ctx, config, streamResp.StreamID, lastMetrics)
-			if completeErr != nil {
-				if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
-					return fmt.Errorf("%v (and completion report failed: %v)", err, completeErr)
-				}
-				return fmt.Errorf("failed to report completion: %w", completeErr)
-			}
-
-			if err != nil && !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
-				return err
-			}
-			return nil
+			return handleClientTestCompletion(ctx, config, formatter, streamResp.StreamID, startTime, engine.GetMetrics(), err)
 
 		case <-metricsTicker.C:
 			lastMetrics = engine.GetMetrics()
@@ -121,23 +103,7 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 
 			formatter.FormatProgress(progress, elapsed.Seconds(), remaining)
 
-			m := &types.Metrics{
-				ThroughputMbps:    lastMetrics.ThroughputMbps,
-				ThroughputAvgMbps: lastMetrics.ThroughputMbps,
-				BytesTransferred:  lastMetrics.BytesTransferred,
-				Latency: types.LatencyMetrics{
-					MinMs: lastMetrics.Latency.MinMs,
-					MaxMs: lastMetrics.Latency.MaxMs,
-					AvgMs: lastMetrics.Latency.AvgMs,
-					P50Ms: lastMetrics.Latency.P50Ms,
-					P95Ms: lastMetrics.Latency.P95Ms,
-					P99Ms: lastMetrics.Latency.P99Ms,
-					Count: lastMetrics.Latency.Count,
-				},
-				JitterMs:  lastMetrics.JitterMs,
-				Timestamp: time.Now(),
-			}
-			formatter.FormatMetrics(m)
+			formatter.FormatMetrics(engineMetricsToTypesMetrics(lastMetrics))
 			if ferr := formatterLastError(formatter); ferr != nil {
 				cancel()
 				return fmt.Errorf("formatter output failed: %w", ferr)
@@ -151,6 +117,35 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 			return ctx.Err()
 		}
 	}
+}
+
+func handleClientTestCompletion(
+	ctx context.Context,
+	config *Config,
+	formatter OutputFormatter,
+	streamID string,
+	startTime time.Time,
+	metrics EngineMetrics,
+	runErr error,
+) error {
+	results := buildResults(streamID, config, metrics, startTime)
+	formatter.FormatComplete(results)
+	if ferr := formatterLastError(formatter); ferr != nil {
+		return fmt.Errorf("formatter output failed: %w", ferr)
+	}
+
+	completeErr := completeStream(ctx, config, streamID, metrics)
+	if completeErr != nil {
+		if runErr != nil && !errors.Is(runErr, context.DeadlineExceeded) && !errors.Is(runErr, context.Canceled) {
+			return fmt.Errorf("%v (and completion report failed: %v)", runErr, completeErr)
+		}
+		return fmt.Errorf("failed to report completion: %w", completeErr)
+	}
+
+	if runErr != nil && !errors.Is(runErr, context.DeadlineExceeded) && !errors.Is(runErr, context.Canceled) {
+		return runErr
+	}
+	return nil
 }
 
 func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatter) error {
@@ -246,23 +241,7 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 
 			formatter.FormatProgress(progress, elapsed.Seconds(), remaining)
 
-			m := &types.Metrics{
-				ThroughputMbps:    metrics.ThroughputMbps,
-				ThroughputAvgMbps: metrics.ThroughputMbps,
-				BytesTransferred:  metrics.BytesTransferred,
-				Latency: types.LatencyMetrics{
-					MinMs: metrics.Latency.MinMs,
-					MaxMs: metrics.Latency.MaxMs,
-					AvgMs: metrics.Latency.AvgMs,
-					P50Ms: metrics.Latency.P50Ms,
-					P95Ms: metrics.Latency.P95Ms,
-					P99Ms: metrics.Latency.P99Ms,
-					Count: metrics.Latency.Count,
-				},
-				JitterMs:  metrics.JitterMs,
-				Timestamp: time.Now(),
-			}
-			formatter.FormatMetrics(m)
+			formatter.FormatMetrics(engineMetricsToTypesMetrics(metrics))
 			if ferr := formatterLastError(formatter); ferr != nil {
 				cancel()
 				return fmt.Errorf("formatter output failed: %w", ferr)
@@ -272,6 +251,25 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 			cancel()
 			return ctx.Err()
 		}
+	}
+}
+
+func engineMetricsToTypesMetrics(metrics EngineMetrics) *types.Metrics {
+	return &types.Metrics{
+		ThroughputMbps:    metrics.ThroughputMbps,
+		ThroughputAvgMbps: metrics.ThroughputMbps,
+		BytesTransferred:  metrics.BytesTransferred,
+		Latency: types.LatencyMetrics{
+			MinMs: metrics.Latency.MinMs,
+			MaxMs: metrics.Latency.MaxMs,
+			AvgMs: metrics.Latency.AvgMs,
+			P50Ms: metrics.Latency.P50Ms,
+			P95Ms: metrics.Latency.P95Ms,
+			P99Ms: metrics.Latency.P99Ms,
+			Count: metrics.Latency.Count,
+		},
+		JitterMs:  metrics.JitterMs,
+		Timestamp: time.Now(),
 	}
 }
 

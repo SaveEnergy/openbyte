@@ -69,30 +69,12 @@ func Run(args []string, version string) int {
 		return exitSuccess
 	}
 
-	if timeout < minTimeoutSeconds || timeout > maxTimeoutSeconds {
-		fmt.Fprintf(os.Stderr, "openbyte check: timeout must be between %d and %d seconds\n", minTimeoutSeconds, maxTimeoutSeconds)
+	resolvedURL, usageErr := resolveCheckServerURL(serverURL, flagSet.Args(), timeout)
+	if usageErr != nil {
+		fmt.Fprintln(os.Stderr, usageErr)
 		return exitUsage
 	}
-
-	// Positional arg = server URL
-	rest := flagSet.Args()
-	if len(rest) > 1 {
-		fmt.Fprintln(os.Stderr, "openbyte check: too many positional arguments")
-		return exitUsage
-	}
-	if len(rest) > 0 {
-		arg := rest[0]
-		if isValidServerURL(arg) {
-			serverURL = arg
-		} else {
-			fmt.Fprintf(os.Stderr, "openbyte check: invalid server URL: %q\n", arg)
-			return exitUsage
-		}
-	}
-	if !isValidServerURL(serverURL) {
-		fmt.Fprintf(os.Stderr, "openbyte check: invalid server URL: %q\n", serverURL)
-		return exitUsage
-	}
+	serverURL = resolvedURL
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
@@ -100,28 +82,11 @@ func Run(args []string, version string) int {
 	result, err := runCheckFn(ctx, serverURL, apiKey)
 
 	if err != nil {
-		if jsonOut {
-			errResp := map[string]any{
-				"schema_version": "1.0",
-				"error":          true,
-				"code":           "check_failed",
-				"message":        err.Error(),
-			}
-			if encErr := json.NewEncoder(os.Stdout).Encode(errResp); encErr != nil {
-				fmt.Fprintf(os.Stderr, "openbyte check: json encode error: %v\n", encErr)
-			}
-		} else {
-			fmt.Fprintf(os.Stderr, "openbyte check: error: %v\n", err)
-		}
+		writeCheckError(jsonOut, err)
 		return exitFailure
 	}
-	if jsonOut {
-		if encErr := json.NewEncoder(os.Stdout).Encode(result); encErr != nil {
-			fmt.Fprintf(os.Stderr, "openbyte check: json encode error: %v\n", encErr)
-			return exitFailure
-		}
-	} else {
-		printHuman(result)
+	if outputErr := writeCheckResult(jsonOut, result); outputErr != nil {
+		return exitFailure
 	}
 
 	// Exit 1 if grade is D or F (degraded)
@@ -129,6 +94,54 @@ func Run(args []string, version string) int {
 		return exitFailure
 	}
 	return exitSuccess
+}
+
+func resolveCheckServerURL(currentURL string, rest []string, timeout int) (string, error) {
+	if timeout < minTimeoutSeconds || timeout > maxTimeoutSeconds {
+		return "", fmt.Errorf("openbyte check: timeout must be between %d and %d seconds", minTimeoutSeconds, maxTimeoutSeconds)
+	}
+	if len(rest) > 1 {
+		return "", fmt.Errorf("openbyte check: too many positional arguments")
+	}
+	if len(rest) == 1 {
+		arg := rest[0]
+		if !isValidServerURL(arg) {
+			return "", fmt.Errorf("openbyte check: invalid server URL: %q", arg)
+		}
+		currentURL = arg
+	}
+	if !isValidServerURL(currentURL) {
+		return "", fmt.Errorf("openbyte check: invalid server URL: %q", currentURL)
+	}
+	return currentURL, nil
+}
+
+func writeCheckError(jsonOut bool, err error) {
+	if jsonOut {
+		errResp := map[string]any{
+			"schema_version": "1.0",
+			"error":          true,
+			"code":           "check_failed",
+			"message":        err.Error(),
+		}
+		if encErr := json.NewEncoder(os.Stdout).Encode(errResp); encErr != nil {
+			fmt.Fprintf(os.Stderr, "openbyte check: json encode error: %v\n", encErr)
+		}
+		return
+	}
+	fmt.Fprintf(os.Stderr, "openbyte check: error: %v\n", err)
+}
+
+func writeCheckResult(jsonOut bool, result *CheckResult) error {
+	if jsonOut {
+		if encErr := json.NewEncoder(os.Stdout).Encode(result); encErr != nil {
+			fmt.Fprintf(os.Stderr, "openbyte check: json encode error: %v\n", encErr)
+			return encErr
+		}
+		return nil
+	}
+	printHuman(result)
+	return nil
 }
 
 func runCheck(ctx context.Context, serverURL, apiKey string) (*CheckResult, error) {

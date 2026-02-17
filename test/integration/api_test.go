@@ -32,7 +32,7 @@ func mustStringField(t *testing.T, m map[string]any, key string) string {
 	return s
 }
 
-func TestAPI_StartStream(t *testing.T) {
+func TestAPIStartStream(t *testing.T) {
 	manager := stream.NewManager(10, 2)
 	manager.Start()
 	defer manager.Stop()
@@ -71,7 +71,7 @@ func TestAPI_StartStream(t *testing.T) {
 	_ = mustStringField(t, resp, "websocket_url")
 }
 
-func TestAPI_GetStreamStatus(t *testing.T) {
+func TestAPIGetStreamStatus(t *testing.T) {
 	manager := stream.NewManager(10, 2)
 	manager.Start()
 	defer manager.Stop()
@@ -140,7 +140,7 @@ func TestCORSBlockedOrigin(t *testing.T) {
 	}
 }
 
-func TestAPI_ResultsSaveAndGet(t *testing.T) {
+func TestAPIResultsSaveAndGet(t *testing.T) {
 	manager := stream.NewManager(10, 2)
 	manager.Start()
 	defer manager.Stop()

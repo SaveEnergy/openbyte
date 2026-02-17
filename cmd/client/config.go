@@ -39,27 +39,31 @@ type ConfigFile struct {
 }
 
 func getConfigPath() string {
-	configDir := os.Getenv("XDG_CONFIG_HOME")
+	configDir := resolvedConfigDir()
 	if configDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ""
-		}
-		configDir = filepath.Join(home, ".config")
+		return ""
 	}
 	return filepath.Join(configDir, "openbyte", "config.yaml")
 }
 
 func getLegacyConfigPath() string {
-	configDir := os.Getenv("XDG_CONFIG_HOME")
+	configDir := resolvedConfigDir()
 	if configDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ""
-		}
-		configDir = filepath.Join(home, ".config")
+		return ""
 	}
 	return filepath.Join(configDir, "obyte", "config.yaml")
+}
+
+func resolvedConfigDir() string {
+	configDir := os.Getenv("XDG_CONFIG_HOME")
+	if configDir != "" {
+		return configDir
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".config")
 }
 
 func loadConfigFile() (*ConfigFile, error) {
@@ -118,6 +122,19 @@ func resolveServerURL(configFile *ConfigFile, serverAlias string) (string, strin
 func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string]bool) *Config {
 	result := &Config{}
 
+	applyDefaults(result)
+	applyConfigFileDefaults(result, configFile, flagConfig.Server)
+
+	if os.Getenv("NO_COLOR") != "" {
+		result.NoColor = true
+	}
+
+	applyFlagOverrides(result, flagConfig, configFile, flagsSet)
+
+	return result
+}
+
+func applyDefaults(result *Config) {
 	result.ServerURL = defaultServerURL
 	result.Protocol = defaultProtocol
 	result.Direction = defaultDirection
@@ -127,66 +144,55 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 	result.ChunkSize = defaultChunkSize
 	result.Timeout = defaultTimeout
 	result.WarmUp = defaultWarmUp
+}
 
-	if configFile != nil {
-		serverURL, apiKey := resolveServerURL(configFile, flagConfig.Server)
-		if serverURL != "" {
-			result.ServerURL = serverURL
-		} else if configFile.ServerURL != "" {
-			result.ServerURL = configFile.ServerURL
-		}
-		if apiKey != "" {
-			result.APIKey = apiKey
-		} else if configFile.APIKey != "" {
-			result.APIKey = configFile.APIKey
-		}
-
-		if configFile.Protocol != "" {
-			result.Protocol = configFile.Protocol
-		}
-		if configFile.Direction != "" {
-			result.Direction = configFile.Direction
-		}
-		if configFile.Duration > 0 {
-			result.Duration = configFile.Duration
-		}
-		if configFile.Streams > 0 {
-			result.Streams = configFile.Streams
-		}
-		if configFile.PacketSize > 0 {
-			result.PacketSize = configFile.PacketSize
-		}
-		if configFile.ChunkSize > 0 {
-			result.ChunkSize = configFile.ChunkSize
-		}
-		if configFile.Timeout > 0 {
-			result.Timeout = configFile.Timeout
-		}
-		result.JSON = configFile.JSON
-		result.Plain = configFile.Plain
-		result.Verbose = configFile.Verbose
-		result.Quiet = configFile.Quiet
-		result.NoColor = configFile.NoColor
-		result.NoProgress = configFile.NoProgress
+func applyConfigFileDefaults(result *Config, configFile *ConfigFile, flagServer string) {
+	if configFile == nil {
+		return
 	}
-
-	if os.Getenv("NO_COLOR") != "" {
-		result.NoColor = true
+	serverURL, apiKey := resolveServerURL(configFile, flagServer)
+	if serverURL != "" {
+		result.ServerURL = serverURL
+	} else if configFile.ServerURL != "" {
+		result.ServerURL = configFile.ServerURL
 	}
+	if apiKey != "" {
+		result.APIKey = apiKey
+	} else if configFile.APIKey != "" {
+		result.APIKey = configFile.APIKey
+	}
+	if configFile.Protocol != "" {
+		result.Protocol = configFile.Protocol
+	}
+	if configFile.Direction != "" {
+		result.Direction = configFile.Direction
+	}
+	if configFile.Duration > 0 {
+		result.Duration = configFile.Duration
+	}
+	if configFile.Streams > 0 {
+		result.Streams = configFile.Streams
+	}
+	if configFile.PacketSize > 0 {
+		result.PacketSize = configFile.PacketSize
+	}
+	if configFile.ChunkSize > 0 {
+		result.ChunkSize = configFile.ChunkSize
+	}
+	if configFile.Timeout > 0 {
+		result.Timeout = configFile.Timeout
+	}
+	result.JSON = configFile.JSON
+	result.Plain = configFile.Plain
+	result.Verbose = configFile.Verbose
+	result.Quiet = configFile.Quiet
+	result.NoColor = configFile.NoColor
+	result.NoProgress = configFile.NoProgress
+}
 
+func applyFlagOverrides(result, flagConfig *Config, configFile *ConfigFile, flagsSet map[string]bool) {
 	if flagsSet["server"] && flagConfig.Server != "" {
-		if configFile != nil && configFile.Servers != nil {
-			if server, ok := configFile.Servers[flagConfig.Server]; ok {
-				result.ServerURL = server.URL
-				if server.APIKey != "" {
-					result.APIKey = server.APIKey
-				}
-			} else {
-				result.ServerURL = flagConfig.Server
-			}
-		} else {
-			result.ServerURL = flagConfig.Server
-		}
+		applyServerFlagOverride(result, flagConfig, configFile)
 	}
 	if flagsSet["server-url"] && flagConfig.ServerURL != "" {
 		result.ServerURL = flagConfig.ServerURL
@@ -233,18 +239,41 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 	if flagsSet["api-key"] && flagConfig.APIKey != "" {
 		result.APIKey = flagConfig.APIKey
 	}
-
 	if flagsSet["warmup"] {
 		result.WarmUp = flagConfig.WarmUp
 	}
 	if flagsSet["auto"] {
 		result.Auto = flagConfig.Auto
 	}
+}
 
-	return result
+func applyServerFlagOverride(result, flagConfig *Config, configFile *ConfigFile) {
+	if configFile == nil || configFile.Servers == nil {
+		result.ServerURL = flagConfig.Server
+		return
+	}
+	server, ok := configFile.Servers[flagConfig.Server]
+	if !ok {
+		result.ServerURL = flagConfig.Server
+		return
+	}
+	result.ServerURL = server.URL
+	if server.APIKey != "" {
+		result.APIKey = server.APIKey
+	}
 }
 
 func validateConfigFile(config *ConfigFile) error {
+	if err := validateServerURLs(config); err != nil {
+		return err
+	}
+	if err := validateProtocolAndDirection(config); err != nil {
+		return err
+	}
+	return validateNumericRanges(config)
+}
+
+func validateServerURLs(config *ConfigFile) error {
 	if config.ServerURL != "" {
 		if _, err := normalizeAndValidateServerURL(config.ServerURL); err != nil {
 			return fmt.Errorf("invalid server_url: %w", err)
@@ -258,6 +287,10 @@ func validateConfigFile(config *ConfigFile) error {
 			return fmt.Errorf("invalid server %q url: %w", alias, err)
 		}
 	}
+	return nil
+}
+
+func validateProtocolAndDirection(config *ConfigFile) error {
 	if config.Protocol != "" && config.Protocol != "tcp" && config.Protocol != "udp" && config.Protocol != "http" {
 		return fmt.Errorf("invalid protocol: %s (must be tcp, udp, or http)", config.Protocol)
 	}
@@ -267,6 +300,10 @@ func validateConfigFile(config *ConfigFile) error {
 	if config.Protocol == "http" && config.Direction == "bidirectional" {
 		return fmt.Errorf("invalid direction for http: %s (must be download or upload)", config.Direction)
 	}
+	return nil
+}
+
+func validateNumericRanges(config *ConfigFile) error {
 	if config.Duration != 0 && (config.Duration < 1 || config.Duration > 300) {
 		return fmt.Errorf("invalid duration: %d (must be 1-300 seconds)", config.Duration)
 	}

@@ -11,7 +11,7 @@ func BenchmarkDownloadChunkCopy(b *testing.B) {
 	dataLen := len(randomData)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		n := copy(buf, randomData[offset:])
 		if n < len(buf) {
 			copy(buf[n:], randomData[:len(buf)-n])
@@ -27,7 +27,7 @@ func BenchmarkDownloadChunkSlice(b *testing.B) {
 	chunkSize := sendBufferSize
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for range b.N {
 		if offset+chunkSize <= dataLen {
 			_ = randomData[offset : offset+chunkSize]
 			offset += chunkSize
