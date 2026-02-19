@@ -36,6 +36,7 @@ const elements = {
   speedNumber: document.getElementById("speedNumber"),
   speedUnit: document.getElementById("speedUnit"),
   testType: document.getElementById("testType"),
+  progressMeter: document.getElementById("progressMeter"),
   progressRing: document.getElementById("progressRing"),
   downloadResult: document.getElementById("downloadResult"),
   uploadResult: document.getElementById("uploadResult"),
@@ -66,18 +67,45 @@ const elements = {
 
 const RING_CIRCUMFERENCE = 2 * Math.PI * 90;
 const RING_END_OFFSET = 2;
+const TEST_CONFIG = {
+  HTTP_TIMEOUT_BUFFER_MS: 10000,
+  HEALTH_CHECK_TIMEOUT_MS: 5000,
+  RETRY_AFTER_DEFAULT_MS: 1000,
+  RETRY_AFTER_MAX_MS: 120000,
+  STREAM_DELAY_MS: 200,
+  MAX_NETWORK_RETRIES: 2,
+  NETWORK_RETRY_DELAY_MS: 250,
+  UPLOAD_RANDOM_CHUNK_BYTES: 65536,
+  MIN_MEASURE_SECONDS: 0.001,
+  PROGRESS_TICK_MS: 100,
+  SPEED_UPDATE_MIN_INTERVAL_MS: 200,
+  EWMA_ALPHA: 0.3,
+  LATENCY_SAMPLE_COUNT: 24,
+  LATENCY_WARMUP_PINGS: 2,
+  LOADED_LATENCY_POLL_MS: 500,
+  WARMUP_WINDOW_MS: 500,
+  WARMUP_STABILITY_THRESHOLD: 0.15,
+  WARMUP_REQUIRED_WINDOWS: 3,
+  WARMUP_MAX_GRACE_RATIO: 0.3,
+  WARMUP_MAX_GRACE_MS: 5000,
+  TOAST_ERROR_MS: 5000,
+  TOAST_SUCCESS_MS: 2000,
+};
 let lastModalTrigger = null;
 let toastTimer = null;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const retryAfterMs = (response, fallbackMs = 1000) => {
+const retryAfterMs = (
+  response,
+  fallbackMs = TEST_CONFIG.RETRY_AFTER_DEFAULT_MS,
+) => {
   if (!response?.headers) return fallbackMs;
   const value = response.headers.get("Retry-After");
   if (!value) return fallbackMs;
   const seconds = Number.parseInt(value, 10);
   if (!Number.isFinite(seconds) || seconds < 1) return fallbackMs;
-  return Math.min(seconds * 1000, 120000);
+  return Math.min(seconds * 1000, TEST_CONFIG.RETRY_AFTER_MAX_MS);
 };
 
 const isNetworkError = (err) => {
@@ -445,7 +473,7 @@ async function selectFastestServer() {
           method: "GET",
           mode: isSameOrigin ? "same-origin" : "cors",
         },
-        5000,
+        TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
       );
       const latency = performance.now() - start;
 
@@ -577,7 +605,11 @@ function setServerOfflineUI() {
 
 async function isHealthyServerCandidate(url) {
   try {
-    const res = await fetchWithTimeout(url, {}, 5000);
+    const res = await fetchWithTimeout(
+      url,
+      {},
+      TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
+    );
     if (!res.ok) {
       await res.text().catch(() => {});
       return false;
@@ -701,21 +733,21 @@ async function runTest(direction, signal) {
   let lastUpdate = startTime;
   let lastBytes = 0;
   let ewmaSpeed = 0;
-  const ewmaAlpha = 0.3; // ~1s effective smoothing window
+  const ewmaAlpha = TEST_CONFIG.EWMA_ALPHA; // ~1s effective smoothing window
 
   // Smooth ring animation: advance based on wall clock time, independent of data callbacks
   const progressTick = setInterval(() => {
     if (signal.aborted) return;
     const elapsed = (performance.now() - startTime) / 1000;
     updateProgress(Math.min(100, (elapsed / duration) * 100));
-  }, 100);
+  }, TEST_CONFIG.PROGRESS_TICK_MS);
 
   const onProgress = (bytes, elapsed) => {
     if (elapsed > duration) return; // Past end time — freeze display
     const now = performance.now();
     const intervalMs = now - lastUpdate;
 
-    if (intervalMs >= 200) {
+    if (intervalMs >= TEST_CONFIG.SPEED_UPDATE_MIN_INTERVAL_MS) {
       // Reset tracking on warmup-to-measurement transition (bytes counter resets)
       if (bytes < lastBytes) {
         lastBytes = bytes;
@@ -771,8 +803,8 @@ async function runTest(direction, signal) {
 
 async function measureLatency(signal) {
   const rawSamples = [];
-  const numSamples = 24;
-  const warmUpPings = 2; // First pings include DNS/TLS overhead
+  const numSamples = TEST_CONFIG.LATENCY_SAMPLE_COUNT;
+  const warmUpPings = TEST_CONFIG.LATENCY_WARMUP_PINGS; // First pings include DNS/TLS overhead
   let capturedIP = false;
 
   for (let i = 0; i < numSamples; i++) {
@@ -887,7 +919,7 @@ function startLoadedLatencyProbe(signal) {
         console.debug("loaded latency probe ping failed", err);
         if (!running) break;
       }
-      await sleep(500);
+      await sleep(TEST_CONFIG.LOADED_LATENCY_POLL_MS);
     }
   };
 
@@ -910,10 +942,13 @@ function startLoadedLatencyProbe(signal) {
 
 // Dynamic warm-up: detects when throughput stabilizes
 function createWarmUpDetector(durationMs) {
-  const windowMs = 500;
-  const stabilityThreshold = 0.15; // 15% variance
-  const requiredStableWindows = 3;
-  const maxGraceMs = Math.min(durationMs * 0.3, 5000);
+  const windowMs = TEST_CONFIG.WARMUP_WINDOW_MS;
+  const stabilityThreshold = TEST_CONFIG.WARMUP_STABILITY_THRESHOLD; // 15% variance
+  const requiredStableWindows = TEST_CONFIG.WARMUP_REQUIRED_WINDOWS;
+  const maxGraceMs = Math.min(
+    durationMs * TEST_CONFIG.WARMUP_MAX_GRACE_RATIO,
+    TEST_CONFIG.WARMUP_MAX_GRACE_MS,
+  );
 
   let windowBytes = 0;
   let windowStart = 0;
@@ -980,16 +1015,17 @@ function buildDownloadChunkAttempts(chunkSize) {
   return attempts;
 }
 
-async function tryDownloadChunkWithRetries(
-  attemptChunk,
-  attemptIndex,
-  attemptsLength,
-  downloadStream,
-  signal,
-  maxNetworkRetries,
-  retryDelayMs,
-  state,
-) {
+async function tryDownloadChunkWithRetries(options) {
+  const {
+    attemptChunk,
+    attemptIndex,
+    attemptsLength,
+    downloadStream,
+    signal,
+    maxNetworkRetries,
+    retryDelayMs,
+    state,
+  } = options;
   for (let retry = 0; retry <= maxNetworkRetries; retry++) {
     if (signal.aborted) return "aborted";
     try {
@@ -1034,16 +1070,16 @@ async function executeDownloadAttempts(
 ) {
   for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
     if (signal.aborted) return "aborted";
-    const result = await tryDownloadChunkWithRetries(
-      attempts[attemptIndex],
+    const result = await tryDownloadChunkWithRetries({
+      attemptChunk: attempts[attemptIndex],
       attemptIndex,
-      attempts.length,
+      attemptsLength: attempts.length,
       downloadStream,
       signal,
       maxNetworkRetries,
       retryDelayMs,
       state,
-    );
+    });
     if (
       result === "success" ||
       result === "aborted" ||
@@ -1060,9 +1096,9 @@ async function runDownloadTest(duration, onProgress, signal) {
   const startTime = performance.now();
   const numStreams = resolveStreams();
   const chunkSize = resolveChunkSize();
-  const streamDelay = 200;
-  const maxNetworkRetries = 2;
-  const retryDelayMs = 250;
+  const streamDelay = TEST_CONFIG.STREAM_DELAY_MS;
+  const maxNetworkRetries = TEST_CONFIG.MAX_NETWORK_RETRIES;
+  const retryDelayMs = TEST_CONFIG.NETWORK_RETRY_DELAY_MS;
   const endTime = startTime + duration * 1000;
   let totalBytes = 0;
   let allBytes = 0;
@@ -1086,7 +1122,7 @@ async function runDownloadTest(duration, onProgress, signal) {
         credentials: "omit",
         signal: signal,
       },
-      duration * 1000 + 10000,
+      duration * 1000 + TEST_CONFIG.HTTP_TIMEOUT_BUFFER_MS,
     );
 
     if (!res.ok || !res.body) {
@@ -1116,15 +1152,15 @@ async function runDownloadTest(duration, onProgress, signal) {
 
         allBytes += value.length;
 
-        if (!warmUp.settled()) {
+        if (warmUp.settled()) {
+          totalBytes += value.length;
+        } else {
           warmUp.record(value.length, now);
           if (warmUp.settled()) {
             // Warm-up just ended — reset measurement
             totalBytes = 0;
             measureStartTime = now;
           }
-        } else {
-          totalBytes += value.length;
         }
 
         const elapsedSec = (now - startTime) / 1000;
@@ -1166,7 +1202,10 @@ async function runDownloadTest(duration, onProgress, signal) {
   const endNow = Math.min(performance.now(), endTime);
   const actualMeasureStart =
     measureStartTime > 0 ? measureStartTime : startTime;
-  const measureTime = Math.max(0.001, (endNow - actualMeasureStart) / 1000);
+  const measureTime = Math.max(
+    TEST_CONFIG.MIN_MEASURE_SECONDS,
+    (endNow - actualMeasureStart) / 1000,
+  );
   const avgSpeed = (totalBytes * 8 * overheadFactor) / measureTime / 1_000_000;
 
   if (totalBytes === 0 && state.sawNetworkError) {
@@ -1197,7 +1236,7 @@ async function sendUploadRequest(blob, duration, signal) {
       credentials: "omit",
       signal: signal,
     },
-    duration * 1000 + 10000,
+    duration * 1000 + TEST_CONFIG.HTTP_TIMEOUT_BUFFER_MS,
   );
 }
 
@@ -1212,14 +1251,14 @@ function recordUploadProgress(
   metricsState.allBytes += blobSize;
   metricsState.successfulStreams += 1;
 
-  if (!warmUp.settled()) {
+  if (warmUp.settled()) {
+    metricsState.totalBytes += blobSize;
+  } else {
     warmUp.record(blobSize, now);
     if (warmUp.settled()) {
       metricsState.totalBytes = 0;
       metricsState.measureStartTime = now;
     }
-  } else {
-    metricsState.totalBytes += blobSize;
   }
 
   const elapsedSec = (now - startTime) / 1000;
@@ -1229,19 +1268,20 @@ function recordUploadProgress(
   onProgress(displayBytes, elapsedSec);
 }
 
-async function runSingleUploadStream(
-  delay,
-  blob,
-  endTime,
-  duration,
-  signal,
-  maxNetworkRetries,
-  retryDelayMs,
-  warmUp,
-  metricsState,
-  startTime,
-  onProgress,
-) {
+async function runSingleUploadStream(options) {
+  const {
+    delay,
+    blob,
+    endTime,
+    duration,
+    signal,
+    maxNetworkRetries,
+    retryDelayMs,
+    warmUp,
+    metricsState,
+    startTime,
+    onProgress,
+  } = options;
   await new Promise((r) => setTimeout(r, delay));
 
   let consecutiveErrors = 0;
@@ -1291,10 +1331,10 @@ async function runUploadTest(duration, onProgress, signal) {
   const startTime = performance.now();
   const numStreams = resolveStreams();
   const chunkSize = resolveChunkSize();
-  const streamDelay = 200;
+  const streamDelay = TEST_CONFIG.STREAM_DELAY_MS;
   const blobSize = chunkSize; // 1MB — balances HTTP overhead vs progress granularity
-  const maxNetworkRetries = 2;
-  const retryDelayMs = 250;
+  const maxNetworkRetries = TEST_CONFIG.MAX_NETWORK_RETRIES;
+  const retryDelayMs = TEST_CONFIG.NETWORK_RETRY_DELAY_MS;
   const metricsState = {
     totalBytes: 0,
     allBytes: 0,
@@ -1307,8 +1347,10 @@ async function runUploadTest(duration, onProgress, signal) {
   const warmUp = createWarmUpDetector(duration * 1000);
 
   const chunks = [];
-  for (let i = 0; i < blobSize; i += 65536) {
-    const piece = new Uint8Array(Math.min(65536, blobSize - i));
+  for (let i = 0; i < blobSize; i += TEST_CONFIG.UPLOAD_RANDOM_CHUNK_BYTES) {
+    const piece = new Uint8Array(
+      Math.min(TEST_CONFIG.UPLOAD_RANDOM_CHUNK_BYTES, blobSize - i),
+    );
     crypto.getRandomValues(piece);
     chunks.push(piece);
   }
@@ -1319,8 +1361,8 @@ async function runUploadTest(duration, onProgress, signal) {
   const streams = [];
   for (let i = 0; i < numStreams; i++) {
     streams.push(
-      runSingleUploadStream(
-        i * streamDelay,
+      runSingleUploadStream({
+        delay: i * streamDelay,
         blob,
         endTime,
         duration,
@@ -1331,7 +1373,7 @@ async function runUploadTest(duration, onProgress, signal) {
         metricsState,
         startTime,
         onProgress,
-      ),
+      }),
     );
   }
   await Promise.all(streams);
@@ -1342,7 +1384,10 @@ async function runUploadTest(duration, onProgress, signal) {
     metricsState.measureStartTime > 0
       ? metricsState.measureStartTime
       : startTime;
-  const measureTime = Math.max(0.001, (endNow - actualMeasureStart) / 1000);
+  const measureTime = Math.max(
+    TEST_CONFIG.MIN_MEASURE_SECONDS,
+    (endNow - actualMeasureStart) / 1000,
+  );
   const avgSpeed =
     (metricsState.totalBytes * 8 * overheadFactor) / measureTime / 1_000_000;
 
@@ -1399,12 +1444,21 @@ function updateProgress(progress) {
     offset = -RING_END_OFFSET;
   }
   elements.progressRing.style.strokeDashoffset = offset;
+  if (elements.progressMeter) {
+    elements.progressMeter.setAttribute(
+      "aria-valuenow",
+      Math.round(progress).toString(),
+    );
+  }
 }
 
 function resetProgress() {
   if (!elements.progressRing || !elements.speedNumber) return;
   state.progress = 0;
   elements.progressRing.style.strokeDashoffset = RING_CIRCUMFERENCE;
+  if (elements.progressMeter) {
+    elements.progressMeter.setAttribute("aria-valuenow", "0");
+  }
   elements.speedNumber.textContent = "0";
 }
 
@@ -1422,6 +1476,10 @@ function showState(stateName) {
   elements.idleState.classList.add("hidden");
   elements.testingState.classList.add("hidden");
   elements.resultsState.classList.add("hidden");
+  elements.testingState.setAttribute(
+    "aria-busy",
+    stateName === "testing" ? "true" : "false",
+  );
   document.body.classList.toggle("results-view", stateName === "results");
 
   switch (stateName) {
@@ -1635,7 +1693,7 @@ function showError(message, isError = true) {
     if (icon) icon.textContent = "⚠";
     elements.errorToast.classList.remove("hidden");
     elements.errorToast.style.background = "";
-    toastTimer = setTimeout(hideError, 5000);
+    toastTimer = setTimeout(hideError, TEST_CONFIG.TOAST_ERROR_MS);
   } else {
     if (icon) icon.textContent = "✓";
     elements.errorToast.classList.remove("hidden");
@@ -1643,7 +1701,7 @@ function showError(message, isError = true) {
     toastTimer = setTimeout(() => {
       hideError();
       elements.errorToast.style.background = "";
-    }, 2000);
+    }, TEST_CONFIG.TOAST_SUCCESS_MS);
   }
 }
 

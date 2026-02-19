@@ -27,8 +27,7 @@ type Server struct {
 	maxConnDur       time.Duration
 	mu               sync.RWMutex
 	wg               sync.WaitGroup
-	ctx              context.Context
-	cancel           context.CancelFunc
+	stopCh           chan struct{}
 	randomData       []byte
 	recvPool         sync.Pool
 	closeOnce        sync.Once
@@ -41,8 +40,6 @@ const (
 )
 
 func NewServer(cfg *config.Config) (*Server, error) {
-	ctx, cancel := context.WithCancel(context.Background())
-
 	maxTCP := int64(cfg.MaxConcurrentHTTP())
 	if maxTCP <= 0 {
 		maxTCP = 64
@@ -57,8 +54,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		maxTCPConns:   maxTCP,
 		maxUDPSenders: maxTCP,
 		maxConnDur:    maxDur,
-		ctx:           ctx,
-		cancel:        cancel,
+		stopCh:        make(chan struct{}),
 		randomData:    make([]byte, randomDataSize),
 		recvPool: sync.Pool{
 			New: func() any {
@@ -68,19 +64,16 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	}
 
 	if _, err := rand.Read(s.randomData); err != nil {
-		cancel()
 		return nil, fmt.Errorf("generate random data: %w", err)
 	}
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", cfg.GetTCPTestAddress())
 	if err != nil {
-		cancel()
 		return nil, fmt.Errorf("resolve TCP address: %w", err)
 	}
 
 	tcpListener, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
-		cancel()
 		return nil, fmt.Errorf("listen TCP: %w", err)
 	}
 	s.tcpListener = tcpListener
@@ -88,14 +81,12 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	udpAddr, err := net.ResolveUDPAddr("udp", cfg.GetUDPTestAddress())
 	if err != nil {
 		tcpListener.Close()
-		cancel()
 		return nil, fmt.Errorf("resolve UDP address: %w", err)
 	}
 
 	udpConn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
 		tcpListener.Close()
-		cancel()
 		return nil, fmt.Errorf("listen UDP: %w", err)
 	}
 	s.udpConn = udpConn
@@ -116,7 +107,7 @@ func (s *Server) acceptTCP() {
 
 	for {
 		select {
-		case <-s.ctx.Done():
+		case <-s.stopCh:
 			return
 		default:
 			s.tcpListener.SetDeadline(time.Now().Add(100 * time.Millisecond))
@@ -125,7 +116,7 @@ func (s *Server) acceptTCP() {
 				if isTimeoutError(err) {
 					continue
 				}
-				if s.ctx.Err() != nil {
+				if s.isStopping() {
 					return
 				}
 				logging.Warn("TCP accept error", logging.Field{Key: "error", Value: err})
@@ -154,10 +145,13 @@ func (s *Server) handleTCPConnection(conn *net.TCPConn) {
 	defer atomic.AddInt64(&s.activeTCPConns, -1)
 
 	// Hard duration cap — prevents indefinitely held connections.
-	connCtx, connCancel := context.WithTimeout(s.ctx, s.maxConnDur)
+	connCtx, connCancel := context.WithTimeout(context.Background(), s.maxConnDur)
 	defer connCancel()
 	go func() {
-		<-connCtx.Done()
+		select {
+		case <-connCtx.Done():
+		case <-s.stopCh:
+		}
 		conn.SetDeadline(time.Now())
 	}()
 
@@ -193,7 +187,7 @@ func (s *Server) writeDownloadLoop(conn *net.TCPConn) {
 
 	for {
 		select {
-		case <-s.ctx.Done():
+		case <-s.stopCh:
 			return
 		default:
 			if writesSinceDeadline >= 128 {
@@ -254,7 +248,7 @@ func (s *Server) readDiscardLoop(conn *net.TCPConn, deadline time.Duration) {
 
 	for {
 		select {
-		case <-s.ctx.Done():
+		case <-s.stopCh:
 			return
 		default:
 			if readsSinceDeadline >= 128 {
@@ -298,7 +292,7 @@ func (s *Server) handleEcho(conn *net.TCPConn) {
 
 	for {
 		select {
-		case <-s.ctx.Done():
+		case <-s.stopCh:
 			return
 		default:
 			if readsSinceDeadline >= 128 {
@@ -398,7 +392,7 @@ func (s *Server) handleUDP() {
 	defer ticker.Stop()
 	for {
 		select {
-		case <-s.ctx.Done():
+		case <-s.stopCh:
 			readersWg.Wait()
 			return
 		case <-ticker.C:
@@ -415,7 +409,7 @@ func (s *Server) udpReader(clients *udpClients, wg *sync.WaitGroup) {
 		_ = s.udpConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 		n, addr, err := s.udpConn.ReadFromUDP(buf)
 		if err != nil {
-			if s.ctx.Err() != nil {
+			if s.isStopping() {
 				return
 			}
 			if isTimeoutError(err) {
@@ -499,7 +493,7 @@ func (s *Server) udpSender(clients *udpClients, clientKey string, client *udpCli
 	lastYield := time.Now()
 	for {
 		select {
-		case <-s.ctx.Done():
+		case <-s.stopCh:
 			return
 		default:
 			lastSeen := time.Unix(0, atomic.LoadInt64(&client.lastSeenUnix))
@@ -531,9 +525,18 @@ func (s *Server) getRecvBuffer() []byte {
 	return buf
 }
 
+func (s *Server) isStopping() bool {
+	select {
+	case <-s.stopCh:
+		return true
+	default:
+		return false
+	}
+}
+
 func (s *Server) Close() error {
 	s.closeOnce.Do(func() {
-		s.cancel()
+		close(s.stopCh)
 
 		if s.tcpListener != nil {
 			s.tcpListener.Close()

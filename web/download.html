@@ -1,125 +1,180 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Download openByte speed test binaries for Linux, macOS, and Windows.">
-  <meta property="og:title" content="openByte — Downloads">
-  <meta property="og:description" content="Download openByte speed test binaries for Linux, macOS, and Windows.">
-  <meta property="og:type" content="website">
-  <title>openByte Downloads</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <div class="app">
-    <header class="header">
-      <div class="brand">
-        <a href="/" style="text-decoration:none"><div class="logo">open<span class="logo-accent">Byte</span></div></a>
-      </div>
-      <a class="footer-link" href="/">Speed Test</a>
-    </header>
-
-    <main class="download-main">
-      <section class="download-panel">
-        <h1 class="download-title">Get openByte</h1>
-        <p class="download-subtitle">
-          Single binary — includes speed test server, CLI client, and embedded web UI.
-          <span class="dl-version" id="versionTag"></span>
-        </p>
-
-        <!-- Recommended download (auto-detected) -->
-        <div class="dl-recommended" id="recommendedSection">
-          <div class="dl-recommended-card" id="recommendedCard">
-            <div class="dl-recommended-badge">Recommended for you</div>
-            <div class="dl-recommended-platform" id="recommendedPlatform">Detecting platform...</div>
-            <a class="dl-primary-btn" id="recommendedBtn" href="#" style="pointer-events:none;opacity:0.5">
-              <span class="dl-primary-icon">↓</span>
-              <span class="dl-primary-text">
-                <span class="dl-primary-label" id="recommendedLabel">Loading...</span>
-                <span class="dl-primary-meta" id="recommendedMeta"></span>
-              </span>
-            </a>
-            <div class="dl-alt-arch" id="altArch"></div>
-          </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Download openByte speed test binaries for Linux, macOS, and Windows."
+    />
+    <meta property="og:title" content="openByte — Downloads" />
+    <meta
+      property="og:description"
+      content="Download openByte speed test binaries for Linux, macOS, and Windows."
+    />
+    <meta property="og:type" content="website" />
+    <title>openByte Downloads</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#mainContent">Skip to main content</a>
+    <div class="app">
+      <header class="header">
+        <div class="brand">
+          <a href="/" style="text-decoration: none"
+            ><div class="logo">
+              open<span class="logo-accent">Byte</span>
+            </div></a
+          >
         </div>
-
-        <!-- Quick install -->
-        <div class="dl-section" id="installSection" style="display:none">
-          <h2 class="dl-section-title">Quick Install</h2>
-          <div class="dl-install-block">
-            <div class="dl-install-tabs" id="installTabs"></div>
-            <div class="dl-code-block">
-              <code id="installCmd"></code>
-              <button class="dl-copy-btn" id="copyBtn" aria-label="Copy command">Copy</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- All platforms -->
-        <div class="dl-section">
-          <h2 class="dl-section-title">All Platforms</h2>
-          <div class="dl-all-grid" id="allPlatforms">
-            <div class="download-card">
-              <div class="dl-card-header">
-                <span class="dl-card-icon">🐧</span>
-                <div class="download-card-title">Linux</div>
-              </div>
-              <div class="download-links" data-os="linux">
-                <span class="download-meta loading">Loading...</span>
-              </div>
-            </div>
-            <div class="download-card">
-              <div class="dl-card-header">
-                <span class="dl-card-icon">🍎</span>
-                <div class="download-card-title">macOS</div>
-              </div>
-              <div class="download-links" data-os="macos">
-                <span class="download-meta loading">Loading...</span>
-              </div>
-            </div>
-            <div class="download-card">
-              <div class="dl-card-header">
-                <span class="dl-card-icon">🪟</span>
-                <div class="download-card-title">Windows</div>
-              </div>
-              <div class="download-links" data-os="windows">
-                <span class="download-meta loading">Loading...</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Docker -->
-        <div class="dl-section">
-          <h2 class="dl-section-title">Docker</h2>
-          <div class="dl-docker-card">
-            <p class="download-meta">Deploy a server instantly with Docker — supports linux/amd64 and linux/arm64.</p>
-            <div class="dl-code-block">
-              <code>docker run -p 8080:8080 -p 8081:8081 -p 8082:8082/udp ghcr.io/saveenergy/openbyte:latest server</code>
-              <button class="dl-copy-btn" id="copyDockerBtn" aria-label="Copy command">Copy</button>
-            </div>
-          </div>
-        </div>
-
-        <p class="download-meta" style="margin-top: var(--space-xl); text-align: center;">
-          All releases on
-          <a class="download-link" href="https://github.com/saveenergy/openbyte/releases" target="_blank" rel="noopener noreferrer">GitHub Releases</a>
-        </p>
-      </section>
-    </main>
-
-    <footer class="footer">
-      <div class="footer-links">
         <a class="footer-link" href="/">Speed Test</a>
-        <span class="footer-divider">&middot;</span>
-        <a class="footer-link" href="/skill.html">Skill</a>
-        <span class="footer-divider">&middot;</span>
-        <a class="footer-link" href="https://github.com/saveenergy/openbyte" target="_blank" rel="noopener noreferrer">GitHub</a>
-      </div>
-    </footer>
-  </div>
+      </header>
 
-  <script src="/download.js"></script>
-</body>
+      <main class="download-main" id="mainContent">
+        <section class="download-panel">
+          <h1 class="download-title">Get openByte</h1>
+          <p class="download-subtitle">
+            Single binary — includes speed test server, CLI client, and embedded
+            web UI.
+            <span class="dl-version" id="versionTag"></span>
+          </p>
+
+          <!-- Recommended download (auto-detected) -->
+          <div class="dl-recommended" id="recommendedSection">
+            <div class="dl-recommended-card" id="recommendedCard">
+              <div class="dl-recommended-badge">Recommended for you</div>
+              <div class="dl-recommended-platform" id="recommendedPlatform">
+                Detecting platform...
+              </div>
+              <a
+                class="dl-primary-btn is-disabled"
+                id="recommendedBtn"
+                href="#"
+                aria-disabled="true"
+                tabindex="-1"
+              >
+                <span class="dl-primary-icon">↓</span>
+                <span class="dl-primary-text">
+                  <span class="dl-primary-label" id="recommendedLabel"
+                    >Loading...</span
+                  >
+                  <span class="dl-primary-meta" id="recommendedMeta"></span>
+                </span>
+              </a>
+              <div class="dl-alt-arch" id="altArch"></div>
+            </div>
+          </div>
+
+          <!-- Quick install -->
+          <div class="dl-section" id="installSection" style="display: none">
+            <h2 class="dl-section-title">Quick Install</h2>
+            <div class="dl-install-block">
+              <div class="dl-install-tabs" id="installTabs"></div>
+              <div class="dl-code-block">
+                <code id="installCmd"></code>
+                <button
+                  class="dl-copy-btn"
+                  id="copyBtn"
+                  aria-label="Copy command"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- All platforms -->
+          <div class="dl-section">
+            <h2 class="dl-section-title">All Platforms</h2>
+            <div class="dl-all-grid" id="allPlatforms">
+              <div class="download-card">
+                <div class="dl-card-header">
+                  <span class="dl-card-icon">🐧</span>
+                  <div class="download-card-title">Linux</div>
+                </div>
+                <div class="download-links" data-os="linux">
+                  <span class="download-meta loading">Loading...</span>
+                </div>
+              </div>
+              <div class="download-card">
+                <div class="dl-card-header">
+                  <span class="dl-card-icon">🍎</span>
+                  <div class="download-card-title">macOS</div>
+                </div>
+                <div class="download-links" data-os="macos">
+                  <span class="download-meta loading">Loading...</span>
+                </div>
+              </div>
+              <div class="download-card">
+                <div class="dl-card-header">
+                  <span class="dl-card-icon">🪟</span>
+                  <div class="download-card-title">Windows</div>
+                </div>
+                <div class="download-links" data-os="windows">
+                  <span class="download-meta loading">Loading...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Docker -->
+          <div class="dl-section">
+            <h2 class="dl-section-title">Docker</h2>
+            <div class="dl-docker-card">
+              <p class="download-meta">
+                Deploy a server instantly with Docker — supports linux/amd64 and
+                linux/arm64.
+              </p>
+              <div class="dl-code-block">
+                <code
+                  >docker run -p 8080:8080 -p 8081:8081 -p 8082:8082/udp
+                  ghcr.io/saveenergy/openbyte:latest server</code
+                >
+                <button
+                  class="dl-copy-btn"
+                  id="copyDockerBtn"
+                  aria-label="Copy command"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <p
+            class="download-meta"
+            style="margin-top: var(--space-xl); text-align: center"
+          >
+            All releases on
+            <a
+              class="download-link"
+              href="https://github.com/saveenergy/openbyte/releases"
+              target="_blank"
+              rel="noopener noreferrer"
+              >GitHub Releases</a
+            >
+          </p>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-links">
+          <a class="footer-link" href="/">Speed Test</a>
+          <span class="footer-divider">&middot;</span>
+          <a class="footer-link" href="/skill.html">Skill</a>
+          <span class="footer-divider">&middot;</span>
+          <a
+            class="footer-link"
+            href="https://github.com/saveenergy/openbyte"
+            target="_blank"
+            rel="noopener noreferrer"
+            >GitHub</a
+          >
+        </div>
+      </footer>
+    </div>
+
+    <script src="/download.js"></script>
+  </body>
 </html>

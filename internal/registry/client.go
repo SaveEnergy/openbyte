@@ -16,6 +16,8 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+const bearerTokenPrefix = "Bearer "
+
 type Client struct {
 	config     *config.Config
 	httpClient *http.Client
@@ -115,7 +117,7 @@ func (c *Client) register(activeTests int) error {
 
 	req.Header.Set("Content-Type", "application/json")
 	if c.config.RegistryAPIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.config.RegistryAPIKey)
+		req.Header.Set("Authorization", bearerTokenPrefix+c.config.RegistryAPIKey)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -155,7 +157,7 @@ func (c *Client) heartbeat(activeTests int) error {
 
 	req.Header.Set("Content-Type", "application/json")
 	if c.config.RegistryAPIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.config.RegistryAPIKey)
+		req.Header.Set("Authorization", bearerTokenPrefix+c.config.RegistryAPIKey)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -188,7 +190,7 @@ func (c *Client) deregister() {
 	}
 
 	if c.config.RegistryAPIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.config.RegistryAPIKey)
+		req.Header.Set("Authorization", bearerTokenPrefix+c.config.RegistryAPIKey)
 	}
 
 	resp, err := c.httpClient.Do(req)

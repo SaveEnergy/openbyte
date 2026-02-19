@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	_ "net/http/pprof"
+	_ "net/http/pprof" // Registers pprof handlers on DefaultServeMux.
 	"runtime"
 	"runtime/debug"
 	rtmetrics "runtime/metrics"

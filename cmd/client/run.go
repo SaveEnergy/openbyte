@@ -190,7 +190,17 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 	for {
 		select {
 		case err := <-doneCh:
-			return finalizeHTTPStreamRun(config, httpCfg, formatter, engine, startTime, graceTime, latencyStats, jitter, err)
+			return finalizeHTTPStreamRun(finalizeHTTPStreamRunInput{
+				config:       config,
+				httpCfg:      httpCfg,
+				formatter:    formatter,
+				engine:       engine,
+				startTime:    startTime,
+				graceTime:    graceTime,
+				latencyStats: latencyStats,
+				jitter:       jitter,
+				runErr:       err,
+			})
 
 		case <-metricsTicker.C:
 			metrics := engine.GetMetrics()
@@ -249,40 +259,42 @@ func emitProgressAndMetrics(
 	return nil
 }
 
-func finalizeHTTPStreamRun(
-	config *Config,
-	httpCfg *HTTPTestConfig,
-	formatter OutputFormatter,
-	engine *HTTPTestEngine,
-	startTime time.Time,
-	graceTime time.Duration,
-	latencyStats LatencyStats,
-	jitter float64,
-	runErr error,
-) error {
-	metrics := engine.GetMetrics()
-	metrics.Latency = latencyStats
-	metrics.JitterMs = jitter
+type finalizeHTTPStreamRunInput struct {
+	config       *Config
+	httpCfg      *HTTPTestConfig
+	formatter    OutputFormatter
+	engine       *HTTPTestEngine
+	startTime    time.Time
+	graceTime    time.Duration
+	latencyStats LatencyStats
+	jitter       float64
+	runErr       error
+}
+
+func finalizeHTTPStreamRun(input finalizeHTTPStreamRunInput) error {
+	metrics := input.engine.GetMetrics()
+	metrics.Latency = input.latencyStats
+	metrics.JitterMs = input.jitter
 
 	totalBytes := metrics.BytesTransferred
-	measuredElapsed := min(time.Since(startTime), httpCfg.Duration)
-	measuredElapsed -= graceTime
+	measuredElapsed := min(time.Since(input.startTime), input.httpCfg.Duration)
+	measuredElapsed -= input.graceTime
 	if measuredElapsed <= 0 {
 		measuredElapsed = 1 * time.Millisecond
 	}
-	avgSpeed := float64(totalBytes*8) / measuredElapsed.Seconds() / 1_000_000 * httpCfg.OverheadFactor
+	avgSpeed := float64(totalBytes*8) / measuredElapsed.Seconds() / 1_000_000 * input.httpCfg.OverheadFactor
 	metrics.ThroughputMbps = avgSpeed
 
-	httpConfig := *config
-	httpConfig.PacketSize = config.ChunkSize
-	results := buildResults("http", &httpConfig, metrics, startTime)
-	formatter.FormatComplete(results)
-	if ferr := formatterLastError(formatter); ferr != nil {
+	httpConfig := *input.config
+	httpConfig.PacketSize = input.config.ChunkSize
+	results := buildResults("http", &httpConfig, metrics, input.startTime)
+	input.formatter.FormatComplete(results)
+	if ferr := formatterLastError(input.formatter); ferr != nil {
 		return fmt.Errorf("formatter output failed: %w", ferr)
 	}
 
-	if runErr != nil && !errors.Is(runErr, context.DeadlineExceeded) && !errors.Is(runErr, context.Canceled) {
-		return runErr
+	if input.runErr != nil && !errors.Is(input.runErr, context.DeadlineExceeded) && !errors.Is(input.runErr, context.Canceled) {
+		return input.runErr
 	}
 	return nil
 }
@@ -307,10 +319,10 @@ func engineMetricsToTypesMetrics(metrics EngineMetrics) *types.Metrics {
 }
 
 func formatterLastError(formatter OutputFormatter) error {
-	type formatterErr interface {
+	type lastErrorer interface {
 		LastError() error
 	}
-	if fe, ok := formatter.(formatterErr); ok {
+	if fe, ok := formatter.(lastErrorer); ok {
 		return fe.LastError()
 	}
 	return nil

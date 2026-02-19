@@ -30,6 +30,13 @@ var (
 	exitFailure = 1
 )
 
+const (
+	flagMaxTestDuration   = "max-test-duration"
+	flagPerfStatsInterval = "perf-stats-interval"
+	flagRegistryInterval  = "registry-interval"
+	flagRegistryServerTTL = "registry-server-ttl"
+)
+
 type serverFlagValues struct {
 	port               *string
 	bindAddress        *string
@@ -208,7 +215,7 @@ func setupRuntimeResources(cfg *config.Config, version string, resources *server
 		router.SetRuntimeMetricsHandler(runtimeMetricsHandler())
 	}
 
-	var registrars []api.RegistryRegistrar
+	var registrars []api.RouteRegistrar
 	if cfg.RegistryMode {
 		logging.Info("Starting in registry mode")
 		resources.registryService = registry.NewService(cfg.RegistryServerTTL, 30*time.Second)
@@ -330,7 +337,7 @@ func buildServerFlagSet(cfg *config.Config) (*flag.FlagSet, *serverFlagValues) {
 		maxConcurrentTests: fs.Int("max-concurrent-tests", cfg.MaxConcurrentTests, "Max concurrent tests (env: MAX_CONCURRENT_TESTS)"),
 		maxConcurrentPerIP: fs.Int("max-concurrent-per-ip", cfg.MaxConcurrentPerIP, "Max concurrent tests per IP (env: MAX_CONCURRENT_PER_IP)"),
 		maxStreams:         fs.Int("max-streams", cfg.MaxStreams, "Max streams per test, 1-64 (env: MAX_STREAMS)"),
-		maxTestDuration:    fs.String("max-test-duration", cfg.MaxTestDuration.String(), "Max test duration, e.g. 300s (env: MAX_TEST_DURATION)"),
+		maxTestDuration:    fs.String(flagMaxTestDuration, cfg.MaxTestDuration.String(), "Max test duration, e.g. 300s (env: MAX_TEST_DURATION)"),
 		rateLimitPerIP:     fs.Int("rate-limit-per-ip", cfg.RateLimitPerIP, "Per-IP rate limit per minute (env: RATE_LIMIT_PER_IP)"),
 		globalRateLimit:    fs.Int("global-rate-limit", cfg.GlobalRateLimit, "Global rate limit per minute (env: GLOBAL_RATE_LIMIT)"),
 		allowedOrigins:     fs.String("allowed-origins", strings.Join(cfg.AllowedOrigins, ","), "Comma-separated allowed origins (env: ALLOWED_ORIGINS)"),
@@ -341,14 +348,14 @@ func buildServerFlagSet(cfg *config.Config) (*flag.FlagSet, *serverFlagValues) {
 		webRoot:            fs.String("web-root", cfg.WebRoot, "Static web root override (env: WEB_ROOT)"),
 		pprofEnabled:       fs.Bool("pprof-enabled", cfg.PprofEnabled, "Enable pprof server (env: PPROF_ENABLED)"),
 		pprofAddress:       fs.String("pprof-addr", cfg.PprofAddress, "Pprof address (env: PPROF_ADDR)"),
-		perfStatsInterval:  fs.String("perf-stats-interval", cfg.PerfStatsInterval.String(), "Runtime stats interval, e.g. 10s (env: PERF_STATS_INTERVAL)"),
+		perfStatsInterval:  fs.String(flagPerfStatsInterval, cfg.PerfStatsInterval.String(), "Runtime stats interval, e.g. 10s (env: PERF_STATS_INTERVAL)"),
 		runtimeMetrics:     fs.Bool("runtime-metrics", cfg.RuntimeMetrics, "Enable runtime metrics endpoint /debug/runtime-metrics (env: RUNTIME_METRICS_ENABLED)"),
 		registryEnabled:    fs.Bool("registry-enabled", cfg.RegistryEnabled, "Enable registry client mode (env: REGISTRY_ENABLED)"),
 		registryMode:       fs.Bool("registry-mode", cfg.RegistryMode, "Enable registry server mode (env: REGISTRY_MODE)"),
 		registryURL:        fs.String("registry-url", cfg.RegistryURL, "Registry URL (env: REGISTRY_URL)"),
 		registryAPIKey:     fs.String("registry-api-key", cfg.RegistryAPIKey, "Registry API key (env: REGISTRY_API_KEY)"),
-		registryInterval:   fs.String("registry-interval", cfg.RegistryInterval.String(), "Registry heartbeat interval, e.g. 30s (env: REGISTRY_INTERVAL)"),
-		registryServerTTL:  fs.String("registry-server-ttl", cfg.RegistryServerTTL.String(), "Registry server TTL, e.g. 60s (env: REGISTRY_SERVER_TTL)"),
+		registryInterval:   fs.String(flagRegistryInterval, cfg.RegistryInterval.String(), "Registry heartbeat interval, e.g. 30s (env: REGISTRY_INTERVAL)"),
+		registryServerTTL:  fs.String(flagRegistryServerTTL, cfg.RegistryServerTTL.String(), "Registry server TTL, e.g. 60s (env: REGISTRY_SERVER_TTL)"),
 	}
 	return fs, fv
 }
@@ -390,8 +397,8 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 		"max-concurrent-tests":  func() error { cfg.MaxConcurrentTests = *fv.maxConcurrentTests; return nil },
 		"max-concurrent-per-ip": func() error { cfg.MaxConcurrentPerIP = *fv.maxConcurrentPerIP; return nil },
 		"max-streams":           func() error { cfg.MaxStreams = *fv.maxStreams; return nil },
-		"max-test-duration": func() error {
-			d, err := parseDuration("max-test-duration", *fv.maxTestDuration)
+		flagMaxTestDuration: func() error {
+			d, err := parseDuration(flagMaxTestDuration, *fv.maxTestDuration)
 			if err != nil {
 				return err
 			}
@@ -408,8 +415,8 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 		"web-root":            func() error { cfg.WebRoot = *fv.webRoot; return nil },
 		"pprof-enabled":       func() error { cfg.PprofEnabled = *fv.pprofEnabled; return nil },
 		"pprof-addr":          func() error { cfg.PprofAddress = *fv.pprofAddress; return nil },
-		"perf-stats-interval": func() error {
-			d, err := parseDuration("perf-stats-interval", *fv.perfStatsInterval)
+		flagPerfStatsInterval: func() error {
+			d, err := parseDuration(flagPerfStatsInterval, *fv.perfStatsInterval)
 			if err != nil {
 				return err
 			}
@@ -421,16 +428,16 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 		"registry-mode":    func() error { cfg.RegistryMode = *fv.registryMode; return nil },
 		"registry-url":     func() error { cfg.RegistryURL = *fv.registryURL; return nil },
 		"registry-api-key": func() error { cfg.RegistryAPIKey = *fv.registryAPIKey; return nil },
-		"registry-interval": func() error {
-			d, err := parseDuration("registry-interval", *fv.registryInterval)
+		flagRegistryInterval: func() error {
+			d, err := parseDuration(flagRegistryInterval, *fv.registryInterval)
 			if err != nil {
 				return err
 			}
 			cfg.RegistryInterval = d
 			return nil
 		},
-		"registry-server-ttl": func() error {
-			d, err := parseDuration("registry-server-ttl", *fv.registryServerTTL)
+		flagRegistryServerTTL: func() error {
+			d, err := parseDuration(flagRegistryServerTTL, *fv.registryServerTTL)
 			if err != nil {
 				return err
 			}

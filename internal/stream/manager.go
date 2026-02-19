@@ -33,7 +33,7 @@ type MetricsUpdate struct {
 	State    types.StreamSnapshot
 }
 
-func NewManager(maxStreams int, maxStreamsPerIP int) *Manager {
+func NewManager(maxStreams, maxStreamsPerIP int) *Manager {
 	return &Manager{
 		streams:               make(map[string]*types.StreamState),
 		activeStreams:         make(map[string]string),

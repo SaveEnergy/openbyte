@@ -1,7 +1,6 @@
 package stream
 
 import (
-	"context"
 	"errors"
 	"net"
 	"sync"
@@ -14,7 +13,7 @@ import (
 
 func TestUDPSenderRemovesClientAndDecrementsCountOnExit(t *testing.T) {
 	s := &Server{
-		ctx:    context.Background(),
+		stopCh: make(chan struct{}),
 		config: &config.Config{UDPBufferSize: 1400},
 	}
 
@@ -79,11 +78,9 @@ func TestAcceptTCPRejectsWhenAtLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen tcp: %v", err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
 	srv := &Server{
 		tcpListener: listener,
-		ctx:         ctx,
-		cancel:      cancel,
+		stopCh:      make(chan struct{}),
 		maxTCPConns: 0,
 	}
 	srv.wg.Add(1)

@@ -2,9 +2,10 @@
 // grades, ratings, and suitability assessments.
 package diagnostic
 
-import "strings"
-
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Interpretation holds the semantic interpretation of speed test results.
 type Interpretation struct {

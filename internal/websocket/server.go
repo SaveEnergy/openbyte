@@ -321,7 +321,7 @@ func (s *Server) removeClient(streamID string, conn *websocket.Conn) {
 	}
 }
 
-func (s *Server) isAllowedOrigin(origin string, host string) bool {
+func (s *Server) isAllowedOrigin(origin, host string) bool {
 	s.mu.RLock()
 	allowedOrigins := append([]string(nil), s.allowedOrigins...)
 	s.mu.RUnlock()
@@ -370,7 +370,7 @@ func matchesAllowedOrigin(allowed, origin, originHostValue string) bool {
 	return allowedHost != "" && originHostValue != "" && strings.EqualFold(allowedHost, originHostValue)
 }
 
-func sameOrigin(origin string, host string) bool {
+func sameOrigin(origin, host string) bool {
 	parsed, err := url.Parse(origin)
 	if err != nil {
 		return false

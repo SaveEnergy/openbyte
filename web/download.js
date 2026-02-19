@@ -33,13 +33,9 @@
     return /Win/i.test(platform) || /Win/i.test(ua);
   }
 
-  function shouldProbeAppleSilicon(platform, ua) {
-    return (
-      /arm64/i.test(ua) ||
-      (navigator.cpuClass === undefined &&
-        /Mac/.test(platform) &&
-        !/Intel/.test(ua))
-    );
+  function userAgentDataArch() {
+    const arch = navigator.userAgentData?.architecture;
+    return typeof arch === "string" ? arch : "";
   }
 
   function hasAppleSiliconRenderer() {
@@ -58,14 +54,24 @@
   }
 
   function detectMacArch(platform, ua) {
-    if (!shouldProbeAppleSilicon(platform, ua)) return "amd64";
+    const uaDataArch = userAgentDataArch();
+    if (/arm|aarch64/i.test(uaDataArch) || /arm64|aarch64/i.test(ua)) {
+      return "arm64";
+    }
+    if (/x86|amd64|x64/i.test(uaDataArch) && !/arm/i.test(uaDataArch)) {
+      return "amd64";
+    }
+    if (!isMac(platform, ua)) return "amd64";
+    // On Safari and privacy-reduced UAs, Intel token can still appear on Apple Silicon.
+    // Probe renderer on macOS to improve package auto-selection accuracy.
     return hasAppleSiliconRenderer() ? "arm64" : "amd64";
   }
 
   function detectPlatform() {
     const ua = navigator.userAgent || "";
     // navigator.userAgentData is preferred (navigator.platform is deprecated)
-    const platform = navigator.userAgentData?.platform || "";
+    const platform =
+      navigator.userAgentData?.platform || navigator.platform || "";
     if (isMac(platform, ua)) {
       return { os: "macos", arch: detectMacArch(platform, ua) };
     }
@@ -114,6 +120,17 @@
     return osKey + "_" + other + ".tar.gz";
   }
 
+  function setRecommendedButtonState(btn, enabled) {
+    if (!btn) return;
+    btn.classList.toggle("is-disabled", !enabled);
+    btn.setAttribute("aria-disabled", enabled ? "false" : "true");
+    if (enabled) {
+      btn.removeAttribute("tabindex");
+      return;
+    }
+    btn.setAttribute("tabindex", "-1");
+  }
+
   function renderRecommended(assets, detected, version) {
     const suffix = suffixForDetected(detected);
     const asset = findAsset(assets, suffix);
@@ -135,15 +152,13 @@
 
     if (asset?.browser_download_url) {
       btn.href = asset.browser_download_url;
-      btn.style.pointerEvents = "";
-      btn.style.opacity = "";
+      setRecommendedButtonState(btn, true);
       btn.rel = "noopener noreferrer";
       label.textContent = "Download " + (version || "");
       meta.textContent = info.arch + " · " + formatBytes(asset.size);
     } else {
       btn.href = releasePage;
-      btn.style.pointerEvents = "";
-      btn.style.opacity = "";
+      setRecommendedButtonState(btn, true);
       btn.rel = "noopener noreferrer";
       label.textContent = "View on GitHub";
       meta.textContent = "";
@@ -312,8 +327,8 @@
     const platform = document.getElementById("recommendedPlatform");
     if (btn) {
       btn.href = releasePage;
-      btn.style.pointerEvents = "";
-      btn.style.opacity = "";
+      setRecommendedButtonState(btn, true);
+      btn.rel = "noopener noreferrer";
     }
     if (label) label.textContent = "View on GitHub";
     if (platform) {

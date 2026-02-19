@@ -1,119 +1,143 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="openByte speed test result — download, upload, latency, and bufferbloat.">
-  <meta property="og:title" content="openByte — Speed Test Result">
-  <meta property="og:description" content="See this internet speed test result on openByte.">
-  <meta property="og:type" content="website">
-  <title>openByte — Shared Result</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="stylesheet" href="/style.css">
-</head>
-<body class="results-view">
-  <div class="app">
-    <header class="header">
-      <div class="brand">
-        <a href="/" style="text-decoration:none"><div class="logo">open<span class="logo-accent">Byte</span></div></a>
-        <div class="server-name" id="serverName">Shared Result</div>
-      </div>
-    </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="openByte speed test result — download, upload, latency, and bufferbloat."
+    />
+    <meta property="og:title" content="openByte — Speed Test Result" />
+    <meta
+      property="og:description"
+      content="See this internet speed test result on openByte."
+    />
+    <meta property="og:type" content="website" />
+    <title>openByte — Shared Result</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body class="results-view">
+    <a class="skip-link" href="#mainContent">Skip to main content</a>
+    <div class="app">
+      <header class="header">
+        <div class="brand">
+          <a href="/" style="text-decoration: none"
+            ><div class="logo">
+              open<span class="logo-accent">Byte</span>
+            </div></a
+          >
+          <div class="server-name" id="serverName">Shared Result</div>
+        </div>
+      </header>
 
-    <main class="main">
-      <section class="speed-section" id="resultView">
-        <div class="results-main" id="resultsMain">
-          <div class="result-card result-primary">
-            <div class="result-icon">↓</div>
-            <div class="result-value" id="downloadResult">-</div>
-            <div class="result-label">Download</div>
-            <div class="result-unit">Mbps</div>
+      <main class="main" id="mainContent">
+        <section class="speed-section" id="resultView">
+          <div class="results-main" id="resultsMain">
+            <div class="result-card result-primary">
+              <div class="result-icon">↓</div>
+              <div class="result-value" id="downloadResult">-</div>
+              <div class="result-label">Download</div>
+              <div class="result-unit">Mbps</div>
+            </div>
+            <div class="result-card result-secondary">
+              <div class="result-icon">↑</div>
+              <div class="result-value" id="uploadResult">-</div>
+              <div class="result-label">Upload</div>
+              <div class="result-unit">Mbps</div>
+            </div>
           </div>
-          <div class="result-card result-secondary">
-            <div class="result-icon">↑</div>
-            <div class="result-value" id="uploadResult">-</div>
-            <div class="result-label">Upload</div>
-            <div class="result-unit">Mbps</div>
+          <div class="results-extra">
+            <div class="extra-stat">
+              <span class="extra-label">Idle Latency</span>
+              <span class="extra-value" id="latencyResult">-</span>
+            </div>
+            <div class="extra-stat">
+              <span class="extra-label">Jitter</span>
+              <span class="extra-value" id="jitterResult">-</span>
+            </div>
+            <div class="extra-stat">
+              <span class="extra-label">Loaded Latency</span>
+              <span class="extra-value" id="loadedLatencyResult">-</span>
+            </div>
+            <div class="extra-stat">
+              <span class="extra-label">Bufferbloat</span>
+              <span class="extra-value" id="bufferbloatResult">-</span>
+            </div>
           </div>
-        </div>
-        <div class="results-extra">
-          <div class="extra-stat">
-            <span class="extra-label">Idle Latency</span>
-            <span class="extra-value" id="latencyResult">-</span>
-          </div>
-          <div class="extra-stat">
-            <span class="extra-label">Jitter</span>
-            <span class="extra-value" id="jitterResult">-</span>
-          </div>
-          <div class="extra-stat">
-            <span class="extra-label">Loaded Latency</span>
-            <span class="extra-value" id="loadedLatencyResult">-</span>
-          </div>
-          <div class="extra-stat">
-            <span class="extra-label">Bufferbloat</span>
-            <span class="extra-value" id="bufferbloatResult">-</span>
-          </div>
-        </div>
-        <div class="results-details">
-          <div class="detail-section">
-            <h3 class="detail-title">Network Information</h3>
-            <div class="detail-grid">
-              <div class="detail-item">
-                <span class="detail-label">IPv4</span>
-                <span class="detail-value" id="networkIPv4">-</span>
+          <div class="results-details">
+            <div class="detail-section">
+              <h3 class="detail-title">Network Information</h3>
+              <div class="detail-grid">
+                <div class="detail-item">
+                  <span class="detail-label">IPv4</span>
+                  <span class="detail-value" id="networkIPv4">-</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">IPv6</span>
+                  <span class="detail-value" id="networkIPv6">-</span>
+                </div>
               </div>
-              <div class="detail-item">
-                <span class="detail-label">IPv6</span>
-                <span class="detail-value" id="networkIPv6">-</span>
+            </div>
+            <div class="detail-section">
+              <h3 class="detail-title" id="serverLabel" style="display: none">
+                Server
+              </h3>
+              <div class="detail-grid">
+                <div class="detail-item" id="serverItem" style="display: none">
+                  <span class="detail-value" id="serverValue">-</span>
+                </div>
+              </div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-grid">
+                <div class="detail-item">
+                  <span class="detail-label">Tested</span>
+                  <span class="detail-value" id="testedAt">-</span>
+                </div>
               </div>
             </div>
           </div>
-          <div class="detail-section">
-            <h3 class="detail-title" id="serverLabel" style="display:none">Server</h3>
-            <div class="detail-grid">
-              <div class="detail-item" id="serverItem" style="display:none">
-                <span class="detail-value" id="serverValue">-</span>
-              </div>
-            </div>
+          <div class="results-actions">
+            <a href="/" class="restart-btn btn-link">Run Your Own Test</a>
           </div>
-          <div class="detail-section">
-            <div class="detail-grid">
-              <div class="detail-item">
-                <span class="detail-label">Tested</span>
-                <span class="detail-value" id="testedAt">-</span>
-              </div>
-            </div>
+        </section>
+
+        <section class="speed-section hidden" id="errorView">
+          <div class="error-view">
+            <div class="error-code">404</div>
+            <div class="error-message">Result not found or has expired.</div>
+            <a href="/" class="restart-btn btn-link">Run a Speed Test</a>
           </div>
+        </section>
+
+        <section
+          class="speed-section hidden"
+          id="loadingView"
+          role="status"
+          aria-live="polite"
+        >
+          <div class="loading loading-text">Loading result...</div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-links">
+          <a class="footer-link" href="/">Speed Test</a>
+          <span class="footer-divider">&middot;</span>
+          <a class="footer-link" href="/skill.html">Skill</a>
+          <span class="footer-divider">&middot;</span>
+          <a
+            class="footer-link"
+            href="https://github.com/saveenergy/openbyte"
+            target="_blank"
+            rel="noopener noreferrer"
+            >GitHub</a
+          >
         </div>
-        <div class="results-actions">
-          <a href="/" class="restart-btn btn-link">Run Your Own Test</a>
-        </div>
-      </section>
+      </footer>
+    </div>
 
-      <section class="speed-section hidden" id="errorView">
-        <div class="error-view">
-          <div class="error-code">404</div>
-          <div class="error-message">Result not found or has expired.</div>
-          <a href="/" class="restart-btn btn-link">Run a Speed Test</a>
-        </div>
-      </section>
-
-      <section class="speed-section hidden" id="loadingView" role="status" aria-live="polite">
-        <div class="loading loading-text">Loading result...</div>
-      </section>
-    </main>
-
-    <footer class="footer">
-      <div class="footer-links">
-        <a class="footer-link" href="/">Speed Test</a>
-        <span class="footer-divider">&middot;</span>
-        <a class="footer-link" href="/skill.html">Skill</a>
-        <span class="footer-divider">&middot;</span>
-        <a class="footer-link" href="https://github.com/saveenergy/openbyte" target="_blank" rel="noopener noreferrer">GitHub</a>
-      </div>
-    </footer>
-  </div>
-
-  <script src="/results.js"></script>
-</body>
+    <script src="/results.js"></script>
+  </body>
 </html>

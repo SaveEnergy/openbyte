@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <a class="skip-link" href="#mainContent">Skip to main content</a>
     <div class="app">
       <!-- Minimal Header -->
       <header class="header">
@@ -32,7 +33,7 @@
       </header>
 
       <!-- Main Speed Display -->
-      <main class="main">
+      <main class="main" id="mainContent">
         <!-- Idle State: Start Button -->
         <section class="speed-section" id="idleState">
           <button class="start-btn" id="startBtn" aria-label="Start speed test">
@@ -42,14 +43,27 @@
         </section>
 
         <!-- Testing State: Speed Counter -->
-        <section class="speed-section hidden" id="testingState">
+        <section
+          class="speed-section hidden"
+          id="testingState"
+          aria-busy="false"
+        >
           <div class="speed-display">
             <div class="speed-number" id="speedNumber">0</div>
             <div class="speed-unit" id="speedUnit">Mbps</div>
           </div>
           <div class="test-type" id="testType">↓ Download</div>
           <div class="progress-ring-container">
-            <svg class="progress-ring" viewBox="0 0 200 200">
+            <svg
+              class="progress-ring"
+              id="progressMeter"
+              viewBox="0 0 200 200"
+              role="progressbar"
+              aria-label="Test progress"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow="0"
+            >
               <circle class="progress-ring-bg" cx="100" cy="100" r="90" />
               <circle
                 class="progress-ring-fill"

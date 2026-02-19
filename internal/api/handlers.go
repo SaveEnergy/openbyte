@@ -30,6 +30,8 @@ const (
 	maxJSONBodyBytes         = 1 << 20
 	defaultStreamDurationSec = 30
 	defaultStreamCount       = 4
+	methodNotAllowedErr      = "method not allowed"
+	contentTypeJSONErr       = "Content-Type must be application/json"
 )
 
 func NewHandler(manager *stream.Manager) *Handler {
@@ -100,12 +102,12 @@ type streamSnapshotResponse struct {
 func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		drainRequestBody(r)
-		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
+		respondJSON(w, map[string]string{"error": methodNotAllowedErr}, http.StatusMethodNotAllowed)
 		return
 	}
 	if !isJSONContentType(r) {
 		drainRequestBody(r)
-		respondJSON(w, map[string]string{"error": "Content-Type must be application/json"}, http.StatusUnsupportedMediaType)
+		respondJSON(w, map[string]string{"error": contentTypeJSONErr}, http.StatusUnsupportedMediaType)
 		return
 	}
 
@@ -201,7 +203,7 @@ func (h *Handler) startCreatedStream(streamID string) error {
 func (h *Handler) GetServers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		drainRequestBody(r)
-		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
+		respondJSON(w, map[string]string{"error": methodNotAllowedErr}, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -281,12 +283,12 @@ func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ReportMetrics(w http.ResponseWriter, r *http.Request, streamID string) {
 	if r.Method != http.MethodPost {
 		drainRequestBody(r)
-		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
+		respondJSON(w, map[string]string{"error": methodNotAllowedErr}, http.StatusMethodNotAllowed)
 		return
 	}
 	if !isJSONContentType(r) {
 		drainRequestBody(r)
-		respondJSON(w, map[string]string{"error": "Content-Type must be application/json"}, http.StatusUnsupportedMediaType)
+		respondJSON(w, map[string]string{"error": contentTypeJSONErr}, http.StatusUnsupportedMediaType)
 		return
 	}
 
@@ -310,12 +312,12 @@ func (h *Handler) ReportMetrics(w http.ResponseWriter, r *http.Request, streamID
 func (h *Handler) CompleteStream(w http.ResponseWriter, r *http.Request, streamID string) {
 	if r.Method != http.MethodPost {
 		drainRequestBody(r)
-		respondJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
+		respondJSON(w, map[string]string{"error": methodNotAllowedErr}, http.StatusMethodNotAllowed)
 		return
 	}
 	if !isJSONContentType(r) {
 		drainRequestBody(r)
-		respondJSON(w, map[string]string{"error": "Content-Type must be application/json"}, http.StatusUnsupportedMediaType)
+		respondJSON(w, map[string]string{"error": contentTypeJSONErr}, http.StatusUnsupportedMediaType)
 		return
 	}
 
