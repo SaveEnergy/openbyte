@@ -193,42 +193,32 @@ func selectFastestServer(configFile *ConfigFile, verbose bool) (*ServerLatency, 
 	if configFile == nil || len(configFile.Servers) == 0 {
 		return nil, fmt.Errorf("no servers configured for auto-selection")
 	}
-
-	results := make(chan ServerLatency, len(configFile.Servers))
-	var wg sync.WaitGroup
-
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
+	allResults := collectServerLatencies(configFile, client)
+	fastest := pickFastestServer(allResults)
+
+	if verbose {
+		printServerLatencies(allResults, fastest)
+	}
+
+	if fastest == nil {
+		return nil, fmt.Errorf("all servers unreachable")
+	}
+
+	return fastest, nil
+}
+
+func collectServerLatencies(configFile *ConfigFile, client *http.Client) []ServerLatency {
+	results := make(chan ServerLatency, len(configFile.Servers))
+	var wg sync.WaitGroup
 
 	for alias, server := range configFile.Servers {
 		wg.Add(1)
 		go func(alias string, server ServerConfig) {
 			defer wg.Done()
-			result := ServerLatency{
-				Alias: alias,
-				URL:   server.URL,
-				Name:  server.Name,
-			}
-
-			healthURL := strings.TrimSuffix(server.URL, "/") + "/health"
-			start := time.Now()
-			resp, err := client.Get(healthURL)
-			result.Latency = time.Since(start)
-			if resp != nil {
-				io.Copy(io.Discard, resp.Body)
-				resp.Body.Close()
-			}
-
-			if err != nil {
-				result.Error = err
-			} else {
-				if resp.StatusCode != http.StatusOK {
-					result.Error = fmt.Errorf("health check failed: %d", resp.StatusCode)
-				}
-			}
-
-			results <- result
+			results <- probeServerLatency(client, alias, server)
 		}(alias, server)
 	}
 
@@ -237,44 +227,71 @@ func selectFastestServer(configFile *ConfigFile, verbose bool) (*ServerLatency, 
 		close(results)
 	}()
 
-	var fastest *ServerLatency
-	var allResults []ServerLatency
-
+	allResults := make([]ServerLatency, 0, len(configFile.Servers))
 	for result := range results {
 		allResults = append(allResults, result)
-		if result.Error == nil {
-			if fastest == nil || result.Latency < fastest.Latency {
-				r := result
-				fastest = &r
-			}
+	}
+	return allResults
+}
+
+func probeServerLatency(client *http.Client, alias string, server ServerConfig) ServerLatency {
+	result := ServerLatency{
+		Alias: alias,
+		URL:   server.URL,
+		Name:  server.Name,
+	}
+
+	healthURL := strings.TrimSuffix(server.URL, "/") + "/health"
+	start := time.Now()
+	resp, err := client.Get(healthURL)
+	result.Latency = time.Since(start)
+	if resp != nil {
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}
+
+	if err != nil {
+		result.Error = err
+		return result
+	}
+	if resp.StatusCode != http.StatusOK {
+		result.Error = fmt.Errorf("health check failed: %d", resp.StatusCode)
+	}
+	return result
+}
+
+func pickFastestServer(allResults []ServerLatency) *ServerLatency {
+	var fastest *ServerLatency
+	for _, result := range allResults {
+		if result.Error != nil {
+			continue
+		}
+		if fastest == nil || result.Latency < fastest.Latency {
+			r := result
+			fastest = &r
 		}
 	}
+	return fastest
+}
 
-	if verbose {
-		fmt.Println("Server latencies:")
-		for _, r := range allResults {
-			status := fmt.Sprintf("%dms", r.Latency.Milliseconds())
-			if r.Error != nil {
-				status = "error"
-			}
-			marker := "  "
-			if fastest != nil && r.Alias == fastest.Alias {
-				marker = "→ "
-			}
-			name := r.Name
-			if name == "" {
-				name = r.Alias
-			}
-			fmt.Printf("%s%-12s %-20s %s\n", marker, r.Alias, name, status)
+func printServerLatencies(allResults []ServerLatency, fastest *ServerLatency) {
+	fmt.Println("Server latencies:")
+	for _, r := range allResults {
+		status := fmt.Sprintf("%dms", r.Latency.Milliseconds())
+		if r.Error != nil {
+			status = "error"
 		}
-		fmt.Println()
+		marker := "  "
+		if fastest != nil && r.Alias == fastest.Alias {
+			marker = "→ "
+		}
+		name := r.Name
+		if name == "" {
+			name = r.Alias
+		}
+		fmt.Printf("%s%-12s %-20s %s\n", marker, r.Alias, name, status)
 	}
-
-	if fastest == nil {
-		return nil, fmt.Errorf("all servers unreachable")
-	}
-
-	return fastest, nil
+	fmt.Println()
 }
 
 func validateConfig(config *Config) error {

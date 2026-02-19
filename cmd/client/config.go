@@ -194,57 +194,51 @@ func applyFlagOverrides(result, flagConfig *Config, configFile *ConfigFile, flag
 	if flagsSet["server"] && flagConfig.Server != "" {
 		applyServerFlagOverride(result, flagConfig, configFile)
 	}
-	if flagsSet["server-url"] && flagConfig.ServerURL != "" {
-		result.ServerURL = flagConfig.ServerURL
+	applyStringOverride(flagsSet, "server-url", flagConfig.ServerURL, func(v string) { result.ServerURL = v })
+	applyStringOverride(flagsSet, "protocol", flagConfig.Protocol, func(v string) { result.Protocol = v })
+	applyStringOverride(flagsSet, "direction", flagConfig.Direction, func(v string) { result.Direction = v })
+	applyPositiveIntOverride(flagsSet, "duration", flagConfig.Duration, func(v int) { result.Duration = v })
+	applyPositiveIntOverride(flagsSet, "streams", flagConfig.Streams, func(v int) { result.Streams = v })
+	applyPositiveIntOverride(flagsSet, "packet-size", flagConfig.PacketSize, func(v int) { result.PacketSize = v })
+	applyPositiveIntOverride(flagsSet, "chunk-size", flagConfig.ChunkSize, func(v int) { result.ChunkSize = v })
+	applyPositiveIntOverride(flagsSet, "timeout", flagConfig.Timeout, func(v int) { result.Timeout = v })
+	applyBoolOverride(flagsSet, "json", flagConfig.JSON, func(v bool) { result.JSON = v })
+	applyBoolOverride(flagsSet, "plain", flagConfig.Plain, func(v bool) { result.Plain = v })
+	applyBoolOverride(flagsSet, "verbose", flagConfig.Verbose, func(v bool) { result.Verbose = v })
+	applyBoolOverride(flagsSet, "quiet", flagConfig.Quiet, func(v bool) { result.Quiet = v })
+	applyBoolOverride(flagsSet, "no-color", flagConfig.NoColor, func(v bool) { result.NoColor = v })
+	applyBoolOverride(flagsSet, "no-progress", flagConfig.NoProgress, func(v bool) { result.NoProgress = v })
+	applyStringOverride(flagsSet, "api-key", flagConfig.APIKey, func(v string) { result.APIKey = v })
+	applyIntOverride(flagsSet, "warmup", flagConfig.WarmUp, func(v int) { result.WarmUp = v })
+	applyBoolOverride(flagsSet, "auto", flagConfig.Auto, func(v bool) { result.Auto = v })
+}
+
+func applyStringOverride(flagsSet map[string]bool, key string, value string, apply func(string)) {
+	if !flagsSet[key] || value == "" {
+		return
 	}
-	if flagsSet["protocol"] && flagConfig.Protocol != "" {
-		result.Protocol = flagConfig.Protocol
+	apply(value)
+}
+
+func applyPositiveIntOverride(flagsSet map[string]bool, key string, value int, apply func(int)) {
+	if !flagsSet[key] || value <= 0 {
+		return
 	}
-	if flagsSet["direction"] && flagConfig.Direction != "" {
-		result.Direction = flagConfig.Direction
+	apply(value)
+}
+
+func applyBoolOverride(flagsSet map[string]bool, key string, value bool, apply func(bool)) {
+	if !flagsSet[key] {
+		return
 	}
-	if flagsSet["duration"] && flagConfig.Duration > 0 {
-		result.Duration = flagConfig.Duration
+	apply(value)
+}
+
+func applyIntOverride(flagsSet map[string]bool, key string, value int, apply func(int)) {
+	if !flagsSet[key] {
+		return
 	}
-	if flagsSet["streams"] && flagConfig.Streams > 0 {
-		result.Streams = flagConfig.Streams
-	}
-	if flagsSet["packet-size"] && flagConfig.PacketSize > 0 {
-		result.PacketSize = flagConfig.PacketSize
-	}
-	if flagsSet["chunk-size"] && flagConfig.ChunkSize > 0 {
-		result.ChunkSize = flagConfig.ChunkSize
-	}
-	if flagsSet["timeout"] && flagConfig.Timeout > 0 {
-		result.Timeout = flagConfig.Timeout
-	}
-	if flagsSet["json"] {
-		result.JSON = flagConfig.JSON
-	}
-	if flagsSet["plain"] {
-		result.Plain = flagConfig.Plain
-	}
-	if flagsSet["verbose"] {
-		result.Verbose = flagConfig.Verbose
-	}
-	if flagsSet["quiet"] {
-		result.Quiet = flagConfig.Quiet
-	}
-	if flagsSet["no-color"] {
-		result.NoColor = flagConfig.NoColor
-	}
-	if flagsSet["no-progress"] {
-		result.NoProgress = flagConfig.NoProgress
-	}
-	if flagsSet["api-key"] && flagConfig.APIKey != "" {
-		result.APIKey = flagConfig.APIKey
-	}
-	if flagsSet["warmup"] {
-		result.WarmUp = flagConfig.WarmUp
-	}
-	if flagsSet["auto"] {
-		result.Auto = flagConfig.Auto
-	}
+	apply(value)
 }
 
 func applyServerFlagOverride(result, flagConfig *Config, configFile *ConfigFile) {

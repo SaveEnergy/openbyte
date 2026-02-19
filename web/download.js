@@ -25,45 +25,57 @@
     "windows_amd64.zip": { arch: "x86_64", short: "amd64" },
   };
 
+  function isMac(platform, ua) {
+    return /Mac/i.test(platform) || /Mac/i.test(ua);
+  }
+
+  function isWindows(platform, ua) {
+    return /Win/i.test(platform) || /Win/i.test(ua);
+  }
+
+  function shouldProbeAppleSilicon(platform, ua) {
+    return (
+      /arm64/i.test(ua) ||
+      (navigator.cpuClass === undefined &&
+        /Mac/.test(platform) &&
+        !/Intel/.test(ua))
+    );
+  }
+
+  function hasAppleSiliconRenderer() {
+    try {
+      const canvas = document.createElement("canvas");
+      const gl = canvas.getContext("webgl");
+      if (!gl) return false;
+      const dbg = gl.getExtension("WEBGL_debug_renderer_info");
+      if (!dbg) return false;
+      const renderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+      return /Apple/.test(renderer) && !/Intel/.test(renderer);
+    } catch (e) {
+      console.debug("download page: GPU renderer probe failed", e);
+      return false;
+    }
+  }
+
+  function detectMacArch(platform, ua) {
+    if (!shouldProbeAppleSilicon(platform, ua)) return "amd64";
+    return hasAppleSiliconRenderer() ? "arm64" : "amd64";
+  }
+
   function detectPlatform() {
     const ua = navigator.userAgent || "";
     // navigator.userAgentData is preferred (navigator.platform is deprecated)
     const platform = navigator.userAgentData?.platform || "";
-    let os = "linux",
-      arch = "amd64";
-
-    if (/Mac/i.test(platform) || /Mac/i.test(ua)) {
-      os = "macos";
-      // Apple Silicon detection
-      if (
-        /arm64/i.test(ua) ||
-        (navigator.cpuClass === undefined &&
-          /Mac/.test(platform) &&
-          !/Intel/.test(ua))
-      ) {
-        // Modern Macs — check via GL renderer if available
-        try {
-          const canvas = document.createElement("canvas");
-          const gl = canvas.getContext("webgl");
-          if (gl) {
-            const dbg = gl.getExtension("WEBGL_debug_renderer_info");
-            if (dbg) {
-              const renderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
-              if (/Apple/.test(renderer) && !/Intel/.test(renderer))
-                arch = "arm64";
-            }
-          }
-        } catch (e) {
-          console.debug("download page: GPU renderer probe failed", e);
-        }
-      }
-    } else if (/Win/i.test(platform) || /Win/i.test(ua)) {
-      os = "windows";
-    } else if (/aarch64|arm64/i.test(ua)) {
-      // Linux/other — check ARM
-      arch = "arm64";
+    if (isMac(platform, ua)) {
+      return { os: "macos", arch: detectMacArch(platform, ua) };
     }
-    return { os, arch };
+    if (isWindows(platform, ua)) {
+      return { os: "windows", arch: "amd64" };
+    }
+    if (/aarch64|arm64/i.test(ua)) {
+      return { os: "linux", arch: "arm64" };
+    }
+    return { os: "linux", arch: "amd64" };
   }
 
   function formatBytes(bytes) {
