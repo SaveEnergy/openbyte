@@ -17,6 +17,13 @@ import (
 const (
 	statusWantFmt     = "status = %d, want %d"
 	exampleBaseURL    = "http://example.com"
+	allowedOriginKey  = "Access-Control-Allow-Origin"
+	cacheControlKey   = "Cache-Control"
+	noStoreHeader     = "no-store"
+	fooOrigin         = "https://foo.example.com"
+	fooOriginWithPort = "https://foo.example.com:8443"
+	resultsDBPath     = "/results.db"
+	resultsNewErrFmt  = "results.New: %v"
 	resultsPagePath   = "/results/abc12345"
 	registryHealthAPI = "/api/v1/registry/health"
 	versionAPIPath    = "/api/v1/version"
@@ -40,7 +47,7 @@ func TestRouterAllowedOriginWildcard(t *testing.T) {
 	router.SetAllowedOrigins([]string{"*.example.com"})
 
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL, nil)
-	req.Header.Set("Origin", "https://foo.example.com")
+	req.Header.Set("Origin", fooOrigin)
 	rec := httptest.NewRecorder()
 
 	handler := router.CORSMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,8 +58,8 @@ func TestRouterAllowedOriginWildcard(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf(statusWantFmt, rec.Code, http.StatusOK)
 	}
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://foo.example.com" {
-		t.Fatalf("allow origin = %q, want %q", got, "https://foo.example.com")
+	if got := rec.Header().Get(allowedOriginKey); got != fooOrigin {
+		t.Fatalf("allow origin = %q, want %q", got, fooOrigin)
 	}
 }
 
@@ -61,7 +68,7 @@ func TestRouterAllowedOriginHostMatch(t *testing.T) {
 	router.SetAllowedOrigins([]string{"foo.example.com"})
 
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL, nil)
-	req.Header.Set("Origin", "https://foo.example.com:8443")
+	req.Header.Set("Origin", fooOriginWithPort)
 	rec := httptest.NewRecorder()
 
 	handler := router.CORSMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -72,8 +79,8 @@ func TestRouterAllowedOriginHostMatch(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf(statusWantFmt, rec.Code, http.StatusOK)
 	}
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://foo.example.com:8443" {
-		t.Fatalf("allow origin = %q, want %q", got, "https://foo.example.com:8443")
+	if got := rec.Header().Get(allowedOriginKey); got != fooOriginWithPort {
+		t.Fatalf("allow origin = %q, want %q", got, fooOriginWithPort)
 	}
 }
 
@@ -90,7 +97,7 @@ func TestRouterRejectsWildcardBypassOrigin(t *testing.T) {
 	}))
 	handler.ServeHTTP(rec, req)
 
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+	if got := rec.Header().Get(allowedOriginKey); got != "" {
 		t.Fatalf("evilexample.com should be rejected, got Allow-Origin = %q", got)
 	}
 }
@@ -129,16 +136,16 @@ func TestStaticHTMLUsesNoStoreCacheControl(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
-	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("cache-control for / = %q, want %q", got, "no-store")
+	if got := rec.Header().Get(cacheControlKey); got != noStoreHeader {
+		t.Fatalf("cache-control for / = %q, want %q", got, noStoreHeader)
 	}
 
 	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+"/download.html", nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
-	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("cache-control for html = %q, want %q", got, "no-store")
+	if got := rec.Header().Get(cacheControlKey); got != noStoreHeader {
+		t.Fatalf("cache-control for html = %q, want %q", got, noStoreHeader)
 	}
 }
 
@@ -152,7 +159,7 @@ func TestStaticJSDoesNotForceNoStore(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
-	if got := rec.Header().Get("Cache-Control"); got == "no-store" {
+	if rec.Header().Get(cacheControlKey) == noStoreHeader {
 		t.Fatalf("cache-control for js should not be no-store")
 	}
 }
@@ -240,9 +247,9 @@ func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
 	handler := api.NewHandler(manager)
 	router := api.NewRouter(handler, config.DefaultConfig())
 
-	store, err := results.New(t.TempDir()+"/results.db", 10)
+	store, err := results.New(t.TempDir()+resultsDBPath, 10)
 	if err != nil {
-		t.Fatalf("results.New: %v", err)
+		t.Fatalf(resultsNewErrFmt, err)
 	}
 	defer store.Close()
 	router.SetResultsHandler(results.NewHandler(store))
@@ -256,8 +263,8 @@ func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf(statusWantFmt, rec.Code, http.StatusOK)
 	}
-	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("cache-control = %q, want %q", got, "no-store")
+	if got := rec.Header().Get(cacheControlKey); got != noStoreHeader {
+		t.Fatalf("cache-control = %q, want %q", got, noStoreHeader)
 	}
 	contentType := rec.Header().Get("Content-Type")
 	if !strings.Contains(contentType, "text/html") {
@@ -270,9 +277,9 @@ func TestResultsPageRouteRejectsInvalidID(t *testing.T) {
 	handler := api.NewHandler(manager)
 	router := api.NewRouter(handler, config.DefaultConfig())
 
-	store, err := results.New(t.TempDir()+"/results.db", 10)
+	store, err := results.New(t.TempDir()+resultsDBPath, 10)
 	if err != nil {
-		t.Fatalf("results.New: %v", err)
+		t.Fatalf(resultsNewErrFmt, err)
 	}
 	defer store.Close()
 	router.SetResultsHandler(results.NewHandler(store))
@@ -321,9 +328,9 @@ func TestResultsPageRouteRateLimited(t *testing.T) {
 	router := api.NewRouter(handler, cfg)
 	router.SetRateLimiter(cfg)
 
-	store, err := results.New(t.TempDir()+"/results.db", 10)
+	store, err := results.New(t.TempDir()+resultsDBPath, 10)
 	if err != nil {
-		t.Fatalf("results.New: %v", err)
+		t.Fatalf(resultsNewErrFmt, err)
 	}
 	defer store.Close()
 	router.SetResultsHandler(results.NewHandler(store))

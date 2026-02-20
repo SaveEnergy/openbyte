@@ -18,7 +18,7 @@ func runStream(ctx context.Context, config *Config, formatter OutputFormatter, s
 	}
 	streamResp, err := startStream(ctx, config)
 	if err != nil {
-		return fmt.Errorf("failed to start stream: %v\n\n"+
+		return fmt.Errorf("failed to start stream: %w\n\n"+
 			"Troubleshooting:\n"+
 			"  - Check server is running: curl %s/health\n"+
 			"  - Verify server URL: openbyte client --server-url %s\n"+
@@ -126,7 +126,7 @@ func handleClientTestCompletion(
 	completeErr := completeStream(ctx, config, streamID, metrics)
 	if completeErr != nil {
 		if runErr != nil && !errors.Is(runErr, context.DeadlineExceeded) && !errors.Is(runErr, context.Canceled) {
-			return fmt.Errorf("%v (and completion report failed: %v)", runErr, completeErr)
+			return fmt.Errorf("%w (and completion report failed: %v)", runErr, completeErr)
 		}
 		return fmt.Errorf("failed to report completion: %w", completeErr)
 	}
@@ -227,7 +227,7 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 func cancelStreamWithCleanup(ctx context.Context, config *Config, streamID string, rootErr error) error {
 	cancelErr := CancelStream(ctx, config.ServerURL, streamID, config.APIKey)
 	if cancelErr != nil {
-		return fmt.Errorf("%v (and cancel cleanup failed: %v)", rootErr, cancelErr)
+		return fmt.Errorf("%w (and cancel cleanup failed: %v)", rootErr, cancelErr)
 	}
 	return rootErr
 }

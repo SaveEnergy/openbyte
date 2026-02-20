@@ -196,7 +196,8 @@ func (c *Collector) Reset() {
 func (c *Collector) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.latencyHistogram = nil
+	// Do not set c.latencyHistogram = nil to avoid data races with RecordLatency
+	// which reads it outside the lock to minimize contention.
 	c.bucketPool = sync.Pool{}
 }
 

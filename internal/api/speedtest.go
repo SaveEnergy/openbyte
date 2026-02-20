@@ -27,7 +27,7 @@ type SpeedTestHandler struct {
 
 const speedtestRandomSize = 4 * 1024 * 1024
 
-func NewSpeedTestHandler(maxConcurrent int, maxDurationSec int) *SpeedTestHandler {
+func NewSpeedTestHandler(maxConcurrent, maxDurationSec int) *SpeedTestHandler {
 	if maxDurationSec <= 0 {
 		maxDurationSec = 300
 	}
@@ -57,7 +57,7 @@ func respondSpeedtestError(w http.ResponseWriter, msg string, code int) {
 }
 
 func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
-	if v := atomic.AddInt64(&h.activeDownloads, 1); v > h.maxConcurrent {
+	if atomic.AddInt64(&h.activeDownloads, 1) > h.maxConcurrent {
 		atomic.AddInt64(&h.activeDownloads, -1)
 		drainRequestBody(r)
 		respondSpeedtestError(w, "too many concurrent downloads", http.StatusServiceUnavailable)
@@ -88,7 +88,7 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	defer drainRequestBody(r)
 
-	if v := atomic.AddInt64(&h.activeUploads, 1); v > h.maxConcurrent {
+	if atomic.AddInt64(&h.activeUploads, 1) > h.maxConcurrent {
 		atomic.AddInt64(&h.activeUploads, -1)
 		respondSpeedtestError(w, "too many concurrent uploads", http.StatusServiceUnavailable)
 		return

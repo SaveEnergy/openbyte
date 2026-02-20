@@ -38,7 +38,7 @@ func TestUDPSenderRemovesClientAndDecrementsCountOnExit(t *testing.T) {
 	if got := atomic.LoadInt32(&client.senderActive); got != 0 {
 		t.Fatalf("client senderActive = %d, want 0", got)
 	}
-	if existing := clients.get(clientKey); existing != nil {
+	if clients.get(clientKey) != nil {
 		t.Fatalf("client %q should be removed from map on sender exit", clientKey)
 	}
 }

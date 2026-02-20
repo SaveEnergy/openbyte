@@ -59,6 +59,7 @@ func Run(args []string, version string) int {
 	flagSet.StringVar(&apiKey, "api-key", "", "API key")
 	help := flagSet.Bool("help", false, "Show help")
 	flagSet.BoolVar(help, "h", false, "Show help (short)")
+	versionFlag := flagSet.Bool("version", false, "Print version")
 
 	if flagSet.Parse(args) != nil {
 		return exitUsage
@@ -66,6 +67,10 @@ func Run(args []string, version string) int {
 
 	if *help {
 		printUsage()
+		return exitSuccess
+	}
+	if *versionFlag {
+		fmt.Printf("openbyte %s\n", version)
 		return exitSuccess
 	}
 
@@ -85,7 +90,7 @@ func Run(args []string, version string) int {
 		writeCheckError(jsonOut, err)
 		return exitFailure
 	}
-	if outputErr := writeCheckResult(jsonOut, result); outputErr != nil {
+	if writeCheckResult(jsonOut, result) != nil {
 		return exitFailure
 	}
 
@@ -187,6 +192,7 @@ Quick connectivity check (~3-5 seconds). Returns grade + key metrics.
 
 Flags:
   -h, --help              Show help
+  --version               Print version
   -S, --server-url string Server URL (default: http://localhost:8080)
   --json                  Output as JSON
   --timeout int           Overall timeout in seconds (default: 10)

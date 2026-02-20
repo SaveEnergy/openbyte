@@ -127,7 +127,7 @@ func (s *Server) acceptTCP() {
 			conn.SetReadBuffer(recvBufferSize)
 			conn.SetWriteBuffer(sendBufferSize)
 
-			if v := atomic.AddInt64(&s.activeTCPConns, 1); v > s.maxTCPConns {
+			if atomic.AddInt64(&s.activeTCPConns, 1) > s.maxTCPConns {
 				atomic.AddInt64(&s.activeTCPConns, -1)
 				conn.Close()
 				continue
@@ -339,7 +339,7 @@ func (c *udpClients) getOrCreate(key string, addr *net.UDPAddr, s *Server) (*udp
 	if existing := c.m[key]; existing != nil {
 		return existing, false
 	}
-	if v := atomic.AddInt64(&s.activeUDPSenders, 1); v > s.maxUDPSenders {
+	if atomic.AddInt64(&s.activeUDPSenders, 1) > s.maxUDPSenders {
 		atomic.AddInt64(&s.activeUDPSenders, -1)
 		return nil, false
 	}

@@ -109,12 +109,17 @@ func Run(args []string, version string) int {
 		return exitFailure
 	}
 	fs, fv := buildServerFlagSet(cfg)
+	versionFlag := fs.Bool("version", false, "Print version")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return exitSuccess
 		}
 		logging.Error("Invalid flags", logging.Field{Key: "error", Value: err})
 		return exitFailure
+	}
+	if *versionFlag {
+		fmt.Printf("openbyte %s\n", version)
+		return exitSuccess
 	}
 	if err := applyServerFlagOverrides(cfg, fs, fv); err != nil {
 		logging.Error("Invalid flag values", logging.Field{Key: "error", Value: err})
@@ -375,7 +380,7 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 		}
 		return out
 	}
-	parseDuration := func(key string, raw string) (time.Duration, error) {
+	parseDuration := func(key, raw string) (time.Duration, error) {
 		d, err := time.ParseDuration(raw)
 		if err != nil {
 			return 0, fmt.Errorf("invalid --%s %q: %w", key, raw, err)

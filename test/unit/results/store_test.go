@@ -13,7 +13,7 @@ import (
 	"encoding/json"
 
 	"github.com/saveenergy/openbyte/internal/results"
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // Registers sqlite driver for direct sql.Open assertions.
 )
 
 const (

@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // Registers sqlite driver used by sql.Open("sqlite", ...).
 	sqlite "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 
@@ -171,7 +171,7 @@ func (s *Store) insertResultWithRetry(id string, r Result, now time.Time) (uniqu
 		}
 		return false, fmt.Errorf("insert result: %w", err)
 	}
-	return false, err
+	panic("unreachable")
 }
 
 func isUniqueViolation(err error) bool {
@@ -217,7 +217,7 @@ func (s *Store) Get(id string) (*Result, error) {
 		}
 		return nil, fmt.Errorf("query result: %w", err)
 	}
-	return nil, fmt.Errorf("%w: query result retries exhausted", ErrStoreRetryable)
+	panic("unreachable")
 }
 
 func (s *Store) cleanup() {
@@ -269,7 +269,7 @@ func (s *Store) execWithBusyRetry(query string, args ...any) (sql.Result, error)
 		}
 		return nil, err
 	}
-	return nil, err
+	panic("unreachable")
 }
 
 func (s *Store) logCleanupCount(msg string, field string, res sql.Result) {

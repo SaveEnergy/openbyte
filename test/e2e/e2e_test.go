@@ -38,6 +38,10 @@ type TestServer struct {
 const (
 	jsonContentType = "application/json"
 	noStoreValue    = "no-store"
+	loopbackIP      = "127.0.0.1"
+	openbyteJSPath  = "/openbyte.js"
+	marshalReqErr   = "Failed to marshal request: %v"
+	startTestErr    = "Failed to start test: %v"
 	streamStartAPI  = "/api/v1/stream/start"
 	httpPrefix      = "http://"
 	httpsPrefix     = "https://"
@@ -63,7 +67,7 @@ func NewTestServer(t *testing.T) *TestServer {
 
 func NewTestServerWithOrigins(t *testing.T, allowedOrigins []string) *TestServer {
 	cfg := config.DefaultConfig()
-	cfg.BindAddress = "127.0.0.1"
+	cfg.BindAddress = loopbackIP
 	cfg.Port = "0"
 	cfg.TCPTestPort = reserveTCPPort(t)
 	cfg.UDPTestPort = reserveUDPPort(t)
@@ -128,14 +132,14 @@ func NewTestServerWithOrigins(t *testing.T, allowedOrigins []string) *TestServer
 		streamServer: streamServer,
 		resultsStore: resultsStore,
 		baseURL:      baseURL,
-		tcpTestAddr:  net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", cfg.TCPTestPort)),
-		udpTestAddr:  net.JoinHostPort("127.0.0.1", fmt.Sprintf("%d", cfg.UDPTestPort)),
+		tcpTestAddr:  net.JoinHostPort(loopbackIP, fmt.Sprintf("%d", cfg.TCPTestPort)),
+		udpTestAddr:  net.JoinHostPort(loopbackIP, fmt.Sprintf("%d", cfg.UDPTestPort)),
 	}
 }
 
 func reserveTCPPort(t *testing.T) int {
 	t.Helper()
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := net.Listen("tcp", loopbackIP+":0")
 	if err != nil {
 		t.Fatalf("reserve tcp port: %v", err)
 	}
@@ -145,7 +149,7 @@ func reserveTCPPort(t *testing.T) int {
 
 func reserveUDPPort(t *testing.T) int {
 	t.Helper()
-	addr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0}
+	addr := &net.UDPAddr{IP: net.ParseIP(loopbackIP), Port: 0}
 	l, err := net.ListenUDP("udp", addr)
 	if err != nil {
 		t.Fatalf("reserve udp port: %v", err)
@@ -205,8 +209,8 @@ func TestPingEndpoint(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("Ping status = %d, want %d", resp.StatusCode, http.StatusOK)
 	}
-	if got := resp.Header.Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("Cache-Control = %q, want %q", got, "no-store")
+	if got := resp.Header.Get("Cache-Control"); got != noStoreValue {
+		t.Fatalf("Cache-Control = %q, want %q", got, noStoreValue)
 	}
 
 	var data map[string]any
@@ -401,7 +405,7 @@ func TestStaticFiles(t *testing.T) {
 	defer ts.Close()
 
 	files := []string{
-		"/openbyte.js",
+		openbyteJSPath,
 		"/style.css",
 	}
 
@@ -420,7 +424,7 @@ func TestStaticFiles(t *testing.T) {
 		}
 
 		contentType := resp.Header.Get("Content-Type")
-		if file == "/openbyte.js" && !strings.Contains(contentType, "javascript") {
+		if file == openbyteJSPath && !strings.Contains(contentType, "javascript") {
 			t.Errorf("%s content-type = %s, want javascript", file, contentType)
 		}
 		if file == "/style.css" && !strings.Contains(contentType, "css") {
@@ -437,7 +441,7 @@ func TestJavaScriptFunctions(t *testing.T) {
 	ts := NewTestServer(t)
 	defer ts.Close()
 
-	resp, err := http.Get(ts.baseURL + "/openbyte.js")
+	resp, err := http.Get(ts.baseURL + openbyteJSPath)
 	if err != nil {
 		t.Fatalf("Failed to load openbyte.js: %v", err)
 	}
@@ -502,7 +506,7 @@ func TestAPIStartTest(t *testing.T) {
 	}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
+		t.Fatalf(marshalReqErr, err)
 	}
 
 	resp, err := http.Post(ts.baseURL+streamStartAPI, jsonContentType, bytes.NewReader(body))
@@ -543,12 +547,12 @@ func TestWebSocketConnection(t *testing.T) {
 	}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
+		t.Fatalf(marshalReqErr, err)
 	}
 
 	resp, err := http.Post(ts.baseURL+"/api/v1/stream/start", "application/json", bytes.NewReader(body))
 	if err != nil {
-		t.Fatalf("Failed to start test: %v", err)
+		t.Fatalf(startTestErr, err)
 	}
 	defer resp.Body.Close()
 
@@ -613,12 +617,12 @@ func TestWebSocketOriginRejected(t *testing.T) {
 	}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
+		t.Fatalf(marshalReqErr, err)
 	}
 
 	resp, err := http.Post(ts.baseURL+streamStartAPI, jsonContentType, bytes.NewReader(body))
 	if err != nil {
-		t.Fatalf("Failed to start test: %v", err)
+		t.Fatalf(startTestErr, err)
 	}
 	defer resp.Body.Close()
 
@@ -664,12 +668,12 @@ func TestFullFlow(t *testing.T) {
 	}
 	body, err := json.Marshal(reqBody)
 	if err != nil {
-		t.Fatalf("Failed to marshal request: %v", err)
+		t.Fatalf(marshalReqErr, err)
 	}
 
 	resp, err := http.Post(ts.baseURL+streamStartAPI, jsonContentType, bytes.NewReader(body))
 	if err != nil {
-		t.Fatalf("Failed to start test: %v", err)
+		t.Fatalf(startTestErr, err)
 	}
 	defer resp.Body.Close()
 

@@ -73,7 +73,7 @@ func TestSpeedTestDownloadWritesData(t *testing.T) {
 	if got := rec.Header().Get("Content-Type"); got != octetStreamType {
 		t.Fatalf("content-type = %q, want %q", got, octetStreamType)
 	}
-	if got := rec.Header().Get("Cache-Control"); got == "" {
+	if rec.Header().Get("Cache-Control") == "" {
 		t.Fatalf("cache-control header missing")
 	}
 	if rec.Body.Len() == 0 {
