@@ -193,6 +193,59 @@ func TestBroadcastMetricsSendsTerminalStatusOnce(t *testing.T) {
 	}
 }
 
+func TestTerminalBroadcastClosesConnection(t *testing.T) {
+	server := obytewebsocket.NewServer()
+	t.Cleanup(server.Close)
+
+	const streamID = "stream-terminal-close"
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server.HandleStream(w, r, streamID)
+	}))
+	defer testServer.Close()
+
+	conn, err := dialWebSocketConn(t, testServer.URL, "")
+	if err != nil {
+		t.Fatalf("dial websocket: %v", err)
+	}
+	defer conn.Close()
+
+	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	if _, _, err := conn.ReadMessage(); err != nil {
+		t.Fatalf("read connected message: %v", err)
+	}
+
+	snapshot := types.StreamSnapshot{
+		Status:    types.StreamStatusCompleted,
+		StartTime: time.Now().Add(-1 * time.Second),
+		Config: types.StreamConfig{
+			Protocol:  types.ProtocolTCP,
+			Direction: types.DirectionDownload,
+			Duration:  1 * time.Second,
+			Streams:   1,
+		},
+	}
+	server.BroadcastMetrics(streamID, snapshot)
+
+	completeCount := 0
+	for {
+		_ = conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+		_, data, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+		var msg map[string]any
+		if err := json.Unmarshal(data, &msg); err != nil {
+			t.Fatalf("unmarshal websocket message: %v", err)
+		}
+		if msg["type"] == "complete" {
+			completeCount++
+		}
+	}
+	if completeCount != 1 {
+		t.Fatalf("complete message count = %d, want 1", completeCount)
+	}
+}
+
 func TestConcurrentBroadcastRemoval(t *testing.T) {
 	server := obytewebsocket.NewServer()
 	t.Cleanup(server.Close)

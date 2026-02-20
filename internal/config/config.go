@@ -70,7 +70,7 @@ type Config struct {
 }
 
 func DefaultConfig() *Config {
-	hostname, _ := os.Hostname()
+	hostname := defaultServerID()
 	return &Config{
 		Port:                  "8080",
 		BindAddress:           "0.0.0.0",
@@ -117,6 +117,14 @@ func DefaultConfig() *Config {
 		TLSKeyFile:            "",
 		TLSAutoGen:            true, // Auto-generate for dev by default
 	}
+}
+
+func defaultServerID() string {
+	hostname, err := os.Hostname()
+	if err != nil || strings.TrimSpace(hostname) == "" {
+		return "openbyte-server"
+	}
+	return hostname
 }
 
 func (c *Config) LoadFromEnv() error {

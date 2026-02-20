@@ -67,7 +67,6 @@ type serverFlagValues struct {
 	registryEnabled    *bool
 	registryMode       *bool
 	registryURL        *string
-	registryAPIKey     *string
 	registryInterval   *string
 	registryServerTTL  *string
 }
@@ -358,7 +357,6 @@ func buildServerFlagSet(cfg *config.Config) (*flag.FlagSet, *serverFlagValues) {
 		registryEnabled:    fs.Bool("registry-enabled", cfg.RegistryEnabled, "Enable registry client mode (env: REGISTRY_ENABLED)"),
 		registryMode:       fs.Bool("registry-mode", cfg.RegistryMode, "Enable registry server mode (env: REGISTRY_MODE)"),
 		registryURL:        fs.String("registry-url", cfg.RegistryURL, "Registry URL (env: REGISTRY_URL)"),
-		registryAPIKey:     fs.String("registry-api-key", cfg.RegistryAPIKey, "Registry API key (env: REGISTRY_API_KEY)"),
 		registryInterval:   fs.String(flagRegistryInterval, cfg.RegistryInterval.String(), "Registry heartbeat interval, e.g. 30s (env: REGISTRY_INTERVAL)"),
 		registryServerTTL:  fs.String(flagRegistryServerTTL, cfg.RegistryServerTTL.String(), "Registry server TTL, e.g. 60s (env: REGISTRY_SERVER_TTL)"),
 	}
@@ -387,6 +385,14 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 		}
 		return d, nil
 	}
+	setDuration := func(key, raw string, target *time.Duration) error {
+		d, err := parseDuration(key, raw)
+		if err != nil {
+			return err
+		}
+		*target = d
+		return nil
+	}
 
 	overrides := map[string]func() error{
 		"port":                  func() error { cfg.Port = *fv.port; return nil },
@@ -402,53 +408,24 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 		"max-concurrent-tests":  func() error { cfg.MaxConcurrentTests = *fv.maxConcurrentTests; return nil },
 		"max-concurrent-per-ip": func() error { cfg.MaxConcurrentPerIP = *fv.maxConcurrentPerIP; return nil },
 		"max-streams":           func() error { cfg.MaxStreams = *fv.maxStreams; return nil },
-		flagMaxTestDuration: func() error {
-			d, err := parseDuration(flagMaxTestDuration, *fv.maxTestDuration)
-			if err != nil {
-				return err
-			}
-			cfg.MaxTestDuration = d
-			return nil
-		},
-		"rate-limit-per-ip":   func() error { cfg.RateLimitPerIP = *fv.rateLimitPerIP; return nil },
-		"global-rate-limit":   func() error { cfg.GlobalRateLimit = *fv.globalRateLimit; return nil },
-		"allowed-origins":     func() error { cfg.AllowedOrigins = applyCSV(*fv.allowedOrigins); return nil },
-		"trust-proxy-headers": func() error { cfg.TrustProxyHeaders = *fv.trustProxyHeaders; return nil },
-		"trusted-proxy-cidrs": func() error { cfg.TrustedProxyCIDRs = applyCSV(*fv.trustedProxyCIDRs); return nil },
-		"data-dir":            func() error { cfg.DataDir = *fv.dataDir; return nil },
-		"max-stored-results":  func() error { cfg.MaxStoredResults = *fv.maxStoredResults; return nil },
-		"web-root":            func() error { cfg.WebRoot = *fv.webRoot; return nil },
-		"pprof-enabled":       func() error { cfg.PprofEnabled = *fv.pprofEnabled; return nil },
-		"pprof-addr":          func() error { cfg.PprofAddress = *fv.pprofAddress; return nil },
-		flagPerfStatsInterval: func() error {
-			d, err := parseDuration(flagPerfStatsInterval, *fv.perfStatsInterval)
-			if err != nil {
-				return err
-			}
-			cfg.PerfStatsInterval = d
-			return nil
-		},
-		"runtime-metrics":  func() error { cfg.RuntimeMetrics = *fv.runtimeMetrics; return nil },
-		"registry-enabled": func() error { cfg.RegistryEnabled = *fv.registryEnabled; return nil },
-		"registry-mode":    func() error { cfg.RegistryMode = *fv.registryMode; return nil },
-		"registry-url":     func() error { cfg.RegistryURL = *fv.registryURL; return nil },
-		"registry-api-key": func() error { cfg.RegistryAPIKey = *fv.registryAPIKey; return nil },
-		flagRegistryInterval: func() error {
-			d, err := parseDuration(flagRegistryInterval, *fv.registryInterval)
-			if err != nil {
-				return err
-			}
-			cfg.RegistryInterval = d
-			return nil
-		},
-		flagRegistryServerTTL: func() error {
-			d, err := parseDuration(flagRegistryServerTTL, *fv.registryServerTTL)
-			if err != nil {
-				return err
-			}
-			cfg.RegistryServerTTL = d
-			return nil
-		},
+		flagMaxTestDuration:     func() error { return setDuration(flagMaxTestDuration, *fv.maxTestDuration, &cfg.MaxTestDuration) },
+		"rate-limit-per-ip":     func() error { cfg.RateLimitPerIP = *fv.rateLimitPerIP; return nil },
+		"global-rate-limit":     func() error { cfg.GlobalRateLimit = *fv.globalRateLimit; return nil },
+		"allowed-origins":       func() error { cfg.AllowedOrigins = applyCSV(*fv.allowedOrigins); return nil },
+		"trust-proxy-headers":   func() error { cfg.TrustProxyHeaders = *fv.trustProxyHeaders; return nil },
+		"trusted-proxy-cidrs":   func() error { cfg.TrustedProxyCIDRs = applyCSV(*fv.trustedProxyCIDRs); return nil },
+		"data-dir":              func() error { cfg.DataDir = *fv.dataDir; return nil },
+		"max-stored-results":    func() error { cfg.MaxStoredResults = *fv.maxStoredResults; return nil },
+		"web-root":              func() error { cfg.WebRoot = *fv.webRoot; return nil },
+		"pprof-enabled":         func() error { cfg.PprofEnabled = *fv.pprofEnabled; return nil },
+		"pprof-addr":            func() error { cfg.PprofAddress = *fv.pprofAddress; return nil },
+		flagPerfStatsInterval:   func() error { return setDuration(flagPerfStatsInterval, *fv.perfStatsInterval, &cfg.PerfStatsInterval) },
+		"runtime-metrics":       func() error { cfg.RuntimeMetrics = *fv.runtimeMetrics; return nil },
+		"registry-enabled":      func() error { cfg.RegistryEnabled = *fv.registryEnabled; return nil },
+		"registry-mode":         func() error { cfg.RegistryMode = *fv.registryMode; return nil },
+		"registry-url":          func() error { cfg.RegistryURL = *fv.registryURL; return nil },
+		flagRegistryInterval:    func() error { return setDuration(flagRegistryInterval, *fv.registryInterval, &cfg.RegistryInterval) },
+		flagRegistryServerTTL:   func() error { return setDuration(flagRegistryServerTTL, *fv.registryServerTTL, &cfg.RegistryServerTTL) },
 	}
 
 	var applyErr error

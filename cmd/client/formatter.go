@@ -13,6 +13,20 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+type messageCodeRule struct {
+	code       string
+	substrings []string
+}
+
+var messageCodeRules = []messageCodeRule{
+	{code: "connection_refused", substrings: []string{"connection refused"}},
+	{code: "server_unavailable", substrings: []string{"no such host"}},
+	{code: "rate_limited", substrings: []string{"429", "rate limit"}},
+	{code: "server_unavailable", substrings: []string{"503", "server at capacity"}},
+	{code: "invalid_config", substrings: []string{"invalid", "must be"}},
+	{code: "timeout", substrings: []string{"timeout", "deadline"}},
+}
+
 // classifyErrorCode maps an error to a machine-readable error code for JSON output.
 func classifyErrorCode(err error) string {
 	if err == nil {
@@ -37,23 +51,28 @@ func classifyErrorCode(err error) string {
 		return "network_error"
 	}
 
-	msg := err.Error()
-	switch {
-	case strings.Contains(msg, "connection refused"):
-		return "connection_refused"
-	case strings.Contains(msg, "no such host"):
-		return "server_unavailable"
-	case strings.Contains(msg, "429") || strings.Contains(msg, "rate limit"):
-		return "rate_limited"
-	case strings.Contains(msg, "503") || strings.Contains(msg, "server at capacity"):
-		return "server_unavailable"
-	case strings.Contains(msg, "invalid") || strings.Contains(msg, "must be"):
-		return "invalid_config"
-	case strings.Contains(msg, "timeout") || strings.Contains(msg, "deadline"):
-		return "timeout"
-	default:
-		return "unknown"
+	if code, ok := classifyMessageErrorCode(err.Error()); ok {
+		return code
 	}
+	return "unknown"
+}
+
+func classifyMessageErrorCode(msg string) (string, bool) {
+	for _, rule := range messageCodeRules {
+		if containsAnySubstring(msg, rule.substrings) {
+			return rule.code, true
+		}
+	}
+	return "", false
+}
+
+func containsAnySubstring(msg string, substrings []string) bool {
+	for _, sub := range substrings {
+		if strings.Contains(msg, sub) {
+			return true
+		}
+	}
+	return false
 }
 
 func (f *JSONFormatter) FormatProgress(progress, elapsed, remaining float64) {

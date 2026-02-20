@@ -222,6 +222,11 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 		if client.writeMessage(websocket.TextMessage, data) != nil {
 			s.removeClient(streamID, client.conn)
 			client.conn.Close()
+			continue
+		}
+		if isTerminal {
+			// Close terminal streams server-side so stale clients cannot leak forever.
+			client.conn.Close()
 		}
 	}
 	s.jsonBufPool.Put(buf)

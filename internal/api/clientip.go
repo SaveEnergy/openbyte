@@ -18,9 +18,17 @@ func NewClientIPResolver(cfg *config.Config) *ClientIPResolver {
 	if cfg == nil {
 		return &ClientIPResolver{}
 	}
+	trustedNetworks, invalidCIDRs := parseTrustedProxyCIDRs(cfg.TrustedProxyCIDRs)
+	trustProxyHeaders := cfg.TrustProxyHeaders
+	if trustProxyHeaders && len(invalidCIDRs) > 0 {
+		// Fail closed on proxy trust when CIDR config is invalid.
+		logging.Error("disabling trusted proxy headers due to invalid trusted CIDRs",
+			logging.Field{Key: "invalid_cidrs", Value: strings.Join(invalidCIDRs, ",")})
+		trustProxyHeaders = false
+	}
 	return &ClientIPResolver{
-		trustProxyHeaders: cfg.TrustProxyHeaders,
-		trustedProxyNets:  parseTrustedProxyCIDRs(cfg.TrustedProxyCIDRs),
+		trustProxyHeaders: trustProxyHeaders,
+		trustedProxyNets:  trustedNetworks,
 	}
 }
 
@@ -73,8 +81,9 @@ func (r *ClientIPResolver) isTrustedProxy(ip net.IP) bool {
 	return false
 }
 
-func parseTrustedProxyCIDRs(cidrs []string) []*net.IPNet {
+func parseTrustedProxyCIDRs(cidrs []string) ([]*net.IPNet, []string) {
 	networks := make([]*net.IPNet, 0, len(cidrs))
+	invalid := make([]string, 0)
 	for _, entry := range cidrs {
 		trimmed := strings.TrimSpace(entry)
 		if trimmed == "" {
@@ -83,13 +92,14 @@ func parseTrustedProxyCIDRs(cidrs []string) []*net.IPNet {
 		_, network, err := net.ParseCIDR(trimmed)
 		if err != nil {
 			logging.Warn("invalid trusted proxy CIDR", logging.Field{Key: "cidr", Value: trimmed}, logging.Field{Key: "error", Value: err})
+			invalid = append(invalid, trimmed)
 			continue
 		}
 		if network != nil {
 			networks = append(networks, network)
 		}
 	}
-	return networks
+	return networks, invalid
 }
 
 func parseRemoteIP(remoteAddr string) net.IP {

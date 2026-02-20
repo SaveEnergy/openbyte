@@ -13,6 +13,8 @@
       content="Open-source internet speed test. Measure download, upload, latency, jitter, and bufferbloat."
     />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="/favicon.svg" />
+    <meta name="theme-color" content="#0a0a0f" />
     <title>openByte</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="style.css" />
@@ -136,6 +138,8 @@
       <!-- Minimal Footer -->
       <footer class="footer">
         <div class="footer-links">
+          <a class="footer-link" href="/">Speed Test</a>
+          <span class="footer-divider">·</span>
           <button class="footer-link" id="showSettings">Settings</button>
           <span class="footer-divider">·</span>
           <a class="footer-link" href="/download.html">Download</a>
@@ -195,11 +199,7 @@
                 <option value="32">32 streams (~5 Gbps+)</option>
               </select>
             </div>
-            <div
-              class="setting-group"
-              id="serverSelectGroup"
-              style="display: none"
-            >
+            <div class="setting-group hidden" id="serverSelectGroup">
               <label class="setting-label" for="serverSelect"
                 >Test Server</label
               >

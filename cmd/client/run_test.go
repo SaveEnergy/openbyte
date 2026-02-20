@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -123,6 +124,41 @@ func TestCreateFormatterSelection(t *testing.T) {
 			got := typeName(f)
 			if got != tc.want {
 				t.Fatalf("formatter type = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+type classifierTimeoutErr struct{}
+
+func (classifierTimeoutErr) Error() string   { return "timeout" }
+func (classifierTimeoutErr) Timeout() bool   { return true }
+func (classifierTimeoutErr) Temporary() bool { return true }
+
+func TestClassifyErrorCode(t *testing.T) {
+	dialErr := &net.OpError{Op: "dial", Err: errors.New("dial failed")}
+	netTimeoutErr := &net.OpError{Op: "read", Err: classifierTimeoutErr{}}
+
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{name: "nil", err: nil, want: "unknown"},
+		{name: "context canceled", err: context.Canceled, want: "cancelled"},
+		{name: "context deadline", err: context.DeadlineExceeded, want: "timeout"},
+		{name: "net dial", err: dialErr, want: "connection_refused"},
+		{name: "net timeout", err: netTimeoutErr, want: "timeout"},
+		{name: "message no such host", err: errors.New("lookup x: no such host"), want: "server_unavailable"},
+		{name: "message rate limited", err: errors.New("request failed with 429"), want: "rate_limited"},
+		{name: "message invalid", err: errors.New("invalid value"), want: "invalid_config"},
+		{name: "fallback unknown", err: errors.New("unexpected failure"), want: "unknown"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := classifyErrorCode(tc.err); got != tc.want {
+				t.Fatalf("classifyErrorCode() = %q, want %q", got, tc.want)
 			}
 		})
 	}

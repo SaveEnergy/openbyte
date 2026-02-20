@@ -29,6 +29,7 @@ var (
 )
 
 // Client is an openByte speed test client targeting a single server.
+// It is safe for concurrent use as long as options are not mutated after New().
 type Client struct {
 	serverURL  string
 	httpClient *http.Client
@@ -49,6 +50,7 @@ func WithHTTPClient(hc *http.Client) Option {
 }
 
 // New creates a new openByte client targeting the given server URL.
+// Returned client should be treated as immutable after construction.
 func New(serverURL string, opts ...Option) *Client {
 	c := &Client{
 		serverURL:  strings.TrimRight(serverURL, "/"),

@@ -70,21 +70,50 @@ func Run(args []string, version string) int {
 	var streamID atomic.Value
 	var interrupted atomic.Bool
 
+	stopInterruptWatcher := startInterruptWatcher(ctx, cancel, config, &streamID, &interrupted)
+	defer stopInterruptWatcher()
+
+	return executeStreamRun(ctx, config, formatter, &streamID, &interrupted)
+}
+
+func startInterruptWatcher(
+	ctx context.Context,
+	cancel context.CancelFunc,
+	config *Config,
+	streamID *atomic.Value,
+	interrupted *atomic.Bool,
+) func() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(sigCh)
+	done := make(chan struct{})
 	go func() {
-		<-sigCh
-		interrupted.Store(true)
-		if id, ok := streamID.Load().(string); ok && id != "" {
-			if err := CancelStream(ctx, config.ServerURL, id, config.APIKey); err != nil {
-				fmt.Fprintf(os.Stderr, "openbyte client: warning: failed to cancel stream %s: %v\n", id, err)
+		select {
+		case <-done:
+			return
+		case <-sigCh:
+			interrupted.Store(true)
+			if id, ok := streamID.Load().(string); ok && id != "" {
+				if err := CancelStream(ctx, config.ServerURL, id, config.APIKey); err != nil {
+					fmt.Fprintf(os.Stderr, "openbyte client: warning: failed to cancel stream %s: %v\n", id, err)
+				}
 			}
+			cancel()
 		}
-		cancel()
 	}()
+	return func() {
+		close(done)
+		signal.Stop(sigCh)
+	}
+}
 
-	if err := runStream(ctx, config, formatter, &streamID); err != nil {
+func executeStreamRun(
+	ctx context.Context,
+	config *Config,
+	formatter OutputFormatter,
+	streamID *atomic.Value,
+	interrupted *atomic.Bool,
+) int {
+	if err := runStream(ctx, config, formatter, streamID); err != nil {
 		if interrupted.Load() && errors.Is(err, context.Canceled) {
 			return exitInterrupt
 		}

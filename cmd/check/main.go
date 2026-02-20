@@ -27,6 +27,7 @@ var (
 const (
 	minTimeoutSeconds = 1
 	maxTimeoutSeconds = 300
+	checkAPIKeyEnv    = "OPENBYTE_API_KEY"
 )
 
 // CheckResult is the structured output of openbyte check.
@@ -56,7 +57,6 @@ func Run(args []string, version string) int {
 	flagSet.StringVar(&serverURL, "S", "http://localhost:8080", "Server URL (short)")
 	flagSet.BoolVar(&jsonOut, "json", false, "Output as JSON")
 	flagSet.IntVar(&timeout, "timeout", 10, "Overall timeout in seconds")
-	flagSet.StringVar(&apiKey, "api-key", "", "API key")
 	help := flagSet.Bool("help", false, "Show help")
 	flagSet.BoolVar(help, "h", false, "Show help (short)")
 	versionFlag := flagSet.Bool("version", false, "Print version")
@@ -80,6 +80,9 @@ func Run(args []string, version string) int {
 		return exitUsage
 	}
 	serverURL = resolvedURL
+	if apiKey == "" {
+		apiKey = strings.TrimSpace(os.Getenv(checkAPIKeyEnv))
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
@@ -196,7 +199,8 @@ Flags:
   -S, --server-url string Server URL (default: http://localhost:8080)
   --json                  Output as JSON
   --timeout int           Overall timeout in seconds (default: 10)
-  --api-key string        API key for authentication
+Environment:
+  OPENBYTE_API_KEY        API key for authentication
 
 Exit codes:
   0   Healthy (grade A-C)

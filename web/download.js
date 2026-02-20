@@ -265,7 +265,7 @@
 
     const keys = Object.keys(commands);
     if (keys.length === 0) return;
-    section.style.display = "";
+    section.classList.remove("hidden");
 
     let activeTab = keys[0];
 

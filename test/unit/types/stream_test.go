@@ -7,18 +7,28 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+const (
+	exampleHost        = "example.com"
+	localhostHost      = "localhost"
+	loopbackIPv4Host   = "127.0.0.1"
+	loopbackIPv6Host   = "::1"
+	streamIDFixture    = "stream-123"
+	httpExampleURL     = "https://example.com"
+	httpsExamplePorted = "https://example.com:8443"
+)
+
 func TestStripHostPort(t *testing.T) {
 	tests := []struct {
 		input string
 		want  string
 	}{
 		{"", ""},
-		{"example.com", "example.com"},
-		{"example.com:8080", "example.com"},
-		{"[::1]:8080", "::1"},
-		{"[::1]", "::1"},
-		{"127.0.0.1:3000", "127.0.0.1"},
-		{"127.0.0.1", "127.0.0.1"},
+		{exampleHost, exampleHost},
+		{exampleHost + ":8080", exampleHost},
+		{"[" + loopbackIPv6Host + "]:8080", loopbackIPv6Host},
+		{"[" + loopbackIPv6Host + "]", loopbackIPv6Host},
+		{loopbackIPv4Host + ":3000", loopbackIPv4Host},
+		{loopbackIPv4Host, loopbackIPv4Host},
 	}
 	for _, tc := range tests {
 		got := types.StripHostPort(tc.input)
@@ -33,12 +43,12 @@ func TestOriginHost(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"https://example.com", "example.com"},
-		{"https://example.com:8443", "example.com"},
-		{"http://localhost:3000", "localhost"},
-		{"http://[::1]:8080", "::1"},
-		{"example.com", "example.com"},
-		{"example.com:8080", "example.com"},
+		{httpExampleURL, exampleHost},
+		{httpsExamplePorted, exampleHost},
+		{"http://" + localhostHost + ":3000", localhostHost},
+		{"http://[" + loopbackIPv6Host + "]:8080", loopbackIPv6Host},
+		{exampleHost, exampleHost},
+		{exampleHost + ":8080", exampleHost},
 		{"", ""},
 	}
 	for _, tc := range tests {
@@ -107,7 +117,7 @@ func TestStreamStateUpdateMetrics(t *testing.T) {
 func TestStreamStateGetState(t *testing.T) {
 	state := &types.StreamState{
 		Config: types.StreamConfig{
-			ID:       "stream-123",
+			ID:       streamIDFixture,
 			Protocol: types.ProtocolTCP,
 		},
 		Status: types.StreamStatusRunning,
@@ -115,8 +125,8 @@ func TestStreamStateGetState(t *testing.T) {
 
 	snapshot := state.GetState()
 
-	if snapshot.Config.ID != "stream-123" {
-		t.Errorf("Snapshot.Config.ID = %v, want stream-123", snapshot.Config.ID)
+	if snapshot.Config.ID != streamIDFixture {
+		t.Errorf("Snapshot.Config.ID = %v, want %s", snapshot.Config.ID, streamIDFixture)
 	}
 	if snapshot.Status != types.StreamStatusRunning {
 		t.Errorf("Snapshot.Status = %v, want %v", snapshot.Status, types.StreamStatusRunning)

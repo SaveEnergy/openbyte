@@ -283,13 +283,27 @@ paths:
   /api/v1/stream/{id}/stream:
     get:
       summary: WebSocket stream for real-time metrics
+      description: |
+        Upgrade this endpoint to WebSocket for live stream metrics/events.
+        Client should connect with `ws://` or `wss://` to this path using a valid stream id.
       operationId: streamMetrics
       tags: [Stream]
       parameters:
         - $ref: "#/components/parameters/StreamID"
       responses:
         "101":
-          description: WebSocket upgrade
+          description: Switching Protocols (WebSocket upgrade accepted)
+          headers:
+            Upgrade:
+              description: Protocol upgraded to websocket
+              schema:
+                type: string
+                example: websocket
+            Connection:
+              description: Upgrade token for protocol switch
+              schema:
+                type: string
+                example: Upgrade
         "400":
           $ref: "#/components/responses/BadRequest"
 

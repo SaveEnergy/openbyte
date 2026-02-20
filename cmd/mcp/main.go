@@ -105,34 +105,54 @@ func diagnoseTool() mcp.Tool {
 // --- Tool Handlers ---
 
 func handleConnectivityCheck(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	serverURL, err := ValidateServerURL(req.GetString("server_url", defaultServerURL))
+	const toolName = "connectivity_check"
+	rawServerURL := req.GetString("server_url", defaultServerURL)
+	serverURL, err := ValidateServerURL(rawServerURL)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(invalidServerURLFmt, err)), nil
+		return toolResultError(toolName, fmt.Errorf(invalidServerURLFmt, err), map[string]any{
+			"server_url":  rawServerURL,
+			"api_key_set": strings.TrimSpace(req.GetString("api_key", "")) != "",
+		}), nil
 	}
 
 	c := clientFromRequest(serverURL, req)
 	result, err := c.Check(ctx)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(connectivityFailedFmt, err)), nil
+		return toolResultError(toolName, fmt.Errorf(connectivityFailedFmt, err), map[string]any{
+			"server_url":  serverURL,
+			"api_key_set": strings.TrimSpace(req.GetString("api_key", "")) != "",
+		}), nil
 	}
 
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(jsonEncodingFailedFmt, err)), nil
+		return toolResultError(toolName, fmt.Errorf(jsonEncodingFailedFmt, err), map[string]any{
+			"server_url": serverURL,
+		}), nil
 	}
 	return mcp.NewToolResultText(string(data)), nil
 }
 
 func handleSpeedTest(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	serverURL, err := ValidateServerURL(req.GetString("server_url", defaultServerURL))
+	const toolName = "speed_test"
+	rawServerURL := req.GetString("server_url", defaultServerURL)
+	serverURL, err := ValidateServerURL(rawServerURL)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(invalidServerURLFmt, err)), nil
+		return toolResultError(toolName, fmt.Errorf(invalidServerURLFmt, err), map[string]any{
+			"server_url":  rawServerURL,
+			"api_key_set": strings.TrimSpace(req.GetString("api_key", "")) != "",
+		}), nil
 	}
 	direction := req.GetString("direction", "download")
 	duration := req.GetInt("duration", 10)
 
 	if err := ValidateSpeedTestInput(direction, duration); err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(speedTestInputFailed, err)), nil
+		return toolResultError(toolName, fmt.Errorf(speedTestInputFailed, err), map[string]any{
+			"server_url":  serverURL,
+			"direction":   direction,
+			"duration":    duration,
+			"api_key_set": strings.TrimSpace(req.GetString("api_key", "")) != "",
+		}), nil
 	}
 
 	c := clientFromRequest(serverURL, req)
@@ -141,33 +161,60 @@ func handleSpeedTest(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 		Duration:  duration,
 	})
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(speedTestFailedFmt, err)), nil
+		return toolResultError(toolName, fmt.Errorf(speedTestFailedFmt, err), map[string]any{
+			"server_url":  serverURL,
+			"direction":   direction,
+			"duration":    duration,
+			"api_key_set": strings.TrimSpace(req.GetString("api_key", "")) != "",
+		}), nil
 	}
 
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(jsonEncodingFailedFmt, err)), nil
+		return toolResultError(toolName, fmt.Errorf(jsonEncodingFailedFmt, err), map[string]any{
+			"server_url": serverURL,
+			"direction":  direction,
+			"duration":   duration,
+		}), nil
 	}
 	return mcp.NewToolResultText(string(data)), nil
 }
 
 func handleDiagnose(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	serverURL, err := ValidateServerURL(req.GetString("server_url", defaultServerURL))
+	const toolName = "diagnose"
+	rawServerURL := req.GetString("server_url", defaultServerURL)
+	serverURL, err := ValidateServerURL(rawServerURL)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(invalidServerURLFmt, err)), nil
+		return toolResultError(toolName, fmt.Errorf(invalidServerURLFmt, err), map[string]any{
+			"server_url":  rawServerURL,
+			"api_key_set": strings.TrimSpace(req.GetString("api_key", "")) != "",
+		}), nil
 	}
 
 	c := clientFromRequest(serverURL, req)
 	result, err := c.Diagnose(ctx)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(diagnosisFailedFmt, err)), nil
+		return toolResultError(toolName, fmt.Errorf(diagnosisFailedFmt, err), map[string]any{
+			"server_url":  serverURL,
+			"api_key_set": strings.TrimSpace(req.GetString("api_key", "")) != "",
+		}), nil
 	}
 
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf(jsonEncodingFailedFmt, err)), nil
+		return toolResultError(toolName, fmt.Errorf(jsonEncodingFailedFmt, err), map[string]any{
+			"server_url": serverURL,
+		}), nil
 	}
 	return mcp.NewToolResultText(string(data)), nil
+}
+
+func toolResultError(tool string, err error, input map[string]any) *mcp.CallToolResult {
+	inputJSON, marshalErr := json.Marshal(input)
+	if marshalErr != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Tool %s failed: %v", tool, err))
+	}
+	return mcp.NewToolResultError(fmt.Sprintf("Tool %s failed: %v (input=%s)", tool, err, string(inputJSON)))
 }
 
 func clientFromRequest(serverURL string, req mcp.CallToolRequest) *client.Client {

@@ -26,6 +26,8 @@ const state = {
   },
   resultId: null,
   shareSavePromise: null,
+  lastAriaProgressUpdateMs: 0,
+  lastAriaProgressValue: -1,
 };
 
 const elements = {
@@ -90,6 +92,7 @@ const TEST_CONFIG = {
   WARMUP_MAX_GRACE_MS: 5000,
   TOAST_ERROR_MS: 5000,
   TOAST_SUCCESS_MS: 2000,
+  ARIA_PROGRESS_UPDATE_MS: 1000,
 };
 let lastModalTrigger = null;
 let toastTimer = null;
@@ -173,10 +176,21 @@ function initSettingsModal() {
   const focusFirstSetting = () => {
     if (elements.duration) elements.duration.focus();
   };
+  let previousBodyOverflow = "";
+
+  const lockBodyScroll = () => {
+    previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+  };
+
+  const unlockBodyScroll = () => {
+    document.body.style.overflow = previousBodyOverflow;
+  };
 
   const openModal = () => {
     lastModalTrigger = document.activeElement;
     elements.settingsModal.showModal();
+    lockBodyScroll();
     requestAnimationFrame(focusFirstSetting);
   };
 
@@ -196,6 +210,7 @@ function initSettingsModal() {
   elements.settingsModal.addEventListener("click", (e) => {
     if (e.target === elements.settingsModal) closeModal();
   });
+  elements.settingsModal.addEventListener("close", unlockBodyScroll);
 }
 
 function loadSettings() {
@@ -527,7 +542,7 @@ function populateServerSelect() {
   );
 
   if (reachableServers.length <= 1) {
-    elements.serverSelectGroup.style.display = "none";
+    elements.serverSelectGroup.classList.add("hidden");
     if (
       reachableServers.length === 1 &&
       (!state.selectedServer ||
@@ -539,7 +554,7 @@ function populateServerSelect() {
     return;
   }
 
-  elements.serverSelectGroup.style.display = "";
+  elements.serverSelectGroup.classList.remove("hidden");
   reachableServers.forEach((server) => {
     const opt = document.createElement("option");
     opt.value = server.id;
@@ -1445,16 +1460,31 @@ function updateProgress(progress) {
   }
   elements.progressRing.style.strokeDashoffset = offset;
   if (elements.progressMeter) {
-    elements.progressMeter.setAttribute(
-      "aria-valuenow",
-      Math.round(progress).toString(),
-    );
+    const roundedProgress = Math.round(progress);
+    const nowMs = performance.now();
+    const isBoundary = roundedProgress <= 0 || roundedProgress >= 100;
+    const valueChanged = roundedProgress !== state.lastAriaProgressValue;
+    const largeStep =
+      Math.abs(roundedProgress - state.lastAriaProgressValue) >= 10;
+    const pastThrottleWindow =
+      nowMs - state.lastAriaProgressUpdateMs >=
+      TEST_CONFIG.ARIA_PROGRESS_UPDATE_MS;
+    if (valueChanged && (isBoundary || largeStep || pastThrottleWindow)) {
+      elements.progressMeter.setAttribute(
+        "aria-valuenow",
+        roundedProgress.toString(),
+      );
+      state.lastAriaProgressValue = roundedProgress;
+      state.lastAriaProgressUpdateMs = nowMs;
+    }
   }
 }
 
 function resetProgress() {
   if (!elements.progressRing || !elements.speedNumber) return;
   state.progress = 0;
+  state.lastAriaProgressUpdateMs = 0;
+  state.lastAriaProgressValue = 0;
   elements.progressRing.style.strokeDashoffset = RING_CIRCUMFERENCE;
   if (elements.progressMeter) {
     elements.progressMeter.setAttribute("aria-valuenow", "0");
@@ -1603,28 +1633,31 @@ async function saveAndEnableShare() {
 async function handleShare() {
   if (state.phase !== "results") return;
 
-  let resultId = state.resultId;
-  if (!resultId) {
+  if (!state.resultId) {
     if (elements.shareBtn) {
       elements.shareBtn.disabled = true;
-      elements.shareBtn.textContent = "Saving...";
+      elements.shareBtn.textContent = "Preparing...";
     }
-    try {
-      resultId = await saveAndEnableShare();
-    } catch (err) {
-      console.debug("Share save unavailable:", err);
-      showError("Unable to create share link right now");
-      return;
-    } finally {
-      if (elements.shareBtn && state.phase === "results") {
-        elements.shareBtn.disabled = false;
-        elements.shareBtn.textContent = "Share";
-      }
-    }
+    saveAndEnableShare()
+      .then(() => {
+        if (elements.shareBtn && state.phase === "results") {
+          elements.shareBtn.disabled = false;
+          elements.shareBtn.textContent = "Share";
+        }
+        showError("Share link ready — tap Share again", false);
+      })
+      .catch((err) => {
+        console.debug("Share save unavailable:", err);
+        if (elements.shareBtn && state.phase === "results") {
+          elements.shareBtn.disabled = false;
+          elements.shareBtn.textContent = "Share";
+        }
+        showError("Unable to create share link right now");
+      });
+    return;
   }
-  if (!resultId) return;
 
-  const url = globalThis.location.origin + "/results/" + resultId;
+  const url = globalThis.location.origin + "/results/" + state.resultId;
   if (navigator.clipboard?.writeText) {
     navigator.clipboard
       .writeText(url)

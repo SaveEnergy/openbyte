@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"net/http"
 	"sync"
@@ -18,6 +19,13 @@ import (
 
 const bearerTokenPrefix = "Bearer "
 
+const (
+	defaultRegistryInterval   = 30 * time.Second
+	maxHeartbeatBackoffFactor = 8
+	heartbeatJitterDivisor    = 5 // 20% jitter
+	minimumJitterWindow       = 5 * time.Millisecond
+)
+
 type Client struct {
 	config     *config.Config
 	httpClient *http.Client
@@ -28,6 +36,8 @@ type Client struct {
 	mu         sync.RWMutex
 	started    bool
 	registered bool
+	rngMu      sync.Mutex
+	rng        *rand.Rand
 }
 
 func NewClient(cfg *config.Config, logger *logging.Logger) *Client {
@@ -47,6 +57,7 @@ func NewClient(cfg *config.Config, logger *logging.Logger) *Client {
 		},
 		logger: logger,
 		stopCh: make(chan struct{}),
+		rng:    rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -216,20 +227,71 @@ func (c *Client) deregister() {
 func (c *Client) heartbeatLoop(getActiveTests func() int) {
 	defer c.wg.Done()
 
-	ticker := time.NewTicker(c.config.RegistryInterval)
-	defer ticker.Stop()
+	baseInterval := c.config.RegistryInterval
+	if baseInterval <= 0 {
+		baseInterval = defaultRegistryInterval
+	}
+	timer := time.NewTimer(baseInterval)
+	defer timer.Stop()
+	failureCount := 0
 
 	for {
 		select {
 		case <-c.stopCh:
 			return
-		case <-ticker.C:
+		case <-timer.C:
 			if err := c.heartbeat(getActiveTests()); err != nil {
+				failureCount++
+				delay := c.nextHeartbeatDelay(baseInterval, failureCount)
 				c.logger.Error("Registry heartbeat failed",
-					logging.Field{Key: "error", Value: err})
+					logging.Field{Key: "error", Value: err},
+					logging.Field{Key: "retry_in_ms", Value: delay.Milliseconds()})
+				timer.Reset(delay)
+				continue
 			}
+			failureCount = 0
+			timer.Reset(c.addJitter(baseInterval))
 		}
 	}
+}
+
+func (c *Client) nextHeartbeatDelay(baseInterval time.Duration, failures int) time.Duration {
+	backoff := baseInterval
+	for i := 1; i < failures && i < maxHeartbeatBackoffFactor; i++ {
+		backoff *= 2
+	}
+	maxBackoff := baseInterval * maxHeartbeatBackoffFactor
+	if backoff > maxBackoff {
+		backoff = maxBackoff
+	}
+	return c.addJitter(backoff)
+}
+
+func (c *Client) addJitter(base time.Duration) time.Duration {
+	if base <= minimumJitterWindow {
+		return base
+	}
+	jitterWindow := base / heartbeatJitterDivisor
+	if jitterWindow <= 0 {
+		return base
+	}
+	max := int64(jitterWindow*2 + 1)
+	offset := c.randomInt63n(max) - int64(jitterWindow)
+	jittered := base + time.Duration(offset)
+	if jittered <= 0 {
+		return base
+	}
+	return jittered
+}
+
+func (c *Client) randomInt63n(n int64) int64 {
+	if n <= 0 {
+		return 0
+	}
+	c.rngMu.Lock()
+	v := c.rng.Int63n(n)
+	c.rngMu.Unlock()
+	return v
 }
 
 func drainAndClose(resp *http.Response, logger *logging.Logger) {

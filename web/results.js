@@ -118,8 +118,8 @@
       return;
     }
     if (refs.serverLabelEl && refs.serverItemEl && refs.serverValueEl) {
-      refs.serverLabelEl.style.display = "";
-      refs.serverItemEl.style.display = "";
+      refs.serverLabelEl.classList.remove("hidden");
+      refs.serverItemEl.classList.remove("hidden");
       refs.serverValueEl.textContent =
         typeof d.server_name === "string"
           ? d.server_name

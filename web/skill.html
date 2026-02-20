@@ -13,6 +13,8 @@
       content="Agent skill for network speed testing: REST API, MCP tools, Go SDK, CLI."
     />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="/favicon.svg" />
+    <meta name="theme-color" content="#0a0a0f" />
     <title>openByte Skill</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="style.css" />
@@ -22,7 +24,7 @@
     <div class="app">
       <header class="header">
         <div class="brand">
-          <a href="/" style="text-decoration: none"
+          <a href="/" class="link-plain"
             ><div class="logo">
               open<span class="logo-accent">Byte</span>
             </div></a
@@ -87,97 +89,101 @@
                 </button>
               </div>
             </div>
-            <table class="skill-table">
-              <thead>
-                <tr>
-                  <th>Tool</th>
-                  <th>Duration</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><code>connectivity_check</code></td>
-                  <td>~3-5s</td>
-                  <td>
-                    Quick latency + burst download/upload. Returns grade A-F.
-                  </td>
-                </tr>
-                <tr>
-                  <td><code>speed_test</code></td>
-                  <td>configurable</td>
-                  <td>Full speed test with direction and duration params.</td>
-                </tr>
-                <tr>
-                  <td><code>diagnose</code></td>
-                  <td>~15-20s</td>
-                  <td>
-                    Comprehensive: 10 latency samples, 5s download, 5s upload.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="skill-table-wrap">
+              <table class="skill-table">
+                <thead>
+                  <tr>
+                    <th>Tool</th>
+                    <th>Duration</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>connectivity_check</code></td>
+                    <td>~3-5s</td>
+                    <td>
+                      Quick latency + burst download/upload. Returns grade A-F.
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><code>speed_test</code></td>
+                    <td>configurable</td>
+                    <td>Full speed test with direction and duration params.</td>
+                  </tr>
+                  <tr>
+                    <td><code>diagnose</code></td>
+                    <td>~15-20s</td>
+                    <td>
+                      Comprehensive: 10 latency samples, 5s download, 5s upload.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <!-- API Endpoints -->
           <div class="dl-section">
             <h2 class="dl-section-title">API Endpoints</h2>
-            <table class="skill-table">
-              <thead>
-                <tr>
-                  <th>Method</th>
-                  <th>Path</th>
-                  <th>Description</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><code>GET</code></td>
-                  <td><code>/health</code></td>
-                  <td>Server health check</td>
-                </tr>
-                <tr>
-                  <td><code>GET</code></td>
-                  <td><code>/api/v1/ping</code></td>
-                  <td>Latency + client IP detection</td>
-                </tr>
-                <tr>
-                  <td><code>GET</code></td>
-                  <td><code>/api/v1/download</code></td>
-                  <td>Download speed test (binary stream)</td>
-                </tr>
-                <tr>
-                  <td><code>POST</code></td>
-                  <td><code>/api/v1/upload</code></td>
-                  <td>Upload speed test (binary body)</td>
-                </tr>
-                <tr>
-                  <td><code>POST</code></td>
-                  <td><code>/api/v1/stream/start</code></td>
-                  <td>Start managed test session</td>
-                </tr>
-                <tr>
-                  <td><code>GET</code></td>
-                  <td><code>/api/v1/stream/{id}/status</code></td>
-                  <td>Poll test status + live metrics</td>
-                </tr>
-                <tr>
-                  <td><code>GET</code></td>
-                  <td><code>/api/v1/stream/{id}/results</code></td>
-                  <td>Final test results</td>
-                </tr>
-                <tr>
-                  <td><code>POST</code></td>
-                  <td><code>/api/v1/results</code></td>
-                  <td>Save test results</td>
-                </tr>
-                <tr>
-                  <td><code>GET</code></td>
-                  <td><code>/api/v1/results/{id}</code></td>
-                  <td>Retrieve saved results</td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="skill-table-wrap">
+              <table class="skill-table">
+                <thead>
+                  <tr>
+                    <th>Method</th>
+                    <th>Path</th>
+                    <th>Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>GET</code></td>
+                    <td><code>/health</code></td>
+                    <td>Server health check</td>
+                  </tr>
+                  <tr>
+                    <td><code>GET</code></td>
+                    <td><code>/api/v1/ping</code></td>
+                    <td>Latency + client IP detection</td>
+                  </tr>
+                  <tr>
+                    <td><code>GET</code></td>
+                    <td><code>/api/v1/download</code></td>
+                    <td>Download speed test (binary stream)</td>
+                  </tr>
+                  <tr>
+                    <td><code>POST</code></td>
+                    <td><code>/api/v1/upload</code></td>
+                    <td>Upload speed test (binary body)</td>
+                  </tr>
+                  <tr>
+                    <td><code>POST</code></td>
+                    <td><code>/api/v1/stream/start</code></td>
+                    <td>Start managed test session</td>
+                  </tr>
+                  <tr>
+                    <td><code>GET</code></td>
+                    <td><code>/api/v1/stream/{id}/status</code></td>
+                    <td>Poll test status + live metrics</td>
+                  </tr>
+                  <tr>
+                    <td><code>GET</code></td>
+                    <td><code>/api/v1/stream/{id}/results</code></td>
+                    <td>Final test results</td>
+                  </tr>
+                  <tr>
+                    <td><code>POST</code></td>
+                    <td><code>/api/v1/results</code></td>
+                    <td>Save test results</td>
+                  </tr>
+                  <tr>
+                    <td><code>GET</code></td>
+                    <td><code>/api/v1/results/{id}</code></td>
+                    <td>Retrieve saved results</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
             <p class="skill-note">
               Public API — no auth required. Full spec:
               <a
@@ -270,47 +276,50 @@ openbyte client -S https://speed.example.com -d upload --json</code></pre>
               All results include an <code>interpretation</code> with grade,
               ratings, and suitability.
             </p>
-            <table class="skill-table skill-table-compact">
-              <thead>
-                <tr>
-                  <th>Grade</th>
-                  <th>Meaning</th>
-                  <th>Suitable For</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>A</td>
-                  <td>Excellent</td>
-                  <td>
-                    Everything: 4K streaming, gaming, video calls, large
-                    transfers
-                  </td>
-                </tr>
-                <tr>
-                  <td>B</td>
-                  <td>Good</td>
-                  <td>
-                    HD streaming, video calls, web browsing, moderate transfers
-                  </td>
-                </tr>
-                <tr>
-                  <td>C</td>
-                  <td>Fair</td>
-                  <td>Web browsing, SD streaming</td>
-                </tr>
-                <tr>
-                  <td>D</td>
-                  <td>Poor</td>
-                  <td>Basic browsing only</td>
-                </tr>
-                <tr>
-                  <td>F</td>
-                  <td>Very poor</td>
-                  <td>Unusable for most workloads</td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="skill-table-wrap">
+              <table class="skill-table skill-table-compact">
+                <thead>
+                  <tr>
+                    <th>Grade</th>
+                    <th>Meaning</th>
+                    <th>Suitable For</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>A</td>
+                    <td>Excellent</td>
+                    <td>
+                      Everything: 4K streaming, gaming, video calls, large
+                      transfers
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>B</td>
+                    <td>Good</td>
+                    <td>
+                      HD streaming, video calls, web browsing, moderate
+                      transfers
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>C</td>
+                    <td>Fair</td>
+                    <td>Web browsing, SD streaming</td>
+                  </tr>
+                  <tr>
+                    <td>D</td>
+                    <td>Poor</td>
+                    <td>Basic browsing only</td>
+                  </tr>
+                  <tr>
+                    <td>F</td>
+                    <td>Very poor</td>
+                    <td>Unusable for most workloads</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <!-- Install Binary -->
@@ -348,7 +357,7 @@ openbyte client -S https://speed.example.com -d upload --json</code></pre>
                   </button>
                 </div>
               </div>
-              <div class="dl-install-block" style="margin-top: var(--space-sm)">
+              <div class="dl-install-block mt-sm">
                 <div class="dl-code-block">
                   <code
                     >docker run -p 8080:8080 -p 8081:8081 -p 8082:8082/udp
@@ -366,10 +375,7 @@ openbyte client -S https://speed.example.com -d upload --json</code></pre>
             </div>
           </div>
 
-          <p
-            class="download-meta"
-            style="margin-top: var(--space-xl); text-align: center"
-          >
+          <p class="download-meta download-meta-centered">
             Full documentation on
             <a
               class="download-link"
@@ -387,6 +393,8 @@ openbyte client -S https://speed.example.com -d upload --json</code></pre>
           <a class="footer-link" href="/">Speed Test</a>
           <span class="footer-divider">&middot;</span>
           <a class="footer-link" href="/download.html">Download</a>
+          <span class="footer-divider">&middot;</span>
+          <a class="footer-link" href="/skill.html">Skill</a>
           <span class="footer-divider">&middot;</span>
           <a
             class="footer-link"

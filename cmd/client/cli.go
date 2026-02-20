@@ -37,10 +37,9 @@ func parseFlags(args []string, version string) (*Config, map[string]bool, int, e
 	flagSet.BoolVar(&config.Quiet, "q", false, "Quiet mode (errors only) (short)")
 	flagSet.BoolVar(&config.NoColor, "no-color", false, "Disable color output")
 	flagSet.BoolVar(&config.NoProgress, "no-progress", false, "Disable progress indicators")
-	flagSet.StringVar(&config.Server, "server", "", "Server alias or URL")
-	flagSet.StringVar(&config.Server, "S", "", "Server alias or URL (short)")
+	flagSet.StringVar(&config.Server, "server", "", "Server alias")
+	flagSet.StringVar(&config.ServerURL, "S", "", "Server URL (short)")
 	flagSet.StringVar(&config.ServerURL, "server-url", "", "Server URL (override)")
-	flagSet.StringVar(&config.APIKey, "api-key", "", "API key for authentication")
 	flagSet.IntVar(&config.Timeout, "timeout", 0, "Request timeout in seconds")
 
 	flagSet.IntVar(&config.WarmUp, "warmup", 2, "Warm-up seconds before measurement")
@@ -97,7 +96,7 @@ func applyFlagAlias(flagsSet map[string]bool, name string) {
 	case "chunk-size":
 		flagsSet["chunk-size"] = true
 	case "S":
-		flagsSet["server"] = true
+		flagsSet["server-url"] = true
 	case "v":
 		flagsSet["verbose"] = true
 	case "q":
@@ -357,7 +356,7 @@ Run network speed test (client-side measurement).
 Server Selection:
   openbyte client <alias>           Use server alias from config
   openbyte client <url>             Use server URL directly
-  openbyte client -S <alias>        Select server by alias
+  openbyte client -S <url>          Use server URL directly
   openbyte client -a, --auto        Auto-select fastest server
   openbyte client --servers         List configured servers
 
@@ -365,7 +364,8 @@ Flags:
   -h, --help              Show help
   --version               Print version
   -a, --auto              Auto-select fastest server (lowest latency)
-  -S, --server string     Server alias or URL
+  -S string               Server URL (short)
+  --server string         Server alias
   --servers               List configured servers
   -p, --protocol string   Protocol: tcp, udp, http (default: tcp)
   -d, --direction string  Direction: download, upload, bidirectional (default: download)
@@ -381,7 +381,6 @@ Flags:
   --no-color              Disable color output
   --no-progress           Disable progress indicators
   --timeout int           Request timeout in seconds (default: 60)
-  --api-key string        API key for authentication
   --server-url string     Override server URL
 
 Measurement:

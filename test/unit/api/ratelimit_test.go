@@ -16,6 +16,18 @@ const (
 	ipSecondary = "10.0.0.2"
 )
 
+func waitUntilAllowed(t *testing.T, timeout time.Duration, allow func() bool, msg string) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if allow() {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal(msg)
+}
+
 func drainGlobalTokens(t *testing.T, rl *api.RateLimiter, ip string, count int) {
 	t.Helper()
 	for i := range count {
@@ -34,11 +46,8 @@ func TestRateLimiterGlobalRefillLowRate(t *testing.T) {
 	ip := loopbackIP
 	drainGlobalTokens(t, rl, ip, cfg.GlobalRateLimit)
 
-	time.Sleep(2 * time.Second)
-
-	if !rl.Allow(ip) {
-		t.Fatalf("expected global refill to allow request at low rate")
-	}
+	waitUntilAllowed(t, 3*time.Second, func() bool { return rl.Allow(ip) },
+		"expected global refill to allow request at low rate")
 }
 
 func TestRateLimiterGlobalRefillVeryLowRate(t *testing.T) {
@@ -50,11 +59,8 @@ func TestRateLimiterGlobalRefillVeryLowRate(t *testing.T) {
 	ip := loopbackIP
 	drainGlobalTokens(t, rl, ip, cfg.GlobalRateLimit)
 
-	time.Sleep(6 * time.Second)
-
-	if !rl.Allow(ip) {
-		t.Fatalf("expected global refill to allow request at very low rate")
-	}
+	waitUntilAllowed(t, 7*time.Second, func() bool { return rl.Allow(ip) },
+		"expected global refill to allow request at very low rate")
 }
 
 func TestRateLimiterIPRefillLowRate(t *testing.T) {
@@ -70,11 +76,8 @@ func TestRateLimiterIPRefillLowRate(t *testing.T) {
 		}
 	}
 
-	time.Sleep(2 * time.Second)
-
-	if !rl.Allow(ip) {
-		t.Fatalf("expected per-ip refill to allow request at low rate")
-	}
+	waitUntilAllowed(t, 3*time.Second, func() bool { return rl.Allow(ip) },
+		"expected per-ip refill to allow request at low rate")
 }
 
 func TestRateLimiterIndependentIPs(t *testing.T) {

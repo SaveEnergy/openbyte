@@ -23,9 +23,14 @@ type SpeedTestHandler struct {
 	maxDurationSec   int
 	clientIPResolver *ClientIPResolver
 	randomData       []byte
+	uploadBufPool    sync.Pool
 }
 
-const speedtestRandomSize = 4 * 1024 * 1024
+const (
+	speedtestRandomSize       = 4 * 1024 * 1024
+	uploadReadBufferSize      = 256 * 1024
+	deadlineCheckWriteSpacing = 64
+)
 
 func NewSpeedTestHandler(maxConcurrent, maxDurationSec int) *SpeedTestHandler {
 	if maxDurationSec <= 0 {
@@ -35,6 +40,11 @@ func NewSpeedTestHandler(maxConcurrent, maxDurationSec int) *SpeedTestHandler {
 		maxConcurrent:  int64(maxConcurrent),
 		maxDurationSec: maxDurationSec,
 		randomData:     make([]byte, speedtestRandomSize),
+		uploadBufPool: sync.Pool{
+			New: func() any {
+				return make([]byte, uploadReadBufferSize)
+			},
+		},
 	}
 	if _, err := rand.Read(handler.randomData); err != nil {
 		logging.Warn("speedtest: random data init failed, using per-request random",
@@ -111,7 +121,7 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	totalBytes, readFailed := readUploadBody(readCtx, r.Body, deadline)
+	totalBytes, readFailed := readUploadBody(readCtx, r.Body, deadline, &h.uploadBufPool)
 	if readFailed {
 		respondSpeedtestError(w, "upload failed", http.StatusInternalServerError)
 		return
@@ -127,8 +137,21 @@ func uploadReadDeadline(start time.Time, maxDurationSec int) time.Time {
 	return start.Add(time.Duration(maxDurationSec) * time.Second)
 }
 
-func readUploadBody(readCtx context.Context, body io.Reader, deadline time.Time) (totalBytes int64, readFailed bool) {
-	buf := make([]byte, 256*1024)
+func readUploadBody(readCtx context.Context, body io.Reader, deadline time.Time, pool *sync.Pool) (totalBytes int64, readFailed bool) {
+	var buf []byte
+	if pool != nil {
+		if pooled := pool.Get(); pooled != nil {
+			if cast, ok := pooled.([]byte); ok && len(cast) >= uploadReadBufferSize {
+				buf = cast[:uploadReadBufferSize]
+			}
+		}
+	}
+	if buf == nil {
+		buf = make([]byte, uploadReadBufferSize)
+	}
+	if pool != nil {
+		defer pool.Put(buf)
+	}
 	now := time.Now()
 	readIterations := 0
 
@@ -176,23 +199,32 @@ func writeUploadResponse(w http.ResponseWriter, controller *http.ResponseControl
 
 func parseDownloadParams(r *http.Request, maxDurationSec int) (time.Duration, int, error) {
 	duration := 10 * time.Second
-	if durationStr := r.URL.Query().Get("duration"); durationStr != "" {
-		d, err := strconv.Atoi(durationStr)
-		if err != nil || d < 1 || d > maxDurationSec {
-			return 0, 0, errors.New("duration must be 1-" + strconv.Itoa(maxDurationSec))
-		}
+	durationRaw := r.URL.Query().Get("duration")
+	if d, ok, err := parseOptionalIntInRange(durationRaw, 1, maxDurationSec, "duration must be 1-"+strconv.Itoa(maxDurationSec)); err != nil {
+		return 0, 0, err
+	} else if ok {
 		duration = time.Duration(d) * time.Second
 	}
 
 	chunkSize := 1048576
-	if cs := r.URL.Query().Get("chunk"); cs != "" {
-		c, err := strconv.Atoi(cs)
-		if err != nil || c < 65536 || c > 4194304 {
-			return 0, 0, errors.New("chunk must be 65536-4194304")
-		}
+	chunkRaw := r.URL.Query().Get("chunk")
+	if c, ok, err := parseOptionalIntInRange(chunkRaw, 65536, 4194304, "chunk must be 65536-4194304"); err != nil {
+		return 0, 0, err
+	} else if ok {
 		chunkSize = c
 	}
 	return duration, chunkSize, nil
+}
+
+func parseOptionalIntInRange(raw string, min, max int, errMessage string) (int, bool, error) {
+	if raw == "" {
+		return 0, false, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < min || value > max {
+		return 0, true, errors.New(errMessage)
+	}
+	return value, true, nil
 }
 
 func (h *SpeedTestHandler) resolveRandomSource() ([]byte, error) {
@@ -217,26 +249,20 @@ func streamDownload(w http.ResponseWriter, r *http.Request, randomSource []byte,
 	flushInterval := 8
 	offset := 0
 	now := time.Now()
-	deadlineTicker := time.NewTicker(100 * time.Millisecond)
-	defer deadlineTicker.Stop()
 
 	for now.Before(deadline) {
-		select {
-		case <-r.Context().Done():
+		if r.Context().Err() != nil {
 			return
-		case <-deadlineTicker.C:
+		}
+		if writeChunkFromSource(w, randomSource, chunkSize, &offset) != nil {
+			return
+		}
+		writeCount++
+		if writeCount%deadlineCheckWriteSpacing == 0 {
 			now = time.Now()
-		default:
-			if writeChunkFromSource(w, randomSource, chunkSize, &offset) != nil {
-				return
-			}
-			writeCount++
-			if writeCount%64 == 0 {
-				now = time.Now()
-			}
-			if canFlush && writeCount%flushInterval == 0 {
-				flusher.Flush()
-			}
+		}
+		if canFlush && writeCount%flushInterval == 0 {
+			flusher.Flush()
 		}
 	}
 	if canFlush {

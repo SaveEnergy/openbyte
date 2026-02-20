@@ -99,6 +99,9 @@ func (r *Router) SetupRoutes(registrars ...RouteRegistrar) http.Handler {
 	if r.runtimeMetrics != nil {
 		mux.HandleFunc("GET /debug/runtime-metrics", r.runtimeMetrics)
 	}
+	mux.HandleFunc("/api/v1/", func(w http.ResponseWriter, req *http.Request) {
+		respondJSON(w, map[string]string{"error": "not found"}, http.StatusNotFound)
+	})
 
 	r.registerResultsPageRoute(mux, webFS)
 
@@ -191,8 +194,7 @@ func (r *Router) registerResultsPageRoute(mux *http.ServeMux, webFS http.FileSys
 	mux.HandleFunc("GET /results/{id}", resultsPageHandler)
 }
 
-func (r *Router) wrapMiddlewares(mux *http.ServeMux) http.Handler {
-	var handler http.Handler = mux
+func (r *Router) wrapMiddlewares(handler http.Handler) http.Handler {
 	if r.limiter != nil {
 		handler = registryRateLimitMiddleware(r.limiter, handler)
 	}
@@ -225,18 +227,16 @@ func registryRateLimitMiddleware(limiter *RateLimiter, next http.Handler) http.H
 
 func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 	allowed := map[string]bool{
-		"index.html":                  true,
-		"download.html":               true,
-		"results.html":                true,
-		"skill.html":                  true,
-		"openbyte.js":                 true,
-		"download.js":                 true,
-		"results.js":                  true,
-		"skill.js":                    true,
-		"style.css":                   true,
-		"favicon.svg":                 true,
-		"openbyte-wordmark-dark.svg":  true,
-		"openbyte-wordmark-light.svg": true,
+		"index.html":    true,
+		"download.html": true,
+		"results.html":  true,
+		"skill.html":    true,
+		"openbyte.js":   true,
+		"download.js":   true,
+		"results.js":    true,
+		"skill.js":      true,
+		"style.css":     true,
+		"favicon.svg":   true,
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -453,7 +453,7 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'self'; "+
 				"font-src 'self'; "+
-				"style-src 'self' 'unsafe-inline'; "+
+				"style-src 'self'; "+
 				"script-src 'self'; "+
 				"img-src 'self' data:; "+
 				"connect-src 'self' https: http: ws: wss:")

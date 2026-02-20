@@ -139,7 +139,7 @@ c := client.New("https://speed.example.com",
 openbyte check                                # localhost
 openbyte check https://speed.example.com      # remote server
 openbyte check --json                         # JSON output for scripts
-openbyte check --json --api-key KEY           # authenticated
+OPENBYTE_API_KEY=KEY openbyte check --json    # authenticated
 ```
 
 Exit codes: `0` = healthy (grade A-C), `1` = degraded (grade D-F) or error.

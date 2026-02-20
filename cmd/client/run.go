@@ -79,24 +79,13 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 	metricsTicker := time.NewTicker(500 * time.Millisecond)
 	defer metricsTicker.Stop()
 
-	var lastMetrics EngineMetrics
-
 	for {
 		select {
 		case err := <-doneCh:
 			return handleClientTestCompletion(ctx, config, formatter, streamResp.StreamID, startTime, engine.GetMetrics(), err)
 
 		case <-metricsTicker.C:
-			lastMetrics = engine.GetMetrics()
-			elapsed := time.Since(startTime)
-			progress, remaining := computeProgress(elapsed, totalRunTime)
-			if err := emitProgressAndMetrics(
-				formatter,
-				engineMetricsToTypesMetrics(lastMetrics),
-				progress,
-				elapsed.Seconds(),
-				remaining,
-			); err != nil {
+			if err := emitCurrentProgress(formatter, startTime, totalRunTime, engine.GetMetrics()); err != nil {
 				cancel()
 				return err
 			}
@@ -125,13 +114,13 @@ func handleClientTestCompletion(
 
 	completeErr := completeStream(ctx, config, streamID, metrics)
 	if completeErr != nil {
-		if runErr != nil && !errors.Is(runErr, context.DeadlineExceeded) && !errors.Is(runErr, context.Canceled) {
+		if shouldReturnRunError(runErr) {
 			return fmt.Errorf("%w (and completion report failed: %v)", runErr, completeErr)
 		}
 		return fmt.Errorf("failed to report completion: %w", completeErr)
 	}
 
-	if runErr != nil && !errors.Is(runErr, context.DeadlineExceeded) && !errors.Is(runErr, context.Canceled) {
+	if shouldReturnRunError(runErr) {
 		return runErr
 	}
 	return nil
@@ -203,16 +192,7 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 			})
 
 		case <-metricsTicker.C:
-			metrics := engine.GetMetrics()
-			elapsed := time.Since(startTime)
-			progress, remaining := computeProgress(elapsed, float64(config.Duration))
-			if err := emitProgressAndMetrics(
-				formatter,
-				engineMetricsToTypesMetrics(metrics),
-				progress,
-				elapsed.Seconds(),
-				remaining,
-			); err != nil {
+			if err := emitCurrentProgress(formatter, startTime, float64(config.Duration), engine.GetMetrics()); err != nil {
 				cancel()
 				return err
 			}
@@ -259,6 +239,23 @@ func emitProgressAndMetrics(
 	return nil
 }
 
+func emitCurrentProgress(
+	formatter OutputFormatter,
+	startTime time.Time,
+	totalSeconds float64,
+	metrics EngineMetrics,
+) error {
+	elapsed := time.Since(startTime)
+	progress, remaining := computeProgress(elapsed, totalSeconds)
+	return emitProgressAndMetrics(
+		formatter,
+		engineMetricsToTypesMetrics(metrics),
+		progress,
+		elapsed.Seconds(),
+		remaining,
+	)
+}
+
 type finalizeHTTPStreamRunInput struct {
 	config       *Config
 	httpCfg      *HTTPTestConfig
@@ -293,10 +290,17 @@ func finalizeHTTPStreamRun(input finalizeHTTPStreamRunInput) error {
 		return fmt.Errorf("formatter output failed: %w", ferr)
 	}
 
-	if input.runErr != nil && !errors.Is(input.runErr, context.DeadlineExceeded) && !errors.Is(input.runErr, context.Canceled) {
+	if shouldReturnRunError(input.runErr) {
 		return input.runErr
 	}
 	return nil
+}
+
+func shouldReturnRunError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled)
 }
 
 func engineMetricsToTypesMetrics(metrics EngineMetrics) *types.Metrics {

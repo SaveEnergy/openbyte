@@ -25,6 +25,7 @@ const (
 	resultsDBPath     = "/results.db"
 	resultsNewErrFmt  = "results.New: %v"
 	resultsPagePath   = "/results/abc12345"
+	apiUnknownPath    = "/api/v1/nonexistent"
 	registryHealthAPI = "/api/v1/registry/health"
 	versionAPIPath    = "/api/v1/version"
 	pingAPIPath       = "/api/v1/ping"
@@ -291,6 +292,28 @@ func TestResultsPageRouteRejectsInvalidID(t *testing.T) {
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf(statusWantFmt, rec.Code, http.StatusNotFound)
+	}
+}
+
+func TestUnknownAPIRouteReturnsJSONNotFound(t *testing.T) {
+	manager := stream.NewManager(10, 10)
+	handler := api.NewHandler(manager)
+	router := api.NewRouter(handler, config.DefaultConfig())
+	h := router.SetupRoutes()
+
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+apiUnknownPath, nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf(statusWantFmt, rec.Code, http.StatusNotFound)
+	}
+	contentType := rec.Header().Get("Content-Type")
+	if !strings.Contains(contentType, "application/json") {
+		t.Fatalf("content-type = %q, want application/json", contentType)
+	}
+	if !strings.Contains(rec.Body.String(), `"error":"not found"`) {
+		t.Fatalf("body = %q, want not found JSON", rec.Body.String())
 	}
 }
 

@@ -13,6 +13,8 @@
       content="Download openByte speed test binaries for Linux, macOS, and Windows."
     />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="/favicon.svg" />
+    <meta name="theme-color" content="#0a0a0f" />
     <title>openByte Downloads</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="style.css" />
@@ -22,7 +24,7 @@
     <div class="app">
       <header class="header">
         <div class="brand">
-          <a href="/" style="text-decoration: none"
+          <a href="/" class="link-plain"
             ><div class="logo">
               open<span class="logo-accent">Byte</span>
             </div></a
@@ -67,7 +69,7 @@
           </div>
 
           <!-- Quick install -->
-          <div class="dl-section" id="installSection" style="display: none">
+          <div class="dl-section hidden" id="installSection">
             <h2 class="dl-section-title">Quick Install</h2>
             <div class="dl-install-block">
               <div class="dl-install-tabs" id="installTabs"></div>
@@ -142,10 +144,7 @@
             </div>
           </div>
 
-          <p
-            class="download-meta"
-            style="margin-top: var(--space-xl); text-align: center"
-          >
+          <p class="download-meta download-meta-centered">
             All releases on
             <a
               class="download-link"
@@ -161,6 +160,8 @@
       <footer class="footer">
         <div class="footer-links">
           <a class="footer-link" href="/">Speed Test</a>
+          <span class="footer-divider">&middot;</span>
+          <a class="footer-link" href="/download.html">Download</a>
           <span class="footer-divider">&middot;</span>
           <a class="footer-link" href="/skill.html">Skill</a>
           <span class="footer-divider">&middot;</span>

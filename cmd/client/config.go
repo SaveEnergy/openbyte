@@ -11,6 +11,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const clientAPIKeyEnv = "OPENBYTE_API_KEY"
+
 type ServerConfig struct {
 	URL    string `yaml:"url"`
 	Name   string `yaml:"name"`
@@ -136,6 +138,7 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 
 func applyDefaults(result *Config) {
 	result.ServerURL = defaultServerURL
+	result.APIKey = strings.TrimSpace(os.Getenv(clientAPIKeyEnv))
 	result.Protocol = defaultProtocol
 	result.Direction = defaultDirection
 	result.Duration = defaultDuration
@@ -208,7 +211,6 @@ func applyFlagOverrides(result, flagConfig *Config, configFile *ConfigFile, flag
 	applyBoolOverride(flagsSet, "quiet", flagConfig.Quiet, func(v bool) { result.Quiet = v })
 	applyBoolOverride(flagsSet, "no-color", flagConfig.NoColor, func(v bool) { result.NoColor = v })
 	applyBoolOverride(flagsSet, "no-progress", flagConfig.NoProgress, func(v bool) { result.NoProgress = v })
-	applyStringOverride(flagsSet, "api-key", flagConfig.APIKey, func(v string) { result.APIKey = v })
 	applyIntOverride(flagsSet, "warmup", flagConfig.WarmUp, func(v int) { result.WarmUp = v })
 	applyBoolOverride(flagsSet, "auto", flagConfig.Auto, func(v bool) { result.Auto = v })
 }

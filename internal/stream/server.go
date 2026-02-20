@@ -34,9 +34,12 @@ type Server struct {
 }
 
 const (
-	sendBufferSize = 256 * 1024
-	recvBufferSize = 256 * 1024
-	randomDataSize = 1024 * 1024
+	sendBufferSize      = 256 * 1024
+	recvBufferSize      = 256 * 1024
+	randomDataSize      = 1024 * 1024
+	tcpReadDeadline     = 5 * time.Second
+	tcpEchoReadDeadline = 1 * time.Second
+	deadlineRefreshOps  = 128
 )
 
 func NewServer(cfg *config.Config) (*Server, error) {
@@ -155,7 +158,7 @@ func (s *Server) handleTCPConnection(conn *net.TCPConn) {
 		conn.SetDeadline(time.Now())
 	}()
 
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(tcpReadDeadline))
 	cmd := make([]byte, 1)
 	if _, err := conn.Read(cmd); err != nil {
 		return
@@ -237,7 +240,7 @@ func (s *Server) writeRandomChunk(conn *net.TCPConn, offset, chunkSize int) (int
 }
 
 func (s *Server) handleUpload(conn *net.TCPConn) {
-	s.readDiscardLoop(conn, 5*time.Second)
+	s.readDiscardLoop(conn, tcpReadDeadline)
 }
 
 func (s *Server) readDiscardLoop(conn *net.TCPConn, deadline time.Duration) {
@@ -251,7 +254,7 @@ func (s *Server) readDiscardLoop(conn *net.TCPConn, deadline time.Duration) {
 		case <-s.stopCh:
 			return
 		default:
-			if readsSinceDeadline >= 128 {
+			if readsSinceDeadline >= deadlineRefreshOps {
 				conn.SetReadDeadline(time.Now().Add(deadline))
 				readsSinceDeadline = 0
 			}
@@ -288,15 +291,15 @@ func (s *Server) handleEcho(conn *net.TCPConn) {
 	buf := s.getRecvBuffer()
 	defer s.recvPool.Put(buf)
 	readsSinceDeadline := 0
-	conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(tcpEchoReadDeadline))
 
 	for {
 		select {
 		case <-s.stopCh:
 			return
 		default:
-			if readsSinceDeadline >= 128 {
-				conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+			if readsSinceDeadline >= deadlineRefreshOps {
+				conn.SetReadDeadline(time.Now().Add(tcpEchoReadDeadline))
 				readsSinceDeadline = 0
 			}
 			n, err := conn.Read(buf)

@@ -118,7 +118,7 @@
 }
 
 html {
-  font-size: 16px;
+  font-size: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -198,6 +198,10 @@ body::before {
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text-primary);
+}
+
+.link-plain {
+  text-decoration: none;
 }
 
 .server-name {
@@ -492,6 +496,15 @@ body::before {
 .download-meta {
   color: var(--text-muted);
   font-size: 0.85rem;
+}
+
+.download-meta-centered {
+  margin-top: var(--space-xl);
+  text-align: center;
+}
+
+.mt-sm {
+  margin-top: var(--space-sm);
 }
 
 /* Install section */
@@ -1514,6 +1527,11 @@ select.setting-input {
   font-size: 0.85rem;
 }
 
+.skill-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
 .skill-table th {
   text-align: left;
   padding: var(--space-sm) var(--space-md);
@@ -1593,6 +1611,7 @@ select.setting-input {
 @media (max-width: 640px) {
   .skill-table {
     font-size: 0.78rem;
+    min-width: 560px;
   }
   .skill-table th,
   .skill-table td {
