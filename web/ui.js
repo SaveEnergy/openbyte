@@ -11,6 +11,9 @@ import {
 import { computeBufferbloatGrade, formatSpeed } from "./utils.js";
 import { updateNetworkDisplay } from "./network.js";
 
+let visualProgress = 0;
+let progressAnimationFrame = 0;
+
 function formatLatencyMs(val) {
   if (typeof val === "number" && Number.isFinite(val) && val > 0) {
     return `${val.toFixed(1)} ms`;
@@ -50,14 +53,19 @@ export function updateSpeed(speed, direction) {
 
 export function updateProgress(progress) {
   if (!elements.progressRing) return;
-  state.progress = progress;
-  let offset = RING_CIRCUMFERENCE - (progress / 100) * RING_CIRCUMFERENCE;
-  if (progress >= 99.5) {
-    offset = -RING_END_OFFSET;
+  const clamped = Math.min(100, Math.max(0, progress));
+  state.progress = clamped;
+  if (!progressAnimationFrame) {
+    progressAnimationFrame = requestAnimationFrame(animateProgressRing);
   }
-  elements.progressRing.style.strokeDashoffset = offset;
+  if (clamped >= 99.5 && clamped > visualProgress) {
+    visualProgress = clamped;
+  }
+  if (visualProgress > state.progress) {
+    visualProgress = state.progress;
+  }
   if (elements.progressMeter) {
-    const roundedProgress = Math.round(progress);
+    const roundedProgress = Math.round(clamped);
     const nowMs = performance.now();
     const isBoundary = roundedProgress <= 0 || roundedProgress >= 100;
     const valueChanged = roundedProgress !== state.lastAriaProgressValue;
@@ -76,9 +84,34 @@ export function updateProgress(progress) {
   }
 }
 
+function animateProgressRing() {
+  progressAnimationFrame = 0;
+  const targetProgress = state.progress;
+  if (!Number.isFinite(targetProgress)) return;
+  const diff = targetProgress - visualProgress;
+  if (Math.abs(diff) > 0.1) {
+    visualProgress += diff * 0.3;
+  } else {
+    visualProgress = targetProgress;
+  }
+  let offset = RING_CIRCUMFERENCE - (visualProgress / 100) * RING_CIRCUMFERENCE;
+  if (visualProgress >= 99.5) {
+    offset = -RING_END_OFFSET;
+  }
+  elements.progressRing.style.strokeDashoffset = offset;
+  if (Math.abs(targetProgress - visualProgress) > 0.1) {
+    progressAnimationFrame = requestAnimationFrame(animateProgressRing);
+  }
+}
+
 export function resetProgress() {
   if (!elements.progressRing || !elements.speedNumber) return;
   state.progress = 0;
+  visualProgress = 0;
+  if (progressAnimationFrame) {
+    cancelAnimationFrame(progressAnimationFrame);
+    progressAnimationFrame = 0;
+  }
   state.lastAriaProgressUpdateMs = 0;
   state.lastAriaProgressValue = 0;
   elements.progressRing.style.strokeDashoffset = RING_CIRCUMFERENCE;

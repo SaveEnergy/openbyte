@@ -163,7 +163,7 @@
   stroke-dasharray: 565.48;
   stroke-dashoffset: 565.48;
   transition:
-    stroke-dashoffset var(--motion-duration-medium) ease,
+    stroke-dashoffset var(--motion-duration-fast) linear,
     stroke var(--motion-duration-medium) ease;
 }
 

@@ -46,16 +46,36 @@ async function runTest(direction, signal) {
   let lastUpdate = startTime;
   let lastBytes = 0;
   let ewmaSpeed = 0;
+  let hasTransferProgress = false;
+  let transferProgress = 0;
+  let maxProgress = 0;
   const ewmaAlpha = TEST_CONFIG.EWMA_ALPHA;
+  const clampProgress = (value) => Math.min(100, Math.max(0, value));
+  const commitProgress = (candidate) => {
+    if (!Number.isFinite(candidate)) return;
+    maxProgress = Math.max(maxProgress, clampProgress(candidate));
+    updateProgress(maxProgress);
+  };
 
   const progressTick = setInterval(() => {
     if (signal.aborted) return;
-    const elapsed = (performance.now() - startTime) / 1000;
-    updateProgress(Math.min(100, (elapsed / duration) * 100));
+    if (hasTransferProgress) {
+      commitProgress(transferProgress);
+      return;
+    }
+    const elapsedSec = (performance.now() - startTime) / 1000;
+    commitProgress((elapsedSec / duration) * 100);
   }, TEST_CONFIG.PROGRESS_TICK_MS);
 
-  const onProgress = (bytes, elapsed) => {
+  const onProgress = (bytes, elapsed, phaseProgress) => {
     if (elapsed > duration) return;
+    if (Number.isFinite(phaseProgress)) {
+      hasTransferProgress = true;
+      transferProgress = Math.max(
+        transferProgress,
+        clampProgress(phaseProgress),
+      );
+    }
     const now = performance.now();
     const intervalMs = now - lastUpdate;
 
@@ -76,7 +96,11 @@ async function runTest(direction, signal) {
         updateSpeed(Math.max(0, ewmaSpeed), direction);
       }
 
-      updateProgress(Math.min(100, (elapsed / duration) * 100));
+      if (hasTransferProgress) {
+        commitProgress(transferProgress);
+      } else {
+        commitProgress((elapsed / duration) * 100);
+      }
 
       lastUpdate = now;
       lastBytes = Math.max(lastBytes, bytes);
@@ -104,7 +128,7 @@ async function runTest(direction, signal) {
   }
 
   if (state.isRunning) {
-    updateProgress(100);
+    commitProgress(100);
   }
 
   return result;

@@ -166,8 +166,13 @@ function processDownloadChunk(value, now, ctx) {
     ctx.endTimeRef.value = now;
   }
   const elapsedSec = (now - ctx.startTime) / 1000;
+  const phaseDurationMs = Math.max(1, ctx.endTimeRef.value - ctx.startTime);
+  const phaseProgress = Math.min(
+    100,
+    Math.max(0, ((now - ctx.startTime) / phaseDurationMs) * 100),
+  );
   const displayBytes = measuring ? s.totalBytes : s.allBytes;
-  ctx.onProgress(displayBytes, elapsedSec);
+  ctx.onProgress(displayBytes, elapsedSec, phaseProgress);
 }
 
 export async function runDownloadTest(duration, onProgress, signal) {
@@ -342,10 +347,15 @@ function recordUploadProgress(
   }
 
   const elapsedSec = (now - startTime) / 1000;
+  const phaseDurationMs = Math.max(1, extra.endTimeRef.value - startTime);
+  const phaseProgress = Math.min(
+    100,
+    Math.max(0, ((now - startTime) / phaseDurationMs) * 100),
+  );
   const displayBytes = measuring
     ? metricsState.totalBytes
     : metricsState.allBytes;
-  onProgress(displayBytes, elapsedSec);
+  onProgress(displayBytes, elapsedSec, phaseProgress);
 }
 
 function handleUploadNonOkResponse(res, metricsState, retryAfterMs) {
