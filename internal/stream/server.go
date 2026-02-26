@@ -33,12 +33,13 @@ type Server struct {
 }
 
 const (
-	sendBufferSize      = 256 * 1024
-	recvBufferSize      = 256 * 1024
-	randomDataSize      = 1024 * 1024
-	tcpReadDeadline     = 5 * time.Second
-	tcpEchoReadDeadline = 1 * time.Second
-	deadlineRefreshOps  = 128
+	sendBufferSize         = 256 * 1024
+	recvBufferSize         = 256 * 1024
+	randomDataSize         = 1024 * 1024
+	tcpReadDeadline        = 5 * time.Second
+	tcpEchoReadDeadline    = 1 * time.Second
+	deadlineRefreshOps     = 128
+	echoMinBytesPerRefresh = 4096 // refresh deadline only after meaningful throughput; prevents slowloris via tiny periodic reads
 )
 
 func NewServer(cfg *config.Config) (*Server, error) {
@@ -289,26 +290,30 @@ func (s *Server) handleBidirectional(conn *net.TCPConn) {
 func (s *Server) handleEcho(conn *net.TCPConn) {
 	buf := s.getRecvBuffer()
 	defer s.recvPool.Put(buf)
-	readsSinceDeadline := 0
-	conn.SetReadDeadline(time.Now().Add(tcpEchoReadDeadline))
+	bytesSinceRefresh := 0
+	deadline := time.Now().Add(tcpEchoReadDeadline)
 
 	for {
 		select {
 		case <-s.stopCh:
 			return
 		default:
-			if readsSinceDeadline >= deadlineRefreshOps {
-				conn.SetReadDeadline(time.Now().Add(tcpEchoReadDeadline))
-				readsSinceDeadline = 0
+			if bytesSinceRefresh >= echoMinBytesPerRefresh {
+				bytesSinceRefresh = 0
+				deadline = time.Now().Add(tcpEchoReadDeadline)
 			}
+			conn.SetReadDeadline(deadline)
 			n, err := conn.Read(buf)
 			if err != nil {
+				if !errors.Is(err, io.EOF) && isTimeoutError(err) {
+					return // idle timeout; close to prevent slowloris via tiny periodic reads
+				}
 				if isRetryableConnReadError(err) {
 					continue
 				}
 				return
 			}
-			readsSinceDeadline++
+			bytesSinceRefresh += n
 
 			if n > 0 {
 				if _, err := conn.Write(buf[:n]); err != nil {

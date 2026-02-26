@@ -155,6 +155,37 @@ func TestServerCloseWithActiveUDPReturnsPromptly(t *testing.T) {
 	}
 }
 
+func TestEchoIdleTimeoutClosesConnection(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.BindAddress = loopbackIPv4
+	cfg.TCPTestPort = 0
+	cfg.UDPTestPort = 0
+
+	srv, err := NewServer(cfg)
+	if err != nil {
+		t.Fatalf(newServerFmt, err)
+	}
+	defer srv.Close()
+
+	addr := srv.tcpListener.Addr().String()
+	conn, err := net.Dial(networkTCP, addr)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer conn.Close()
+
+	if _, err := conn.Write([]byte{0}); err != nil {
+		t.Fatalf("write cmd: %v", err)
+	}
+
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	buf := make([]byte, 1)
+	_, err = conn.Read(buf)
+	if err == nil {
+		t.Error("expected read error (connection closed by idle timeout), got nil")
+	}
+}
+
 func TestServerCloseIdempotentConcurrent(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.BindAddress = loopbackIPv4

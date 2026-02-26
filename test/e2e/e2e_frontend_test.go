@@ -29,11 +29,12 @@ func TestFrontendLoads(t *testing.T) {
 
 	html := string(body)
 
+	// Modular frontend: index uses ES module entry + CSS partials (no style.css monolith)
 	checks := []string{
 		"<title>openByte",
 		"openByte",
 		"openbyte.js",
-		"style.css",
+		"base.css",
 	}
 
 	for _, check := range checks {
@@ -48,34 +49,31 @@ func TestStaticFiles(t *testing.T) {
 	ts := NewTestServer(t)
 	defer ts.Close()
 
-	files := []string{
-		openbyteJSPath,
-		"/style.css",
-	}
+	files := []struct {
+		path       string
+		wantPartCT string
+	}{{openbyteJSPath, "javascript"}, {"/base.css", "css"}}
 
-	for _, file := range files {
-		resp, err := http.Get(ts.baseURL + file)
+	for _, f := range files {
+		resp, err := http.Get(ts.baseURL + f.path)
 		if err != nil {
-			t.Errorf("Failed to load %s: %v", file, err)
+			t.Errorf("Failed to load %s: %v", f.path, err)
 			continue
 		}
 
 		if resp.StatusCode != http.StatusOK {
 			if _, drainErr := io.Copy(io.Discard, resp.Body); drainErr != nil {
-				t.Errorf("failed to drain %s response body: %v", file, drainErr)
+				t.Errorf("failed to drain %s response body: %v", f.path, drainErr)
 			}
-			t.Errorf("%s status = %d, want %d", file, resp.StatusCode, http.StatusOK)
+			t.Errorf("%s status = %d, want %d", f.path, resp.StatusCode, http.StatusOK)
 		}
 
 		contentType := resp.Header.Get("Content-Type")
-		if file == openbyteJSPath && !strings.Contains(contentType, "javascript") {
-			t.Errorf("%s content-type = %s, want javascript", file, contentType)
-		}
-		if file == "/style.css" && !strings.Contains(contentType, "css") {
-			t.Errorf("%s content-type = %s, want css", file, contentType)
+		if f.wantPartCT != "" && !strings.Contains(contentType, f.wantPartCT) {
+			t.Errorf("%s content-type = %s, want %s", f.path, contentType, f.wantPartCT)
 		}
 		if err := resp.Body.Close(); err != nil {
-			t.Errorf("failed to close %s response body: %v", file, err)
+			t.Errorf("failed to close %s response body: %v", f.path, err)
 		}
 	}
 }
@@ -102,30 +100,17 @@ func TestJavaScriptFunctions(t *testing.T) {
 
 	js := string(body)
 
-	requiredFunctions := []string{
-		"function startTest",
-		"function runTest",
-		"function updateSpeed",
-		"function showResults",
-		"function resetToIdle",
-		"function showError",
+	// Modular frontend: ES module entry imports state/ui; orchestration lives in openbyte.js
+	required := []string{
+		"import",
+		"startTest",
+		"resetToIdle",
+		"state.js",
 	}
 
-	for _, fn := range requiredFunctions {
-		if !strings.Contains(js, fn) {
-			t.Errorf("Missing required function: %s", fn)
-		}
-	}
-
-	requiredVars := []string{
-		"apiBase",
-		"const state",
-		"const elements",
-	}
-
-	for _, v := range requiredVars {
-		if !strings.Contains(js, v) {
-			t.Errorf("Missing required variable: %s", v)
+	for _, s := range required {
+		if !strings.Contains(js, s) {
+			t.Errorf("openbyte.js missing expected: %s", s)
 		}
 	}
 

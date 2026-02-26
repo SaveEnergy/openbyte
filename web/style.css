@@ -1,7 +1,0 @@
-/* Entry point: imports partials (each ≤500 LOC) */
-@import url("base.css");
-@import url("download.css");
-@import url("speed.css");
-@import url("modal.css");
-@import url("skill.css");
-@import url("motion.css");

@@ -82,54 +82,45 @@
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| 20260226-sonar-02 | quality | A0 | Done | Burn down newest Sonar findings from post-push reanalysis (`javascript:S1481`, `javascript:S2814`, plus high-frequency `go:S1192` literals in `internal/api/speedtest.go` and `internal/registry/handler.go`). | Targeted cleanup applied (`web/speedtest-http.js`, `internal/api/speedtest.go`, `internal/registry/handler.go`) with focused tests + lint gates green; awaiting next SonarCloud reanalysis after push for remote parity. | `go test -short ./internal/api ./internal/registry && npx prettier --check web/speedtest-http.js && make ci-lint` |
+| _none_ | - | - | - | Active queue clear after 2026-02-26 closure wave. | All listed workstreams closed with local verification; next cycle starts from refreshed Sonar/CI signals. | Trigger CI + Sonar reanalysis and refresh snapshot if needed. |
 
 ### Check Hold (manual/external)
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| 20260217-go-10 | go | A0 | Done | Reduce remaining production complexity/literal hotspots in `cmd/server/main.go`, `internal/api/speedtest.go`, `internal/stream/server.go`, `internal/websocket/server.go`, `cmd/check/main.go`. | Closure verification: race gate re-run in this pass after structural splits; no regressions in target packages. | `go test -race -short ./cmd/server ./internal/api ./internal/stream ./internal/websocket ./cmd/check` |
-| 20260217-go-11 | client | A0 | Done | Clear client-path residuals in `pkg/client/client.go`, `cmd/client/{cli,config,engine,main,run}.go`, `cmd/client/formatter.go` (`go:S3776`, `go:S1186`). | Closure verification: race gate re-run in this pass and client suites remain green after engine file split. | `go test -race -short ./cmd/client ./pkg/client ./test/unit/client` |
-| 20260219-a11y-01 | a11y | A2 | Done | Remediate accessibility gaps: add skip-to-content links on all 4 HTML pages, add `aria-busy` on `#testingState` during test execution, add `role="progressbar"` + `aria-valuenow` on progress ring SVG, add `<main>` landmark to `download.html`/`results.html`/`skill.html`, verify `<dialog>` focus trap cross-browser. | Batch-3 closure: semantic progress/loading elements migrated to native controls, skip links/landmarks and busy state retained, and full UI regression suite green after modal + state flow checks. | `bunx playwright test` |
+| _none_ | - | - | - | No pending manual/external checks. | Last wave completed with local verification. | N/A |
 
 ### Sonar Snapshot (latest recheck)
 
 - Strict OPEN filter parity maintained with Cloud:
   - Query: `projects=[SaveEnergy_openbyte]`, `issueStatuses=[OPEN]`, `ps=500`
-  - Total OPEN: `35`
-  - Current top tracked rules: `go:S1192=14`, `go:S3776=13`, `javascript:S3776=2`, `javascript:S7735=2`, `javascript:S1481=1`, `javascript:S2814=1`, `javascript:S2004=1`, `godre:S8196=1` (MCP live fetch on 2026-02-26; project `SaveEnergy_openbyte`)
+  - Total OPEN: `29`
+  - Current top tracked rules: `go:S3776=13`, `go:S1192=10`, `javascript:S3776=2`, `javascript:S7735=2`, `javascript:S2004=1`, `godre:S8196=1` (MCP live fetch on 2026-02-26; project `SaveEnergy_openbyte`)
   - Rule-to-backlog mapping refreshed:
-    - `go:S1192`, `go:S3776`, `javascript:S3776`, `javascript:S7735`, `javascript:S2004`, `godre:S8196` -> `20260226-sonar-01`
-    - `javascript:S1481`, `javascript:S2814` + targeted `go:S1192` cleanup follow-up -> `20260226-sonar-02`
+    - `go:S1192`, `go:S3776`, `javascript:S3776`, `javascript:S7735`, `javascript:S2004`, `godre:S8196` -> next quality burn-down wave
+    - CI frontend-contract regressions from modularization -> closed in `20260226-ci-10`
     - Security hotspots (`security_hotspots`, `new_security_hotspots`) -> `20260226-sec-02`
-    - Residual `godre:S8196` and high-complexity rows remain under ongoing quality burn-down
+    - Residual `godre:S8196` and complexity rows remain under ongoing quality burn-down
   - Security OPEN issues: `0`
   - Security hotspot debt: `0` total, `0` new (`100%` reviewed overall)
 
 ### Recently Closed IDs
 
 - Most historical IDs intentionally pruned for readability; canonical record remains in git history.
-- Recent close: `20260217-ci-09`.
+- Recent close: `20260226-web-04`.
 - Latest completed wave (moved `Check -> Done -> removed`):
   - `20260217-web-02`, `20260217-go-02`, `20260217-go-03`, `20260217-go-04`, `20260217-go-05`, `20260217-go-06`, `20260217-go-07`, `20260217-go-08`, `20260217-go-09`
   - `20260217-test-02`, `20260217-test-03`, `20260217-test-04`, `20260217-test-05`, `20260217-test-06`, `20260217-test-07`
-  - `20260217-sec-01`, `20260218-go-12`, `20260218-go-13`, `20260219-ui-01`, `20260219-ui-02`, `20260219-web-02`, `20260219-web-05`, `20260219-web-06`, `20260219-ui-03`, `20260219-cli-03`, `20260219-go-16`, `20260219-cli-01`, `20260219-cli-02`, `20260219-ui-04`, `20260219-ui-05`, `20260219-go-15`, `20260217-test-09`, `20260217-test-10`, `20260219-go-17`, `20260219-go-18`, `20260219-go-19`, `20260219-ci-01`, `20260219-doc-01`, `20260219-ui-06`, `20260219-ui-07`, `20260219-go-20`, `20260219-go-21`, `20260220-sec-01`, `20260220-api-01`, `20260219-go-22`, `20260220-web-01`, `20260220-meta-01`, `20260219-sdk-01`, `20260219-reg-01`, `20260219-test-13`, `20260219-test-11`, `20260219-test-12`, `20260226-sec-02`, `20260226-sonar-01`, `20260226-sonar-02`
+  - `20260217-sec-01`, `20260218-go-12`, `20260218-go-13`, `20260219-ui-01`, `20260219-ui-02`, `20260219-web-02`, `20260219-web-05`, `20260219-web-06`, `20260219-ui-03`, `20260219-cli-03`, `20260219-go-16`, `20260219-cli-01`, `20260219-cli-02`, `20260219-ui-04`, `20260219-ui-05`, `20260219-go-15`, `20260217-test-09`, `20260217-test-10`, `20260219-go-17`, `20260219-go-18`, `20260219-go-19`, `20260219-ci-01`, `20260219-doc-01`, `20260219-ui-06`, `20260219-ui-07`, `20260219-go-20`, `20260219-go-21`, `20260220-sec-01`, `20260220-api-01`, `20260219-go-22`, `20260220-web-01`, `20260220-meta-01`, `20260219-sdk-01`, `20260219-reg-01`, `20260219-test-13`, `20260219-test-11`, `20260219-test-12`, `20260226-sec-02`, `20260226-sonar-01`, `20260226-sonar-02`, `20260226-ci-10`, `20260226-go-24`, `20260226-go-25`, `20260226-go-26`, `20260226-sonar-03`, `20260226-api-02`, `20260226-web-03`, `20260226-go-04`, `20260226-web-04`
 
 ### Recent Decision Notes
 
 - Adopted Go 1.26 baseline across runtime and CI/release workflows.
 - Sonar reporting uses strict OPEN parity query (`projects=SaveEnergy_openbyte`, `issueStatuses=OPEN`).
 - Current Sonar MCP surface exposes issue search + metrics, but not hotspot-review transitions; hotspot closure requires Sonar UI/API support outside current MCP tools.
-- 2026-02-26 closure wave used parallel subagents for Go literal/complexity and JS modular Sonar hotspots; local test/format/lint gates passed, with Sonar rule counts awaiting next server-side reanalysis.
-- 2026-02-26 follow-up rerun: Sonar OPEN dropped to `35`; targeted local fixes applied for `web/speedtest-http.js` (`S1481`,`S2814`) and `go:S1192` literals in `internal/api/speedtest.go` + `internal/registry/handler.go` pending remote scan parity after push.
+- 2026-02-26 parallel closure wave (4 subagents): closed all previously open live-queue rows (`ci-10`, `go-24`, `go-25`, `go-26`, `sonar-03`, `api-02`, `web-03`, `go-04`, `web-04`) with green local gates (`make ci-lint`, `go test -short ./...`, `bunx playwright test`); Sonar Cloud OPEN remains `29` pending remote analysis refresh after push.
 - Prefer behavior-preserving refactors + targeted regression tests over broad rewrites.
-- Active backlog rows now keep only unresolved/externally-dependent items; completed/check work is folded into `Recently Closed IDs` to keep queue readable.
-- A2 full-codebase analysis (2026-02-19): identified 9 new backlog items across a11y, CSS architecture, Go LOC splits, test coverage gaps, flaky tests, and frontend UX. Sonar snapshot updated with per-rule breakdown (133 OPEN). Key risk: `cmd/client/engine.go` has zero direct test coverage (541 LOC). UDP `lastSeenUnix` concurrency verified safe (atomic ops). `<dialog>` focus trap assumption needs cross-browser validation.
-- A2 second-pass analysis (2026-02-19): deep-dive into CI/CD, error handling, SDK surface, registry resilience, and frontend runtime. Added 6 new items: error wrapping (`%v`→`%w`), config init hardening (hostname/CIDR), SDK thread-safety docs, registry backoff/jitter, CI pin gaps, deploy docs. Verified false positives: JS single-threaded rules out `startTest` race; `progressTick` cleared in `finally`; `fetchWithTimeout` abort listener properly cleaned via `.finally()`; Alpine BusyBox includes `wget` (health check OK); `TEST_CONFIG` already centralizes most magic numbers. Frontend `state.ws` field confirmed dead code.
-- A1 correctness and reliability pass (2026-02-19): Deep dive on core stream, metrics, and result storage concurrency/invariants. Fixed unreachable return statements masking loop termination intents in `internal/results/store.go` SQLite retry loops. Found and fixed a data race in `internal/metrics/collector.go` where `latencyHistogram` was zeroed during `Close()` while concurrently read without a lock by `RecordLatency`. Verified UDP active counts and server context cancellation limits as safe.
-- A1 third-pass analysis (2026-02-19): frontend accessibility and backend performance critique. Identified WCAG 1.4.4 text scaling barrier in `web/style.css` (`font-size: 16px` on `html`) and screen-reader overwhelming via 100ms `aria-valuenow` `setInterval` updates in `web/openbyte.js`. Found high GC allocation path in `internal/api/speedtest.go` (256KB per HTTP upload via `readUploadBody`) missing `sync.Pool`, and excessive CPU wakeups from per-download stream `100ms` tickers (up to 1,000 wakeups/sec under load). Items added to active queue.
-- A1 fourth-pass analysis (2026-02-19): Deep dive into Web UI edge cases and Go WebSocket behavior. Identified a persistent memory leak in `internal/websocket/server.go` where the server relies entirely on the client to close terminal connections. Found a critical Safari UX bug in `web/openbyte.js` where `await`ing the result save before calling `navigator.clipboard.writeText` causes a `NotAllowedError` by breaking the synchronous user-gesture context. Noted missing background scroll lock (`overflow: hidden`) during modal presentation, causing scroll chaining on mobile. Added to active queue.
-- A2 third-pass analysis (2026-02-20): security deep-dive, web performance, visual critique (browser), dependency health, cross-page consistency. Security posture strong: CORS dot-boundary safe, rate-limiter memory-bounded + timing-safe, path traversal blocked by allowlist + Clean + `..` check, share ID crypto-secure (`crypto/rand` + rejection sampling), API key constant-time compare. `govulncheck` clean; all deps current. Added 5 new items: CSP `'unsafe-inline'` removal (10 inline attrs convertible to CSS classes), API JSON 404, web perf (font preload/defer/compression), meta/SEO/footer consistency, skill page responsive tables + dead SVG cleanup.
+- Active backlog rows keep only unresolved/external items; completed/check work is folded into `Recently Closed IDs`.
 
 ### Verification Baseline
 

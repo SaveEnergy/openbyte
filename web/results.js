@@ -1,4 +1,6 @@
-(function () {
+/** Results page: load shared result by ID, render speed/latency/bufferbloat. */
+
+(function init() {
   const loadingView = document.getElementById("loadingView");
   const resultView = document.getElementById("resultView");
   const errorView = document.getElementById("errorView");

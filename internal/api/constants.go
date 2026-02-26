@@ -9,4 +9,10 @@ const (
 	errOriginNotAllowed  = "origin not allowed"
 	apiV1Prefix          = "/api/v1"
 	apiV1RegistryPrefix  = "/api/v1/registry/"
+
+	headerCacheControl = "Cache-Control"
+	valueNoStore       = "no-store"
+	headerRetryAfter   = "Retry-After"
+	retryAfterSec      = "60"
+	resultsHTML        = "results.html"
 )

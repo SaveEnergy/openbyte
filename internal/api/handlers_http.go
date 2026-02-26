@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	stdErrors "errors"
 	"io"
@@ -8,12 +9,17 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/logging"
 	"github.com/saveenergy/openbyte/pkg/errors"
 	"github.com/saveenergy/openbyte/pkg/types"
 )
+
+var jsonBufPool = sync.Pool{
+	New: func() any { return &bytes.Buffer{} },
+}
 
 func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any, limit int64) error {
 	if limit > 0 {
@@ -86,16 +92,28 @@ func respondJSONBodyError(w http.ResponseWriter, err error) {
 }
 
 func respondJSON(w http.ResponseWriter, data any, statusCode int) {
-	payload, err := json.Marshal(data)
-	if err != nil {
+	buf, ok := jsonBufPool.Get().(*bytes.Buffer)
+	if !ok {
+		buf = &bytes.Buffer{}
+	}
+	defer func() {
+		buf.Reset()
+		jsonBufPool.Put(buf)
+	}()
+	encoder := json.NewEncoder(buf)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(data); err != nil {
 		logging.Warn("JSON response marshal failed",
 			logging.Field{Key: "error", Value: err})
 		statusCode = http.StatusInternalServerError
-		payload = []byte(`{"error":"internal error"}` + "\n")
+		buf.Reset()
+		buf.WriteString(`{"error":"internal error"}`)
+	} else if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] == '\n' {
+		buf.Truncate(buf.Len() - 1) // match json.Marshal output (no trailing newline)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	if _, err := w.Write(payload); err != nil {
+	if _, err := w.Write(buf.Bytes()); err != nil {
 		logging.Warn("JSON response write failed",
 			logging.Field{Key: "error", Value: err})
 	}

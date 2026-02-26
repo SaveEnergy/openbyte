@@ -17,13 +17,14 @@ import (
 )
 
 type SpeedTestHandler struct {
-	activeDownloads  int64
-	activeUploads    int64
-	maxConcurrent    int64
-	maxDurationSec   int
-	clientIPResolver *ClientIPResolver
-	randomData       []byte
-	uploadBufPool    sync.Pool
+	activeDownloads    int64
+	activeUploads      int64
+	maxConcurrent      int64
+	maxDurationSec     int
+	clientIPResolver   *ClientIPResolver
+	randomData         []byte
+	uploadBufPool      sync.Pool
+	fallbackRandomPool sync.Pool
 }
 
 const (
@@ -39,14 +40,16 @@ func NewSpeedTestHandler(maxConcurrent, maxDurationSec int) *SpeedTestHandler {
 	if maxDurationSec <= 0 {
 		maxDurationSec = 300
 	}
+	const fallbackRandomSize = 64 * 1024
 	handler := &SpeedTestHandler{
 		maxConcurrent:  int64(maxConcurrent),
 		maxDurationSec: maxDurationSec,
 		randomData:     make([]byte, speedtestRandomSize),
 		uploadBufPool: sync.Pool{
-			New: func() any {
-				return make([]byte, uploadReadBufferSize)
-			},
+			New: func() any { return make([]byte, uploadReadBufferSize) },
+		},
+		fallbackRandomPool: sync.Pool{
+			New: func() any { return make([]byte, fallbackRandomSize) },
 		},
 	}
 	if _, err := rand.Read(handler.randomData); err != nil {
@@ -86,14 +89,15 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set(headerContentType, contentTypeOctetStream)
-	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set(headerCacheControl, valueNoStore)
 
-	randomSource, err := h.resolveRandomSource()
+	randomSource, release, err := h.resolveRandomSource()
 	if err != nil {
 		drainRequestBody(r)
 		respondSpeedtestError(w, "failed to generate random data", http.StatusInternalServerError)
 		return
 	}
+	defer release()
 
 	streamDownload(w, r, randomSource, chunkSize, duration)
 }
@@ -230,17 +234,28 @@ func parseOptionalIntInRange(raw string, min, max int, errMessage string) (int, 
 	return value, true, nil
 }
 
-func (h *SpeedTestHandler) resolveRandomSource() ([]byte, error) {
-	randomSource := h.randomData
-	if len(randomSource) != 0 {
-		return randomSource, nil
+// resolveRandomSource returns data source and release func. Call release when done.
+func (h *SpeedTestHandler) resolveRandomSource() ([]byte, func(), error) {
+	if len(h.randomData) != 0 {
+		return h.randomData, func() {}, nil
 	}
-	// Keep fallback allocation bounded; stream logic handles chunk expansion.
-	randomSource = make([]byte, 64*1024)
+	pooled, _ := h.fallbackRandomPool.Get().([]byte)
+	const fallbackSize = 64 * 1024
+	if len(pooled) < fallbackSize {
+		pooled = make([]byte, fallbackSize)
+	}
+	randomSource := pooled[:fallbackSize]
 	if _, err := rand.Read(randomSource); err != nil {
-		return nil, err
+		if cap(pooled) >= fallbackSize {
+			h.fallbackRandomPool.Put(pooled)
+		}
+		return nil, nil, err
 	}
-	return randomSource, nil
+	return randomSource, func() {
+		if cap(pooled) >= fallbackSize {
+			h.fallbackRandomPool.Put(pooled)
+		}
+	}, nil
 }
 
 func streamDownload(w http.ResponseWriter, r *http.Request, randomSource []byte, chunkSize int, duration time.Duration) {
@@ -279,7 +294,7 @@ func (h *SpeedTestHandler) Ping(w http.ResponseWriter, r *http.Request) {
 	isIPv6 := strings.Contains(clientIP, ":")
 
 	w.Header().Set(headerContentType, contentTypeJSON)
-	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set(headerCacheControl, valueNoStore)
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]any{
 		"pong":      true,

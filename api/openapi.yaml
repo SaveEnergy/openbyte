@@ -74,6 +74,8 @@ paths:
               schema:
                 type: string
                 format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "429":
           $ref: "#/components/responses/RateLimited"
         "503":
@@ -140,6 +142,7 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/StartStreamRequest"
+        description: Content-Type must be application/json. Max 1MB.
       responses:
         "201":
           description: Stream created
@@ -149,6 +152,14 @@ paths:
                 $ref: "#/components/schemas/StartStreamResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/RequestEntityTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
         "429":
           $ref: "#/components/responses/RateLimited"
         "503":
@@ -168,6 +179,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/StreamSnapshot"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -195,6 +208,8 @@ paths:
                   status:
                     type: string
                     example: stream not completed
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -216,6 +231,8 @@ paths:
                   status:
                     type: string
                     example: cancelled
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -232,6 +249,7 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/Metrics"
+        description: Content-Type must be application/json. Max 1MB.
       responses:
         "202":
           description: Metrics accepted
@@ -243,8 +261,16 @@ paths:
                   status:
                     type: string
                     example: accepted
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/RequestEntityTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/v1/stream/{id}/complete:
     post:
@@ -266,6 +292,7 @@ paths:
                   enum: [completed, failed]
                 metrics:
                   $ref: "#/components/schemas/Metrics"
+        description: Content-Type must be application/json. Max 1MB.
       responses:
         "200":
           description: Stream completed
@@ -277,8 +304,16 @@ paths:
                   status:
                     type: string
                     example: ok
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+        "405":
+          $ref: "#/components/responses/MethodNotAllowed"
+        "413":
+          $ref: "#/components/responses/RequestEntityTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
 
   /api/v1/stream/{id}/stream:
     get:
@@ -318,6 +353,7 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/SaveResultRequest"
+        description: Max 4096 bytes. Content-Type must be application/json.
       responses:
         "201":
           description: Result saved
@@ -327,6 +363,12 @@ paths:
                 $ref: "#/components/schemas/SaveResultResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "413":
+          $ref: "#/components/responses/RequestEntityTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
   /api/v1/results/{id}:
     get:
@@ -347,8 +389,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SavedResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
 
   /api/v1/registry/servers:
     get:
@@ -376,6 +422,8 @@ paths:
                       $ref: "#/components/schemas/RegisteredServer"
                   count:
                     type: integer
+        "429":
+          $ref: "#/components/responses/RateLimited"
     post:
       summary: Register a server
       operationId: registerServer
@@ -388,6 +436,7 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/ServerInfo"
+        description: Max 64KB. Content-Type must be application/json.
       responses:
         "201":
           description: Server registered
@@ -401,8 +450,16 @@ paths:
                     example: registered
                   server_id:
                     type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/RequestEntityTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/v1/registry/servers/{id}:
     get:
@@ -420,6 +477,8 @@ paths:
                 $ref: "#/components/schemas/RegisteredServer"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     put:
       summary: Update registered server
       operationId: updateRegistryServer
@@ -434,6 +493,7 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/ServerInfo"
+        description: Max 64KB. Content-Type must be application/json.
       responses:
         "200":
           description: Server updated
@@ -447,10 +507,18 @@ paths:
                     example: updated
                   server_id:
                     type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "413":
+          $ref: "#/components/responses/RequestEntityTooLarge"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
     delete:
       summary: Deregister a server
       operationId: deregisterServer
@@ -466,6 +534,8 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/v1/registry/health:
     get:
@@ -516,6 +586,30 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    MethodNotAllowed:
+      description: Method not allowed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Resource conflict (e.g. stream already exists)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RequestEntityTooLarge:
+      description: Request body exceeds size limit
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnsupportedMediaType:
+      description: Content-Type must be application/json
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     NotFound:
       description: Resource not found
       content:
@@ -534,6 +628,12 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
     ServerBusy:
       description: Server at capacity
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ServiceUnavailable:
+      description: Service temporarily unavailable (e.g. store retryable)
       content:
         application/json:
           schema:
@@ -654,8 +754,9 @@ components:
         streams:
           type: integer
           minimum: 1
-          maximum: 64
+          maximum: 32
           default: 4
+          description: Max 32 (configurable). Default 4.
         packet_size:
           type: integer
           minimum: 64
@@ -817,6 +918,9 @@ components:
           $ref: "#/components/schemas/Metrics"
         network:
           $ref: "#/components/schemas/NetworkInfo"
+        error:
+          type: string
+          description: Error message when status is failed
         start_time:
           type: string
           format: date-time
@@ -826,30 +930,44 @@ components:
 
     SaveResultRequest:
       type: object
+      description: |
+        Single JSON object. Body max 4096 bytes.
+        Validation: numeric fields >= 0 and finite; download_mbps/upload_mbps <= 100000;
+        latency_ms/jitter_ms/loaded_latency_ms <= 60000; server_name <= 200 chars;
+        ipv4/ipv6 <= 45 chars; bufferbloat_grade <= 5 chars.
       properties:
         download_mbps:
           type: number
           format: double
+          minimum: 0
         upload_mbps:
           type: number
           format: double
+          minimum: 0
         latency_ms:
           type: number
           format: double
+          minimum: 0
         jitter_ms:
           type: number
           format: double
+          minimum: 0
         loaded_latency_ms:
           type: number
           format: double
+          minimum: 0
         bufferbloat_grade:
           type: string
+          maxLength: 5
         ipv4:
           type: string
+          maxLength: 45
         ipv6:
           type: string
+          maxLength: 45
         server_name:
           type: string
+          maxLength: 200
 
     SaveResultResponse:
       type: object
