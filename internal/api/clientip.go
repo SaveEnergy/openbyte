@@ -41,6 +41,12 @@ func (r *ClientIPResolver) FromRequest(req *http.Request) string {
 	if clientIP := r.rightmostUntrustedIP(req.Header.Get("X-Forwarded-For")); clientIP != nil {
 		return ipString(clientIP)
 	}
+	// When XFF contains only trusted hops, do not fall back to X-Real-IP:
+	// a proxy may not strip it, allowing an attacker to spoof (trusted XFF + fake X-Real-IP).
+	// Fall back to the direct connection (remoteAddr).
+	if req.Header.Get("X-Forwarded-For") != "" {
+		return ipString(remoteIP)
+	}
 	if clientIP := parseHeaderIP(req.Header.Get("X-Real-IP")); clientIP != nil {
 		return ipString(clientIP)
 	}

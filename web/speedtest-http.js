@@ -7,7 +7,8 @@ import {
   isNetworkError,
   fetchWithTimeout,
 } from "./utils.js";
-import { createWarmUpDetector } from "./warmup.js";
+import { createWarmUpDetector, createEarlyStopDetector } from "./warmup.js";
+import { createDiagnosticsCollector } from "./diagnostics.js";
 
 function resolveStreamsInner() {
   if (!state.settings.streams || Number.isNaN(state.settings.streams)) {
@@ -57,6 +58,33 @@ function classifyDownloadStreamError(e, signal, streamState) {
   return "failed";
 }
 
+async function handleDownloadStreamCatch(e, options) {
+  const {
+    attemptIndex,
+    attemptsLength,
+    signal,
+    maxNetworkRetries,
+    retryDelayMs,
+    streamState,
+  } = options;
+  const action = classifyDownloadStreamError(e, signal, streamState);
+  if (action === "aborted") return { done: true, result: "aborted" };
+  if (action === "overloaded") {
+    await sleep(e.retryAfter || 500);
+    return { done: true, result: "overloaded" };
+  }
+  if (action === "failed") {
+    const msg =
+      attemptIndex < attemptsLength - 1
+        ? "Download stream failed, retrying smaller chunk"
+        : "Download stream failed after retries";
+    console.warn(msg, e);
+    return { done: true, result: "failed" };
+  }
+  if (action === "network_retry") return { done: false, retry: true };
+  return { done: true, result: "failed" };
+}
+
 async function tryDownloadChunkWithRetries(options) {
   const {
     attemptChunk,
@@ -74,26 +102,16 @@ async function tryDownloadChunkWithRetries(options) {
       if (await downloadStream(attemptChunk)) return "success";
       return "failed";
     } catch (e) {
-      const action = classifyDownloadStreamError(e, signal, streamState);
-      if (action === "aborted") return "aborted";
-      if (action === "overloaded") {
-        await sleep(e.retryAfter || 500);
-        return "overloaded";
-      }
-      if (action === "network_retry") {
-        if (retry < maxNetworkRetries) {
-          await sleep(retryDelayMs);
-          continue;
-        }
-      }
-      if (action === "failed") {
-        const msg =
-          attemptIndex < attemptsLength - 1
-            ? "Download stream failed, retrying smaller chunk"
-            : "Download stream failed after retries";
-        console.warn(msg, e);
-        return "failed";
-      }
+      const outcome = await handleDownloadStreamCatch(e, {
+        attemptIndex,
+        attemptsLength,
+        signal,
+        maxNetworkRetries,
+        retryDelayMs,
+        streamState,
+      });
+      if (outcome.done) return outcome.result;
+      await sleep(retryDelayMs);
     }
   }
   return "failed";
@@ -132,8 +150,9 @@ async function executeDownloadAttempts(
 
 function processDownloadChunk(value, now, ctx) {
   const s = ctx.readState;
+  const measuring = ctx.warmUp.settled();
   s.allBytes += value.length;
-  if (ctx.warmUp.settled()) {
+  if (measuring) {
     s.totalBytes += value.length;
   } else {
     ctx.warmUp.record(value.length, now);
@@ -142,8 +161,12 @@ function processDownloadChunk(value, now, ctx) {
       s.measureStartTime = now;
     }
   }
+  if (ctx.diagnostics) ctx.diagnostics.record(value.length, now, measuring);
+  if (ctx.earlyStop && measuring && ctx.earlyStop.record(value.length, now)) {
+    ctx.endTimeRef.value = now;
+  }
   const elapsedSec = (now - ctx.startTime) / 1000;
-  const displayBytes = ctx.warmUp.settled() ? s.totalBytes : s.allBytes;
+  const displayBytes = measuring ? s.totalBytes : s.allBytes;
   ctx.onProgress(displayBytes, elapsedSec);
 }
 
@@ -154,7 +177,8 @@ export async function runDownloadTest(duration, onProgress, signal) {
   const streamDelay = TEST_CONFIG.STREAM_DELAY_MS;
   const maxNetworkRetries = TEST_CONFIG.MAX_NETWORK_RETRIES;
   const retryDelayMs = TEST_CONFIG.NETWORK_RETRY_DELAY_MS;
-  const endTime = startTime + duration * 1000;
+  const nominalEndTime = startTime + duration * 1000;
+  const endTimeRef = { value: nominalEndTime };
   const streamState = {
     sawNetworkError: false,
     sawOverload: false,
@@ -162,6 +186,8 @@ export async function runDownloadTest(duration, onProgress, signal) {
   };
 
   const warmUp = createWarmUpDetector(duration * 1000);
+  const earlyStop = createEarlyStopDetector(() => warmUp.settled());
+  const diagnostics = createDiagnosticsCollector(TEST_CONFIG.WARMUP_WINDOW_MS);
   const readState = { totalBytes: 0, measureStartTime: 0, allBytes: 0 };
 
   const downloadStream = async (chunk) => {
@@ -192,14 +218,16 @@ export async function runDownloadTest(duration, onProgress, signal) {
       warmUp,
       readState,
       startTime,
-      endTime,
+      endTimeRef,
+      earlyStop,
+      diagnostics,
       onProgress,
     };
     try {
       while (true) {
         if (signal.aborted) break;
         const now = performance.now();
-        if (now >= endTime) {
+        if (now >= endTimeRef.value) {
           await reader.cancel();
           break;
         }
@@ -235,7 +263,7 @@ export async function runDownloadTest(duration, onProgress, signal) {
   await Promise.all(streamPromises);
 
   const overheadFactor = detectOverheadFactor();
-  const endNow = Math.min(performance.now(), endTime);
+  const endNow = Math.min(performance.now(), endTimeRef.value);
   const { totalBytes } = readState;
   const actualMeasureStart =
     readState.measureStartTime > 0 ? readState.measureStartTime : startTime;
@@ -250,6 +278,15 @@ export async function runDownloadTest(duration, onProgress, signal) {
     overload: "Server overloaded. Try again in a moment or change server.",
     noStreams: "Download failed. No stream completed successfully.",
   });
+
+  const stopReason = signal.aborted
+    ? "aborted"
+    : endTimeRef.value < nominalEndTime - 500
+      ? "early_stable"
+      : "duration";
+  const diag = diagnostics.finish(stopReason);
+  state.diagnostics = state.diagnostics || {};
+  state.diagnostics.download = diag;
 
   return Math.max(avgSpeed, 0);
 }
@@ -283,11 +320,13 @@ function recordUploadProgress(
   now,
   startTime,
   onProgress,
+  extra,
 ) {
+  const measuring = warmUp.settled();
   metricsState.allBytes += blobSize;
   metricsState.successfulStreams += 1;
 
-  if (warmUp.settled()) {
+  if (measuring) {
     metricsState.totalBytes += blobSize;
   } else {
     warmUp.record(blobSize, now);
@@ -297,8 +336,13 @@ function recordUploadProgress(
     }
   }
 
+  if (extra?.diagnostics) extra.diagnostics.record(blobSize, now, measuring);
+  if (extra?.earlyStop && measuring && extra.earlyStop.record(blobSize, now)) {
+    extra.endTimeRef.value = now;
+  }
+
   const elapsedSec = (now - startTime) / 1000;
-  const displayBytes = warmUp.settled()
+  const displayBytes = measuring
     ? metricsState.totalBytes
     : metricsState.allBytes;
   onProgress(displayBytes, elapsedSec);
@@ -327,11 +371,46 @@ function handleUploadCatchError(
   return { action: "throw" };
 }
 
+async function processUploadResponse(res, options) {
+  const {
+    blob,
+    metricsState,
+    retryAfterMs,
+    maxNetworkRetries,
+    retryDelayMs,
+    warmUp,
+    startTime,
+    onProgress,
+    extra,
+  } = options;
+  if (res.ok) {
+    await res.text().catch(() => {});
+    const now = performance.now();
+    recordUploadProgress(
+      metricsState,
+      warmUp,
+      blob.size,
+      now,
+      startTime,
+      onProgress,
+      extra,
+    );
+    return { ok: true };
+  }
+  await res.text().catch(() => {});
+  const hr = handleUploadNonOkResponse(res, metricsState, retryAfterMs);
+  if (hr.action === "overload_break") {
+    await sleep(hr.retryAfter);
+    return { ok: false, overload: true };
+  }
+  return { ok: false, retry: true };
+}
+
 async function runSingleUploadStream(options) {
   const {
     delay,
     blob,
-    endTime,
+    endTimeRef,
     duration,
     signal,
     maxNetworkRetries,
@@ -340,37 +419,33 @@ async function runSingleUploadStream(options) {
     metricsState,
     startTime,
     onProgress,
+    extra,
   } = options;
   await new Promise((r) => setTimeout(r, delay));
 
   let consecutiveErrors = 0;
-  while (performance.now() < endTime && !signal.aborted) {
+  while (performance.now() < endTimeRef.value && !signal.aborted) {
     try {
       const res = await sendUploadRequest(blob, duration, signal);
-      if (!res.ok) {
-        await res.text().catch(() => {});
-        const hr = handleUploadNonOkResponse(res, metricsState, retryAfterMs);
-        if (hr.action === "overload_break") {
-          await sleep(hr.retryAfter);
-          break;
-        }
-        consecutiveErrors += 1;
-        if (consecutiveErrors > maxNetworkRetries) break;
-        await sleep(retryDelayMs);
-        continue;
-      }
-
-      consecutiveErrors = 0;
-      await res.text().catch(() => {});
-      const now = performance.now();
-      recordUploadProgress(
+      const pr = await processUploadResponse(res, {
+        blob,
         metricsState,
+        retryAfterMs,
+        maxNetworkRetries,
+        retryDelayMs,
         warmUp,
-        blob.size,
-        now,
         startTime,
         onProgress,
-      );
+        extra,
+      });
+      if (pr.ok) {
+        consecutiveErrors = 0;
+        continue;
+      }
+      if (pr.overload) break;
+      consecutiveErrors += 1;
+      if (consecutiveErrors > maxNetworkRetries) break;
+      await sleep(retryDelayMs);
     } catch (e) {
       const hc = handleUploadCatchError(
         e,
@@ -407,6 +482,11 @@ export async function runUploadTest(duration, onProgress, signal) {
   };
 
   const warmUp = createWarmUpDetector(duration * 1000);
+  const earlyStop = createEarlyStopDetector(() => warmUp.settled());
+  const diagnostics = createDiagnosticsCollector(TEST_CONFIG.WARMUP_WINDOW_MS);
+  const nominalEndTime = startTime + duration * 1000;
+  const endTimeRef = { value: nominalEndTime };
+  const extra = { earlyStop, diagnostics, endTimeRef };
 
   const chunks = [];
   for (let i = 0; i < blobSize; i += TEST_CONFIG.UPLOAD_RANDOM_CHUNK_BYTES) {
@@ -418,15 +498,13 @@ export async function runUploadTest(duration, onProgress, signal) {
   }
   const blob = new Blob(chunks);
 
-  const endTime = startTime + duration * 1000;
-
   const streams = [];
   for (let i = 0; i < numStreams; i++) {
     streams.push(
       runSingleUploadStream({
         delay: i * streamDelay,
         blob,
-        endTime,
+        endTimeRef,
         duration,
         signal,
         maxNetworkRetries,
@@ -435,13 +513,14 @@ export async function runUploadTest(duration, onProgress, signal) {
         metricsState,
         startTime,
         onProgress,
+        extra,
       }),
     );
   }
   await Promise.all(streams);
 
   const overheadFactor = detectOverheadFactor();
-  const endNow = Math.min(performance.now(), endTime);
+  const endNow = Math.min(performance.now(), endTimeRef.value);
   const actualMeasureStart =
     metricsState.measureStartTime > 0
       ? metricsState.measureStartTime
@@ -458,6 +537,15 @@ export async function runUploadTest(duration, onProgress, signal) {
     overload: "Server overloaded. Try again in a moment or change server.",
     noStreams: "Upload failed. No stream completed successfully.",
   });
+
+  const stopReason = signal.aborted
+    ? "aborted"
+    : endTimeRef.value < nominalEndTime - 500
+      ? "early_stable"
+      : "duration";
+  const diag = diagnostics.finish(stopReason);
+  state.diagnostics = state.diagnostics || {};
+  state.diagnostics.upload = diag;
 
   return Math.max(avgSpeed, 0);
 }

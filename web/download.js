@@ -419,15 +419,14 @@ setupCopy("copyDockerBtn", function () {
 
 const detected = detectPlatform();
 
-fetchLatestRelease()
-  .then(function (data) {
-    const assets = Array.isArray(data.assets) ? data.assets : [];
-    renderVersion(data);
-    renderRecommended(assets, detected, data.tag_name);
-    renderAllPlatforms(assets);
-    renderInstall(detected, data.tag_name);
-  })
-  .catch(function (err) {
-    console.warn("Release fetch failed:", err);
-    applyGithubFallback(err);
-  });
+try {
+  const data = await fetchLatestRelease();
+  const assets = Array.isArray(data.assets) ? data.assets : [];
+  renderVersion(data);
+  renderRecommended(assets, detected, data.tag_name);
+  renderAllPlatforms(assets);
+  renderInstall(detected, data.tag_name);
+} catch (err) {
+  console.warn("Release fetch failed:", err);
+  applyGithubFallback(err);
+}

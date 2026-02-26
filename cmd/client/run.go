@@ -12,6 +12,8 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+const formatterOutputFailedFmt = "formatter output failed: %w"
+
 func runStream(ctx context.Context, config *Config, formatter OutputFormatter, streamID *atomic.Value) error {
 	if config.Protocol == protocolHTTP {
 		return runHTTPStream(ctx, config, formatter)
@@ -109,7 +111,7 @@ func handleClientTestCompletion(
 	results := buildResults(streamID, config, metrics, startTime)
 	formatter.FormatComplete(results)
 	if ferr := formatterLastError(formatter); ferr != nil {
-		return fmt.Errorf("formatter output failed: %w", ferr)
+		return fmt.Errorf(formatterOutputFailedFmt, ferr)
 	}
 
 	completeErr := completeStream(ctx, config, streamID, metrics)
@@ -234,7 +236,7 @@ func emitProgressAndMetrics(
 	formatter.FormatProgress(progress, elapsedSeconds, remaining)
 	formatter.FormatMetrics(metrics)
 	if ferr := formatterLastError(formatter); ferr != nil {
-		return fmt.Errorf("formatter output failed: %w", ferr)
+		return fmt.Errorf(formatterOutputFailedFmt, ferr)
 	}
 	return nil
 }
@@ -287,7 +289,7 @@ func finalizeHTTPStreamRun(input finalizeHTTPStreamRunInput) error {
 	results := buildResults(protocolHTTP, &httpConfig, metrics, input.startTime)
 	input.formatter.FormatComplete(results)
 	if ferr := formatterLastError(input.formatter); ferr != nil {
-		return fmt.Errorf("formatter output failed: %w", ferr)
+		return fmt.Errorf(formatterOutputFailedFmt, ferr)
 	}
 
 	if shouldReturnRunError(input.runErr) {

@@ -89,3 +89,21 @@ func TestClientIPResolverFallbackToRealIP(t *testing.T) {
 		t.Fatalf(clientIPWantFmt, ip, realIPHeaderValue)
 	}
 }
+
+func TestClientIPResolverXFFOnlyTrustedNoXRealIPFallback(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.TrustProxyHeaders = true
+	cfg.TrustedProxyCIDRs = []string{trustedLoopbackCIDR, trustedPrivateCIDR}
+
+	resolver := api.NewClientIPResolver(cfg)
+	req := httptest.NewRequest(clientIPMethod, clientIPURL, nil)
+	req.RemoteAddr = localhostWithPort
+	// XFF contains only trusted IPs; X-Real-IP could be attacker-spoofed — must not use it.
+	req.Header.Set(headerForwardedFor, realClientIP)
+	req.Header.Set(headerRealIP, "1.2.3.4")
+
+	ip := resolver.FromRequest(req)
+	if ip != clientLoopbackIP {
+		t.Fatalf("when XFF has only trusted hops, must fall back to remoteAddr, not X-Real-IP: got %s, want %s", ip, clientLoopbackIP)
+	}
+}

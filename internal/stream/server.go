@@ -292,7 +292,6 @@ func (s *Server) handleEcho(conn *net.TCPConn) {
 	defer s.recvPool.Put(buf)
 	bytesSinceRefresh := 0
 	deadline := time.Now().Add(tcpEchoReadDeadline)
-
 	for {
 		select {
 		case <-s.stopCh:
@@ -305,16 +304,12 @@ func (s *Server) handleEcho(conn *net.TCPConn) {
 			conn.SetReadDeadline(deadline)
 			n, err := conn.Read(buf)
 			if err != nil {
-				if !errors.Is(err, io.EOF) && isTimeoutError(err) {
-					return // idle timeout; close to prevent slowloris via tiny periodic reads
-				}
-				if isRetryableConnReadError(err) {
+				if handleEchoReadError(err) {
 					continue
 				}
 				return
 			}
 			bytesSinceRefresh += n
-
 			if n > 0 {
 				if _, err := conn.Write(buf[:n]); err != nil {
 					return
@@ -322,6 +317,13 @@ func (s *Server) handleEcho(conn *net.TCPConn) {
 			}
 		}
 	}
+}
+
+func handleEchoReadError(err error) bool {
+	if !errors.Is(err, io.EOF) && isTimeoutError(err) {
+		return false // idle timeout; close to prevent slowloris
+	}
+	return isRetryableConnReadError(err)
 }
 
 func isTimeoutError(err error) bool {

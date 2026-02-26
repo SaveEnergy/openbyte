@@ -209,7 +209,16 @@ export async function selectFastestServer() {
     return;
   }
 
-  reachable.sort((a, b) => a.latency - b.latency);
+  const loadFactor = (s) => {
+    const max = Math.max(1, s.max_tests ?? 1);
+    const active = s.active_tests ?? 0;
+    return 1 + 0.3 * (active / max);
+  };
+  reachable.sort((a, b) => {
+    const scoreA = a.latency * loadFactor(a.server);
+    const scoreB = b.latency * loadFactor(b.server);
+    return scoreA - scoreB;
+  });
   setSelectedServer(reachable[0].server);
   updateServerName();
 

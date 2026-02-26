@@ -103,53 +103,66 @@ func (s *Server) handleUDP() {
 func (s *Server) udpReader(clients *udpClients, wg *sync.WaitGroup) {
 	defer wg.Done()
 	buf := make([]byte, s.config.UDPBufferSize)
-
 	for {
 		_ = s.udpConn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 		n, addr, err := s.udpConn.ReadFromUDP(buf)
 		if err != nil {
-			if s.isStopping() {
+			if udpReadErrorDone(s, err) {
 				return
 			}
-			if isTimeoutError(err) {
-				continue
-			}
-			logging.Warn("UDP read error", logging.Field{Key: "error", Value: err})
-			return
+			continue
 		}
-
 		if n == 0 {
 			continue
 		}
-
-		clientKey := addr.String()
-		client := clients.get(clientKey)
-
+		client := udpReaderEnsureClient(s, clients, addr)
 		if client == nil {
-			var created bool
-			client, created = clients.getOrCreate(clientKey, addr, s)
-			if client == nil {
-				continue
-			}
-			if created {
-				s.wg.Add(1)
-				go s.udpSender(clients, clientKey, client)
-			}
+			continue
 		}
-
 		atomic.StoreInt64(&client.lastSeenUnix, time.Now().UnixNano())
+		udpHandlePacket(s, buf, n, addr, client)
+	}
+}
 
-		switch buf[0] {
-		case udpCmdDownload:
-			atomic.StoreInt32(&client.downloading, 1)
-		case udpCmdUpload:
-			atomic.AddInt64(&client.bytesRecv, int64(n))
-		case udpCmdStop:
-			atomic.StoreInt32(&client.downloading, 0)
-		default:
-			if _, err := s.udpConn.WriteToUDP(buf[:n], addr); err != nil {
-				logging.Warn("UDP echo error", logging.Field{Key: "error", Value: err})
-			}
+func udpReadErrorDone(s *Server, err error) bool {
+	if s.isStopping() {
+		return true
+	}
+	if isTimeoutError(err) {
+		return false
+	}
+	logging.Warn("UDP read error", logging.Field{Key: "error", Value: err})
+	return true
+}
+
+func udpReaderEnsureClient(s *Server, clients *udpClients, addr *net.UDPAddr) *udpClientState {
+	clientKey := addr.String()
+	client := clients.get(clientKey)
+	if client != nil {
+		return client
+	}
+	client, created := clients.getOrCreate(clientKey, addr, s)
+	if client == nil {
+		return nil
+	}
+	if created {
+		s.wg.Add(1)
+		go s.udpSender(clients, clientKey, client)
+	}
+	return client
+}
+
+func udpHandlePacket(s *Server, buf []byte, n int, addr *net.UDPAddr, client *udpClientState) {
+	switch buf[0] {
+	case udpCmdDownload:
+		atomic.StoreInt32(&client.downloading, 1)
+	case udpCmdUpload:
+		atomic.AddInt64(&client.bytesRecv, int64(n))
+	case udpCmdStop:
+		atomic.StoreInt32(&client.downloading, 0)
+	default:
+		if _, err := s.udpConn.WriteToUDP(buf[:n], addr); err != nil {
+			logging.Warn("UDP echo error", logging.Field{Key: "error", Value: err})
 		}
 	}
 }
@@ -177,6 +190,8 @@ func (s *Server) udpSender(clients *udpClients, clientKey string, client *udpCli
 	n := min(len(packet), len(s.randomData))
 	copy(packet, s.randomData[:n])
 
+	const deadlineRefreshPackets = 128
+	writesSinceDeadline := 0
 	lastYield := time.Now()
 	for {
 		select {
@@ -188,11 +203,19 @@ func (s *Server) udpSender(clients *udpClients, clientKey string, client *udpCli
 				return
 			}
 			if atomic.LoadInt32(&client.downloading) == 1 {
-				_ = s.udpConn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+				if writesSinceDeadline == 0 || writesSinceDeadline >= deadlineRefreshPackets {
+					if s.udpConn != nil {
+						_ = s.udpConn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+					}
+					if writesSinceDeadline >= deadlineRefreshPackets {
+						writesSinceDeadline = 0
+					}
+				}
 				if _, err := s.udpConn.WriteToUDP(packet, client.addr); err != nil {
 					logging.Warn("UDP send error", logging.Field{Key: "error", Value: err})
 					return
 				}
+				writesSinceDeadline++
 				if time.Since(lastYield) > 2*time.Millisecond {
 					runtime.Gosched()
 					lastYield = time.Now()

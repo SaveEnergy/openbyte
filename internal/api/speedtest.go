@@ -145,36 +145,23 @@ func uploadReadDeadline(start time.Time, maxDurationSec int) time.Time {
 }
 
 func readUploadBody(readCtx context.Context, body io.Reader, deadline time.Time, pool *sync.Pool) (totalBytes int64, readFailed bool) {
-	var buf []byte
-	if pool != nil {
-		if pooled := pool.Get(); pooled != nil {
-			if cast, ok := pooled.([]byte); ok && len(cast) >= uploadReadBufferSize {
-				buf = cast[:uploadReadBufferSize]
-			}
-		}
-	}
-	if buf == nil {
-		buf = make([]byte, uploadReadBufferSize)
-	}
+	buf := getUploadBuf(pool)
 	if pool != nil {
 		defer pool.Put(buf)
 	}
 	now := time.Now()
 	readIterations := 0
-
 	for {
 		select {
 		case <-readCtx.Done():
 			return totalBytes, false
 		default:
 		}
-
 		n, err := body.Read(buf)
 		totalBytes += int64(n)
 		if err != nil {
 			return totalBytes, !errors.Is(err, io.EOF)
 		}
-
 		readIterations++
 		if readIterations%32 == 0 {
 			now = time.Now()
@@ -183,6 +170,20 @@ func readUploadBody(readCtx context.Context, body io.Reader, deadline time.Time,
 			return totalBytes, false
 		}
 	}
+}
+
+func getUploadBuf(pool *sync.Pool) []byte {
+	if pool == nil {
+		return make([]byte, uploadReadBufferSize)
+	}
+	pooled := pool.Get()
+	if pooled == nil {
+		return make([]byte, uploadReadBufferSize)
+	}
+	if cast, ok := pooled.([]byte); ok && len(cast) >= uploadReadBufferSize {
+		return cast[:uploadReadBufferSize]
+	}
+	return make([]byte, uploadReadBufferSize)
 }
 
 func writeUploadResponse(w http.ResponseWriter, controller *http.ResponseController, totalBytes int64, startTime time.Time) {
@@ -237,7 +238,9 @@ func parseOptionalIntInRange(raw string, min, max int, errMessage string) (int, 
 // resolveRandomSource returns data source and release func. Call release when done.
 func (h *SpeedTestHandler) resolveRandomSource() ([]byte, func(), error) {
 	if len(h.randomData) != 0 {
-		return h.randomData, func() {}, nil
+		return h.randomData, func() {
+			// Intentionally empty: shared randomData has no per-request cleanup.
+		}, nil
 	}
 	pooled, _ := h.fallbackRandomPool.Get().([]byte)
 	const fallbackSize = 64 * 1024

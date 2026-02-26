@@ -177,3 +177,25 @@ func responseHost(r *http.Request, cfg *config.Config) string {
 	}
 	return normalizeHost(r.Host)
 }
+
+// responseHostForEndpoint returns host or host:port for API endpoint construction.
+// When proxied and using r.Host, preserves non-standard ports (e.g. proxy:8443).
+func responseHostForEndpoint(r *http.Request, cfg *config.Config) string {
+	if cfg != nil {
+		if cfg.PublicHost != "" {
+			return cfg.PublicHost
+		}
+		if !cfg.TrustProxyHeaders {
+			h := normalizeHost(cfg.BindAddress)
+			if cfg.Port != "" && cfg.Port != "80" && cfg.Port != "443" {
+				return h + ":" + cfg.Port
+			}
+			return h
+		}
+	}
+	// Preserve r.Host as-is (includes port when proxied).
+	if r != nil && r.Host != "" {
+		return r.Host
+	}
+	return "127.0.0.1"
+}

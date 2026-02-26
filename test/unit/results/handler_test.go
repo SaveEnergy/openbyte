@@ -357,6 +357,38 @@ func TestHandlerSaveBodyTooLarge(t *testing.T) {
 	}
 }
 
+func TestSaveAcceptsOptionalDiagnostics(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, resultsDBName)
+	store, err := results.New(dbPath, 100)
+	if err != nil {
+		t.Fatalf(newStoreFmt, err)
+	}
+	defer store.Close()
+
+	h := results.NewHandler(store)
+	body := `{
+		"download_mbps": 100,
+		"upload_mbps": 50,
+		"latency_ms": 10,
+		"jitter_ms": 1,
+		"loaded_latency_ms": 12,
+		"bufferbloat_grade": "A",
+		"ipv4": "203.0.113.10",
+		"ipv6": "",
+		"server_name": "test",
+		"diagnostics": {"download": {"peakMbps": 105, "sustainedMbps": 98, "volatility": 2.1, "stopReason": "duration"}}
+	}`
+	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
+	rec := httptest.NewRecorder()
+	h.Save(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusCreated)
+	}
+}
+
 func TestHandlerSaveRejectsUnknownFields(t *testing.T) {
 	tempDir := t.TempDir()
 	dbPath := filepath.Join(tempDir, resultsDBName)

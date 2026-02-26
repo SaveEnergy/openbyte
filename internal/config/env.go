@@ -70,6 +70,16 @@ func defaultServerID() string {
 }
 
 func (c *Config) loadCoreEnv() error {
+	if err := c.loadCoreEnvPortsAndBind(); err != nil {
+		return err
+	}
+	if err := c.loadCoreEnvServerMeta(); err != nil {
+		return err
+	}
+	return c.loadCoreEnvCapacityAndLimits()
+}
+
+func (c *Config) loadCoreEnvPortsAndBind() error {
 	if port := os.Getenv("PORT"); port != "" {
 		if _, err := strconv.Atoi(port); err != nil {
 			return fmt.Errorf("invalid PORT %q: must be a number", port)
@@ -93,6 +103,10 @@ func (c *Config) loadCoreEnv() error {
 		}
 		c.UDPTestPort = p
 	}
+	return nil
+}
+
+func (c *Config) loadCoreEnvServerMeta() error {
 	if id := os.Getenv("SERVER_ID"); id != "" {
 		c.ServerID = id
 	}
@@ -108,6 +122,10 @@ func (c *Config) loadCoreEnv() error {
 	if host := os.Getenv("PUBLIC_HOST"); host != "" {
 		c.PublicHost = host
 	}
+	return nil
+}
+
+func (c *Config) loadCoreEnvCapacityAndLimits() error {
 	if capRaw := os.Getenv("CAPACITY_GBPS"); capRaw != "" {
 		g, err := strconv.Atoi(capRaw)
 		if err != nil || g <= 0 {

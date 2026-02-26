@@ -25,15 +25,16 @@ func NewHandler(store *Store) *Handler {
 }
 
 type saveRequest struct {
-	DownloadMbps     float64 `json:"download_mbps"`
-	UploadMbps       float64 `json:"upload_mbps"`
-	LatencyMs        float64 `json:"latency_ms"`
-	JitterMs         float64 `json:"jitter_ms"`
-	LoadedLatencyMs  float64 `json:"loaded_latency_ms"`
-	BufferbloatGrade string  `json:"bufferbloat_grade"`
-	IPv4             string  `json:"ipv4"`
-	IPv6             string  `json:"ipv6"`
-	ServerName       string  `json:"server_name"`
+	DownloadMbps     float64         `json:"download_mbps"`
+	UploadMbps       float64         `json:"upload_mbps"`
+	LatencyMs        float64         `json:"latency_ms"`
+	JitterMs         float64         `json:"jitter_ms"`
+	LoadedLatencyMs  float64         `json:"loaded_latency_ms"`
+	BufferbloatGrade string          `json:"bufferbloat_grade"`
+	IPv4             string          `json:"ipv4"`
+	IPv6             string          `json:"ipv6"`
+	ServerName       string          `json:"server_name"`
+	Diagnostics      json.RawMessage `json:"diagnostics,omitempty"`
 }
 
 type saveResponse struct {

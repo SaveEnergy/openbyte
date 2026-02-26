@@ -80,6 +80,8 @@ paths:
           $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/ServerBusy"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/upload:
     post:
@@ -104,6 +106,8 @@ paths:
           $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/ServerBusy"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/version:
     get:
@@ -164,6 +168,8 @@ paths:
           $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/ServerBusy"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/stream/{id}/status:
     get:
@@ -369,6 +375,8 @@ paths:
           $ref: "#/components/responses/UnsupportedMediaType"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/results/{id}:
     get:
@@ -395,6 +403,8 @@ paths:
           $ref: "#/components/responses/NotFound"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/registry/servers:
     get:
@@ -634,6 +644,12 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
     ServiceUnavailable:
       description: Service temporarily unavailable (e.g. store retryable)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalServerError:
+      description: Internal server error
       content:
         application/json:
           schema:

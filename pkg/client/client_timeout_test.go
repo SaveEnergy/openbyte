@@ -12,8 +12,8 @@ import (
 
 func TestSpeedTestLongDuration(t *testing.T) {
 	c := New("http://localhost:8080")
-	if c.httpClient.Timeout != 0 {
-		t.Fatalf("default HTTP timeout = %v, want 0 (unbounded, context-driven)", c.httpClient.Timeout)
+	if c.httpClient.Timeout != defaultHTTPTimeout {
+		t.Fatalf("default HTTP timeout = %v, want %v", c.httpClient.Timeout, defaultHTTPTimeout)
 	}
 }
 

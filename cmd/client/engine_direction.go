@@ -12,26 +12,35 @@ import (
 	"time"
 )
 
+const sendCmdFmt = "send command: %w"
+
 func (e *TestEngine) runDownload(ctx context.Context, conn net.Conn) error {
 	if _, err := conn.Write([]byte(cmdDownload)); err != nil {
-		return fmt.Errorf("send command: %w", err)
+		return fmt.Errorf(sendCmdFmt, err)
 	}
+	return e.runReadLoop(ctx, conn, 1*time.Second, func(n int, d time.Duration) {
+		atomic.AddInt64(&e.metrics.BytesReceived, int64(n))
+		e.addBytes(int64(n))
+		if e.pastWarmUp() {
+			e.recordLatency(d)
+		}
+	})
+}
 
+func (e *TestEngine) runReadLoop(ctx context.Context, conn net.Conn, timeout time.Duration, onRead func(n int, readDuration time.Duration)) error {
 	buf, ok := e.bufferPool.Get().([]byte)
 	if !ok {
 		buf = make([]byte, 64*1024)
 	}
 	defer e.bufferPool.Put(buf)
-
 	lastRTTSample := time.Now()
 	rttSampleInterval := 500 * time.Millisecond
-
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+			conn.SetReadDeadline(time.Now().Add(timeout))
 			readStart := time.Now()
 			n, err := conn.Read(buf)
 			readDuration := time.Since(readStart)
@@ -39,22 +48,16 @@ func (e *TestEngine) runDownload(ctx context.Context, conn net.Conn) error {
 				if errors.Is(err, io.EOF) {
 					return nil
 				}
-				var netErr net.Error
-				if errors.As(err, &netErr) && netErr.Timeout() {
+				if isTimeoutError(err) {
 					continue
 				}
 				return err
 			}
 			if n > 0 {
-				atomic.AddInt64(&e.metrics.BytesReceived, int64(n))
-				e.addBytes(int64(n))
-
-				if e.pastWarmUp() {
-					e.recordLatency(readDuration)
-					if time.Since(lastRTTSample) > rttSampleInterval {
-						e.rttCollector.AddSample(readDuration.Seconds() * 1000)
-						lastRTTSample = time.Now()
-					}
+				onRead(n, readDuration)
+				if time.Since(lastRTTSample) > rttSampleInterval && e.pastWarmUp() {
+					e.rttCollector.AddSample(readDuration.Seconds() * 1000)
+					lastRTTSample = time.Now()
 				}
 			}
 		}
@@ -63,44 +66,45 @@ func (e *TestEngine) runDownload(ctx context.Context, conn net.Conn) error {
 
 func (e *TestEngine) runUpload(ctx context.Context, conn net.Conn) error {
 	if _, err := conn.Write([]byte(cmdUpload)); err != nil {
-		return fmt.Errorf("send command: %w", err)
+		return fmt.Errorf(sendCmdFmt, err)
 	}
+	return e.runWriteLoop(ctx, conn, 1*time.Second, func(n int, d time.Duration) {
+		atomic.AddInt64(&e.metrics.BytesSent, int64(n))
+		e.addBytes(int64(n))
+		if e.pastWarmUp() {
+			e.recordLatency(d)
+		}
+	})
+}
 
+func (e *TestEngine) runWriteLoop(ctx context.Context, conn net.Conn, timeout time.Duration, onWrite func(n int, writeDuration time.Duration)) error {
 	buf, ok := e.bufferPool.Get().([]byte)
 	if !ok {
 		buf = make([]byte, 64*1024)
 	}
 	defer e.bufferPool.Put(buf)
-
 	lastRTTSample := time.Now()
 	rttSampleInterval := 500 * time.Millisecond
-
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
+			conn.SetWriteDeadline(time.Now().Add(timeout))
 			writeStart := time.Now()
 			n, err := conn.Write(buf)
 			writeDuration := time.Since(writeStart)
 			if err != nil {
-				var netErr net.Error
-				if errors.As(err, &netErr) && netErr.Timeout() {
+				if isTimeoutError(err) {
 					continue
 				}
 				return err
 			}
 			if n > 0 {
-				atomic.AddInt64(&e.metrics.BytesSent, int64(n))
-				e.addBytes(int64(n))
-
-				if e.pastWarmUp() {
-					e.recordLatency(writeDuration)
-					if time.Since(lastRTTSample) > rttSampleInterval {
-						e.rttCollector.AddSample(writeDuration.Seconds() * 1000)
-						lastRTTSample = time.Now()
-					}
+				onWrite(n, writeDuration)
+				if time.Since(lastRTTSample) > rttSampleInterval && e.pastWarmUp() {
+					e.rttCollector.AddSample(writeDuration.Seconds() * 1000)
+					lastRTTSample = time.Now()
 				}
 			}
 		}
@@ -109,7 +113,7 @@ func (e *TestEngine) runUpload(ctx context.Context, conn net.Conn) error {
 
 func (e *TestEngine) runBidirectional(ctx context.Context, conn net.Conn) error {
 	if _, err := conn.Write([]byte(cmdBidirectional)); err != nil {
-		return fmt.Errorf("send command: %w", err)
+		return fmt.Errorf(sendCmdFmt, err)
 	}
 
 	var wg sync.WaitGroup
@@ -130,6 +134,16 @@ func (e *TestEngine) runBidirectional(ctx context.Context, conn net.Conn) error 
 }
 
 func (e *TestEngine) runBidirectionalReadLoop(ctx context.Context, conn net.Conn) {
+	e.runBidiReadLoop(ctx, conn, func(n int, d time.Duration) {
+		atomic.AddInt64(&e.metrics.BytesReceived, int64(n))
+		e.addBytes(int64(n))
+		if e.pastWarmUp() {
+			e.recordLatency(d)
+		}
+	})
+}
+
+func (e *TestEngine) runBidiReadLoop(ctx context.Context, conn net.Conn, onRead func(n int, d time.Duration)) {
 	buf, ok := e.bufferPool.Get().([]byte)
 	if !ok {
 		buf = make([]byte, 64*1024)
@@ -154,14 +168,10 @@ func (e *TestEngine) runBidirectionalReadLoop(ctx context.Context, conn net.Conn
 			if n <= 0 {
 				continue
 			}
-			atomic.AddInt64(&e.metrics.BytesReceived, int64(n))
-			e.addBytes(int64(n))
-			if e.pastWarmUp() {
-				e.recordLatency(readDuration)
-				if time.Since(lastRTTSample) > 500*time.Millisecond {
-					e.rttCollector.AddSample(readDuration.Seconds() * 1000)
-					lastRTTSample = time.Now()
-				}
+			onRead(n, readDuration)
+			if time.Since(lastRTTSample) > 500*time.Millisecond && e.pastWarmUp() {
+				e.rttCollector.AddSample(readDuration.Seconds() * 1000)
+				lastRTTSample = time.Now()
 			}
 		}
 	}

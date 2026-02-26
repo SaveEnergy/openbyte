@@ -11,6 +11,8 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+const errStreamAlreadyFinalized = "stream already finalized"
+
 type Manager struct {
 	streams               map[string]*types.StreamState
 	activeStreams         map[string]string
@@ -173,7 +175,7 @@ func (m *Manager) CancelStream(streamID string) error {
 		if current == types.StreamStatusCancelled {
 			return nil
 		}
-		return errors.ErrInvalidConfig("stream already finalized", nil)
+		return errors.ErrInvalidConfig(errStreamAlreadyFinalized, nil)
 	}
 	state.UpdateStatus(types.StreamStatusCancelled)
 	m.releaseActiveStreamLocked(streamID)
@@ -194,7 +196,7 @@ func (m *Manager) CompleteStream(streamID string, metrics types.Metrics) error {
 		if current == types.StreamStatusCompleted {
 			return nil
 		}
-		return errors.ErrInvalidConfig("stream already finalized", nil)
+		return errors.ErrInvalidConfig(errStreamAlreadyFinalized, nil)
 	}
 	state.UpdateMetrics(metrics)
 	state.UpdateStatus(types.StreamStatusCompleted)
@@ -221,7 +223,7 @@ func (m *Manager) FailStream(streamID string, metrics types.Metrics) error {
 		if current == types.StreamStatusFailed {
 			return nil
 		}
-		return errors.ErrInvalidConfig("stream already finalized", nil)
+		return errors.ErrInvalidConfig(errStreamAlreadyFinalized, nil)
 	}
 	state.UpdateMetrics(metrics)
 	state.UpdateStatus(types.StreamStatusFailed)

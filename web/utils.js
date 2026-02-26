@@ -17,6 +17,21 @@ export function computeBufferbloatGrade(idleLatency, loadedLatency) {
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+export function formatSpeed(speed) {
+  if (typeof speed !== "number" || !Number.isFinite(speed) || speed < 0)
+    speed = 0;
+  if (speed >= 1000) return { value: (speed / 1000).toFixed(2), unit: "Gbps" };
+  return { value: speed.toFixed(1), unit: "Mbps" };
+}
+
+export async function consumeErrorBody(res) {
+  try {
+    await res.text();
+  } catch (err) {
+    console.debug("failed to read error response body", err);
+  }
+}
+
 export function retryAfterMs(
   response,
   fallbackMs = TEST_CONFIG.RETRY_AFTER_DEFAULT_MS,

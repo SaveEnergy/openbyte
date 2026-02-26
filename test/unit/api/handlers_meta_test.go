@@ -133,6 +133,36 @@ func TestGetServersIgnoresRequestHostWhenProxyUntrusted(t *testing.T) {
 	}
 }
 
+func TestGetServersPreservesProxyPort(t *testing.T) {
+	mgr := stream.NewManager(10, 10)
+	handler := api.NewHandler(mgr)
+	cfg := config.DefaultConfig()
+	cfg.TrustProxyHeaders = true
+	handler.SetConfig(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, serversEndpoint, nil)
+	req.Host = "proxy.example.com:8443"
+	req.Header.Set("X-Forwarded-Proto", "https")
+	rec := httptest.NewRecorder()
+	handler.GetServers(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
+	}
+
+	var resp api.ServersResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode servers response: %v", err)
+	}
+	if len(resp.Servers) != 1 {
+		t.Fatalf("servers = %d, want 1", len(resp.Servers))
+	}
+	want := "https://proxy.example.com:8443"
+	if resp.Servers[0].APIEndpoint != want {
+		t.Errorf("api_endpoint = %q, want %q", resp.Servers[0].APIEndpoint, want)
+	}
+}
+
 func TestGetServersRejectsWrongMethodDrainsBody(t *testing.T) {
 	mgr := stream.NewManager(10, 10)
 	handler := api.NewHandler(mgr)

@@ -59,12 +59,17 @@ func WithHTTPClient(hc *http.Client) Option {
 	return func(c *Client) { c.httpClient = hc }
 }
 
+const defaultHTTPTimeout = 60 * time.Second
+
 // New creates a new openByte client targeting the given server URL.
 // Returned client should be treated as immutable after construction.
+// Default http.Client has a 60s timeout to avoid indefinite hangs on stalled connections.
 func New(serverURL string, opts ...Option) *Client {
 	c := &Client{
-		serverURL:  strings.TrimRight(serverURL, "/"),
-		httpClient: &http.Client{},
+		serverURL: strings.TrimRight(serverURL, "/"),
+		httpClient: &http.Client{
+			Timeout: defaultHTTPTimeout,
+		},
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -311,14 +316,22 @@ func (c *Client) healthCheck(ctx context.Context) error {
 }
 
 func (c *Client) measureLatency(ctx context.Context, samples int) (avgMs, jitterMs float64, ok bool) {
+	latencies := c.collectLatencySamples(ctx, samples)
+	if len(latencies) < 2 {
+		return 0, 0, false
+	}
+	avgMs = float64(latenciesSum(latencies)) / float64(len(latencies)) / float64(time.Millisecond)
+	jitterMs = jitterFromLatencies(latencies)
+	return avgMs, jitterMs, true
+}
+
+func (c *Client) collectLatencySamples(ctx context.Context, samples int) []time.Duration {
 	pingURL := c.serverURL + pathPing
 	var latencies []time.Duration
-
 	for range samples {
 		if ctx.Err() != nil {
 			break
 		}
-		start := time.Now()
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, pingURL, nil)
 		if err != nil {
 			continue
@@ -326,36 +339,32 @@ func (c *Client) measureLatency(ctx context.Context, samples int) (avgMs, jitter
 		if c.apiKey != "" {
 			req.Header.Set("Authorization", authBearerPrefix+c.apiKey)
 		}
-		latency, sampleOK := c.latencySample(req, start)
-		if !sampleOK {
-			continue
+		latency, sampleOK := c.latencySample(req, time.Now())
+		if sampleOK {
+			latencies = append(latencies, latency)
 		}
-		latencies = append(latencies, latency)
 	}
+	return latencies
+}
 
-	if len(latencies) < 2 {
-		return 0, 0, false
-	}
-
+func latenciesSum(latencies []time.Duration) time.Duration {
 	var total time.Duration
 	for _, l := range latencies {
 		total += l
 	}
-	avgMs = float64(total) / float64(len(latencies)) / float64(time.Millisecond)
+	return total
+}
 
-	if len(latencies) >= 2 {
-		var jitterSum float64
-		for i := 1; i < len(latencies); i++ {
-			diff := latencies[i] - latencies[i-1]
-			if diff < 0 {
-				diff = -diff
-			}
-			jitterSum += float64(diff) / float64(time.Millisecond)
+func jitterFromLatencies(latencies []time.Duration) float64 {
+	var jitterSum float64
+	for i := 1; i < len(latencies); i++ {
+		diff := latencies[i] - latencies[i-1]
+		if diff < 0 {
+			diff = -diff
 		}
-		jitterMs = jitterSum / float64(len(latencies)-1)
+		jitterSum += float64(diff) / float64(time.Millisecond)
 	}
-
-	return avgMs, jitterMs, true
+	return jitterSum / float64(len(latencies)-1)
 }
 
 func (c *Client) latencySample(req *http.Request, start time.Time) (time.Duration, bool) {
@@ -429,45 +438,45 @@ func (c *Client) uploadBurst(ctx context.Context, durationSec int) (float64, boo
 func (c *Client) uploadMeasured(ctx context.Context, durationSec int) (mbps float64, totalBytes int64, ok bool) {
 	upCtx, cancel := context.WithTimeout(ctx, time.Duration(durationSec+3)*time.Second)
 	defer cancel()
+	totalBytes, elapsed := c.uploadLoop(upCtx, durationSec)
+	if elapsed <= 0 || totalBytes == 0 {
+		return 0, totalBytes, false
+	}
+	return float64(totalBytes*8) / elapsed.Seconds() / 1_000_000, totalBytes, true
+}
 
+func (c *Client) uploadLoop(ctx context.Context, durationSec int) (totalBytes int64, elapsed time.Duration) {
 	payload := make([]byte, 1024*1024)
 	targetDuration := time.Duration(durationSec) * time.Second
 	start := time.Now()
 	iterations := 0
 	for {
-		if upCtx.Err() != nil {
+		if ctx.Err() != nil {
 			break
 		}
 		if iterations > 0 && time.Since(start) >= targetDuration {
 			break
 		}
-
-		req, err := http.NewRequestWithContext(upCtx, http.MethodPost, c.serverURL+pathUpload,
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.serverURL+pathUpload,
 			bytes.NewReader(payload))
 		if err != nil {
-			return 0, totalBytes, false
+			return totalBytes, 0
 		}
 		req.Header.Set("Content-Type", "application/octet-stream")
 		if c.apiKey != "" {
 			req.Header.Set("Authorization", authBearerPrefix+c.apiKey)
 		}
-
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
-			return 0, totalBytes, false
+			return totalBytes, 0
 		}
 		io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
-			return 0, totalBytes, false
+			return totalBytes, 0
 		}
 		totalBytes += int64(len(payload))
 		iterations++
 	}
-
-	elapsed := time.Since(start)
-	if elapsed <= 0 || totalBytes == 0 {
-		return 0, totalBytes, false
-	}
-	return float64(totalBytes*8) / elapsed.Seconds() / 1_000_000, totalBytes, true
+	return totalBytes, time.Since(start)
 }

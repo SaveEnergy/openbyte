@@ -21,6 +21,7 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 		"speedtest-http.js":    true,
 		"speedtest-latency.js": true,
 		"warmup.js":            true,
+		"diagnostics.js":       true,
 		"settings.js":          true,
 		"ui.js":                true,
 		"download.js":          true,

@@ -15,6 +15,7 @@ import (
 )
 
 const (
+	headerContentType  = "Content-Type"
 	jsonContentType    = "application/json"
 	statusOKBody       = `{"status":"ok"}`
 	unreachableBaseURL = "http://127.0.0.1:1"
@@ -31,7 +32,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	handler := api.NewSpeedTestHandler(10, 300)
 	mux := http.NewServeMux()
 	mux.HandleFunc(healthPath, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", jsonContentType)
+		w.Header().Set(headerContentType, jsonContentType)
 		w.Write([]byte(statusOKBody))
 	})
 	mux.HandleFunc(pingPath, handler.Ping)
@@ -180,7 +181,7 @@ func TestSDKSpeedTestUnreachableServer(t *testing.T) {
 
 func TestSDKWithAPIKey(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", jsonContentType)
+		w.Header().Set(headerContentType, jsonContentType)
 		w.Write([]byte(statusOKBody))
 	}))
 	t.Cleanup(srv.Close)
@@ -226,7 +227,7 @@ func TestSDKCheckHasInterpretation(t *testing.T) {
 func TestSDKCheckReturnsLatencyMeasurementErrorWhenPingFails(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc(healthPath, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", jsonContentType)
+		w.Header().Set(headerContentType, jsonContentType)
 		_, _ = w.Write([]byte(statusOKBody))
 	})
 	mux.HandleFunc(pingPath, func(w http.ResponseWriter, r *http.Request) {
@@ -254,7 +255,7 @@ func TestSDKSpeedTestReturnsDownloadMeasurementErrorWhenDownloadFails(t *testing
 	mux := http.NewServeMux()
 	handler := api.NewSpeedTestHandler(10, 300)
 	mux.HandleFunc(healthPath, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", jsonContentType)
+		w.Header().Set(headerContentType, jsonContentType)
 		_, _ = w.Write([]byte(statusOKBody))
 	})
 	mux.HandleFunc(pingPath, handler.Ping)
@@ -280,7 +281,7 @@ func TestSDKSpeedTestDownloadUnexpectedEOF(t *testing.T) {
 	mux := http.NewServeMux()
 	handler := api.NewSpeedTestHandler(10, 300)
 	mux.HandleFunc(healthPath, func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", jsonContentType)
+		w.Header().Set(headerContentType, jsonContentType)
 		_, _ = w.Write([]byte(statusOKBody))
 	})
 	mux.HandleFunc(pingPath, handler.Ping)

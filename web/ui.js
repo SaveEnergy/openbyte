@@ -8,8 +8,15 @@ import {
   TEST_CONFIG,
   toast,
 } from "./state.js";
-import { computeBufferbloatGrade } from "./utils.js";
+import { computeBufferbloatGrade, formatSpeed } from "./utils.js";
 import { updateNetworkDisplay } from "./network.js";
+
+function formatLatencyMs(val) {
+  if (typeof val === "number" && Number.isFinite(val) && val > 0) {
+    return `${val.toFixed(1)} ms`;
+  }
+  return "-";
+}
 
 export function updateSpeed(speed, direction) {
   if (typeof speed !== "number" || !Number.isFinite(speed) || speed < 0)
@@ -130,17 +137,8 @@ export function showResults() {
   }
   showState("results");
 
-  const formatSpeedWithUnit = (speed) => {
-    if (typeof speed !== "number" || !Number.isFinite(speed) || speed < 0)
-      speed = 0;
-    if (speed >= 1000) {
-      return { value: (speed / 1000).toFixed(2), unit: "Gbps" };
-    }
-    return { value: speed.toFixed(1), unit: "Mbps" };
-  };
-
-  const download = formatSpeedWithUnit(state.downloadResult);
-  const upload = formatSpeedWithUnit(state.uploadResult);
+  const download = formatSpeed(state.downloadResult);
+  const upload = formatSpeed(state.uploadResult);
 
   elements.downloadResult.textContent = download.value;
   elements.uploadResult.textContent = upload.value;
@@ -150,15 +148,12 @@ export function showResults() {
   if (downloadUnit) downloadUnit.textContent = download.unit;
   if (uploadUnit) uploadUnit.textContent = upload.unit;
 
-  elements.latencyResult.textContent =
-    state.latencyResult != null ? `${state.latencyResult.toFixed(1)} ms` : "-";
-  elements.jitterResult.textContent =
-    state.jitterResult != null ? `${state.jitterResult.toFixed(1)} ms` : "-";
+  elements.latencyResult.textContent = formatLatencyMs(state.latencyResult);
+  elements.jitterResult.textContent = formatLatencyMs(state.jitterResult);
 
   const loadedLatency = Math.max(state.downloadLatency, state.uploadLatency);
   if (elements.loadedLatencyResult) {
-    elements.loadedLatencyResult.textContent =
-      loadedLatency > 0 ? `${loadedLatency.toFixed(1)} ms` : "-";
+    elements.loadedLatencyResult.textContent = formatLatencyMs(loadedLatency);
   }
 
   if (elements.bufferbloatResult) {

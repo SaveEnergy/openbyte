@@ -12,6 +12,12 @@ import (
 	"time"
 )
 
+const (
+	flagChunkSize  = "chunk-size"
+	flagServerURL  = "server-url"
+	helpHintSuffix = "See: openbyte client --help"
+)
+
 func parseFlags(args []string, version string) (*Config, map[string]bool, int, error) {
 	config := &Config{}
 	flagsSet := make(map[string]bool)
@@ -27,7 +33,7 @@ func parseFlags(args []string, version string) (*Config, map[string]bool, int, e
 	flagSet.IntVar(&config.Streams, "streams", 0, "Parallel streams (1-64)")
 	flagSet.IntVar(&config.Streams, "s", 0, "Parallel streams (1-64) (short)")
 	flagSet.IntVar(&config.PacketSize, "packet-size", 0, "Packet size in bytes (64-9000)")
-	flagSet.IntVar(&config.ChunkSize, "chunk-size", 0, "HTTP chunk size in bytes (65536-4194304)")
+	flagSet.IntVar(&config.ChunkSize, flagChunkSize, 0, "HTTP chunk size in bytes (65536-4194304)")
 	flagSet.BoolVar(&config.JSON, "json", false, "Output results as JSON")
 	flagSet.BoolVar(&config.NDJSON, "ndjson", false, "Streaming newline-delimited JSON output")
 	flagSet.BoolVar(&config.Plain, "plain", false, "Plain text output")
@@ -39,7 +45,7 @@ func parseFlags(args []string, version string) (*Config, map[string]bool, int, e
 	flagSet.BoolVar(&config.NoProgress, "no-progress", false, "Disable progress indicators")
 	flagSet.StringVar(&config.Server, "server", "", "Server alias")
 	flagSet.StringVar(&config.ServerURL, "S", "", "Server URL (short)")
-	flagSet.StringVar(&config.ServerURL, "server-url", "", "Server URL (override)")
+	flagSet.StringVar(&config.ServerURL, flagServerURL, "", "Server URL (override)")
 	flagSet.IntVar(&config.Timeout, "timeout", 0, "Request timeout in seconds")
 
 	flagSet.IntVar(&config.WarmUp, "warmup", 2, "Warm-up seconds before measurement")
@@ -93,10 +99,10 @@ func applyFlagAlias(flagsSet map[string]bool, name string) {
 		flagsSet["duration"] = true
 	case "s":
 		flagsSet["streams"] = true
-	case "chunk-size":
-		flagsSet["chunk-size"] = true
+	case flagChunkSize:
+		flagsSet[flagChunkSize] = true
 	case "S":
-		flagsSet["server-url"] = true
+		flagsSet[flagServerURL] = true
 	case "v":
 		flagsSet["verbose"] = true
 	case "q":
@@ -122,7 +128,7 @@ func applyPositionalServerArg(config *Config, flagsSet map[string]bool, rest []s
 			return fmt.Errorf("invalid server URL: %w", err)
 		}
 		config.ServerURL = normalized
-		flagsSet["server-url"] = true
+		flagsSet[flagServerURL] = true
 		return nil
 	}
 	config.Server = server
@@ -316,13 +322,13 @@ func validateProtocol(config *Config) error {
 		return fmt.Errorf("invalid protocol: %s\n\n"+
 			"Protocol must be 'tcp', 'udp', or 'http'.\n"+
 			"Use: openbyte client -p tcp  or  openbyte client -p udp  or  openbyte client -p http\n"+
-			"See: openbyte client --help", config.Protocol)
+			helpHintSuffix, config.Protocol)
 	}
 	if config.Protocol == protocolHTTP && config.Direction == directionBidirectional {
 		return fmt.Errorf("invalid direction for http: %s\n\n"+
 			"HTTP protocol supports 'download' or 'upload'.\n"+
 			"Use: openbyte client -p http -d download  or  openbyte client -p http -d upload\n"+
-			"See: openbyte client --help", config.Direction)
+			helpHintSuffix, config.Direction)
 	}
 	return nil
 }
@@ -332,7 +338,7 @@ func validateDirection(config *Config) error {
 		return fmt.Errorf("invalid direction: %s\n\n"+
 			"Direction must be 'download', 'upload', or 'bidirectional'.\n"+
 			"Use: openbyte client -d download  or  openbyte client -d upload  or  openbyte client -d bidirectional\n"+
-			"See: openbyte client --help", config.Direction)
+			helpHintSuffix, config.Direction)
 	}
 	return nil
 }
@@ -342,20 +348,20 @@ func validateNumericConfig(config *Config) error {
 		return fmt.Errorf("invalid duration: %d\n\n"+
 			"Duration must be between 1 and 300 seconds.\n"+
 			"Use: openbyte client -t 30  (for 30 seconds)\n"+
-			"See: openbyte client --help", config.Duration)
+			helpHintSuffix, config.Duration)
 	}
 	if config.Streams < 1 || config.Streams > 64 {
 		return fmt.Errorf("invalid streams: %d\n\n"+
 			"Streams must be between 1 and 64.\n"+
 			"Use: openbyte client -s 4  (for 4 parallel streams)\n"+
-			"See: openbyte client --help", config.Streams)
+			helpHintSuffix, config.Streams)
 	}
 	if config.Protocol != protocolHTTP {
 		if config.PacketSize < 64 || config.PacketSize > 9000 {
 			return fmt.Errorf("invalid packet size: %d\n\n"+
 				"Packet size must be between 64 and 9000 bytes.\n"+
 				"Use: openbyte client --packet-size 1400  (WAN-safe default)\n"+
-				"See: openbyte client --help", config.PacketSize)
+				helpHintSuffix, config.PacketSize)
 		}
 	}
 	if config.Protocol == protocolHTTP {
@@ -363,7 +369,7 @@ func validateNumericConfig(config *Config) error {
 			return fmt.Errorf("invalid chunk size: %d\n\n"+
 				"Chunk size must be between 65536 and 4194304 bytes.\n"+
 				"Use: openbyte client --chunk-size 1048576  (1MB)\n"+
-				"See: openbyte client --help", config.ChunkSize)
+				helpHintSuffix, config.ChunkSize)
 		}
 	}
 	return nil

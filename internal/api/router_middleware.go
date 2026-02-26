@@ -163,6 +163,16 @@ func (r *Router) LoggingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func isHTTPS(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	if r.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
+
 func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -175,6 +185,9 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 				"script-src 'self'; "+
 				"img-src 'self' data:; "+
 				"connect-src 'self' https: http: ws: wss:")
+		if isHTTPS(r) {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
 		next.ServeHTTP(w, r)
 	})
 }

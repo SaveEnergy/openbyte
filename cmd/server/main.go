@@ -219,7 +219,7 @@ func setupRuntimeResources(cfg *config.Config, version string, resources *server
 		router.SetRuntimeMetricsHandler(runtimeMetricsHandler())
 	}
 
-	var registrars []api.RoutesRegistrar
+	var registrars []api.RouteRegistrar
 	if cfg.RegistryMode {
 		logging.Info("Starting in registry mode")
 		resources.registryService = registry.NewService(cfg.RegistryServerTTL, 30*time.Second)

@@ -14,8 +14,8 @@ import (
 const (
 	loopbackAddrWithPort = "127.0.0.1:12345"
 	loopbackIPv4         = "127.0.0.1"
-	udpAddrA             = "127.0.0.1"
-	udpAddrB             = "127.0.0.1"
+	udpAddrA             = loopbackIPv4
+	udpAddrB             = loopbackIPv4
 	udpPortA             = 10001
 	udpPortB             = 10002
 	readTimeoutShort     = 2 * time.Second

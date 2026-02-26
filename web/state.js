@@ -17,8 +17,6 @@ export const state = {
   uploadLatency: 0,
   currentSpeed: 0,
   progress: 0,
-  ws: null,
-  streamId: null,
   abortController: null,
   servers: [],
   selectedServer: null,
@@ -34,6 +32,8 @@ export const state = {
   shareSavePromise: null,
   lastAriaProgressUpdateMs: 0,
   lastAriaProgressValue: -1,
+  /** Internal diagnostics (peak/sustained/volatility, stop_reason) — not shown in default UI */
+  diagnostics: null,
 };
 
 export const elements = {
