@@ -155,8 +155,6 @@ export async function runDownloadTest(duration, onProgress, signal) {
   const maxNetworkRetries = TEST_CONFIG.MAX_NETWORK_RETRIES;
   const retryDelayMs = TEST_CONFIG.NETWORK_RETRY_DELAY_MS;
   const endTime = startTime + duration * 1000;
-  let totalBytes = 0;
-  let allBytes = 0;
   const streamState = {
     sawNetworkError: false,
     sawOverload: false,

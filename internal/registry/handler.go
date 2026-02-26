@@ -19,8 +19,10 @@ type Handler struct {
 }
 
 const (
-	authBearerPrefix      = "Bearer "
-	contentTypeJSONPrefix = "application/json"
+	authBearerPrefix  = "Bearer "
+	headerContentType = "Content-Type"
+	contentTypeJSON   = "application/json"
+	errServerNotFound = "server not found"
 )
 
 type updateServerRequest struct {
@@ -88,7 +90,7 @@ func (h *Handler) ListServers(w http.ResponseWriter, r *http.Request) {
 		servers = h.service.List()
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, contentTypeJSON)
 	if err := json.NewEncoder(w).Encode(map[string]any{
 		"servers": servers,
 		"count":   len(servers),
@@ -98,7 +100,7 @@ func (h *Handler) ListServers(w http.ResponseWriter, r *http.Request) {
 }
 
 func respondRegistryError(w http.ResponseWriter, msg string, code int) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
 		logging.Warn("registry: encode error response", logging.Field{Key: "error", Value: err})
@@ -110,11 +112,11 @@ func (h *Handler) GetServer(w http.ResponseWriter, r *http.Request) {
 
 	server, exists := h.service.Get(id)
 	if !exists {
-		respondRegistryError(w, "server not found", http.StatusNotFound)
+		respondRegistryError(w, errServerNotFound, http.StatusNotFound)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, contentTypeJSON)
 	if err := json.NewEncoder(w).Encode(server); err != nil {
 		h.logger.Warn("encode server response", logging.Field{Key: "error", Value: err})
 	}
@@ -126,7 +128,7 @@ func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ct := r.Header.Get("Content-Type"); ct != "" && !strings.HasPrefix(ct, contentTypeJSONPrefix) {
+	if ct := r.Header.Get(headerContentType); ct != "" && !strings.HasPrefix(ct, contentTypeJSON) {
 		respondRegistryError(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -161,7 +163,7 @@ func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
 		logging.Field{Key: "id", Value: info.ID},
 		logging.Field{Key: "name", Value: info.Name})
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":    "registered",
@@ -177,7 +179,7 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ct := r.Header.Get("Content-Type"); ct != "" && !strings.HasPrefix(ct, contentTypeJSONPrefix) {
+	if ct := r.Header.Get(headerContentType); ct != "" && !strings.HasPrefix(ct, contentTypeJSON) {
 		respondRegistryError(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -212,11 +214,11 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 	if !h.service.UpdatePatched(id, func(dst *types.ServerInfo) {
 		applyServerUpdatePatch(dst, req)
 	}) {
-		respondRegistryError(w, "server not found", http.StatusNotFound)
+		respondRegistryError(w, errServerNotFound, http.StatusNotFound)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, contentTypeJSON)
 	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":    "updated",
 		"server_id": id,
@@ -270,13 +272,13 @@ func (h *Handler) DeregisterServer(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	if !h.service.Deregister(id) {
-		respondRegistryError(w, "server not found", http.StatusNotFound)
+		respondRegistryError(w, errServerNotFound, http.StatusNotFound)
 		return
 	}
 
 	h.logger.Info("Server deregistered", logging.Field{Key: "id", Value: id})
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, contentTypeJSON)
 	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":    "deregistered",
 		"server_id": id,
@@ -286,7 +288,7 @@ func (h *Handler) DeregisterServer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, contentTypeJSON)
 	if err := json.NewEncoder(w).Encode(map[string]any{
 		"status":  "healthy",
 		"servers": h.service.Count(),

@@ -82,7 +82,7 @@
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| _none_ | - | - | - | Backlog active queue is clear after 2026-02-26 closure wave. | Await next Sonar server-side reanalysis to confirm remote parity of local rule fixes. | Trigger Sonar analysis in CI / SonarCloud and refresh snapshot. |
+| 20260226-sonar-02 | quality | A0 | Done | Burn down newest Sonar findings from post-push reanalysis (`javascript:S1481`, `javascript:S2814`, plus high-frequency `go:S1192` literals in `internal/api/speedtest.go` and `internal/registry/handler.go`). | Targeted cleanup applied (`web/speedtest-http.js`, `internal/api/speedtest.go`, `internal/registry/handler.go`) with focused tests + lint gates green; awaiting next SonarCloud reanalysis after push for remote parity. | `go test -short ./internal/api ./internal/registry && npx prettier --check web/speedtest-http.js && make ci-lint` |
 
 ### Check Hold (manual/external)
 
@@ -96,12 +96,13 @@
 
 - Strict OPEN filter parity maintained with Cloud:
   - Query: `projects=[SaveEnergy_openbyte]`, `issueStatuses=[OPEN]`, `ps=500`
-  - Total OPEN: `58`
-  - Current top tracked rules: `go:S1192=27`, `go:S3776=13`, `javascript:S3863=5`, `javascript:S3776=4`, `javascript:S1128=3`, `javascript:S7735=2`, `javascript:S2004=1`, `javascript:S7763=1`, `javascript:S6861=1`, `godre:S8196=1` (MCP live fetch on 2026-02-26; project `SaveEnergy_openbyte`)
+  - Total OPEN: `35`
+  - Current top tracked rules: `go:S1192=14`, `go:S3776=13`, `javascript:S3776=2`, `javascript:S7735=2`, `javascript:S1481=1`, `javascript:S2814=1`, `javascript:S2004=1`, `godre:S8196=1` (MCP live fetch on 2026-02-26; project `SaveEnergy_openbyte`)
   - Rule-to-backlog mapping refreshed:
-    - `go:S1192`, `go:S3776`, `javascript:S3863`, `javascript:S3776`, `javascript:S1128` -> `20260226-sonar-01`
+    - `go:S1192`, `go:S3776`, `javascript:S3776`, `javascript:S7735`, `javascript:S2004`, `godre:S8196` -> `20260226-sonar-01`
+    - `javascript:S1481`, `javascript:S2814` + targeted `go:S1192` cleanup follow-up -> `20260226-sonar-02`
     - Security hotspots (`security_hotspots`, `new_security_hotspots`) -> `20260226-sec-02`
-    - `godre:S8196` residual single issue remains under `20260226-sonar-01` until next targeted pass
+    - Residual `godre:S8196` and high-complexity rows remain under ongoing quality burn-down
   - Security OPEN issues: `0`
   - Security hotspot debt: `0` total, `0` new (`100%` reviewed overall)
 
@@ -112,7 +113,7 @@
 - Latest completed wave (moved `Check -> Done -> removed`):
   - `20260217-web-02`, `20260217-go-02`, `20260217-go-03`, `20260217-go-04`, `20260217-go-05`, `20260217-go-06`, `20260217-go-07`, `20260217-go-08`, `20260217-go-09`
   - `20260217-test-02`, `20260217-test-03`, `20260217-test-04`, `20260217-test-05`, `20260217-test-06`, `20260217-test-07`
-  - `20260217-sec-01`, `20260218-go-12`, `20260218-go-13`, `20260219-ui-01`, `20260219-ui-02`, `20260219-web-02`, `20260219-web-05`, `20260219-web-06`, `20260219-ui-03`, `20260219-cli-03`, `20260219-go-16`, `20260219-cli-01`, `20260219-cli-02`, `20260219-ui-04`, `20260219-ui-05`, `20260219-go-15`, `20260217-test-09`, `20260217-test-10`, `20260219-go-17`, `20260219-go-18`, `20260219-go-19`, `20260219-ci-01`, `20260219-doc-01`, `20260219-ui-06`, `20260219-ui-07`, `20260219-go-20`, `20260219-go-21`, `20260220-sec-01`, `20260220-api-01`, `20260219-go-22`, `20260220-web-01`, `20260220-meta-01`, `20260219-sdk-01`, `20260219-reg-01`, `20260219-test-13`, `20260219-test-11`, `20260219-test-12`, `20260226-sec-02`, `20260226-sonar-01`
+  - `20260217-sec-01`, `20260218-go-12`, `20260218-go-13`, `20260219-ui-01`, `20260219-ui-02`, `20260219-web-02`, `20260219-web-05`, `20260219-web-06`, `20260219-ui-03`, `20260219-cli-03`, `20260219-go-16`, `20260219-cli-01`, `20260219-cli-02`, `20260219-ui-04`, `20260219-ui-05`, `20260219-go-15`, `20260217-test-09`, `20260217-test-10`, `20260219-go-17`, `20260219-go-18`, `20260219-go-19`, `20260219-ci-01`, `20260219-doc-01`, `20260219-ui-06`, `20260219-ui-07`, `20260219-go-20`, `20260219-go-21`, `20260220-sec-01`, `20260220-api-01`, `20260219-go-22`, `20260220-web-01`, `20260220-meta-01`, `20260219-sdk-01`, `20260219-reg-01`, `20260219-test-13`, `20260219-test-11`, `20260219-test-12`, `20260226-sec-02`, `20260226-sonar-01`, `20260226-sonar-02`
 
 ### Recent Decision Notes
 
@@ -120,6 +121,7 @@
 - Sonar reporting uses strict OPEN parity query (`projects=SaveEnergy_openbyte`, `issueStatuses=OPEN`).
 - Current Sonar MCP surface exposes issue search + metrics, but not hotspot-review transitions; hotspot closure requires Sonar UI/API support outside current MCP tools.
 - 2026-02-26 closure wave used parallel subagents for Go literal/complexity and JS modular Sonar hotspots; local test/format/lint gates passed, with Sonar rule counts awaiting next server-side reanalysis.
+- 2026-02-26 follow-up rerun: Sonar OPEN dropped to `35`; targeted local fixes applied for `web/speedtest-http.js` (`S1481`,`S2814`) and `go:S1192` literals in `internal/api/speedtest.go` + `internal/registry/handler.go` pending remote scan parity after push.
 - Prefer behavior-preserving refactors + targeted regression tests over broad rewrites.
 - Active backlog rows now keep only unresolved/externally-dependent items; completed/check work is folded into `Recently Closed IDs` to keep queue readable.
 - A2 full-codebase analysis (2026-02-19): identified 9 new backlog items across a11y, CSS architecture, Go LOC splits, test coverage gaps, flaky tests, and frontend UX. Sonar snapshot updated with per-rule breakdown (133 OPEN). Key risk: `cmd/client/engine.go` has zero direct test coverage (541 LOC). UDP `lastSeenUnix` concurrency verified safe (atomic ops). `<dialog>` focus trap assumption needs cross-browser validation.
