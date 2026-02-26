@@ -479,4 +479,3 @@ func (h *Handler) resolveClientIP(r *http.Request) string {
 	}
 	return h.clientIPResolver.FromRequest(r)
 }
-

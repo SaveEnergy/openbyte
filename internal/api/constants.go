@@ -1,0 +1,12 @@
+package api
+
+// Error and path literals for S1192.
+const (
+	errNotFound          = "not found"
+	errStreamIDRequired  = "stream ID required"
+	errInvalidStreamID   = "invalid stream ID"
+	errRateLimitExceeded = "rate limit exceeded"
+	errOriginNotAllowed  = "origin not allowed"
+	apiV1Prefix          = "/api/v1"
+	apiV1RegistryPrefix  = "/api/v1/registry/"
+)

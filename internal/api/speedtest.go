@@ -30,6 +30,8 @@ const (
 	speedtestRandomSize       = 4 * 1024 * 1024
 	uploadReadBufferSize      = 256 * 1024
 	deadlineCheckWriteSpacing = 64
+	contentTypeJSON           = "application/json"
+	contentTypeOctetStream    = "application/octet-stream"
 )
 
 func NewSpeedTestHandler(maxConcurrent, maxDurationSec int) *SpeedTestHandler {
@@ -59,7 +61,7 @@ func (h *SpeedTestHandler) SetClientIPResolver(resolver *ClientIPResolver) {
 }
 
 func respondSpeedtestError(w http.ResponseWriter, msg string, code int) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentTypeJSON)
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
 		logging.Warn("speedtest: encode error response", logging.Field{Key: "error", Value: err})
@@ -82,7 +84,7 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Type", contentTypeOctetStream)
 	w.Header().Set("Cache-Control", "no-store")
 
 	randomSource, err := h.resolveRandomSource()
@@ -185,7 +187,7 @@ func writeUploadResponse(w http.ResponseWriter, controller *http.ResponseControl
 	}
 	throughputMbps := float64(totalBytes*8) / elapsed.Seconds() / 1_000_000
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentTypeJSON)
 	_ = controller.SetWriteDeadline(time.Now().Add(2 * time.Second))
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]any{
@@ -275,7 +277,7 @@ func (h *SpeedTestHandler) Ping(w http.ResponseWriter, r *http.Request) {
 	clientIP := h.resolveClientIP(r)
 	isIPv6 := strings.Contains(clientIP, ":")
 
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", contentTypeJSON)
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]any{

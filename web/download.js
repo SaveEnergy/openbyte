@@ -358,26 +358,26 @@
     return false;
   }
 
+  function tryFallbackCopy(text, onSuccess, onFailure) {
+    if (fallbackCopy(text)) {
+      onSuccess();
+      return true;
+    }
+    onFailure();
+    return false;
+  }
+
   function copyText(text, onSuccess, onFailure) {
     if (navigator.clipboard?.writeText) {
       navigator.clipboard
         .writeText(text)
         .then(onSuccess)
         .catch(function () {
-          if (fallbackCopy(text)) {
-            onSuccess();
-            return;
-          }
-          onFailure();
+          tryFallbackCopy(text, onSuccess, onFailure);
         });
       return;
     }
-
-    if (fallbackCopy(text)) {
-      onSuccess();
-      return;
-    }
-    onFailure();
+    tryFallbackCopy(text, onSuccess, onFailure);
   }
 
   function setTemporaryButtonText(btn, text) {

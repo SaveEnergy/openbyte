@@ -16,6 +16,16 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+const (
+	apiPathStreamStart = "/api/v1/stream/start"
+	apiPathStreamBase  = "/api/v1/stream/"
+	contentTypeJSON    = "application/json"
+	authBearerPrefix   = "Bearer "
+	pathCancel         = "/cancel"
+	pathComplete       = "/complete"
+	statusCompleted    = "completed"
+)
+
 func startStream(ctx context.Context, config *Config) (*StreamResponse, error) {
 	reqBody := StartStreamRequest{
 		Protocol:   config.Protocol,
@@ -23,7 +33,7 @@ func startStream(ctx context.Context, config *Config) (*StreamResponse, error) {
 		Duration:   config.Duration,
 		Streams:    config.Streams,
 		PacketSize: config.PacketSize,
-		Mode:       "client",
+		Mode:       modeClient,
 	}
 
 	jsonData, err := json.Marshal(reqBody)
@@ -31,8 +41,8 @@ func startStream(ctx context.Context, config *Config) (*StreamResponse, error) {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	apiURL := config.ServerURL + "/api/v1/stream/start"
-	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewReader(jsonData))
+	apiURL := config.ServerURL + apiPathStreamStart
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -80,13 +90,13 @@ func CancelStream(ctx context.Context, serverURL, streamID, apiKey string) error
 	reqCtx, cancel := context.WithTimeout(parent, 5*time.Second)
 	defer cancel()
 
-	apiURL := serverURL + "/api/v1/stream/" + streamID + "/cancel"
-	req, err := http.NewRequestWithContext(reqCtx, "POST", apiURL, nil)
+	apiURL := serverURL + apiPathStreamBase + streamID + pathCancel
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, apiURL, nil)
 	if err != nil {
 		return err
 	}
 	if apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+apiKey)
+		req.Header.Set("Authorization", authBearerPrefix+apiKey)
 	}
 
 	client := newHTTPClient(5 * time.Second)
@@ -115,7 +125,7 @@ func completeStream(ctx context.Context, config *Config, streamID string, metric
 	defer cancel()
 
 	reqBody := map[string]any{
-		"status": "completed",
+		"status": statusCompleted,
 		"metrics": map[string]any{
 			"throughput_mbps":     metrics.ThroughputMbps,
 			"throughput_avg_mbps": metrics.ThroughputMbps,
@@ -137,13 +147,13 @@ func completeStream(ctx context.Context, config *Config, streamID string, metric
 	if err != nil {
 		return fmt.Errorf("complete stream marshal: %w", err)
 	}
-	req, err := http.NewRequestWithContext(reqCtx, "POST", config.ServerURL+"/api/v1/stream/"+streamID+"/complete", bytes.NewReader(jsonData))
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, config.ServerURL+apiPathStreamBase+streamID+pathComplete, bytes.NewReader(jsonData))
 	if err != nil {
 		return fmt.Errorf("complete stream request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", contentTypeJSON)
 	if config.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+config.APIKey)
+		req.Header.Set("Authorization", authBearerPrefix+config.APIKey)
 	}
 
 	client := newHTTPClient(5 * time.Second)

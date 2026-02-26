@@ -70,10 +70,10 @@ func (r *Router) SetResultsHandler(h *results.Handler) {
 
 // SetWebRoot overrides the embedded web assets with a directory on disk.
 // Use this for development so you can edit HTML/CSS/JS without rebuilding.
-// If path is empty, the embedded assets are used.
-func (r *Router) SetWebRoot(path string) {
-	if path != "" {
-		r.webFS = http.Dir(path)
+// If webRootDir is empty, the embedded assets are used.
+func (r *Router) SetWebRoot(webRootDir string) {
+	if webRootDir != "" {
+		r.webFS = http.Dir(webRootDir)
 	}
 }
 
@@ -101,14 +101,13 @@ func (r *Router) SetupRoutes(registrars ...RoutesRegistrar) http.Handler {
 		mux.HandleFunc("GET /debug/runtime-metrics", r.runtimeMetrics)
 	}
 	mux.HandleFunc("/api/v1/", func(w http.ResponseWriter, req *http.Request) {
-		respondJSON(w, map[string]string{"error": "not found"}, http.StatusNotFound)
+		respondJSON(w, map[string]string{"error": errNotFound}, http.StatusNotFound)
 	})
 
 	r.registerResultsPageRoute(mux, webFS)
 
 	staticHandler := staticCacheMiddleware(newStaticAllowlistHandler(webFS))
 	mux.Handle("/", gzipMiddleware(staticHandler))
-
 
 	// Let external registrars add routes before middleware wrapping
 	for _, reg := range registrars {
@@ -124,7 +123,7 @@ func (r *Router) newV1Registrar(mux *http.ServeMux) func(method, route string, h
 		if r.limiter != nil {
 			h = applyRateLimit(r.limiter, h)
 		}
-		mux.HandleFunc(method+" /api/v1"+route, h)
+		mux.HandleFunc(method+" "+apiV1Prefix+route, h)
 	}
 }
 
@@ -161,7 +160,7 @@ func (r *Router) registerWebSocketStreamRoute(v1 func(method, route string, hand
 	v1("GET", "/stream/{id}/stream", func(w http.ResponseWriter, req *http.Request) {
 		streamID := req.PathValue("id")
 		if streamID == "" {
-			respondJSON(w, map[string]string{"error": "stream ID required"}, http.StatusBadRequest)
+			respondJSON(w, map[string]string{"error": errStreamIDRequired}, http.StatusBadRequest)
 			return
 		}
 		wsHandler(w, req, streamID)
@@ -210,7 +209,7 @@ func (r *Router) wrapMiddlewares(handler http.Handler) http.Handler {
 
 func registryRateLimitMiddleware(limiter *RateLimiter, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/api/v1/registry/") {
+		if !strings.HasPrefix(r.URL.Path, apiV1RegistryPrefix) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -221,7 +220,7 @@ func registryRateLimitMiddleware(limiter *RateLimiter, next http.Handler) http.H
 		ip := limiter.ClientIP(r)
 		if !limiter.Allow(ip) {
 			w.Header().Set("Retry-After", "60")
-			respondJSON(w, map[string]string{"error": "rate limit exceeded"}, http.StatusTooManyRequests)
+			respondJSON(w, map[string]string{"error": errRateLimitExceeded}, http.StatusTooManyRequests)
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -230,30 +229,31 @@ func registryRateLimitMiddleware(limiter *RateLimiter, next http.Handler) http.H
 
 func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 	allowed := map[string]bool{
-		"index.html":    true,
-		"download.html": true,
-		"results.html":  true,
-		"skill.html":    true,
-		"openbyte.js":   true,
-		"state.js":      true,
-		"utils.js":      true,
-		"network.js":    true,
-		"speedtest.js":     true,
-		"speedtest-http.js": true,
+		"index.html":           true,
+		"download.html":        true,
+		"results.html":         true,
+		"skill.html":           true,
+		"openbyte.js":          true,
+		"state.js":             true,
+		"utils.js":             true,
+		"network.js":           true,
+		"speedtest.js":         true,
+		"speedtest-http.js":    true,
 		"speedtest-latency.js": true,
-		"settings.js":   true,
-		"ui.js":         true,
-		"download.js":   true,
-		"results.js":    true,
-		"skill.js":      true,
-		"style.css":     true,
-		"base.css":      true,
-		"download.css":  true,
-		"speed.css":     true,
-		"modal.css":     true,
-		"skill.css":     true,
-		"motion.css":    true,
-		"favicon.svg":   true,
+		"warmup.js":            true,
+		"settings.js":          true,
+		"ui.js":                true,
+		"download.js":          true,
+		"results.js":           true,
+		"skill.js":             true,
+		"style.css":            true,
+		"base.css":             true,
+		"download.css":         true,
+		"speed.css":            true,
+		"modal.css":            true,
+		"skill.css":            true,
+		"motion.css":           true,
+		"favicon.svg":          true,
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -307,7 +307,7 @@ func applyRateLimit(limiter *RateLimiter, next http.HandlerFunc) http.HandlerFun
 		ip := limiter.ClientIP(r)
 		if !limiter.Allow(ip) {
 			w.Header().Set("Retry-After", "60")
-			respondJSON(w, map[string]string{"error": "rate limit exceeded"}, http.StatusTooManyRequests)
+			respondJSON(w, map[string]string{"error": errRateLimitExceeded}, http.StatusTooManyRequests)
 			return
 		}
 		next(w, r)
@@ -318,11 +318,11 @@ func (r *Router) HandleWithID(fn func(http.ResponseWriter, *http.Request, string
 	return func(w http.ResponseWriter, req *http.Request) {
 		streamID := req.PathValue("id")
 		if streamID == "" {
-			respondJSON(w, map[string]string{"error": "stream ID required"}, http.StatusBadRequest)
+			respondJSON(w, map[string]string{"error": errStreamIDRequired}, http.StatusBadRequest)
 			return
 		}
 		if !isValidStreamID(streamID) {
-			respondJSON(w, map[string]string{"error": "invalid stream ID"}, http.StatusBadRequest)
+			respondJSON(w, map[string]string{"error": errInvalidStreamID}, http.StatusBadRequest)
 			return
 		}
 		fn(w, req, streamID)
@@ -360,7 +360,7 @@ func (r *Router) CORSMiddleware(next http.Handler) http.Handler {
 		}
 		if req.Method == http.MethodOptions {
 			if origin != "" && !originAllowed {
-				respondJSON(w, map[string]string{"error": "origin not allowed"}, http.StatusForbidden)
+				respondJSON(w, map[string]string{"error": errOriginNotAllowed}, http.StatusForbidden)
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)

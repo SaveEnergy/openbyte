@@ -10,6 +10,12 @@ import (
 	"github.com/saveenergy/openbyte/internal/logging"
 )
 
+const (
+	udpCmdDownload = 'D'
+	udpCmdUpload   = 'U'
+	udpCmdStop     = 'S'
+)
+
 // udpClients tracks active UDP client state, safe for concurrent access.
 type udpClients struct {
 	mu sync.RWMutex
@@ -134,11 +140,11 @@ func (s *Server) udpReader(clients *udpClients, wg *sync.WaitGroup) {
 		atomic.StoreInt64(&client.lastSeenUnix, time.Now().UnixNano())
 
 		switch buf[0] {
-		case 'D':
+		case udpCmdDownload:
 			atomic.StoreInt32(&client.downloading, 1)
-		case 'U':
+		case udpCmdUpload:
 			atomic.AddInt64(&client.bytesRecv, int64(n))
-		case 'S':
+		case udpCmdStop:
 			atomic.StoreInt32(&client.downloading, 0)
 		default:
 			if _, err := s.udpConn.WriteToUDP(buf[:n], addr); err != nil {

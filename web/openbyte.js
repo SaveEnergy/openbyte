@@ -1,7 +1,6 @@
 /** Main entry: orchestration, test lifecycle, share. */
 
-import { state, elements } from "./state.js";
-import { apiBase } from "./state.js";
+import { state, elements, getApiBase } from "./state.js";
 import { computeBufferbloatGrade } from "./utils.js";
 import {
   showState,
@@ -13,10 +12,7 @@ import {
 import {
   loadServers,
   detectNetworkInfo,
-  updateNetworkDisplay,
-  updateServerName,
   onServerChange,
-  checkServer,
   resolveServerName,
 } from "./network.js";
 import { bindEvents, loadSettings } from "./settings.js";
@@ -114,7 +110,7 @@ async function saveAndEnableShare() {
   const bbGrade = computeBufferbloatGrade(state.latencyResult, loadedLat) || "";
 
   state.shareSavePromise = (async () => {
-    const res = await fetch(`${apiBase}/results`, {
+    const res = await fetch(`${getApiBase()}/results`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

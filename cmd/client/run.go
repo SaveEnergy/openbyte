@@ -13,7 +13,7 @@ import (
 )
 
 func runStream(ctx context.Context, config *Config, formatter OutputFormatter, streamID *atomic.Value) error {
-	if config.Protocol == "http" {
+	if config.Protocol == protocolHTTP {
 		return runHTTPStream(ctx, config, formatter)
 	}
 	streamResp, err := startStream(ctx, config)
@@ -27,7 +27,7 @@ func runStream(ctx context.Context, config *Config, formatter OutputFormatter, s
 
 	streamID.Store(streamResp.StreamID)
 
-	if streamResp.Mode == "client" {
+	if streamResp.Mode == modeClient {
 		return runClientSideTest(ctx, config, formatter, streamResp)
 	}
 
@@ -46,7 +46,7 @@ type EngineRunner interface {
 
 func runClientSideTest(ctx context.Context, config *Config, formatter OutputFormatter, streamResp *StreamResponse) error {
 	testAddr := streamResp.TestServerTCP
-	if config.Protocol == "udp" {
+	if config.Protocol == protocolUDP {
 		testAddr = streamResp.TestServerUDP
 	}
 
@@ -284,7 +284,7 @@ func finalizeHTTPStreamRun(input finalizeHTTPStreamRunInput) error {
 
 	httpConfig := *input.config
 	httpConfig.PacketSize = input.config.ChunkSize
-	results := buildResults("http", &httpConfig, metrics, input.startTime)
+	results := buildResults(protocolHTTP, &httpConfig, metrics, input.startTime)
 	input.formatter.FormatComplete(results)
 	if ferr := formatterLastError(input.formatter); ferr != nil {
 		return fmt.Errorf("formatter output failed: %w", ferr)
@@ -345,11 +345,11 @@ func buildResults(streamID string, config *Config, metrics EngineMetrics, startT
 	throughput := metrics.ThroughputMbps
 	var downMbps, upMbps float64
 	switch config.Direction {
-	case "download":
+	case directionDownload:
 		downMbps = throughput
-	case "upload":
+	case directionUpload:
 		upMbps = throughput
-	case "bidirectional":
+	case directionBidirectional:
 		downMbps = throughput / 2
 		upMbps = throughput / 2
 	}
@@ -365,7 +365,7 @@ func buildResults(streamID string, config *Config, metrics EngineMetrics, startT
 	return &StreamResults{
 		SchemaVersion: SchemaVersion,
 		StreamID:      streamID,
-		Status:        "completed",
+		Status:        statusCompleted,
 		Config: &StreamConfig{
 			Protocol:   config.Protocol,
 			Direction:  config.Direction,

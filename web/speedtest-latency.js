@@ -1,6 +1,6 @@
 /** Latency measurement and loaded-latency probe. */
 
-import { apiBase, state, TEST_CONFIG } from "./state.js";
+import { getApiBase, state, TEST_CONFIG } from "./state.js";
 import { sleep } from "./utils.js";
 import { updateNetworkDisplay } from "./network.js";
 import { updateProgress, updateSpeed } from "./ui.js";
@@ -16,6 +16,33 @@ function filterOutliersIQR(samples) {
   return samples.filter((s) => s >= lower && s <= upper);
 }
 
+async function captureClientIPIfNeeded(res, capturedRef) {
+  if (capturedRef.captured || !res.ok) {
+    await res.text().catch(() => {});
+    return;
+  }
+  try {
+    const data = await res.json();
+    if (data.client_ip) {
+      state.networkInfo[data.ipv6 ? "ipv6" : "ipv4"] = data.client_ip;
+      updateNetworkDisplay();
+      capturedRef.captured = true;
+    }
+  } catch (err) {
+    console.debug("failed to parse ping response", err);
+    await res.text().catch(() => {});
+  }
+}
+
+function computeJitter(samples) {
+  if (samples.length < 2) return 0;
+  let sumDiff = 0;
+  for (let i = 1; i < samples.length; i++) {
+    sumDiff += Math.abs(samples[i] - samples[i - 1]);
+  }
+  return sumDiff / (samples.length - 1);
+}
+
 export function startLoadedLatencyProbe(signal) {
   const samples = [];
   let running = true;
@@ -24,7 +51,7 @@ export function startLoadedLatencyProbe(signal) {
     while (running && !signal.aborted) {
       const start = performance.now();
       try {
-        const res = await fetch(`${apiBase}/ping`, {
+        const res = await fetch(`${getApiBase()}/ping`, {
           method: "GET",
           cache: "no-store",
           signal,
@@ -60,35 +87,20 @@ export async function measureLatency(signal) {
   const rawSamples = [];
   const numSamples = TEST_CONFIG.LATENCY_SAMPLE_COUNT;
   const warmUpPings = TEST_CONFIG.LATENCY_WARMUP_PINGS;
-  let capturedIP = false;
+  const capturedRef = { captured: false };
 
   for (let i = 0; i < numSamples; i++) {
     if (signal.aborted) break;
 
     const start = performance.now();
     try {
-      const res = await fetch(`${apiBase}/ping`, { method: "GET", signal });
+      const res = await fetch(`${getApiBase()}/ping`, {
+        method: "GET",
+        signal,
+      });
       const rtt = performance.now() - start;
 
-      if (!capturedIP && res.ok) {
-        try {
-          const data = await res.json();
-          if (data.client_ip) {
-            if (data.ipv6) {
-              state.networkInfo.ipv6 = data.client_ip;
-            } else {
-              state.networkInfo.ipv4 = data.client_ip;
-            }
-            updateNetworkDisplay();
-            capturedIP = true;
-          }
-        } catch (err) {
-          console.debug("failed to parse ping response", err);
-          await res.text().catch(() => {});
-        }
-      } else {
-        await res.text().catch(() => {});
-      }
+      await captureClientIPIfNeeded(res, capturedRef);
 
       rawSamples.push(rtt);
       updateProgress((i / numSamples) * 100);
@@ -106,19 +118,8 @@ export async function measureLatency(signal) {
       : rawSamples;
 
   const filtered = filterOutliersIQR(samples);
-
-  if (filtered.length >= 2) {
-    let sumDiff = 0;
-    for (let i = 1; i < filtered.length; i++) {
-      sumDiff += Math.abs(filtered[i] - filtered[i - 1]);
-    }
-    state.jitterResult = sumDiff / (filtered.length - 1);
-  } else {
-    state.jitterResult = 0;
-  }
+  state.jitterResult = computeJitter(filtered);
 
   filtered.sort((a, b) => a - b);
-  const median = filtered[Math.floor(filtered.length / 2)];
-
-  return median;
+  return filtered[Math.floor(filtered.length / 2)];
 }

@@ -9,12 +9,8 @@ import {
   updateTestType,
 } from "./ui.js";
 import { runDownloadTest, runUploadTest } from "./speedtest-http.js";
-import {
-  startLoadedLatencyProbe,
-  measureLatency,
-} from "./speedtest-latency.js";
-
-export { measureLatency };
+export { measureLatency } from "./speedtest-latency.js";
+import { startLoadedLatencyProbe } from "./speedtest-latency.js";
 
 function setTestPhase(phase, label, className) {
   state.phase = phase;

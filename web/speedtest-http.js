@@ -1,12 +1,13 @@
 /** HTTP download/upload test execution. */
 
-import { apiBase, state, TEST_CONFIG } from "./state.js";
+import { getApiBase, state, TEST_CONFIG } from "./state.js";
 import {
   sleep,
   retryAfterMs,
   isNetworkError,
   fetchWithTimeout,
 } from "./utils.js";
+import { createWarmUpDetector } from "./warmup.js";
 
 function resolveStreamsInner() {
   if (!state.settings.streams || Number.isNaN(state.settings.streams)) {
@@ -35,65 +36,25 @@ function detectOverheadFactor() {
   return 1.02;
 }
 
-export function createWarmUpDetector(durationMs) {
-  const windowMs = TEST_CONFIG.WARMUP_WINDOW_MS;
-  const stabilityThreshold = TEST_CONFIG.WARMUP_STABILITY_THRESHOLD;
-  const requiredStableWindows = TEST_CONFIG.WARMUP_REQUIRED_WINDOWS;
-  const maxGraceMs = Math.min(
-    durationMs * TEST_CONFIG.WARMUP_MAX_GRACE_RATIO,
-    TEST_CONFIG.WARMUP_MAX_GRACE_MS,
-  );
-
-  let windowBytes = 0;
-  let windowStart = 0;
-  let detectorStart = 0;
-  let recentSpeeds = [];
-  let settled = false;
-
-  return {
-    settled() {
-      return settled;
-    },
-    record(bytes, now) {
-      if (settled) return;
-      if (detectorStart === 0) {
-        detectorStart = now;
-        windowStart = now;
-      }
-      windowBytes += bytes;
-      const windowElapsed = now - windowStart;
-
-      if (windowElapsed >= windowMs) {
-        const speed = (windowBytes * 8) / (windowElapsed / 1000);
-        recentSpeeds.push(speed);
-        windowBytes = 0;
-        windowStart = now;
-
-        if (recentSpeeds.length >= requiredStableWindows) {
-          const recent = recentSpeeds.slice(-requiredStableWindows);
-          const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
-          if (avg === 0) {
-            settled = true;
-            return;
-          }
-          const maxDev = Math.max(
-            ...recent.map((s) => Math.abs(s - avg) / avg),
-          );
-          if (maxDev < stabilityThreshold) settled = true;
-        }
-
-        if (now - detectorStart > maxGraceMs) settled = true;
-      }
-    },
-  };
-}
-
 function buildDownloadChunkAttempts(chunkSize) {
   const preferredFallback = 256 * 1024;
   const attempts = [chunkSize];
   if (preferredFallback < chunkSize) attempts.push(preferredFallback);
   if (65536 < (attempts.at(-1) ?? 0)) attempts.push(65536);
   return attempts;
+}
+
+function classifyDownloadStreamError(e, signal, streamState) {
+  if (e.name === "AbortError" || signal.aborted) return "aborted";
+  if (e.status === 503 || e.status === 429) {
+    streamState.sawOverload = true;
+    return "overloaded";
+  }
+  if (isNetworkError(e)) {
+    streamState.sawNetworkError = true;
+    return "network_retry";
+  }
+  return "failed";
 }
 
 async function tryDownloadChunkWithRetries(options) {
@@ -113,25 +74,26 @@ async function tryDownloadChunkWithRetries(options) {
       if (await downloadStream(attemptChunk)) return "success";
       return "failed";
     } catch (e) {
-      if (e.name === "AbortError" || signal.aborted) return "aborted";
-      if (e.status === 503 || e.status === 429) {
-        streamState.sawOverload = true;
+      const action = classifyDownloadStreamError(e, signal, streamState);
+      if (action === "aborted") return "aborted";
+      if (action === "overloaded") {
         await sleep(e.retryAfter || 500);
         return "overloaded";
       }
-      if (isNetworkError(e)) {
-        streamState.sawNetworkError = true;
+      if (action === "network_retry") {
         if (retry < maxNetworkRetries) {
           await sleep(retryDelayMs);
           continue;
         }
       }
-      if (attemptIndex < attemptsLength - 1) {
-        console.warn("Download stream failed, retrying smaller chunk", e);
-      } else {
-        console.warn("Download stream failed after retries", e);
+      if (action === "failed") {
+        const msg =
+          attemptIndex < attemptsLength - 1
+            ? "Download stream failed, retrying smaller chunk"
+            : "Download stream failed after retries";
+        console.warn(msg, e);
+        return "failed";
       }
-      return "failed";
     }
   }
   return "failed";
@@ -168,6 +130,23 @@ async function executeDownloadAttempts(
   return "failed";
 }
 
+function processDownloadChunk(value, now, ctx) {
+  const s = ctx.readState;
+  s.allBytes += value.length;
+  if (ctx.warmUp.settled()) {
+    s.totalBytes += value.length;
+  } else {
+    ctx.warmUp.record(value.length, now);
+    if (ctx.warmUp.settled()) {
+      s.totalBytes = 0;
+      s.measureStartTime = now;
+    }
+  }
+  const elapsedSec = (now - ctx.startTime) / 1000;
+  const displayBytes = ctx.warmUp.settled() ? s.totalBytes : s.allBytes;
+  ctx.onProgress(displayBytes, elapsedSec);
+}
+
 export async function runDownloadTest(duration, onProgress, signal) {
   const startTime = performance.now();
   const numStreams = resolveStreamsInner();
@@ -185,11 +164,11 @@ export async function runDownloadTest(duration, onProgress, signal) {
   };
 
   const warmUp = createWarmUpDetector(duration * 1000);
-  let measureStartTime = 0;
+  const readState = { totalBytes: 0, measureStartTime: 0, allBytes: 0 };
 
   const downloadStream = async (chunk) => {
     const res = await fetchWithTimeout(
-      `${apiBase}/download?duration=${duration}&chunk=${chunk}`,
+      `${getApiBase()}/download?duration=${duration}&chunk=${chunk}`,
       {
         method: "GET",
         cache: "no-store",
@@ -211,34 +190,24 @@ export async function runDownloadTest(duration, onProgress, signal) {
     }
 
     const reader = res.body.getReader();
+    const readCtx = {
+      warmUp,
+      readState,
+      startTime,
+      endTime,
+      onProgress,
+    };
     try {
       while (true) {
         if (signal.aborted) break;
-
         const now = performance.now();
         if (now >= endTime) {
           await reader.cancel();
           break;
         }
-
         const { done, value } = await reader.read();
         if (done) break;
-
-        allBytes += value.length;
-
-        if (warmUp.settled()) {
-          totalBytes += value.length;
-        } else {
-          warmUp.record(value.length, now);
-          if (warmUp.settled()) {
-            totalBytes = 0;
-            measureStartTime = now;
-          }
-        }
-
-        const elapsedSec = (now - startTime) / 1000;
-        const displayBytes = warmUp.settled() ? totalBytes : allBytes;
-        onProgress(displayBytes, elapsedSec);
+        processDownloadChunk(value, now, readCtx);
       }
     } finally {
       reader.releaseLock();
@@ -269,34 +238,34 @@ export async function runDownloadTest(duration, onProgress, signal) {
 
   const overheadFactor = detectOverheadFactor();
   const endNow = Math.min(performance.now(), endTime);
+  const { totalBytes } = readState;
   const actualMeasureStart =
-    measureStartTime > 0 ? measureStartTime : startTime;
+    readState.measureStartTime > 0 ? readState.measureStartTime : startTime;
   const measureTime = Math.max(
     TEST_CONFIG.MIN_MEASURE_SECONDS,
     (endNow - actualMeasureStart) / 1000,
   );
   const avgSpeed = (totalBytes * 8 * overheadFactor) / measureTime / 1_000_000;
 
-  if (totalBytes === 0 && streamState.sawNetworkError) {
-    throw new Error(
-      "Network error during download. Try again or change server.",
-    );
-  }
-  if (totalBytes === 0 && streamState.sawOverload) {
-    throw new Error(
-      "Server overloaded. Try again in a moment or change server.",
-    );
-  }
-  if (totalBytes === 0 && streamState.successfulStreams === 0) {
-    throw new Error("Download failed. No stream completed successfully.");
-  }
+  throwIfZeroBytes(streamState, totalBytes, {
+    network: "Network error during download. Try again or change server.",
+    overload: "Server overloaded. Try again in a moment or change server.",
+    noStreams: "Download failed. No stream completed successfully.",
+  });
 
   return Math.max(avgSpeed, 0);
 }
 
+function throwIfZeroBytes(state, totalBytes, messages) {
+  if (totalBytes > 0) return;
+  if (state.sawNetworkError) throw new Error(messages.network);
+  if (state.sawOverload) throw new Error(messages.overload);
+  if (state.successfulStreams === 0) throw new Error(messages.noStreams);
+}
+
 async function sendUploadRequest(blob, duration, signal) {
   return fetchWithTimeout(
-    `${apiBase}/upload`,
+    `${getApiBase()}/upload`,
     {
       method: "POST",
       body: blob,
@@ -337,6 +306,29 @@ function recordUploadProgress(
   onProgress(displayBytes, elapsedSec);
 }
 
+function handleUploadNonOkResponse(res, metricsState, retryAfterMs) {
+  if (res.status === 503 || res.status === 429) {
+    metricsState.sawOverload = true;
+    return { action: "overload_break", retryAfter: retryAfterMs(res, 500) };
+  }
+  return { action: "retry_or_break" };
+}
+
+function handleUploadCatchError(
+  e,
+  metricsState,
+  consecutiveErrors,
+  maxRetries,
+) {
+  if (e.name === "AbortError") return { action: "break" };
+  if (isNetworkError(e)) {
+    metricsState.sawNetworkError = true;
+    const next = consecutiveErrors + 1;
+    return next <= maxRetries ? { action: "retry", next } : { action: "throw" };
+  }
+  return { action: "throw" };
+}
+
 async function runSingleUploadStream(options) {
   const {
     delay,
@@ -359,9 +351,9 @@ async function runSingleUploadStream(options) {
       const res = await sendUploadRequest(blob, duration, signal);
       if (!res.ok) {
         await res.text().catch(() => {});
-        if (res.status === 503 || res.status === 429) {
-          metricsState.sawOverload = true;
-          await sleep(retryAfterMs(res, 500));
+        const hr = handleUploadNonOkResponse(res, metricsState, retryAfterMs);
+        if (hr.action === "overload_break") {
+          await sleep(hr.retryAfter);
           break;
         }
         consecutiveErrors += 1;
@@ -382,14 +374,17 @@ async function runSingleUploadStream(options) {
         onProgress,
       );
     } catch (e) {
-      if (e.name === "AbortError") break;
-      if (isNetworkError(e)) {
-        metricsState.sawNetworkError = true;
-        consecutiveErrors += 1;
-        if (consecutiveErrors <= maxNetworkRetries) {
-          await sleep(retryDelayMs);
-          continue;
-        }
+      const hc = handleUploadCatchError(
+        e,
+        metricsState,
+        consecutiveErrors,
+        maxNetworkRetries,
+      );
+      if (hc.action === "break") break;
+      if (hc.action === "retry") {
+        consecutiveErrors = hc.next;
+        await sleep(retryDelayMs);
+        continue;
       }
       throw e;
     }
@@ -460,17 +455,11 @@ export async function runUploadTest(duration, onProgress, signal) {
   const avgSpeed =
     (metricsState.totalBytes * 8 * overheadFactor) / measureTime / 1_000_000;
 
-  if (metricsState.totalBytes === 0 && metricsState.sawNetworkError) {
-    throw new Error("Network error during upload. Try again or change server.");
-  }
-  if (metricsState.totalBytes === 0 && metricsState.sawOverload) {
-    throw new Error(
-      "Server overloaded. Try again in a moment or change server.",
-    );
-  }
-  if (metricsState.totalBytes === 0 && metricsState.successfulStreams === 0) {
-    throw new Error("Upload failed. No stream completed successfully.");
-  }
+  throwIfZeroBytes(metricsState, metricsState.totalBytes, {
+    network: "Network error during upload. Try again or change server.",
+    overload: "Server overloaded. Try again in a moment or change server.",
+    noStreams: "Upload failed. No stream completed successfully.",
+  });
 
   return Math.max(avgSpeed, 0);
 }

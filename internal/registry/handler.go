@@ -18,6 +18,11 @@ type Handler struct {
 	apiKey  string
 }
 
+const (
+	authBearerPrefix      = "Bearer "
+	contentTypeJSONPrefix = "application/json"
+)
+
 type updateServerRequest struct {
 	ID           *string `json:"id,omitempty"`
 	Name         *string `json:"name,omitempty"`
@@ -60,10 +65,10 @@ func (h *Handler) authenticate(r *http.Request) bool {
 		return false
 	}
 
-	if !strings.HasPrefix(auth, "Bearer ") {
+	if !strings.HasPrefix(auth, authBearerPrefix) {
 		return false
 	}
-	token := strings.TrimPrefix(auth, "Bearer ")
+	token := strings.TrimPrefix(auth, authBearerPrefix)
 	if token == "" {
 		return false
 	}
@@ -121,7 +126,7 @@ func (h *Handler) RegisterServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ct := r.Header.Get("Content-Type"); ct != "" && !strings.HasPrefix(ct, "application/json") {
+	if ct := r.Header.Get("Content-Type"); ct != "" && !strings.HasPrefix(ct, contentTypeJSONPrefix) {
 		respondRegistryError(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -172,7 +177,7 @@ func (h *Handler) UpdateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ct := r.Header.Get("Content-Type"); ct != "" && !strings.HasPrefix(ct, "application/json") {
+	if ct := r.Header.Get("Content-Type"); ct != "" && !strings.HasPrefix(ct, contentTypeJSONPrefix) {
 		respondRegistryError(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 		return
 	}

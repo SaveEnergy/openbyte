@@ -18,6 +18,7 @@ const (
 	registryInterval5s  = "5s"
 	loopbackClientIP    = "127.0.0.1"
 	maxDuration2m       = "2m0s"
+	parseFlagsFmt       = "parse flags: %v"
 )
 
 func TestApplyServerFlagOverrides(t *testing.T) {
@@ -32,7 +33,7 @@ func TestApplyServerFlagOverrides(t *testing.T) {
 		"--allowed-origins=" + allowedOriginsValue,
 		"--registry-enabled=true",
 	}); err != nil {
-		t.Fatalf("parse flags: %v", err)
+		t.Fatalf(parseFlagsFmt, err)
 	}
 
 	if err := applyServerFlagOverrides(cfg, fs, fv); err != nil {
@@ -57,7 +58,7 @@ func TestApplyServerFlagOverridesInvalidDuration(t *testing.T) {
 	cfg := config.DefaultConfig()
 	fs, fv := buildServerFlagSet(cfg)
 	if err := fs.Parse([]string{"--max-test-duration=not-a-duration"}); err != nil {
-		t.Fatalf("parse flags: %v", err)
+		t.Fatalf(parseFlagsFmt, err)
 	}
 
 	if applyServerFlagOverrides(cfg, fs, fv) == nil {
@@ -74,7 +75,7 @@ func TestApplyServerFlagOverridesFailsFastOnInvalidDuration(t *testing.T) {
 		"--max-test-duration=not-a-duration",
 		"--registry-interval=" + registryInterval5s,
 	}); err != nil {
-		t.Fatalf("parse flags: %v", err)
+		t.Fatalf(parseFlagsFmt, err)
 	}
 
 	if applyServerFlagOverrides(cfg, fs, fv) == nil {
@@ -127,7 +128,7 @@ func TestCapacityGbpsFlagBypassValidation(t *testing.T) {
 	cfg := config.DefaultConfig()
 	fs, fv := buildServerFlagSet(cfg)
 	if err := fs.Parse([]string{"--capacity-gbps=0"}); err != nil {
-		t.Fatalf("parse flags: %v", err)
+		t.Fatalf(parseFlagsFmt, err)
 	}
 	if err := applyServerFlagOverrides(cfg, fs, fv); err != nil {
 		t.Fatalf("apply overrides: %v", err)

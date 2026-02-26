@@ -287,13 +287,13 @@ func validateServerURLs(config *ConfigFile) error {
 }
 
 func validateProtocolAndDirection(config *ConfigFile) error {
-	if config.Protocol != "" && config.Protocol != "tcp" && config.Protocol != "udp" && config.Protocol != "http" {
+	if config.Protocol != "" && config.Protocol != protocolTCP && config.Protocol != protocolUDP && config.Protocol != protocolHTTP {
 		return fmt.Errorf("invalid protocol: %s (must be tcp, udp, or http)", config.Protocol)
 	}
-	if config.Direction != "" && config.Direction != "download" && config.Direction != "upload" && config.Direction != "bidirectional" {
+	if config.Direction != "" && config.Direction != directionDownload && config.Direction != directionUpload && config.Direction != directionBidirectional {
 		return fmt.Errorf("invalid direction: %s (must be download, upload, or bidirectional)", config.Direction)
 	}
-	if config.Protocol == "http" && config.Direction == "bidirectional" {
+	if config.Protocol == protocolHTTP && config.Direction == directionBidirectional {
 		return fmt.Errorf("invalid direction for http: %s (must be download or upload)", config.Direction)
 	}
 	return nil
@@ -323,7 +323,7 @@ func normalizeAndValidateServerURL(raw string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if u.Scheme != "http" && u.Scheme != "https" {
+	if u.Scheme != schemeHTTP && u.Scheme != schemeHTTPS {
 		return "", fmt.Errorf("scheme must be http or https")
 	}
 	if u.Host == "" {

@@ -20,6 +20,8 @@ const (
 	udpPortB             = 10002
 	readTimeoutShort     = 2 * time.Second
 	closeTimeoutLong     = 3 * time.Second
+	networkTCP           = "tcp"
+	newServerFmt         = "new server: %v"
 )
 
 func TestUDPSenderRemovesClientAndDecrementsCountOnExit(t *testing.T) {
@@ -81,11 +83,11 @@ func TestGetOrCreateRejectsWhenSenderLimitReached(t *testing.T) {
 }
 
 func TestAcceptTCPRejectsWhenAtLimit(t *testing.T) {
-	addr, err := net.ResolveTCPAddr("tcp", loopbackIPv4+":0")
+	addr, err := net.ResolveTCPAddr(networkTCP, loopbackIPv4+":0")
 	if err != nil {
 		t.Fatalf("resolve tcp addr: %v", err)
 	}
-	listener, err := net.ListenTCP("tcp", addr)
+	listener, err := net.ListenTCP(networkTCP, addr)
 	if err != nil {
 		t.Fatalf("listen tcp: %v", err)
 	}
@@ -98,7 +100,7 @@ func TestAcceptTCPRejectsWhenAtLimit(t *testing.T) {
 	go srv.acceptTCP()
 	defer srv.Close()
 
-	conn, err := net.DialTimeout("tcp", listener.Addr().String(), time.Second)
+	conn, err := net.DialTimeout(networkTCP, listener.Addr().String(), time.Second)
 	if err != nil {
 		t.Fatalf("dial tcp: %v", err)
 	}
@@ -124,7 +126,7 @@ func TestServerCloseWithActiveUDPReturnsPromptly(t *testing.T) {
 
 	srv, err := NewServer(cfg)
 	if err != nil {
-		t.Fatalf("new server: %v", err)
+		t.Fatalf(newServerFmt, err)
 	}
 
 	udpAddr, ok := srv.udpConn.LocalAddr().(*net.UDPAddr)
@@ -161,7 +163,7 @@ func TestServerCloseIdempotentConcurrent(t *testing.T) {
 
 	srv, err := NewServer(cfg)
 	if err != nil {
-		t.Fatalf("new server: %v", err)
+		t.Fatalf(newServerFmt, err)
 	}
 
 	var wg sync.WaitGroup

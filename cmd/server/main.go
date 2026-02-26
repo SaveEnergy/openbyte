@@ -97,7 +97,7 @@ func (r *serverResources) stopAll(pprofServer *http.Server, stopStats func()) {
 
 func Run(args []string, version string) int {
 	logLevel := logging.LevelInfo
-	if os.Getenv("LOG_LEVEL") == "debug" {
+	if os.Getenv("LOG_LEVEL") == config.EnvDebug {
 		logLevel = logging.LevelDebug
 	}
 	logging.Init(logLevel)

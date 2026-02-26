@@ -32,6 +32,22 @@ const (
 	defaultWarmUp     = 2
 )
 
+// Protocol/direction literals for validation and branching (S1192).
+const (
+	protocolTCP            = "tcp"
+	protocolUDP            = "udp"
+	protocolHTTP           = "http"
+	directionDownload      = "download"
+	directionUpload        = "upload"
+	directionBidirectional = "bidirectional"
+	modeClient             = "client"
+	schemeHTTP             = "http"
+	schemeHTTPS            = "https"
+	cmdDownload            = "D"
+	cmdUpload              = "U"
+	cmdBidirectional       = "B"
+)
+
 func Run(args []string, version string) int {
 	configFile, err := loadConfigFile()
 	if err != nil {

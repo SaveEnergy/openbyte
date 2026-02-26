@@ -1,8 +1,12 @@
 /** Server discovery, health checks, and network info. */
 
-import { apiBase, state, setApiBase } from "./state.js";
-import { elements } from "./state.js";
-import { TEST_CONFIG } from "./state.js";
+import {
+  getApiBase,
+  state,
+  setApiBase,
+  elements,
+  TEST_CONFIG,
+} from "./state.js";
 import {
   parseJSONOrThrow,
   isSameOriginURL,
@@ -64,7 +68,7 @@ export function updateServerName() {
 }
 
 export function detectNetworkInfo() {
-  const mainPing = fetch(`${apiBase}/ping`)
+  const mainPing = fetch(`${getApiBase()}/ping`)
     .then((res) => parseJSONOrThrow(res))
     .then((data) => {
       if (data.client_ip) {
@@ -118,7 +122,7 @@ export function detectNetworkInfo() {
 
 export async function loadServers() {
   try {
-    const res = await fetch(`${apiBase}/servers`);
+    const res = await fetch(`${getApiBase()}/servers`);
     if (!res.ok) {
       await res.text().catch(() => {});
       throw new Error(`Failed to load servers: HTTP ${res.status}`);
@@ -329,7 +333,11 @@ async function isHealthyServerCandidate(url) {
 }
 
 export async function checkServer() {
-  const candidates = ["/health", `${apiBase}/health`, `${apiBase}/ping`];
+  const candidates = [
+    "/health",
+    `${getApiBase()}/health`,
+    `${getApiBase()}/ping`,
+  ];
 
   try {
     for (const url of candidates) {

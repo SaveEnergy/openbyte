@@ -10,11 +10,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
 )
 
 func (e *TestEngine) runDownload(ctx context.Context, conn net.Conn) error {
-	if _, err := conn.Write([]byte("D")); err != nil {
+	if _, err := conn.Write([]byte(cmdDownload)); err != nil {
 		return fmt.Errorf("send command: %w", err)
 	}
 
@@ -63,7 +62,7 @@ func (e *TestEngine) runDownload(ctx context.Context, conn net.Conn) error {
 }
 
 func (e *TestEngine) runUpload(ctx context.Context, conn net.Conn) error {
-	if _, err := conn.Write([]byte("U")); err != nil {
+	if _, err := conn.Write([]byte(cmdUpload)); err != nil {
 		return fmt.Errorf("send command: %w", err)
 	}
 
@@ -109,7 +108,7 @@ func (e *TestEngine) runUpload(ctx context.Context, conn net.Conn) error {
 }
 
 func (e *TestEngine) runBidirectional(ctx context.Context, conn net.Conn) error {
-	if _, err := conn.Write([]byte("B")); err != nil {
+	if _, err := conn.Write([]byte(cmdBidirectional)); err != nil {
 		return fmt.Errorf("send command: %w", err)
 	}
 

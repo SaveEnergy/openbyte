@@ -146,11 +146,11 @@ func (e *TestEngine) captureConnectionNetworkInfo() {
 
 func (e *TestEngine) runStreamWorker(ctx context.Context, conn net.Conn) error {
 	switch e.config.Direction {
-	case "download":
+	case directionDownload:
 		return e.runDownload(ctx, conn)
-	case "upload":
+	case directionUpload:
 		return e.runUpload(ctx, conn)
-	case "bidirectional":
+	case directionBidirectional:
 		return e.runBidirectional(ctx, conn)
 	default:
 		return nil
@@ -170,7 +170,7 @@ func (e *TestEngine) createConnections() error {
 }
 
 func (e *TestEngine) dialConnection() (net.Conn, error) {
-	if e.config.Protocol == "udp" {
+	if e.config.Protocol == protocolUDP {
 		return dialUDPConnection(e.config.ServerAddr)
 	}
 	return dialTCPConnection(e.config.ServerAddr)
@@ -307,4 +307,3 @@ type LatencyStats struct {
 	P99Ms float64
 	Count int
 }
-

@@ -14,6 +14,13 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+const (
+	wsTypeConnected = "connected"
+	wsTypeComplete  = "complete"
+	wsTypeError     = "error"
+	wsTypeMetrics   = "metrics"
+)
+
 type Server struct {
 	upgrader       websocket.Upgrader
 	clients        map[string]map[*websocket.Conn]*clientConn
@@ -92,7 +99,7 @@ func (s *Server) HandleStream(w http.ResponseWriter, r *http.Request, streamID s
 	s.mu.Unlock()
 
 	if client.writeJSON(map[string]any{
-		"type":      "connected",
+		"type":      wsTypeConnected,
 		"stream_id": streamID,
 		"time":      time.Now().Unix(),
 	}) != nil {
@@ -135,11 +142,11 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 	var msgType string
 	switch state.Status {
 	case types.StreamStatusCompleted:
-		msgType = "complete"
+		msgType = wsTypeComplete
 	case types.StreamStatusFailed:
-		msgType = "error"
+		msgType = wsTypeError
 	default:
-		msgType = "metrics"
+		msgType = wsTypeMetrics
 	}
 
 	if isTerminal {

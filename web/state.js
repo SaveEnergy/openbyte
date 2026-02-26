@@ -1,6 +1,10 @@
 /** Shared state, DOM element refs, and config constants. */
 
-export let apiBase = "/api/v1";
+let _apiBase = "/api/v1";
+
+export function getApiBase() {
+  return _apiBase;
+}
 
 export const state = {
   phase: "idle",
@@ -99,7 +103,7 @@ export const TEST_CONFIG = {
 };
 
 export function setApiBase(base) {
-  apiBase = base;
+  _apiBase = base;
 }
 
 export const modal = { lastTrigger: null };

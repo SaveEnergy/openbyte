@@ -10,11 +10,13 @@ import (
 )
 
 const (
-	streamMissingID = "missing"
-	streamUnknownID = "nonexistent"
-	streamFixedID   = "fixed-id"
-	testIPPrimary   = "10.0.0.1"
-	testIPSecondary = "10.0.0.2"
+	streamMissingID          = "missing"
+	streamUnknownID          = "nonexistent"
+	streamFixedID            = "fixed-id"
+	testIPPrimary            = "10.0.0.1"
+	testIPSecondary          = "10.0.0.2"
+	expectedErrMissingStream = "expected error for missing stream"
+	startStreamErrFmt        = "StartStream: %v"
 )
 
 func newTestManager() *stream.Manager {
@@ -58,7 +60,7 @@ func TestManagerStartStream(t *testing.T) {
 
 	state, _ := m.CreateStream(testConfig(types.DirectionDownload))
 	if err := m.StartStream(state.Config.ID); err != nil {
-		t.Fatalf("StartStream: %v", err)
+		t.Fatalf(startStreamErrFmt, err)
 	}
 }
 
@@ -91,7 +93,7 @@ func TestManagerGetStreamNotFound(t *testing.T) {
 
 	_, err := m.GetStream(streamMissingID)
 	if err == nil {
-		t.Fatal("expected error for missing stream")
+		t.Fatal(expectedErrMissingStream)
 	}
 }
 
@@ -121,7 +123,7 @@ func TestManagerCancelStreamNotFound(t *testing.T) {
 	defer m.Stop()
 
 	if m.CancelStream(streamMissingID) == nil {
-		t.Fatal("expected error for missing stream")
+		t.Fatal(expectedErrMissingStream)
 	}
 }
 
@@ -156,7 +158,7 @@ func TestManagerCompleteStreamNotFound(t *testing.T) {
 
 	err := m.CompleteStream(streamMissingID, types.Metrics{})
 	if err == nil {
-		t.Fatal("expected error for missing stream")
+		t.Fatal(expectedErrMissingStream)
 	}
 }
 
@@ -205,7 +207,7 @@ func TestManagerUpdateMetricsNotFound(t *testing.T) {
 	defer m.Stop()
 
 	if m.UpdateMetrics(streamMissingID, types.Metrics{}) == nil {
-		t.Fatal("expected error for missing stream")
+		t.Fatal(expectedErrMissingStream)
 	}
 }
 
@@ -372,7 +374,7 @@ func TestManagerStartStreamDoesNotOverrideTerminalStatus(t *testing.T) {
 
 	state, _ := m.CreateStream(testConfig(types.DirectionDownload))
 	if err := m.StartStream(state.Config.ID); err != nil {
-		t.Fatalf("StartStream: %v", err)
+		t.Fatalf(startStreamErrFmt, err)
 	}
 	if err := m.CancelStream(state.Config.ID); err != nil {
 		t.Fatalf("CancelStream: %v", err)
@@ -393,7 +395,7 @@ func TestManagerUpdateMetricsRejectedAfterTerminal(t *testing.T) {
 
 	state, _ := m.CreateStream(testConfig(types.DirectionDownload))
 	if err := m.StartStream(state.Config.ID); err != nil {
-		t.Fatalf("StartStream: %v", err)
+		t.Fatalf(startStreamErrFmt, err)
 	}
 	if err := m.CompleteStream(state.Config.ID, types.Metrics{ThroughputMbps: 111}); err != nil {
 		t.Fatalf("CompleteStream: %v", err)
@@ -414,7 +416,7 @@ func TestManagerTerminalStatusImmutable(t *testing.T) {
 
 	state, _ := m.CreateStream(testConfig(types.DirectionDownload))
 	if err := m.StartStream(state.Config.ID); err != nil {
-		t.Fatalf("StartStream: %v", err)
+		t.Fatalf(startStreamErrFmt, err)
 	}
 
 	var wg sync.WaitGroup

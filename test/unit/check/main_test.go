@@ -14,39 +14,40 @@ const (
 	invalidURLArg    = "not-a-valid-url"
 	timeoutZero      = "0"
 	timeoutExcessive = "301"
+	exitCodeWantFmt  = "exit code = %d, want %d"
 )
 
 func TestRunUnreachableServerReturnsFailure(t *testing.T) {
 	exitCode := check.Run([]string{"--json", "--server-url", unreachableURL, "--timeout", "1"}, testCommandName)
 	if exitCode != exitCodeFailure {
-		t.Fatalf("exit code = %d, want %d", exitCode, exitCodeFailure)
+		t.Fatalf(exitCodeWantFmt, exitCode, exitCodeFailure)
 	}
 }
 
 func TestRunInvalidPositionalArgReturnsUsage(t *testing.T) {
 	exitCode := check.Run([]string{invalidURLArg}, testCommandName)
 	if exitCode != exitCodeUsage {
-		t.Fatalf("exit code = %d, want %d", exitCode, exitCodeUsage)
+		t.Fatalf(exitCodeWantFmt, exitCode, exitCodeUsage)
 	}
 }
 
 func TestRunRejectsExtraPositionalArgs(t *testing.T) {
 	exitCode := check.Run([]string{"https://example.com", "https://example.org"}, testCommandName)
 	if exitCode != exitCodeUsage {
-		t.Fatalf("exit code = %d, want %d", exitCode, exitCodeUsage)
+		t.Fatalf(exitCodeWantFmt, exitCode, exitCodeUsage)
 	}
 }
 
 func TestRunRejectsNonPositiveTimeout(t *testing.T) {
 	exitCode := check.Run([]string{"--timeout", timeoutZero}, testCommandName)
 	if exitCode != exitCodeUsage {
-		t.Fatalf("exit code = %d, want %d", exitCode, exitCodeUsage)
+		t.Fatalf(exitCodeWantFmt, exitCode, exitCodeUsage)
 	}
 }
 
 func TestRunRejectsExcessiveTimeout(t *testing.T) {
 	exitCode := check.Run([]string{"--timeout", timeoutExcessive}, testCommandName)
 	if exitCode != exitCodeUsage {
-		t.Fatalf("exit code = %d, want %d", exitCode, exitCodeUsage)
+		t.Fatalf(exitCodeWantFmt, exitCode, exitCodeUsage)
 	}
 }

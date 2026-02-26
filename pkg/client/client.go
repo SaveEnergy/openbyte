@@ -22,6 +22,16 @@ import (
 	"github.com/saveenergy/openbyte/pkg/diagnostic"
 )
 
+const (
+	directionDownload = "download"
+	directionUpload   = "upload"
+	pathHealth        = "/health"
+	pathPing          = "/api/v1/ping"
+	pathDownload      = "/api/v1/download"
+	pathUpload        = "/api/v1/upload"
+	authBearerPrefix  = "Bearer "
+)
+
 var (
 	ErrLatencyMeasurementFailed  = errors.New("latency measurement failed")
 	ErrDownloadMeasurementFailed = errors.New("download measurement failed")
@@ -158,7 +168,7 @@ func (c *Client) SpeedTest(ctx context.Context, opts SpeedTestOptions) (*SpeedTe
 
 	throughput, totalBytes, throughputOK := c.measureThroughput(testCtx, opts)
 	if !throughputOK {
-		if opts.Direction == "download" {
+		if opts.Direction == directionDownload {
 			return nil, ErrDownloadMeasurementFailed
 		}
 		return nil, ErrUploadMeasurementFailed
@@ -189,7 +199,7 @@ func (c *Client) SpeedTest(ctx context.Context, opts SpeedTestOptions) (*SpeedTe
 
 func normalizeSpeedTestOptions(opts SpeedTestOptions) (SpeedTestOptions, error) {
 	if opts.Direction == "" {
-		opts.Direction = "download"
+		opts.Direction = directionDownload
 	}
 	if opts.Duration < 1 {
 		opts.Duration = 10
@@ -197,21 +207,21 @@ func normalizeSpeedTestOptions(opts SpeedTestOptions) (SpeedTestOptions, error) 
 	if opts.Duration > 300 {
 		opts.Duration = 300
 	}
-	if opts.Direction != "download" && opts.Direction != "upload" {
+	if opts.Direction != directionDownload && opts.Direction != directionUpload {
 		return SpeedTestOptions{}, fmt.Errorf("invalid direction: %s (must be download or upload)", opts.Direction)
 	}
 	return opts, nil
 }
 
 func (c *Client) measureThroughput(ctx context.Context, opts SpeedTestOptions) (float64, int64, bool) {
-	if opts.Direction == "download" {
+	if opts.Direction == directionDownload {
 		return c.downloadMeasured(ctx, opts.Duration)
 	}
 	return c.uploadMeasured(ctx, opts.Duration)
 }
 
 func splitThroughputByDirection(direction string, throughput float64) (downMbps, upMbps float64) {
-	if direction == "download" {
+	if direction == directionDownload {
 		return throughput, 0
 	}
 	return 0, throughput
@@ -281,12 +291,12 @@ func (c *Client) Healthy(ctx context.Context) error {
 // --- Internal helpers ---
 
 func (c *Client) healthCheck(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.serverURL+"/health", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.serverURL+pathHealth, nil)
 	if err != nil {
 		return fmt.Errorf("server unreachable: %w", err)
 	}
 	if c.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+		req.Header.Set("Authorization", authBearerPrefix+c.apiKey)
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -301,7 +311,7 @@ func (c *Client) healthCheck(ctx context.Context) error {
 }
 
 func (c *Client) measureLatency(ctx context.Context, samples int) (avgMs, jitterMs float64, ok bool) {
-	pingURL := c.serverURL + "/api/v1/ping"
+	pingURL := c.serverURL + pathPing
 	var latencies []time.Duration
 
 	for range samples {
@@ -314,7 +324,7 @@ func (c *Client) measureLatency(ctx context.Context, samples int) (avgMs, jitter
 			continue
 		}
 		if c.apiKey != "" {
-			req.Header.Set("Authorization", "Bearer "+c.apiKey)
+			req.Header.Set("Authorization", authBearerPrefix+c.apiKey)
 		}
 		latency, sampleOK := c.latencySample(req, start)
 		if !sampleOK {
@@ -370,14 +380,14 @@ func (c *Client) downloadMeasured(ctx context.Context, durationSec int) (mbps fl
 	dlCtx, cancel := context.WithTimeout(ctx, time.Duration(durationSec+3)*time.Second)
 	defer cancel()
 
-	reqURL := fmt.Sprintf("%s/api/v1/download?duration=%d&chunk=1048576", c.serverURL, durationSec)
+	reqURL := fmt.Sprintf("%s%s?duration=%d&chunk=1048576", c.serverURL, pathDownload, durationSec)
 	req, err := http.NewRequestWithContext(dlCtx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return 0, 0, false
 	}
 	req.Header.Set("Accept-Encoding", "identity")
 	if c.apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+		req.Header.Set("Authorization", authBearerPrefix+c.apiKey)
 	}
 
 	start := time.Now()
@@ -432,14 +442,14 @@ func (c *Client) uploadMeasured(ctx context.Context, durationSec int) (mbps floa
 			break
 		}
 
-		req, err := http.NewRequestWithContext(upCtx, http.MethodPost, c.serverURL+"/api/v1/upload",
+		req, err := http.NewRequestWithContext(upCtx, http.MethodPost, c.serverURL+pathUpload,
 			bytes.NewReader(payload))
 		if err != nil {
 			return 0, totalBytes, false
 		}
 		req.Header.Set("Content-Type", "application/octet-stream")
 		if c.apiKey != "" {
-			req.Header.Set("Authorization", "Bearer "+c.apiKey)
+			req.Header.Set("Authorization", authBearerPrefix+c.apiKey)
 		}
 
 		resp, err := c.httpClient.Do(req)

@@ -37,6 +37,8 @@ const (
 	saveErrorMsg        = "failed to save result"
 	internalErrorMsg    = "internal error"
 	bodyTooLargeMsg     = "request body too large"
+	decodeResponseFmt   = "decode response: %v"
+	errorWantFmt        = "error = %q, want %q"
 	sampleResultPayload = `{
 		"download_mbps": 100,
 		"upload_mbps": 50,
@@ -118,10 +120,10 @@ func TestSaveReturnsInternalErrorWhenStoreFails(t *testing.T) {
 
 	var resp map[string]string
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
+		t.Fatalf(decodeResponseFmt, err)
 	}
 	if got := resp["error"]; got != saveErrorMsg {
-		t.Fatalf("error = %q, want %q", got, saveErrorMsg)
+		t.Fatalf(errorWantFmt, got, saveErrorMsg)
 	}
 
 	_ = os.Remove(dbPath)
@@ -229,7 +231,7 @@ func TestSaveSucceedsReturns201WithIDAndURL(t *testing.T) {
 	}
 	var resp map[string]string
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
+		t.Fatalf(decodeResponseFmt, err)
 	}
 	id := resp["id"]
 	url := resp["url"]
@@ -294,10 +296,10 @@ func TestGetReturnsInternalErrorWhenStoreFails(t *testing.T) {
 	}
 	var resp map[string]string
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
+		t.Fatalf(decodeResponseFmt, err)
 	}
 	if got := resp["error"]; got != internalErrorMsg {
-		t.Fatalf("error = %q, want %q", got, internalErrorMsg)
+		t.Fatalf(errorWantFmt, got, internalErrorMsg)
 	}
 }
 
@@ -348,10 +350,10 @@ func TestHandlerSaveBodyTooLarge(t *testing.T) {
 	}
 	var resp map[string]string
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
+		t.Fatalf(decodeResponseFmt, err)
 	}
 	if got := resp["error"]; got != bodyTooLargeMsg {
-		t.Fatalf("error = %q, want %q", got, bodyTooLargeMsg)
+		t.Fatalf(errorWantFmt, got, bodyTooLargeMsg)
 	}
 }
 

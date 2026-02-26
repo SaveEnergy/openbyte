@@ -82,15 +82,7 @@
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| 20260217-test-08 | test | A0 | Done | Continue test literal cleanup (`go:S1192`) in `test/e2e/e2e_test.go`, `test/unit/api/{router,clientip,speedtest,handlers}_test.go`, `test/unit/results/store_test.go`, `test/unit/types/stream_test.go`. | Batch-108 closure: retained and extended literal dedups (including integration assertions), with full scope gate passing in this run. | `go test -count=3 -short ./test/e2e ./test/unit/api ./test/unit/results ./test/unit/types && go test -short ./test/integration` |
-| 20260217-web-03 | web | A0 | Done | Burn down JS maintainability hotspots in `web/openbyte.js`, `web/download.js`, `web/results.js`, `web/skill.js` (`javascript:S3776`, `S2486`, `S2004`, `S7766`). | Batch-10 closure: completed module split and follow-up runtime fix (`SVG class` assignment in `web/ui.js`), with targeted failing flow tests and full UI suite green. | `npx prettier --check web/*.js && bunx playwright test` |
-| 20260218-web-04 | web | A0 | Done | Close frontend readability/consistency findings outside current complexity track: `web/openbyte.js` (`javascript:S107`, `S7735`), `web/style.css` (`css:S4666`), `test/e2e/ui/basic.spec.js` (`javascript:S7773`). | Batch-6 closure: readability/consistency refactors retained after module extraction, formatting clean, and end-to-end UI suite passing. | `npx prettier --check web/*.js test/e2e/ui/*.js && bunx playwright test` |
-| 20260226-web-07 | web | A0 | Done | Close remaining low-count Sonar web rules not yet mapped in active rows: `Web:S6819`, `javascript:S1874`, `javascript:S6582`. | Batch-3 closure: semantic element remediations (`<progress>`, `<output>`) and JS updates validated by full UI suite; Sonar server parity expected on next external reanalysis. | `npx prettier --check web/index.html web/results.html web/style.css web/openbyte.js && bunx playwright test` |
-| 20260226-go-23 | go | A0 | Done | Close residual low-count Go reliability/code-smell rule `godre:S8196` with targeted fix and regression coverage. | Batch-2 closure: `RouteRegistrar` renamed to `RoutesRegistrar` and consumer updated; focused and aggregate Go gates pass. | `go test -short ./internal/api ./cmd/server && go build ./...` |
-| 20260219-go-14 | go | A2 | Done | Split oversized Go production files to respect 500 LOC rule: `internal/api/handlers.go` (629 LOC), `internal/stream/server.go` (548), `cmd/client/engine.go` (541), `internal/api/router.go` (500). | Batch-2 closure: split into `handlers_http.go`, `server_udp.go`, and `engine_direction.go`; resulting target files all ≤500 LOC and compile/test gates green. | `wc -l internal/api/handlers.go internal/api/handlers_http.go internal/stream/server.go internal/stream/server_udp.go cmd/client/engine.go cmd/client/engine_direction.go && go build ./... && go test -short ./internal/api ./internal/stream ./cmd/client` |
-| 20260219-web-01 | web | A0 | Done | Split `web/openbyte.js` monolith into focused ES modules (state, network, UI) to respect the 500 LOC/file rule. | Closure: split into focused modules (`state`, `utils`, `ui`, `network`, `settings`, `speedtest*`), entrypoint reduced to orchestration, all JS files ≤500 LOC, UI suite passing. | `wc -l web/*.js && npx prettier --check web/*.js && bunx playwright test` |
-| 20260219-css-01 | web | A2 | Done | Split `web/style.css` monolith (1470 LOC) into modular partials: `base.css` (reset + variables + layout), page-specific files (`speed.css`, `download.css`, `results.css`, `skill.css`), and `motion.css`. | Closure: stylesheet modularized (`base`, `speed`, `download`, `modal`, `skill`, `motion`) with `style.css` as import entrypoint; all CSS files ≤500 LOC. | `wc -l web/*.css && bunx playwright test` |
-| 20260220-perf-01 | web | A2 | Done | Web performance: add `<link rel="preload">` for critical fonts (96 KB woff2, 4 files), add `defer` to all `<script>` tags, add HTTP compression middleware (gzip/brotli) for embedded assets. | Closure: font preloads present on all pages, scripts deferred/module-loaded, and gzip middleware active on static assets. | `curl -I -H 'Accept-Encoding: gzip' http://127.0.0.1:8080/speed.css` shows `Content-Encoding: gzip` |
+| _none_ | - | - | - | Backlog active queue is clear after 2026-02-26 closure wave. | Await next Sonar server-side reanalysis to confirm remote parity of local rule fixes. | Trigger Sonar analysis in CI / SonarCloud and refresh snapshot. |
 
 ### Check Hold (manual/external)
 
@@ -104,16 +96,14 @@
 
 - Strict OPEN filter parity maintained with Cloud:
   - Query: `projects=[SaveEnergy_openbyte]`, `issueStatuses=[OPEN]`, `ps=500`
-  - Total OPEN: `81`
-  - Current top tracked rules: `go:S1192=49`, `go:S3776=14`, `javascript:S3776=4`, `javascript:S2004=3`, `Web:S6819=2`, `javascript:S7735=2`, `javascript:S2486=2`, `javascript:S7766=2`, `javascript:S1874=1`, `javascript:S6582=1`, `godre:S8196=1` (MCP live fetch on 2026-02-26; project `SaveEnergy_openbyte`)
+  - Total OPEN: `58`
+  - Current top tracked rules: `go:S1192=27`, `go:S3776=13`, `javascript:S3863=5`, `javascript:S3776=4`, `javascript:S1128=3`, `javascript:S7735=2`, `javascript:S2004=1`, `javascript:S7763=1`, `javascript:S6861=1`, `godre:S8196=1` (MCP live fetch on 2026-02-26; project `SaveEnergy_openbyte`)
   - Rule-to-backlog mapping refreshed:
-    - `go:S1192` -> `20260217-test-08`
-    - `go:S3776` -> `20260217-go-10`, `20260217-go-11`
-    - `javascript:S3776`, `javascript:S2004`, `javascript:S2486`, `javascript:S7766` -> `20260217-web-03`
-    - `javascript:S7735` -> `20260218-web-04`
-    - `Web:S6819`, `javascript:S1874`, `javascript:S6582` -> `20260226-web-07`
-    - `godre:S8196` -> `20260226-go-23`
-  - Security OPEN: `0`
+    - `go:S1192`, `go:S3776`, `javascript:S3863`, `javascript:S3776`, `javascript:S1128` -> `20260226-sonar-01`
+    - Security hotspots (`security_hotspots`, `new_security_hotspots`) -> `20260226-sec-02`
+    - `godre:S8196` residual single issue remains under `20260226-sonar-01` until next targeted pass
+  - Security OPEN issues: `0`
+  - Security hotspot debt: `0` total, `0` new (`100%` reviewed overall)
 
 ### Recently Closed IDs
 
@@ -122,12 +112,14 @@
 - Latest completed wave (moved `Check -> Done -> removed`):
   - `20260217-web-02`, `20260217-go-02`, `20260217-go-03`, `20260217-go-04`, `20260217-go-05`, `20260217-go-06`, `20260217-go-07`, `20260217-go-08`, `20260217-go-09`
   - `20260217-test-02`, `20260217-test-03`, `20260217-test-04`, `20260217-test-05`, `20260217-test-06`, `20260217-test-07`
-  - `20260217-sec-01`, `20260218-go-12`, `20260218-go-13`, `20260219-ui-01`, `20260219-ui-02`, `20260219-web-02`, `20260219-web-05`, `20260219-web-06`, `20260219-ui-03`, `20260219-cli-03`, `20260219-go-16`, `20260219-cli-01`, `20260219-cli-02`, `20260219-ui-04`, `20260219-ui-05`, `20260219-go-15`, `20260217-test-09`, `20260217-test-10`, `20260219-go-17`, `20260219-go-18`, `20260219-go-19`, `20260219-ci-01`, `20260219-doc-01`, `20260219-ui-06`, `20260219-ui-07`, `20260219-go-20`, `20260219-go-21`, `20260220-sec-01`, `20260220-api-01`, `20260219-go-22`, `20260220-web-01`, `20260220-meta-01`, `20260219-sdk-01`, `20260219-reg-01`, `20260219-test-13`, `20260219-test-11`, `20260219-test-12`
+  - `20260217-sec-01`, `20260218-go-12`, `20260218-go-13`, `20260219-ui-01`, `20260219-ui-02`, `20260219-web-02`, `20260219-web-05`, `20260219-web-06`, `20260219-ui-03`, `20260219-cli-03`, `20260219-go-16`, `20260219-cli-01`, `20260219-cli-02`, `20260219-ui-04`, `20260219-ui-05`, `20260219-go-15`, `20260217-test-09`, `20260217-test-10`, `20260219-go-17`, `20260219-go-18`, `20260219-go-19`, `20260219-ci-01`, `20260219-doc-01`, `20260219-ui-06`, `20260219-ui-07`, `20260219-go-20`, `20260219-go-21`, `20260220-sec-01`, `20260220-api-01`, `20260219-go-22`, `20260220-web-01`, `20260220-meta-01`, `20260219-sdk-01`, `20260219-reg-01`, `20260219-test-13`, `20260219-test-11`, `20260219-test-12`, `20260226-sec-02`, `20260226-sonar-01`
 
 ### Recent Decision Notes
 
 - Adopted Go 1.26 baseline across runtime and CI/release workflows.
 - Sonar reporting uses strict OPEN parity query (`projects=SaveEnergy_openbyte`, `issueStatuses=OPEN`).
+- Current Sonar MCP surface exposes issue search + metrics, but not hotspot-review transitions; hotspot closure requires Sonar UI/API support outside current MCP tools.
+- 2026-02-26 closure wave used parallel subagents for Go literal/complexity and JS modular Sonar hotspots; local test/format/lint gates passed, with Sonar rule counts awaiting next server-side reanalysis.
 - Prefer behavior-preserving refactors + targeted regression tests over broad rewrites.
 - Active backlog rows now keep only unresolved/externally-dependent items; completed/check work is folded into `Recently Closed IDs` to keep queue readable.
 - A2 full-codebase analysis (2026-02-19): identified 9 new backlog items across a11y, CSS architecture, Go LOC splits, test coverage gaps, flaky tests, and frontend UX. Sonar snapshot updated with per-rule breakdown (133 OPEN). Key risk: `cmd/client/engine.go` has zero direct test coverage (541 LOC). UDP `lastSeenUnix` concurrency verified safe (atomic ops). `<dialog>` focus trap assumption needs cross-browser validation.

@@ -23,6 +23,7 @@ const (
 	runContextTimeout    = 2 * time.Second
 	downloadChunkSize    = 65536
 	multiStreamChunkSize = 64 * 1024
+	measureHTTPPingFmt   = "measureHTTPPing: %v"
 )
 
 func TestHTTPTestEngineDownload(t *testing.T) {
@@ -121,7 +122,7 @@ func TestMeasureHTTPPingReturnsSamples(t *testing.T) {
 
 	samples, err := measureHTTPPing(ctx, server.URL, 3)
 	if err != nil {
-		t.Fatalf("measureHTTPPing: %v", err)
+		t.Fatalf(measureHTTPPingFmt, err)
 	}
 	if len(samples) != 3 {
 		t.Fatalf("samples len = %d, want 3", len(samples))
@@ -143,7 +144,7 @@ func TestMeasureHTTPPingHonorsContextCancel(t *testing.T) {
 	samples, err := measureHTTPPing(ctx, server.URL, 5)
 	elapsed := time.Since(start)
 	if err != nil {
-		t.Fatalf("measureHTTPPing: %v", err)
+		t.Fatalf(measureHTTPPingFmt, err)
 	}
 	if len(samples) != 0 {
 		t.Fatalf("samples len = %d, want 0", len(samples))
@@ -167,7 +168,7 @@ func TestMeasureHTTPPingSkipsNonOKResponses(t *testing.T) {
 
 	samples, err := measureHTTPPing(ctx, server.URL, 3)
 	if err != nil {
-		t.Fatalf("measureHTTPPing: %v", err)
+		t.Fatalf(measureHTTPPingFmt, err)
 	}
 	if len(samples) != 0 {
 		t.Fatalf("samples len = %d, want 0 for non-OK responses", len(samples))
@@ -188,7 +189,7 @@ func TestMeasureHTTPPingAllFailuresReturnEmptyNoError(t *testing.T) {
 
 	samples, err := measureHTTPPing(ctx, baseURL, 3)
 	if err != nil {
-		t.Fatalf("measureHTTPPing: %v", err)
+		t.Fatalf(measureHTTPPingFmt, err)
 	}
 	if len(samples) != 0 {
 		t.Fatalf("samples len = %d, want 0 when all requests fail", len(samples))

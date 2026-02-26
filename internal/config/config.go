@@ -69,6 +69,14 @@ type Config struct {
 	TLSAutoGen  bool // Auto-generate self-signed cert for dev
 }
 
+const (
+	envTrue  = "true"
+	envOne   = "1"
+	EnvDebug = "debug" // exported for cmd/server
+	envFalse = "false"
+	envZero  = "0"
+)
+
 func DefaultConfig() *Config {
 	hostname := defaultServerID()
 	return &Config{
@@ -149,7 +157,7 @@ func (c *Config) LoadFromEnv() error {
 
 func envBool(name string) bool {
 	val := os.Getenv(name)
-	return val == "true" || val == "1"
+	return val == envTrue || val == envOne
 }
 
 func envCSV(name string) []string {
@@ -346,7 +354,7 @@ func (c *Config) loadTLSEnv() {
 	if key := os.Getenv("TLS_KEY_FILE"); key != "" {
 		c.TLSKeyFile = key
 	}
-	if autoGen := os.Getenv("TLS_AUTO_GEN"); autoGen == "false" || autoGen == "0" {
+	if autoGen := os.Getenv("TLS_AUTO_GEN"); autoGen == envFalse || autoGen == envZero {
 		c.TLSAutoGen = false
 	}
 }

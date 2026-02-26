@@ -25,6 +25,11 @@ const (
 	wsConnectedReadTimeout    = 2 * time.Second
 	wsTerminalReadTimeout     = 1 * time.Second
 	wsDrainReadTimeout        = 120 * time.Millisecond
+	parseTestServerURLFmt     = "parse test server URL: %v"
+	dialWebsocketFmt          = "dial websocket: %v"
+	readConnectedMsgFmt       = "read connected message: %v"
+	unmarshalWsMsgFmt         = "unmarshal websocket message: %v"
+	completeMsgCountWantFmt   = "complete message count = %d, want 1"
 )
 
 func dialWebSocket(t *testing.T, serverURL string, origin string) error {
@@ -116,18 +121,18 @@ func TestServerCloseClosesActiveConnections(t *testing.T) {
 
 	parsed, err := url.Parse(testServer.URL)
 	if err != nil {
-		t.Fatalf("parse test server URL: %v", err)
+		t.Fatalf(parseTestServerURLFmt, err)
 	}
 	parsed.Scheme = "ws"
 	conn, _, err := gorilla.DefaultDialer.Dial(parsed.String(), nil)
 	if err != nil {
-		t.Fatalf("dial websocket: %v", err)
+		t.Fatalf(dialWebsocketFmt, err)
 	}
 	defer conn.Close()
 
 	_ = conn.SetReadDeadline(time.Now().Add(wsConnectedReadTimeout))
 	if _, _, err := conn.ReadMessage(); err != nil {
-		t.Fatalf("read connected message: %v", err)
+		t.Fatalf(readConnectedMsgFmt, err)
 	}
 
 	server.Close()
@@ -151,18 +156,18 @@ func TestBroadcastMetricsSendsTerminalStatusOnce(t *testing.T) {
 
 	parsed, err := url.Parse(testServer.URL)
 	if err != nil {
-		t.Fatalf("parse test server URL: %v", err)
+		t.Fatalf(parseTestServerURLFmt, err)
 	}
 	parsed.Scheme = "ws"
 	conn, _, err := gorilla.DefaultDialer.Dial(parsed.String(), nil)
 	if err != nil {
-		t.Fatalf("dial websocket: %v", err)
+		t.Fatalf(dialWebsocketFmt, err)
 	}
 	defer conn.Close()
 
 	_ = conn.SetReadDeadline(time.Now().Add(wsConnectedReadTimeout))
 	if _, _, err := conn.ReadMessage(); err != nil {
-		t.Fatalf("read connected message: %v", err)
+		t.Fatalf(readConnectedMsgFmt, err)
 	}
 
 	snapshot := types.StreamSnapshot{
@@ -194,7 +199,7 @@ func TestBroadcastMetricsSendsTerminalStatusOnce(t *testing.T) {
 
 		var msg map[string]any
 		if err := json.Unmarshal(data, &msg); err != nil {
-			t.Fatalf("unmarshal websocket message: %v", err)
+			t.Fatalf(unmarshalWsMsgFmt, err)
 		}
 		if msg["type"] == messageTypeComplete {
 			completeCount++
@@ -202,7 +207,7 @@ func TestBroadcastMetricsSendsTerminalStatusOnce(t *testing.T) {
 	}
 
 	if completeCount != 1 {
-		t.Fatalf("complete message count = %d, want 1", completeCount)
+		t.Fatalf(completeMsgCountWantFmt, completeCount)
 	}
 }
 
@@ -218,13 +223,13 @@ func TestTerminalBroadcastClosesConnection(t *testing.T) {
 
 	conn, err := dialWebSocketConn(t, testServer.URL, "")
 	if err != nil {
-		t.Fatalf("dial websocket: %v", err)
+		t.Fatalf(dialWebsocketFmt, err)
 	}
 	defer conn.Close()
 
 	_ = conn.SetReadDeadline(time.Now().Add(wsConnectedReadTimeout))
 	if _, _, err := conn.ReadMessage(); err != nil {
-		t.Fatalf("read connected message: %v", err)
+		t.Fatalf(readConnectedMsgFmt, err)
 	}
 
 	snapshot := types.StreamSnapshot{
@@ -248,14 +253,14 @@ func TestTerminalBroadcastClosesConnection(t *testing.T) {
 		}
 		var msg map[string]any
 		if err := json.Unmarshal(data, &msg); err != nil {
-			t.Fatalf("unmarshal websocket message: %v", err)
+			t.Fatalf(unmarshalWsMsgFmt, err)
 		}
 		if msg["type"] == messageTypeComplete {
 			completeCount++
 		}
 	}
 	if completeCount != 1 {
-		t.Fatalf("complete message count = %d, want 1", completeCount)
+		t.Fatalf(completeMsgCountWantFmt, completeCount)
 	}
 }
 
@@ -271,12 +276,12 @@ func TestConcurrentBroadcastRemoval(t *testing.T) {
 
 	conn, err := dialWebSocketConn(t, testServer.URL, "")
 	if err != nil {
-		t.Fatalf("dial websocket: %v", err)
+		t.Fatalf(dialWebsocketFmt, err)
 	}
 
 	_ = conn.SetReadDeadline(time.Now().Add(wsConnectedReadTimeout))
 	if _, _, err := conn.ReadMessage(); err != nil {
-		t.Fatalf("read connected message: %v", err)
+		t.Fatalf(readConnectedMsgFmt, err)
 	}
 
 	snapshot := types.StreamSnapshot{
