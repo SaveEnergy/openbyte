@@ -16,13 +16,46 @@ import (
 )
 
 const (
-	speedtestStatusFmt   = "status = %d, want %d"
-	octetStreamType      = "application/octet-stream"
-	jsonContentType      = "application/json"
-	noStoreCacheControl  = "no-store"
-	downloadEndpointBase = "http://example.com/api/v1/download"
-	uploadEndpoint       = "http://example.com/api/v1/upload"
-	pingEndpoint         = "http://example.com/api/v1/ping"
+	speedtestStatusFmt                 = "status = %d, want %d"
+	octetStreamType                    = "application/octet-stream"
+	jsonContentType                    = "application/json"
+	noStoreCacheControl                = "no-store"
+	downloadEndpointBase               = "http://example.com/api/v1/download"
+	uploadEndpoint                     = "http://example.com/api/v1/upload"
+	pingEndpoint                       = "http://example.com/api/v1/ping"
+	statusServiceUnavailable           = http.StatusServiceUnavailable
+	statusBadRequest                   = http.StatusBadRequest
+	statusInternalServerErr            = http.StatusInternalServerError
+	speedtestQueryDur1Chunk            = "?duration=1&chunk=65536"
+	speedtestQueryDur60Chunk           = "?duration=60&chunk=65536"
+	speedtestQueryDur5Chunk            = "?duration=5&chunk=65536"
+	speedtestQueryDur10Chunk           = "?duration=10&chunk=65536"
+	speedtestQueryDurZero              = "?duration=0"
+	speedtestQueryChunkBad             = "?chunk=bad"
+	speedtestQueryChunkABC             = "?chunk=abc"
+	speedtestWaitTimeout               = 2 * time.Second
+	pingClientIPKey                    = "client_ip"
+	pingIPv6Key                        = "ipv6"
+	pingClientIPv4Want                 = "203.0.113.10"
+	pingClientIPv6Want                 = "2001:db8::1"
+	pingIPv6FalseMsg                   = "ipv6 = %v, want false"
+	pingIPv6TrueMsg                    = "ipv6 = %v, want true"
+	speedtestContentTypeKey            = "Content-Type"
+	speedtestCacheControlKey           = "Cache-Control"
+	speedtestDecodeRespFmt             = "decode response: %v"
+	speedtestExpectBodyDrained         = "expected body to be drained"
+	speedtestExpectBodyClosed          = "expected body to be closed"
+	speedtestExpectReqBodyDrained503   = "expected request body to be drained before returning 503"
+	speedtestExpectReqBodyClosed       = "expected request body to be closed"
+	speedtestWaitDownloadStartTimeout  = "timed out waiting for download goroutine to start"
+	speedtestWaitUploadStartTimeout    = "timed out waiting for upload goroutine to start"
+	speedtestExpected503AtLimitFmt     = "expected 503 when at limit, got %d"
+	speedtestExpected200AfterCancelFmt = "expected 200 after cancel freed slots, got %d"
+	speedtestURLStatusFmt              = "url=%s status = %d, want %d"
+	speedtestURLBodyDrainedFmt         = "url=%s expected body to be drained"
+	speedtestURLBodyClosedFmt          = "url=%s expected body to be closed"
+	speedtestDurationTooHighFmt        = "duration=10 with max=5: status = %d, want 400"
+	speedtestChunkABCFmt               = "chunk=abc: status = %d, want 400"
 )
 
 // signalWriter wraps httptest.ResponseRecorder and signals a channel on first Write,
@@ -61,7 +94,7 @@ func TestSpeedTestDownloadWritesData(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	t.Cleanup(cancel)
 
-	req := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?duration=1&chunk=65536", nil)
+	req := httptest.NewRequest(http.MethodGet, downloadEndpointBase+speedtestQueryDur1Chunk, nil)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -70,10 +103,10 @@ func TestSpeedTestDownloadWritesData(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusOK)
 	}
-	if got := rec.Header().Get("Content-Type"); got != octetStreamType {
+	if got := rec.Header().Get(speedtestContentTypeKey); got != octetStreamType {
 		t.Fatalf("content-type = %q, want %q", got, octetStreamType)
 	}
-	if rec.Header().Get("Cache-Control") == "" {
+	if rec.Header().Get(speedtestCacheControlKey) == "" {
 		t.Fatalf("cache-control header missing")
 	}
 	if rec.Body.Len() == 0 {
@@ -86,7 +119,7 @@ func TestSpeedTestUploadReportsBytes(t *testing.T) {
 
 	payload := bytes.Repeat([]byte("a"), 256*1024)
 	req := httptest.NewRequest(http.MethodPost, uploadEndpoint, bytes.NewReader(payload))
-	req.Header.Set("Content-Type", octetStreamType)
+	req.Header.Set(speedtestContentTypeKey, octetStreamType)
 	rec := httptest.NewRecorder()
 
 	handler.Upload(rec, req)
@@ -99,7 +132,7 @@ func TestSpeedTestUploadReportsBytes(t *testing.T) {
 		Bytes int64 `json:"bytes"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode response: %v", err)
+		t.Fatalf(speedtestDecodeRespFmt, err)
 	}
 	if resp.Bytes != int64(len(payload)) {
 		t.Fatalf("bytes = %d, want %d", resp.Bytes, len(payload))
@@ -193,7 +226,7 @@ func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 
 		go func(ch chan struct{}) {
 			defer func() { done <- struct{}{} }()
-			req := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?duration=60&chunk=65536", nil)
+			req := httptest.NewRequest(http.MethodGet, downloadEndpointBase+speedtestQueryDur60Chunk, nil)
 			req = req.WithContext(ctx)
 			sw := &signalWriter{ResponseRecorder: httptest.NewRecorder(), started: ch}
 			handler.Download(sw, req)
@@ -204,17 +237,17 @@ func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 	for _, ch := range started {
 		select {
 		case <-ch:
-		case <-time.After(2 * time.Second):
-			t.Fatal("timed out waiting for download goroutine to start")
+		case <-time.After(speedtestWaitTimeout):
+			t.Fatal(speedtestWaitDownloadStartTimeout)
 		}
 	}
 
 	// New download should get 503
-	reqOver := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?duration=1&chunk=65536", nil)
+	reqOver := httptest.NewRequest(http.MethodGet, downloadEndpointBase+speedtestQueryDur1Chunk, nil)
 	recOver := httptest.NewRecorder()
 	handler.Download(recOver, reqOver)
-	if recOver.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503 when at limit, got %d", recOver.Code)
+	if recOver.Code != statusServiceUnavailable {
+		t.Fatalf(speedtestExpected503AtLimitFmt, recOver.Code)
 	}
 
 	// Cancel all running downloads (simulates user pressing cancel)
@@ -228,12 +261,12 @@ func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 	// After cancellation, new download should succeed
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	t.Cleanup(cancel)
-	reqAfter := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?duration=1&chunk=65536", nil)
+	reqAfter := httptest.NewRequest(http.MethodGet, downloadEndpointBase+speedtestQueryDur1Chunk, nil)
 	reqAfter = reqAfter.WithContext(ctx)
 	recAfter := httptest.NewRecorder()
 	handler.Download(recAfter, reqAfter)
 	if recAfter.Code != http.StatusOK {
-		t.Fatalf("expected 200 after cancel freed slots, got %d", recAfter.Code)
+		t.Fatalf(speedtestExpected200AfterCancelFmt, recAfter.Code)
 	}
 }
 
@@ -241,20 +274,20 @@ func TestDownloadAtCapacityDrainsBodyBefore503(t *testing.T) {
 	handler := api.NewSpeedTestHandler(0, 300)
 
 	tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 4096)}
-	req := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?duration=1&chunk=65536", nil)
+	req := httptest.NewRequest(http.MethodGet, downloadEndpointBase+speedtestQueryDur1Chunk, nil)
 	req.Body = tb
 	rec := httptest.NewRecorder()
 
 	handler.Download(rec, req)
 
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusServiceUnavailable)
+	if rec.Code != statusServiceUnavailable {
+		t.Fatalf(speedtestStatusFmt, rec.Code, statusServiceUnavailable)
 	}
 	if tb.reads == 0 {
-		t.Fatalf("expected request body to be drained before returning 503")
+		t.Fatalf(speedtestExpectReqBodyDrained503)
 	}
 	if !tb.closed {
-		t.Fatalf("expected request body to be closed")
+		t.Fatalf(speedtestExpectReqBodyClosed)
 	}
 }
 
@@ -262,8 +295,8 @@ func TestDownloadValidationRejectsDrainBody(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 
 	tests := []string{
-		downloadEndpointBase + "?duration=0",
-		downloadEndpointBase + "?chunk=bad",
+		downloadEndpointBase + speedtestQueryDurZero,
+		downloadEndpointBase + speedtestQueryChunkBad,
 	}
 	for _, u := range tests {
 		tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 1024)}
@@ -273,14 +306,14 @@ func TestDownloadValidationRejectsDrainBody(t *testing.T) {
 
 		handler.Download(rec, req)
 
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("url=%s status = %d, want %d", u, rec.Code, http.StatusBadRequest)
+		if rec.Code != statusBadRequest {
+			t.Fatalf(speedtestURLStatusFmt, u, rec.Code, statusBadRequest)
 		}
 		if tb.reads == 0 {
-			t.Fatalf("url=%s expected body to be drained", u)
+			t.Fatalf(speedtestURLBodyDrainedFmt, u)
 		}
 		if !tb.closed {
-			t.Fatalf("url=%s expected body to be closed", u)
+			t.Fatalf(speedtestURLBodyClosedFmt, u)
 		}
 	}
 }
@@ -294,8 +327,8 @@ func TestSpeedTestUploadHandlesReadError(t *testing.T) {
 
 	handler.Upload(rec, req)
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusInternalServerError)
+	if rec.Code != statusInternalServerErr {
+		t.Fatalf(speedtestStatusFmt, rec.Code, statusInternalServerErr)
 	}
 }
 
@@ -308,8 +341,8 @@ func TestSpeedTestUploadReadErrorDrainsBody(t *testing.T) {
 
 	handler.Upload(rec, req)
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusInternalServerError)
+	if rec.Code != statusInternalServerErr {
+		t.Fatalf(speedtestStatusFmt, rec.Code, statusInternalServerErr)
 	}
 	if tb.reads == 0 {
 		t.Fatal("expected upload body to be read")
@@ -352,8 +385,8 @@ func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 	for _, ch := range started {
 		select {
 		case <-ch:
-		case <-time.After(2 * time.Second):
-			t.Fatal("timed out waiting for upload goroutine to start")
+		case <-time.After(speedtestWaitTimeout):
+			t.Fatal(speedtestWaitUploadStartTimeout)
 		}
 	}
 
@@ -361,8 +394,8 @@ func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 	reqOver := httptest.NewRequest(http.MethodPost, uploadEndpoint, bytes.NewReader([]byte("data")))
 	recOver := httptest.NewRecorder()
 	handler.Upload(recOver, reqOver)
-	if recOver.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503 when at limit, got %d", recOver.Code)
+	if recOver.Code != statusServiceUnavailable {
+		t.Fatalf(speedtestExpected503AtLimitFmt, recOver.Code)
 	}
 
 	// Cancel all running uploads
@@ -378,7 +411,7 @@ func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 	recAfter := httptest.NewRecorder()
 	handler.Upload(recAfter, reqAfter)
 	if recAfter.Code != http.StatusOK {
-		t.Fatalf("expected 200 after cancel freed slots, got %d", recAfter.Code)
+		t.Fatalf(speedtestExpected200AfterCancelFmt, recAfter.Code)
 	}
 }
 
@@ -392,14 +425,14 @@ func TestUploadAtCapacityDrainsBodyBefore503(t *testing.T) {
 
 	handler.Upload(rec, req)
 
-	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusServiceUnavailable)
+	if rec.Code != statusServiceUnavailable {
+		t.Fatalf(speedtestStatusFmt, rec.Code, statusServiceUnavailable)
 	}
 	if tb.reads == 0 {
-		t.Fatalf("expected request body to be drained before returning 503")
+		t.Fatalf(speedtestExpectReqBodyDrained503)
 	}
 	if !tb.closed {
-		t.Fatalf("expected request body to be closed")
+		t.Fatalf(speedtestExpectReqBodyClosed)
 	}
 }
 
@@ -414,10 +447,10 @@ func TestUploadRespectsReadDeadlineWhenBodyStalls(t *testing.T) {
 	handler.Upload(rec, req)
 	elapsed := time.Since(start)
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusInternalServerError)
+	if rec.Code != statusInternalServerErr {
+		t.Fatalf(speedtestStatusFmt, rec.Code, statusInternalServerErr)
 	}
-	if elapsed > 2*time.Second {
+	if elapsed > speedtestWaitTimeout {
 		t.Fatalf("upload read deadline not enforced, elapsed=%v", elapsed)
 	}
 }
@@ -430,7 +463,7 @@ func TestDownloadRespectsMaxDuration(t *testing.T) {
 	t.Cleanup(cancel)
 
 	// duration=5 (within max) should be accepted
-	req := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?duration=5&chunk=65536", nil)
+	req := httptest.NewRequest(http.MethodGet, downloadEndpointBase+speedtestQueryDur5Chunk, nil)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 	handler.Download(rec, req)
@@ -439,19 +472,19 @@ func TestDownloadRespectsMaxDuration(t *testing.T) {
 	}
 
 	// duration=10 (above max=5) should be rejected with 400
-	req2 := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?duration=10&chunk=65536", nil)
+	req2 := httptest.NewRequest(http.MethodGet, downloadEndpointBase+speedtestQueryDur10Chunk, nil)
 	rec2 := httptest.NewRecorder()
 	handler.Download(rec2, req2)
-	if rec2.Code != http.StatusBadRequest {
-		t.Fatalf("duration=10 with max=5: status = %d, want 400", rec2.Code)
+	if rec2.Code != statusBadRequest {
+		t.Fatalf(speedtestDurationTooHighFmt, rec2.Code)
 	}
 
 	// invalid chunk should be rejected with 400
-	req3 := httptest.NewRequest(http.MethodGet, downloadEndpointBase+"?chunk=abc", nil)
+	req3 := httptest.NewRequest(http.MethodGet, downloadEndpointBase+speedtestQueryChunkABC, nil)
 	rec3 := httptest.NewRecorder()
 	handler.Download(rec3, req3)
-	if rec3.Code != http.StatusBadRequest {
-		t.Fatalf("chunk=abc: status = %d, want 400", rec3.Code)
+	if rec3.Code != statusBadRequest {
+		t.Fatalf(speedtestChunkABCFmt, rec3.Code)
 	}
 }
 
@@ -466,16 +499,16 @@ func TestSpeedTestHandlerPingResponseShape(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusOK)
 	}
-	if got := rec.Header().Get("Content-Type"); got != jsonContentType {
+	if got := rec.Header().Get(speedtestContentTypeKey); got != jsonContentType {
 		t.Fatalf("content-type = %q, want %q", got, jsonContentType)
 	}
-	if got := rec.Header().Get("Cache-Control"); got != noStoreCacheControl {
+	if got := rec.Header().Get(speedtestCacheControlKey); got != noStoreCacheControl {
 		t.Fatalf("cache-control = %q, want %q", got, noStoreCacheControl)
 	}
 
 	var resp map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode response: %v", err)
+		t.Fatalf(speedtestDecodeRespFmt, err)
 	}
 	if pong, ok := resp["pong"].(bool); !ok || !pong {
 		t.Fatalf("pong = %v, want true", resp["pong"])
@@ -483,11 +516,11 @@ func TestSpeedTestHandlerPingResponseShape(t *testing.T) {
 	if _, ok := resp["timestamp"].(float64); !ok {
 		t.Fatalf("timestamp missing or wrong type: %T", resp["timestamp"])
 	}
-	if ip, ok := resp["client_ip"].(string); !ok || ip != "203.0.113.10" {
-		t.Fatalf("client_ip = %v, want 203.0.113.10", resp["client_ip"])
+	if ip, ok := resp[pingClientIPKey].(string); !ok || ip != pingClientIPv4Want {
+		t.Fatalf("client_ip = %v, want %s", resp[pingClientIPKey], pingClientIPv4Want)
 	}
-	if ipv6, ok := resp["ipv6"].(bool); !ok || ipv6 {
-		t.Fatalf("ipv6 = %v, want false", resp["ipv6"])
+	if ipv6, ok := resp[pingIPv6Key].(bool); !ok || ipv6 {
+		t.Fatalf(pingIPv6FalseMsg, resp[pingIPv6Key])
 	}
 }
 
@@ -501,13 +534,13 @@ func TestSpeedTestHandlerPingNilResolverFallback(t *testing.T) {
 
 	var resp map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode response: %v", err)
+		t.Fatalf(speedtestDecodeRespFmt, err)
 	}
-	if ip, ok := resp["client_ip"].(string); !ok || ip != "2001:db8::1" {
-		t.Fatalf("client_ip = %v, want 2001:db8::1", resp["client_ip"])
+	if ip, ok := resp[pingClientIPKey].(string); !ok || ip != pingClientIPv6Want {
+		t.Fatalf("client_ip = %v, want %s", resp[pingClientIPKey], pingClientIPv6Want)
 	}
-	if ipv6, ok := resp["ipv6"].(bool); !ok || !ipv6 {
-		t.Fatalf("ipv6 = %v, want true", resp["ipv6"])
+	if ipv6, ok := resp[pingIPv6Key].(bool); !ok || !ipv6 {
+		t.Fatalf(pingIPv6TrueMsg, resp[pingIPv6Key])
 	}
 }
 
@@ -524,9 +557,9 @@ func TestSpeedTestHandlerPingDrainsUnexpectedBody(t *testing.T) {
 		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusOK)
 	}
 	if tb.reads == 0 {
-		t.Fatal("expected body to be drained")
+		t.Fatal(speedtestExpectBodyDrained)
 	}
 	if !tb.closed {
-		t.Fatal("expected body to be closed")
+		t.Fatal(speedtestExpectBodyClosed)
 	}
 }

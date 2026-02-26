@@ -17,7 +17,12 @@
     <meta name="theme-color" content="#0a0a0f" />
     <title>openByte</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="preload" href="/fonts/dm-sans-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="speed.css" />
+    <link rel="stylesheet" href="modal.css" />
+    <link rel="stylesheet" href="motion.css" />
   </head>
   <body>
     <a class="skip-link" href="#mainContent">Skip to main content</a>
@@ -26,7 +31,7 @@
       <header class="header">
         <div class="brand">
           <div class="logo">open<span class="logo-accent">Byte</span></div>
-          <div class="server-name" id="serverName">OpenByte Server</div>
+          <div class="server-name" id="serverName">Current Server</div>
         </div>
         <div class="server-info" id="serverInfo">
           <span class="server-dot"></span>
@@ -56,15 +61,19 @@
           </div>
           <div class="test-type" id="testType">↓ Download</div>
           <div class="progress-ring-container">
+            <progress
+              class="visually-hidden"
+              id="progressMeter"
+              max="100"
+              value="0"
+            >
+              0%
+            </progress>
             <svg
               class="progress-ring"
-              id="progressMeter"
+              id="progressRingSvg"
               viewBox="0 0 200 200"
-              role="progressbar"
-              aria-label="Test progress"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              aria-valuenow="0"
+              aria-hidden="true"
             >
               <circle class="progress-ring-bg" cx="100" cy="100" r="90" />
               <circle
@@ -222,6 +231,6 @@
       </div>
     </div>
 
-    <script src="openbyte.js"></script>
+    <script type="module" src="openbyte.js"></script>
   </body>
 </html>

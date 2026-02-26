@@ -14,6 +14,19 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+const (
+	testStreamID              = "test"
+	testOriginWildcard        = "https://foo.example.com"
+	testOriginHostWithPort    = "https://foo.example.com:8443"
+	streamIDTerminalOnce      = "stream-terminal-once"
+	streamIDTerminalClose     = "stream-terminal-close"
+	streamIDConcurrentRemoval = "stream-concurrent-removal"
+	messageTypeComplete       = "complete"
+	wsConnectedReadTimeout    = 2 * time.Second
+	wsTerminalReadTimeout     = 1 * time.Second
+	wsDrainReadTimeout        = 120 * time.Millisecond
+)
+
 func dialWebSocket(t *testing.T, serverURL string, origin string) error {
 	t.Helper()
 	parsed, err := url.Parse(serverURL)
@@ -58,11 +71,11 @@ func TestServerAllowedOriginWildcard(t *testing.T) {
 	server.SetAllowedOrigins([]string{"*.example.com"})
 
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		server.HandleStream(w, r, "test")
+		server.HandleStream(w, r, testStreamID)
 	}))
 	t.Cleanup(testServer.Close)
 
-	if err := dialWebSocket(t, testServer.URL, "https://foo.example.com"); err != nil {
+	if err := dialWebSocket(t, testServer.URL, testOriginWildcard); err != nil {
 		t.Fatalf("expected wildcard origin to be allowed: %v", err)
 	}
 }
@@ -72,20 +85,20 @@ func TestServerAllowedOriginHostMatch(t *testing.T) {
 	server.SetAllowedOrigins([]string{"foo.example.com"})
 
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		server.HandleStream(w, r, "test")
+		server.HandleStream(w, r, testStreamID)
 	}))
 	t.Cleanup(testServer.Close)
 
-	if err := dialWebSocket(t, testServer.URL, "https://foo.example.com:8443"); err != nil {
+	if err := dialWebSocket(t, testServer.URL, testOriginHostWithPort); err != nil {
 		t.Fatalf("expected host-only origin to be allowed: %v", err)
 	}
 }
 
 func TestWebSocketEmptyOriginWithConfiguredOrigins(t *testing.T) {
 	server := obytewebsocket.NewServer()
-	server.SetAllowedOrigins([]string{"https://foo.example.com"})
+	server.SetAllowedOrigins([]string{testOriginWildcard})
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		server.HandleStream(w, r, "test")
+		server.HandleStream(w, r, testStreamID)
 	}))
 	t.Cleanup(testServer.Close)
 
@@ -112,7 +125,7 @@ func TestServerCloseClosesActiveConnections(t *testing.T) {
 	}
 	defer conn.Close()
 
-	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(wsConnectedReadTimeout))
 	if _, _, err := conn.ReadMessage(); err != nil {
 		t.Fatalf("read connected message: %v", err)
 	}
@@ -130,7 +143,7 @@ func TestBroadcastMetricsSendsTerminalStatusOnce(t *testing.T) {
 	server := obytewebsocket.NewServer()
 	t.Cleanup(server.Close)
 
-	const streamID = "stream-terminal-once"
+	const streamID = streamIDTerminalOnce
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		server.HandleStream(w, r, streamID)
 	}))
@@ -147,7 +160,7 @@ func TestBroadcastMetricsSendsTerminalStatusOnce(t *testing.T) {
 	}
 	defer conn.Close()
 
-	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(wsConnectedReadTimeout))
 	if _, _, err := conn.ReadMessage(); err != nil {
 		t.Fatalf("read connected message: %v", err)
 	}
@@ -173,7 +186,7 @@ func TestBroadcastMetricsSendsTerminalStatusOnce(t *testing.T) {
 
 	completeCount := 0
 	for {
-		_ = conn.SetReadDeadline(time.Now().Add(120 * time.Millisecond))
+		_ = conn.SetReadDeadline(time.Now().Add(wsDrainReadTimeout))
 		_, data, err := conn.ReadMessage()
 		if err != nil {
 			break
@@ -183,7 +196,7 @@ func TestBroadcastMetricsSendsTerminalStatusOnce(t *testing.T) {
 		if err := json.Unmarshal(data, &msg); err != nil {
 			t.Fatalf("unmarshal websocket message: %v", err)
 		}
-		if msg["type"] == "complete" {
+		if msg["type"] == messageTypeComplete {
 			completeCount++
 		}
 	}
@@ -197,7 +210,7 @@ func TestTerminalBroadcastClosesConnection(t *testing.T) {
 	server := obytewebsocket.NewServer()
 	t.Cleanup(server.Close)
 
-	const streamID = "stream-terminal-close"
+	const streamID = streamIDTerminalClose
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		server.HandleStream(w, r, streamID)
 	}))
@@ -209,7 +222,7 @@ func TestTerminalBroadcastClosesConnection(t *testing.T) {
 	}
 	defer conn.Close()
 
-	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(wsConnectedReadTimeout))
 	if _, _, err := conn.ReadMessage(); err != nil {
 		t.Fatalf("read connected message: %v", err)
 	}
@@ -228,7 +241,7 @@ func TestTerminalBroadcastClosesConnection(t *testing.T) {
 
 	completeCount := 0
 	for {
-		_ = conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(wsTerminalReadTimeout))
 		_, data, err := conn.ReadMessage()
 		if err != nil {
 			break
@@ -237,7 +250,7 @@ func TestTerminalBroadcastClosesConnection(t *testing.T) {
 		if err := json.Unmarshal(data, &msg); err != nil {
 			t.Fatalf("unmarshal websocket message: %v", err)
 		}
-		if msg["type"] == "complete" {
+		if msg["type"] == messageTypeComplete {
 			completeCount++
 		}
 	}
@@ -250,7 +263,7 @@ func TestConcurrentBroadcastRemoval(t *testing.T) {
 	server := obytewebsocket.NewServer()
 	t.Cleanup(server.Close)
 
-	const streamID = "stream-concurrent-removal"
+	const streamID = streamIDConcurrentRemoval
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		server.HandleStream(w, r, streamID)
 	}))
@@ -261,7 +274,7 @@ func TestConcurrentBroadcastRemoval(t *testing.T) {
 		t.Fatalf("dial websocket: %v", err)
 	}
 
-	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(wsConnectedReadTimeout))
 	if _, _, err := conn.ReadMessage(); err != nil {
 		t.Fatalf("read connected message: %v", err)
 	}

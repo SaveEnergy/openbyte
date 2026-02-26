@@ -15,6 +15,18 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+const (
+	integrationGetMethod   = "GET"
+	integrationPostMethod  = "POST"
+	integrationOptionsVerb = "OPTIONS"
+	integrationJSONType    = "application/json"
+	integrationOrigin      = "https://example.com"
+	integrationStatusFmt   = "Status code = %d, want %d"
+	resultsPath            = "/api/v1/results"
+	noStoreValue           = "no-store"
+	resultsDBSuffix        = "/results.db"
+)
+
 func testConfig() *config.Config {
 	return config.DefaultConfig()
 }
@@ -50,15 +62,15 @@ func TestAPIStartStream(t *testing.T) {
 		t.Fatalf("marshal request body: %v", err)
 	}
 
-	req := httptest.NewRequest("POST", "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(integrationPostMethod, "/api/v1/stream/start", bytes.NewReader(body))
+	req.Header.Set("Content-Type", integrationJSONType)
 	w := httptest.NewRecorder()
 
 	handler.StartStream(w, req)
 
 	if w.Code != http.StatusCreated {
 		t.Logf("Response body: %s", w.Body.String())
-		t.Errorf("Status code = %d, want %d", w.Code, http.StatusCreated)
+		t.Errorf(integrationStatusFmt, w.Code, http.StatusCreated)
 		return
 	}
 
@@ -89,14 +101,14 @@ func TestAPIGetStreamStatus(t *testing.T) {
 		t.Fatalf("Failed to create stream: %v", err)
 	}
 
-	req := httptest.NewRequest("GET", "/api/v1/stream/"+state.Config.ID+"/status", nil)
+	req := httptest.NewRequest(integrationGetMethod, "/api/v1/stream/"+state.Config.ID+"/status", nil)
 	w := httptest.NewRecorder()
 
 	router := api.NewRouter(handler, testConfig())
 	router.SetupRoutes().ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Errorf("Status code = %d, want %d", w.Code, http.StatusOK)
+		t.Errorf(integrationStatusFmt, w.Code, http.StatusOK)
 	}
 }
 
@@ -107,16 +119,16 @@ func TestCORSAllowedOrigin(t *testing.T) {
 
 	handler := api.NewHandler(manager)
 	router := api.NewRouter(handler, testConfig())
-	router.SetAllowedOrigins([]string{"https://example.com"})
+	router.SetAllowedOrigins([]string{integrationOrigin})
 
-	req := httptest.NewRequest("GET", "/health", nil)
-	req.Header.Set("Origin", "https://example.com")
+	req := httptest.NewRequest(integrationGetMethod, "/health", nil)
+	req.Header.Set("Origin", integrationOrigin)
 	w := httptest.NewRecorder()
 
 	router.SetupRoutes().ServeHTTP(w, req)
 
-	if w.Header().Get("Access-Control-Allow-Origin") != "https://example.com" {
-		t.Errorf("Access-Control-Allow-Origin = %s, want %s", w.Header().Get("Access-Control-Allow-Origin"), "https://example.com")
+	if w.Header().Get("Access-Control-Allow-Origin") != integrationOrigin {
+		t.Errorf("Access-Control-Allow-Origin = %s, want %s", w.Header().Get("Access-Control-Allow-Origin"), integrationOrigin)
 	}
 }
 
@@ -127,16 +139,16 @@ func TestCORSBlockedOrigin(t *testing.T) {
 
 	handler := api.NewHandler(manager)
 	router := api.NewRouter(handler, testConfig())
-	router.SetAllowedOrigins([]string{"https://example.com"})
+	router.SetAllowedOrigins([]string{integrationOrigin})
 
-	req := httptest.NewRequest("OPTIONS", "/health", nil)
+	req := httptest.NewRequest(integrationOptionsVerb, "/health", nil)
 	req.Header.Set("Origin", "https://evil.example")
 	w := httptest.NewRecorder()
 
 	router.SetupRoutes().ServeHTTP(w, req)
 
 	if w.Code != http.StatusForbidden {
-		t.Errorf("Status code = %d, want %d", w.Code, http.StatusForbidden)
+		t.Errorf(integrationStatusFmt, w.Code, http.StatusForbidden)
 	}
 }
 
@@ -148,7 +160,7 @@ func TestAPIResultsSaveAndGet(t *testing.T) {
 	handler := api.NewHandler(manager)
 	router := api.NewRouter(handler, testConfig())
 
-	store, err := results.New(t.TempDir()+"/results.db", 100)
+	store, err := results.New(t.TempDir()+resultsDBSuffix, 100)
 	if err != nil {
 		t.Fatalf("results.New: %v", err)
 	}
@@ -168,8 +180,8 @@ func TestAPIResultsSaveAndGet(t *testing.T) {
 		"ipv6": "",
 		"server_name": "integration-server"
 	}`
-	saveReq := httptest.NewRequest(http.MethodPost, "/api/v1/results", bytes.NewBufferString(saveBody))
-	saveReq.Header.Set("Content-Type", "application/json")
+	saveReq := httptest.NewRequest(http.MethodPost, resultsPath, bytes.NewBufferString(saveBody))
+	saveReq.Header.Set("Content-Type", integrationJSONType)
 	saveRec := httptest.NewRecorder()
 	h.ServeHTTP(saveRec, saveReq)
 	if saveRec.Code != http.StatusCreated {
@@ -182,14 +194,14 @@ func TestAPIResultsSaveAndGet(t *testing.T) {
 	}
 	id := mustStringField(t, saveResp, "id")
 
-	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/results/"+id, nil)
+	getReq := httptest.NewRequest(http.MethodGet, resultsPath+"/"+id, nil)
 	getRec := httptest.NewRecorder()
 	h.ServeHTTP(getRec, getReq)
 	if getRec.Code != http.StatusOK {
 		t.Fatalf("get status = %d, want %d; body=%s", getRec.Code, http.StatusOK, getRec.Body.String())
 	}
-	if got := getRec.Header().Get("Cache-Control"); got != "no-store" {
-		t.Fatalf("cache-control = %q, want %q", got, "no-store")
+	if got := getRec.Header().Get("Cache-Control"); got != noStoreValue {
+		t.Fatalf("cache-control = %q, want %q", got, noStoreValue)
 	}
 
 	var gotResult map[string]any

@@ -11,6 +11,8 @@ import (
 
 const (
 	streamMissingID = "missing"
+	streamUnknownID = "nonexistent"
+	streamFixedID   = "fixed-id"
 	testIPPrimary   = "10.0.0.1"
 	testIPSecondary = "10.0.0.2"
 )
@@ -64,7 +66,7 @@ func TestManagerStartStreamNotFound(t *testing.T) {
 	m := newTestManager()
 	defer m.Stop()
 
-	if m.StartStream("nonexistent") == nil {
+	if m.StartStream(streamUnknownID) == nil {
 		t.Fatal("expected error for nonexistent stream")
 	}
 }
@@ -278,7 +280,7 @@ func TestManagerDuplicateStreamID(t *testing.T) {
 	defer m.Stop()
 
 	cfg := testConfig(types.DirectionDownload)
-	cfg.ID = "fixed-id"
+	cfg.ID = streamFixedID
 
 	_, err := m.CreateStream(cfg)
 	if err != nil {

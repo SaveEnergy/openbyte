@@ -11,13 +11,24 @@ import (
 	"github.com/saveenergy/openbyte/internal/config"
 )
 
+const (
+	loopbackAddrWithPort = "127.0.0.1:12345"
+	loopbackIPv4         = "127.0.0.1"
+	udpAddrA             = "127.0.0.1"
+	udpAddrB             = "127.0.0.1"
+	udpPortA             = 10001
+	udpPortB             = 10002
+	readTimeoutShort     = 2 * time.Second
+	closeTimeoutLong     = 3 * time.Second
+)
+
 func TestUDPSenderRemovesClientAndDecrementsCountOnExit(t *testing.T) {
 	s := &Server{
 		stopCh: make(chan struct{}),
 		config: &config.Config{UDPBufferSize: 1400},
 	}
 
-	clientKey := "127.0.0.1:12345"
+	clientKey := loopbackAddrWithPort
 	client := &udpClientState{
 		senderActive: 1,
 		// Force immediate sender exit path.
@@ -49,8 +60,8 @@ func TestGetOrCreateRejectsWhenSenderLimitReached(t *testing.T) {
 	}
 	clients := &udpClients{m: make(map[string]*udpClientState)}
 
-	addrA := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 10001}
-	addrB := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 10002}
+	addrA := &net.UDPAddr{IP: net.ParseIP(udpAddrA), Port: udpPortA}
+	addrB := &net.UDPAddr{IP: net.ParseIP(udpAddrB), Port: udpPortB}
 
 	first, created := clients.getOrCreate("a", addrA, s)
 	if first == nil || !created {
@@ -70,7 +81,7 @@ func TestGetOrCreateRejectsWhenSenderLimitReached(t *testing.T) {
 }
 
 func TestAcceptTCPRejectsWhenAtLimit(t *testing.T) {
-	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
+	addr, err := net.ResolveTCPAddr("tcp", loopbackIPv4+":0")
 	if err != nil {
 		t.Fatalf("resolve tcp addr: %v", err)
 	}
@@ -94,7 +105,7 @@ func TestAcceptTCPRejectsWhenAtLimit(t *testing.T) {
 	defer conn.Close()
 
 	buf := make([]byte, 1)
-	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(readTimeoutShort))
 	_, readErr := conn.Read(buf)
 	if readErr == nil {
 		t.Fatal("expected connection close/reject when TCP limit is reached")
@@ -107,7 +118,7 @@ func TestAcceptTCPRejectsWhenAtLimit(t *testing.T) {
 
 func TestServerCloseWithActiveUDPReturnsPromptly(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfg.BindAddress = "127.0.0.1"
+	cfg.BindAddress = loopbackIPv4
 	cfg.TCPTestPort = 0
 	cfg.UDPTestPort = 0
 
@@ -137,14 +148,14 @@ func TestServerCloseWithActiveUDPReturnsPromptly(t *testing.T) {
 
 	select {
 	case <-done:
-	case <-time.After(3 * time.Second):
+	case <-time.After(closeTimeoutLong):
 		t.Fatal("server close timed out with active udp path")
 	}
 }
 
 func TestServerCloseIdempotentConcurrent(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfg.BindAddress = "127.0.0.1"
+	cfg.BindAddress = loopbackIPv4
 	cfg.TCPTestPort = 0
 	cfg.UDPTestPort = 0
 

@@ -8,13 +8,25 @@ import (
 )
 
 const (
-	exampleHost        = "example.com"
-	localhostHost      = "localhost"
-	loopbackIPv4Host   = "127.0.0.1"
-	loopbackIPv6Host   = "::1"
-	streamIDFixture    = "stream-123"
-	httpExampleURL     = "https://example.com"
-	httpsExamplePorted = "https://example.com:8443"
+	exampleHost             = "example.com"
+	localhostHost           = "localhost"
+	loopbackIPv4Host        = "127.0.0.1"
+	loopbackIPv6Host        = "::1"
+	streamIDFixture         = "stream-123"
+	httpExampleURL          = "https://example.com"
+	httpsExamplePorted      = "https://example.com:8443"
+	streamDuration          = 30 * time.Second
+	metricsStartDelta       = -10 * time.Second
+	throughputTarget        = 1000.0
+	statusWantFmt           = "Status = %v, want %v"
+	stripHostPortFmt        = "StripHostPort(%q) = %q, want %q"
+	originHostFmt           = "OriginHost(%q) = %q, want %q"
+	streamStartTimeErr      = "StartTime should be set when status changes to running"
+	streamEndTimeErr        = "EndTime should be set when status changes to completed"
+	streamMetricsWantFmt    = "Metrics.ThroughputMbps = %v, want %v"
+	streamProgressRangeFmt  = "Progress = %v, should be between 0 and 100"
+	streamSnapshotIDFmt     = "Snapshot.Config.ID = %v, want %s"
+	streamSnapshotStatusFmt = "Snapshot.Status = %v, want %v"
 )
 
 func TestStripHostPort(t *testing.T) {
@@ -33,7 +45,7 @@ func TestStripHostPort(t *testing.T) {
 	for _, tc := range tests {
 		got := types.StripHostPort(tc.input)
 		if got != tc.want {
-			t.Errorf("StripHostPort(%q) = %q, want %q", tc.input, got, tc.want)
+			t.Errorf(stripHostPortFmt, tc.input, got, tc.want)
 		}
 	}
 }
@@ -54,7 +66,7 @@ func TestOriginHost(t *testing.T) {
 	for _, tc := range tests {
 		got := types.OriginHost(tc.input)
 		if got != tc.want {
-			t.Errorf("OriginHost(%q) = %q, want %q", tc.input, got, tc.want)
+			t.Errorf(originHostFmt, tc.input, got, tc.want)
 		}
 	}
 }
@@ -62,55 +74,55 @@ func TestOriginHost(t *testing.T) {
 func TestStreamStateUpdateStatus(t *testing.T) {
 	state := &types.StreamState{
 		Config: types.StreamConfig{
-			Duration: 30 * time.Second,
+			Duration: streamDuration,
 		},
 		Status: types.StreamStatusPending,
 	}
 
 	state.UpdateStatus(types.StreamStatusStarting)
 	if state.Status != types.StreamStatusStarting {
-		t.Errorf("Status = %v, want %v", state.Status, types.StreamStatusStarting)
+		t.Errorf(statusWantFmt, state.Status, types.StreamStatusStarting)
 	}
 
 	state.UpdateStatus(types.StreamStatusRunning)
 	if state.Status != types.StreamStatusRunning {
-		t.Errorf("Status = %v, want %v", state.Status, types.StreamStatusRunning)
+		t.Errorf(statusWantFmt, state.Status, types.StreamStatusRunning)
 	}
 	if state.StartTime.IsZero() {
-		t.Error("StartTime should be set when status changes to running")
+		t.Error(streamStartTimeErr)
 	}
 
 	state.UpdateStatus(types.StreamStatusCompleted)
 	if state.Status != types.StreamStatusCompleted {
-		t.Errorf("Status = %v, want %v", state.Status, types.StreamStatusCompleted)
+		t.Errorf(statusWantFmt, state.Status, types.StreamStatusCompleted)
 	}
 	if state.EndTime.IsZero() {
-		t.Error("EndTime should be set when status changes to completed")
+		t.Error(streamEndTimeErr)
 	}
 }
 
 func TestStreamStateUpdateMetrics(t *testing.T) {
 	state := &types.StreamState{
 		Config: types.StreamConfig{
-			Duration: 30 * time.Second,
+			Duration: streamDuration,
 		},
 		Status:    types.StreamStatusRunning,
-		StartTime: time.Now().Add(-10 * time.Second),
+		StartTime: time.Now().Add(metricsStartDelta),
 	}
 
 	m := types.Metrics{
-		ThroughputMbps: 1000.0,
+		ThroughputMbps: throughputTarget,
 		Timestamp:      time.Now(),
 	}
 
 	state.UpdateMetrics(m)
 
 	if state.Metrics.ThroughputMbps != m.ThroughputMbps {
-		t.Errorf("Metrics.ThroughputMbps = %v, want %v", state.Metrics.ThroughputMbps, m.ThroughputMbps)
+		t.Errorf(streamMetricsWantFmt, state.Metrics.ThroughputMbps, m.ThroughputMbps)
 	}
 
 	if state.Progress < 0 || state.Progress > 100 {
-		t.Errorf("Progress = %v, should be between 0 and 100", state.Progress)
+		t.Errorf(streamProgressRangeFmt, state.Progress)
 	}
 }
 
@@ -126,9 +138,9 @@ func TestStreamStateGetState(t *testing.T) {
 	snapshot := state.GetState()
 
 	if snapshot.Config.ID != streamIDFixture {
-		t.Errorf("Snapshot.Config.ID = %v, want %s", snapshot.Config.ID, streamIDFixture)
+		t.Errorf(streamSnapshotIDFmt, snapshot.Config.ID, streamIDFixture)
 	}
 	if snapshot.Status != types.StreamStatusRunning {
-		t.Errorf("Snapshot.Status = %v, want %v", snapshot.Status, types.StreamStatusRunning)
+		t.Errorf(streamSnapshotStatusFmt, snapshot.Status, types.StreamStatusRunning)
 	}
 }

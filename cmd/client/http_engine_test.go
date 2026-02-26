@@ -12,24 +12,37 @@ import (
 	"github.com/saveenergy/openbyte/internal/api"
 )
 
+const (
+	pingPath             = "/api/v1/ping"
+	downloadPath         = "/api/v1/download"
+	uploadPath           = "/api/v1/upload"
+	downloadDirection    = "download"
+	uploadDirection      = "upload"
+	engineDuration       = 1 * time.Second
+	engineTimeout        = 5 * time.Second
+	runContextTimeout    = 2 * time.Second
+	downloadChunkSize    = 65536
+	multiStreamChunkSize = 64 * 1024
+)
+
 func TestHTTPTestEngineDownload(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/download", handler.Download)
-	mux.HandleFunc("/api/v1/ping", handler.Ping)
+	mux.HandleFunc(downloadPath, handler.Download)
+	mux.HandleFunc(pingPath, handler.Ping)
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 
 	cfg := &HTTPTestConfig{
 		ServerURL:      server.URL,
-		Duration:       1 * time.Second,
+		Duration:       engineDuration,
 		Streams:        1,
-		ChunkSize:      65536,
-		Direction:      "download",
+		ChunkSize:      downloadChunkSize,
+		Direction:      downloadDirection,
 		GraceTime:      0,
 		StreamDelay:    0,
 		OverheadFactor: 1.0,
-		Timeout:        5 * time.Second,
+		Timeout:        engineTimeout,
 	}
 
 	engine, err := NewHTTPTestEngine(cfg)
@@ -37,7 +50,7 @@ func TestHTTPTestEngineDownload(t *testing.T) {
 		t.Fatalf("new http test engine: %v", err)
 	}
 	defer engine.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), runContextTimeout)
 	t.Cleanup(cancel)
 
 	if err := engine.Run(ctx); err != nil {
@@ -56,21 +69,21 @@ func TestHTTPTestEngineDownload(t *testing.T) {
 func TestHTTPTestEngineUpload(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/upload", handler.Upload)
-	mux.HandleFunc("/api/v1/ping", handler.Ping)
+	mux.HandleFunc(uploadPath, handler.Upload)
+	mux.HandleFunc(pingPath, handler.Ping)
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 
 	cfg := &HTTPTestConfig{
 		ServerURL:      server.URL,
-		Duration:       1 * time.Second,
+		Duration:       engineDuration,
 		Streams:        1,
-		ChunkSize:      65536,
-		Direction:      "upload",
+		ChunkSize:      downloadChunkSize,
+		Direction:      uploadDirection,
 		GraceTime:      0,
 		StreamDelay:    0,
 		OverheadFactor: 1.0,
-		Timeout:        5 * time.Second,
+		Timeout:        engineTimeout,
 	}
 
 	engine, err := NewHTTPTestEngine(cfg)
@@ -78,7 +91,7 @@ func TestHTTPTestEngineUpload(t *testing.T) {
 		t.Fatalf("new http test engine: %v", err)
 	}
 	defer engine.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), runContextTimeout)
 	t.Cleanup(cancel)
 
 	if err := engine.Run(ctx); err != nil {
@@ -96,14 +109,14 @@ func TestHTTPTestEngineUpload(t *testing.T) {
 
 func TestMeasureHTTPPingReturnsSamples(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/ping", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(pingPath, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"pong":true}`))
 	})
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), runContextTimeout)
 	defer cancel()
 
 	samples, err := measureHTTPPing(ctx, server.URL, 3)
@@ -117,7 +130,7 @@ func TestMeasureHTTPPingReturnsSamples(t *testing.T) {
 
 func TestMeasureHTTPPingHonorsContextCancel(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/ping", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(pingPath, func(w http.ResponseWriter, r *http.Request) {
 		<-r.Context().Done()
 	})
 	server := httptest.NewServer(mux)
@@ -142,14 +155,14 @@ func TestMeasureHTTPPingHonorsContextCancel(t *testing.T) {
 
 func TestMeasureHTTPPingSkipsNonOKResponses(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/ping", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(pingPath, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = w.Write([]byte(`{"error":"busy"}`))
 	})
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), runContextTimeout)
 	defer cancel()
 
 	samples, err := measureHTTPPing(ctx, server.URL, 3)
@@ -184,7 +197,7 @@ func TestMeasureHTTPPingAllFailuresReturnEmptyNoError(t *testing.T) {
 
 func TestHTTPEngineMultiStreamFailure(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/download", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(downloadPath, func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "overloaded", http.StatusServiceUnavailable)
 	})
 	server := httptest.NewServer(mux)
@@ -192,14 +205,14 @@ func TestHTTPEngineMultiStreamFailure(t *testing.T) {
 
 	cfg := &HTTPTestConfig{
 		ServerURL:      server.URL,
-		Duration:       1 * time.Second,
+		Duration:       engineDuration,
 		Streams:        3,
-		ChunkSize:      64 * 1024,
-		Direction:      "download",
+		ChunkSize:      multiStreamChunkSize,
+		Direction:      downloadDirection,
 		GraceTime:      0,
 		StreamDelay:    0,
 		OverheadFactor: 1.0,
-		Timeout:        2 * time.Second,
+		Timeout:        runContextTimeout,
 	}
 	engine, err := NewHTTPTestEngine(cfg)
 	if err != nil {

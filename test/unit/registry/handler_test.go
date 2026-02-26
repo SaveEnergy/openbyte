@@ -15,9 +15,18 @@ import (
 const (
 	registryServersPath  = "/api/v1/registry/servers"
 	registryServerS1Path = "/api/v1/registry/servers/s1"
+	registryMissingPath  = "/api/v1/registry/servers/missing"
+	registryHealthPath   = "/api/v1/registry/health"
+	registryHealthyQuery = "/api/v1/registry/servers?healthy=true"
 	contentTypeHeader    = "Content-Type"
 	applicationJSON      = "application/json"
+	textPlainType        = "text/plain"
 	statusCodeWantFmt    = "status = %d, want %d"
+	methodGet            = "GET"
+	methodPost           = "POST"
+	methodPut            = "PUT"
+	methodDelete         = "DELETE"
+	serverBodyS1         = `{"id":"s1","name":"Test","host":"localhost"}`
 )
 
 func setupHandler(apiKey string) (*registry.Handler, *http.ServeMux) {
@@ -47,7 +56,7 @@ func TestHandlerRegisterAndList(t *testing.T) {
 
 	// Register
 	body := `{"id":"s1","name":"Test Server","host":"localhost","tcp_port":8081,"udp_port":8082,"health":"healthy"}`
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -57,7 +66,7 @@ func TestHandlerRegisterAndList(t *testing.T) {
 	}
 
 	// List
-	req = httptest.NewRequest("GET", registryServersPath, nil)
+	req = httptest.NewRequest(methodGet, registryServersPath, nil)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -78,14 +87,13 @@ func TestHandlerGetServer(t *testing.T) {
 	_, mux := setupHandler("")
 
 	// Register first
-	body := `{"id":"s1","name":"Test","host":"localhost"}`
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(serverBodyS1))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
 	// Get
-	req = httptest.NewRequest("GET", registryServerS1Path, nil)
+	req = httptest.NewRequest(methodGet, registryServerS1Path, nil)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -97,7 +105,7 @@ func TestHandlerGetServer(t *testing.T) {
 func TestHandlerGetServerNotFound(t *testing.T) {
 	_, mux := setupHandler("")
 
-	req := httptest.NewRequest("GET", "/api/v1/registry/servers/missing", nil)
+	req := httptest.NewRequest(methodGet, registryMissingPath, nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -110,8 +118,7 @@ func TestHandlerAuthRequired(t *testing.T) {
 	_, mux := setupHandler("secret-key")
 
 	// Register without auth → 401
-	body := `{"id":"s1","name":"Test","host":"localhost"}`
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(serverBodyS1))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -121,7 +128,7 @@ func TestHandlerAuthRequired(t *testing.T) {
 	}
 
 	// Register with correct auth → 201
-	req = httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+	req = httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(serverBodyS1))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	req.Header.Set("Authorization", "Bearer secret-key")
 	rec = httptest.NewRecorder()
@@ -135,8 +142,7 @@ func TestHandlerAuthRequired(t *testing.T) {
 func TestHandlerAuthWrongKey(t *testing.T) {
 	_, mux := setupHandler("correct-key")
 
-	body := `{"id":"s1","name":"Test","host":"localhost"}`
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(serverBodyS1))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	req.Header.Set("Authorization", "Bearer wrong-key")
 	rec := httptest.NewRecorder()
@@ -151,8 +157,7 @@ func TestHandlerAuthMalformedBearerHeader(t *testing.T) {
 	_, mux := setupHandler("secret-key")
 
 	for _, auth := range []string{"Bearer", "Bearer ", "Bear secret-key"} {
-		body := `{"id":"s1","name":"Test","host":"localhost"}`
-		req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+		req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(serverBodyS1))
 		req.Header.Set(contentTypeHeader, applicationJSON)
 		req.Header.Set("Authorization", auth)
 		rec := httptest.NewRecorder()
@@ -169,14 +174,14 @@ func TestHandlerUpdateServer(t *testing.T) {
 
 	// Register
 	body := `{"id":"s1","name":"Before","host":"localhost"}`
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
 	// Update
 	body = `{"name":"After","host":"remotehost"}`
-	req = httptest.NewRequest("PUT", registryServerS1Path, strings.NewReader(body))
+	req = httptest.NewRequest(methodPut, registryServerS1Path, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -190,7 +195,7 @@ func TestHandlerUpdateNotFound(t *testing.T) {
 	_, mux := setupHandler("")
 
 	body := `{"name":"X"}`
-	req := httptest.NewRequest("PUT", "/api/v1/registry/servers/missing", strings.NewReader(body))
+	req := httptest.NewRequest(methodPut, registryMissingPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -204,14 +209,13 @@ func TestHandlerDeregister(t *testing.T) {
 	_, mux := setupHandler("")
 
 	// Register
-	body := `{"id":"s1","name":"Test","host":"localhost"}`
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(serverBodyS1))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
 	// Deregister
-	req = httptest.NewRequest("DELETE", registryServerS1Path, nil)
+	req = httptest.NewRequest(methodDelete, registryServerS1Path, nil)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -220,7 +224,7 @@ func TestHandlerDeregister(t *testing.T) {
 	}
 
 	// Verify gone
-	req = httptest.NewRequest("GET", registryServerS1Path, nil)
+	req = httptest.NewRequest(methodGet, registryServerS1Path, nil)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -232,7 +236,7 @@ func TestHandlerDeregister(t *testing.T) {
 func TestHandlerDeregisterNotFound(t *testing.T) {
 	_, mux := setupHandler("")
 
-	req := httptest.NewRequest("DELETE", "/api/v1/registry/servers/missing", nil)
+	req := httptest.NewRequest(methodDelete, registryMissingPath, nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -244,7 +248,7 @@ func TestHandlerDeregisterNotFound(t *testing.T) {
 func TestHandlerHealth(t *testing.T) {
 	_, mux := setupHandler("")
 
-	req := httptest.NewRequest("GET", "/api/v1/registry/health", nil)
+	req := httptest.NewRequest(methodGet, registryHealthPath, nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -265,7 +269,7 @@ func TestHandlerRegisterMissingID(t *testing.T) {
 	_, mux := setupHandler("")
 
 	body := `{"name":"No ID","host":"localhost"}`
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -278,8 +282,8 @@ func TestHandlerRegisterMissingID(t *testing.T) {
 func TestHandlerRegisterWrongContentType(t *testing.T) {
 	_, mux := setupHandler("")
 
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader("not json"))
-	req.Header.Set(contentTypeHeader, "text/plain")
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader("not json"))
+	req.Header.Set(contentTypeHeader, textPlainType)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -292,7 +296,7 @@ func TestHandlerRegisterRejectsConcatenatedJSON(t *testing.T) {
 	_, mux := setupHandler("")
 
 	body := `{"id":"s1","name":"Test","host":"localhost"}{"id":"s2"}`
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -305,7 +309,7 @@ func TestHandlerRegisterRejectsConcatenatedJSON(t *testing.T) {
 func TestHandlerRegisterRejectsUnknownFields(t *testing.T) {
 	_, mux := setupHandler("")
 	body := `{"id":"s1","name":"Test","host":"localhost","unknown":1}`
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -323,14 +327,14 @@ func TestHandlerListHealthyFilter(t *testing.T) {
 		`{"id":"h1","name":"Healthy","host":"a","health":"healthy"}`,
 		`{"id":"h2","name":"Unhealthy","host":"b","health":"degraded"}`,
 	} {
-		req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+		req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(body))
 		req.Header.Set(contentTypeHeader, applicationJSON)
 		rec := httptest.NewRecorder()
 		mux.ServeHTTP(rec, req)
 	}
 
 	// List with healthy=true
-	req := httptest.NewRequest("GET", "/api/v1/registry/servers?healthy=true", nil)
+	req := httptest.NewRequest(methodGet, registryHealthyQuery, nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -348,13 +352,13 @@ func TestHandlerUpdateRejectsConcatenatedJSON(t *testing.T) {
 
 	// Register baseline server.
 	body := `{"id":"s1","name":"Before","host":"localhost"}`
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
 	updateBody := `{"name":"After","host":"remotehost"}{"name":"Extra"}`
-	req = httptest.NewRequest("PUT", registryServerS1Path, strings.NewReader(updateBody))
+	req = httptest.NewRequest(methodPut, registryServerS1Path, strings.NewReader(updateBody))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -367,13 +371,13 @@ func TestHandlerUpdateRejectsConcatenatedJSON(t *testing.T) {
 func TestHandlerUpdateRejectsUnknownFields(t *testing.T) {
 	_, mux := setupHandler("")
 	body := `{"id":"s1","name":"Before","host":"localhost"}`
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
 	updateBody := `{"name":"After","unknown":true}`
-	req = httptest.NewRequest("PUT", registryServerS1Path, strings.NewReader(updateBody))
+	req = httptest.NewRequest(methodPut, registryServerS1Path, strings.NewReader(updateBody))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -388,7 +392,7 @@ func TestHandlerRegisterBodyTooLarge(t *testing.T) {
 	oversized := strings.Repeat("x", 70*1024)
 	body := `{"id":"s1","name":"` + oversized + `","host":"localhost"}`
 
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -402,14 +406,14 @@ func TestHandlerUpdateBodyTooLarge(t *testing.T) {
 	_, mux := setupHandler("")
 	// Register first
 	body := `{"id":"s1","name":"Before","host":"localhost"}`
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(body))
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
 	oversized := strings.Repeat("x", 70*1024)
 	update := `{"name":"` + oversized + `","host":"localhost"}`
-	req = httptest.NewRequest("PUT", registryServerS1Path, strings.NewReader(update))
+	req = httptest.NewRequest(methodPut, registryServerS1Path, strings.NewReader(update))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -424,7 +428,7 @@ func TestHandlerUpdateServerPreservesRequiredFields(t *testing.T) {
 
 	// Register with required baseline fields.
 	registerBody := `{"id":"s1","name":"Before","host":"localhost","tcp_port":8081,"udp_port":8082,"api_endpoint":"http://localhost:8080","health":"healthy"}`
-	req := httptest.NewRequest("POST", registryServersPath, strings.NewReader(registerBody))
+	req := httptest.NewRequest(methodPost, registryServersPath, strings.NewReader(registerBody))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -434,7 +438,7 @@ func TestHandlerUpdateServerPreservesRequiredFields(t *testing.T) {
 
 	// Partial update should not zero omitted fields.
 	updateBody := `{"name":"After"}`
-	req = httptest.NewRequest("PUT", registryServerS1Path, strings.NewReader(updateBody))
+	req = httptest.NewRequest(methodPut, registryServerS1Path, strings.NewReader(updateBody))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
@@ -442,7 +446,7 @@ func TestHandlerUpdateServerPreservesRequiredFields(t *testing.T) {
 		t.Fatalf("update status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
-	req = httptest.NewRequest("GET", registryServerS1Path, nil)
+	req = httptest.NewRequest(methodGet, registryServerS1Path, nil)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {

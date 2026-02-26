@@ -11,12 +11,17 @@ import (
 	"github.com/saveenergy/openbyte/internal/stream"
 )
 
+const (
+	versionEndpoint = "/api/v1/version"
+	serversEndpoint = "/api/v1/servers"
+)
+
 func TestGetVersion(t *testing.T) {
 	mgr := stream.NewManager(10, 10)
 	handler := api.NewHandler(mgr)
 	handler.SetVersion("1.2.3")
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/version", nil)
+	req := httptest.NewRequest(http.MethodGet, versionEndpoint, nil)
 	rec := httptest.NewRecorder()
 	handler.GetVersion(rec, req)
 
@@ -37,7 +42,7 @@ func TestGetVersionDefault(t *testing.T) {
 	mgr := stream.NewManager(10, 10)
 	handler := api.NewHandler(mgr)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/version", nil)
+	req := httptest.NewRequest(http.MethodGet, versionEndpoint, nil)
 	rec := httptest.NewRecorder()
 	handler.GetVersion(rec, req)
 
@@ -55,7 +60,7 @@ func TestGetVersionDrainsUnexpectedBody(t *testing.T) {
 	handler := api.NewHandler(mgr)
 	tb := &trackingBody{data: []byte(`{"unexpected":"payload"}`)}
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/version", nil)
+	req := httptest.NewRequest(http.MethodGet, versionEndpoint, nil)
 	req.Body = tb
 	rec := httptest.NewRecorder()
 	handler.GetVersion(rec, req)
@@ -73,7 +78,7 @@ func TestGetServers(t *testing.T) {
 	cfg.ServerName = "Test Server"
 	handler.SetConfig(cfg)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/servers", nil)
+	req := httptest.NewRequest(http.MethodGet, serversEndpoint, nil)
 	req.Host = "testhost:8080"
 	rec := httptest.NewRecorder()
 	handler.GetServers(rec, req)
@@ -106,7 +111,7 @@ func TestGetServersIgnoresRequestHostWhenProxyUntrusted(t *testing.T) {
 	cfg.TrustProxyHeaders = false
 	handler.SetConfig(cfg)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/servers", nil)
+	req := httptest.NewRequest(http.MethodGet, serversEndpoint, nil)
 	req.Host = "evil.example:9999"
 	req.Header.Set("X-Forwarded-Proto", "https")
 	rec := httptest.NewRecorder()
@@ -133,7 +138,7 @@ func TestGetServersRejectsWrongMethodDrainsBody(t *testing.T) {
 	handler := api.NewHandler(mgr)
 
 	tb := &trackingBody{data: []byte(`{"unexpected":"payload"}`)}
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/servers", nil)
+	req := httptest.NewRequest(http.MethodPost, serversEndpoint, nil)
 	req.Body = tb
 	rec := httptest.NewRecorder()
 

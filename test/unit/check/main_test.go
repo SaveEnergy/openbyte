@@ -6,37 +6,47 @@ import (
 	"github.com/saveenergy/openbyte/cmd/check"
 )
 
+const (
+	testCommandName  = "test"
+	exitCodeFailure  = 1
+	exitCodeUsage    = 2
+	unreachableURL   = "http://127.0.0.1:1"
+	invalidURLArg    = "not-a-valid-url"
+	timeoutZero      = "0"
+	timeoutExcessive = "301"
+)
+
 func TestRunUnreachableServerReturnsFailure(t *testing.T) {
-	exitCode := check.Run([]string{"--json", "--server-url", "http://127.0.0.1:1", "--timeout", "1"}, "test")
-	if exitCode != 1 {
-		t.Fatalf("exit code = %d, want 1", exitCode)
+	exitCode := check.Run([]string{"--json", "--server-url", unreachableURL, "--timeout", "1"}, testCommandName)
+	if exitCode != exitCodeFailure {
+		t.Fatalf("exit code = %d, want %d", exitCode, exitCodeFailure)
 	}
 }
 
 func TestRunInvalidPositionalArgReturnsUsage(t *testing.T) {
-	exitCode := check.Run([]string{"not-a-valid-url"}, "test")
-	if exitCode != 2 {
-		t.Fatalf("exit code = %d, want 2", exitCode)
+	exitCode := check.Run([]string{invalidURLArg}, testCommandName)
+	if exitCode != exitCodeUsage {
+		t.Fatalf("exit code = %d, want %d", exitCode, exitCodeUsage)
 	}
 }
 
 func TestRunRejectsExtraPositionalArgs(t *testing.T) {
-	exitCode := check.Run([]string{"https://example.com", "https://example.org"}, "test")
-	if exitCode != 2 {
-		t.Fatalf("exit code = %d, want 2", exitCode)
+	exitCode := check.Run([]string{"https://example.com", "https://example.org"}, testCommandName)
+	if exitCode != exitCodeUsage {
+		t.Fatalf("exit code = %d, want %d", exitCode, exitCodeUsage)
 	}
 }
 
 func TestRunRejectsNonPositiveTimeout(t *testing.T) {
-	exitCode := check.Run([]string{"--timeout", "0"}, "test")
-	if exitCode != 2 {
-		t.Fatalf("exit code = %d, want 2", exitCode)
+	exitCode := check.Run([]string{"--timeout", timeoutZero}, testCommandName)
+	if exitCode != exitCodeUsage {
+		t.Fatalf("exit code = %d, want %d", exitCode, exitCodeUsage)
 	}
 }
 
 func TestRunRejectsExcessiveTimeout(t *testing.T) {
-	exitCode := check.Run([]string{"--timeout", "301"}, "test")
-	if exitCode != 2 {
-		t.Fatalf("exit code = %d, want 2", exitCode)
+	exitCode := check.Run([]string{"--timeout", timeoutExcessive}, testCommandName)
+	if exitCode != exitCodeUsage {
+		t.Fatalf("exit code = %d, want %d", exitCode, exitCodeUsage)
 	}
 }

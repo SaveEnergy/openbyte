@@ -10,6 +10,12 @@ import (
 	client "github.com/saveenergy/openbyte/cmd/client"
 )
 
+const (
+	testStreamID      = "stream-id"
+	cancelTimeout     = 2 * time.Second
+	maxCancelDuration = 2 * time.Second
+)
+
 func TestCancelStreamUsesDetachedContextWhenParentCanceled(t *testing.T) {
 	called := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +28,7 @@ func TestCancelStreamUsesDetachedContextWhenParentCanceled(t *testing.T) {
 	cancel()
 
 	start := time.Now()
-	err := client.CancelStream(ctx, server.URL, "stream-id", "")
+	err := client.CancelStream(ctx, server.URL, testStreamID, "")
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -31,7 +37,7 @@ func TestCancelStreamUsesDetachedContextWhenParentCanceled(t *testing.T) {
 	if !called {
 		t.Fatal("request should reach server even when parent context is canceled")
 	}
-	if elapsed > 2*time.Second {
+	if elapsed > maxCancelDuration {
 		t.Fatalf("CancelStream took too long: %v", elapsed)
 	}
 }
@@ -46,10 +52,10 @@ func TestCancelStreamSuccess(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), cancelTimeout)
 	defer cancel()
 
-	if err := client.CancelStream(ctx, server.URL, "stream-id", ""); err != nil {
+	if err := client.CancelStream(ctx, server.URL, testStreamID, ""); err != nil {
 		t.Fatalf("CancelStream: %v", err)
 	}
 }
@@ -60,9 +66,9 @@ func TestCancelStreamServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), cancelTimeout)
 	defer cancel()
-	if client.CancelStream(ctx, server.URL, "stream-id", "") == nil {
+	if client.CancelStream(ctx, server.URL, testStreamID, "") == nil {
 		t.Fatal("expected error on non-2xx cancel response")
 	}
 }

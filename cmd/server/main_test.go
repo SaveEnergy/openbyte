@@ -10,16 +10,26 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+const (
+	envServerName       = "Env Name"
+	flagServerName      = "Flag Name"
+	duration120s        = "120s"
+	allowedOriginsValue = "https://a.example.com, https://b.example.com"
+	registryInterval5s  = "5s"
+	loopbackClientIP    = "127.0.0.1"
+	maxDuration2m       = "2m0s"
+)
+
 func TestApplyServerFlagOverrides(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfg.ServerName = "Env Name"
+	cfg.ServerName = envServerName
 	cfg.MaxTestDuration = 5 * time.Minute
 
 	fs, fv := buildServerFlagSet(cfg)
 	if err := fs.Parse([]string{
-		"--server-name=Flag Name",
-		"--max-test-duration=120s",
-		"--allowed-origins=https://a.example.com, https://b.example.com",
+		"--server-name=" + flagServerName,
+		"--max-test-duration=" + duration120s,
+		"--allowed-origins=" + allowedOriginsValue,
 		"--registry-enabled=true",
 	}); err != nil {
 		t.Fatalf("parse flags: %v", err)
@@ -29,11 +39,11 @@ func TestApplyServerFlagOverrides(t *testing.T) {
 		t.Fatalf("apply overrides: %v", err)
 	}
 
-	if cfg.ServerName != "Flag Name" {
-		t.Fatalf("server name = %q, want %q", cfg.ServerName, "Flag Name")
+	if cfg.ServerName != flagServerName {
+		t.Fatalf("server name = %q, want %q", cfg.ServerName, flagServerName)
 	}
-	if cfg.MaxTestDuration.String() != "2m0s" {
-		t.Fatalf("max test duration = %s, want 2m0s", cfg.MaxTestDuration)
+	if cfg.MaxTestDuration.String() != maxDuration2m {
+		t.Fatalf("max test duration = %s, want %s", cfg.MaxTestDuration, maxDuration2m)
 	}
 	if len(cfg.AllowedOrigins) != 2 || cfg.AllowedOrigins[0] != "https://a.example.com" || cfg.AllowedOrigins[1] != "https://b.example.com" {
 		t.Fatalf("allowed origins = %#v, want two trimmed entries", cfg.AllowedOrigins)
@@ -62,7 +72,7 @@ func TestApplyServerFlagOverridesFailsFastOnInvalidDuration(t *testing.T) {
 	fs, fv := buildServerFlagSet(cfg)
 	if err := fs.Parse([]string{
 		"--max-test-duration=not-a-duration",
-		"--registry-interval=5s",
+		"--registry-interval=" + registryInterval5s,
 	}); err != nil {
 		t.Fatalf("parse flags: %v", err)
 	}
@@ -93,7 +103,7 @@ func TestRunShutdownBroadcastDrain(t *testing.T) {
 		Streams:    1,
 		PacketSize: 1400,
 		StartTime:  time.Now(),
-		ClientIP:   "127.0.0.1",
+		ClientIP:   loopbackClientIP,
 	})
 	if err != nil {
 		t.Fatalf("create stream: %v", err)

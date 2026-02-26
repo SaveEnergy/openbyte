@@ -69,9 +69,8 @@
 
   function detectPlatform() {
     const ua = navigator.userAgent || "";
-    // navigator.userAgentData is preferred (navigator.platform is deprecated)
-    const platform =
-      navigator.userAgentData?.platform || navigator.platform || "";
+    // Prefer UA-CH platform; fallback relies on UA sniffing below.
+    const platform = navigator.userAgentData?.platform || "";
     if (isMac(platform, ua)) {
       return { os: "macos", arch: detectMacArch(platform, ua) };
     }
@@ -196,7 +195,7 @@
 
       plat.suffixes.forEach(function (suffix) {
         const asset = findAsset(assets, suffix);
-        if (!asset || !asset.browser_download_url) return;
+        if (!asset?.browser_download_url) return;
         found = true;
         const info = archLabels[suffix] || { arch: suffix, short: suffix };
 
@@ -381,6 +380,13 @@
     onFailure();
   }
 
+  function setTemporaryButtonText(btn, text) {
+    btn.textContent = text;
+    setTimeout(function () {
+      btn.textContent = "Copy";
+    }, 1500);
+  }
+
   // Setup copy buttons
   function setupCopy(btnId, getTextFn) {
     const btn = document.getElementById(btnId);
@@ -390,16 +396,10 @@
       copyText(
         text,
         function () {
-          btn.textContent = "Copied!";
-          setTimeout(function () {
-            btn.textContent = "Copy";
-          }, 1500);
+          setTemporaryButtonText(btn, "Copied!");
         },
         function () {
-          btn.textContent = "Failed";
-          setTimeout(function () {
-            btn.textContent = "Copy";
-          }, 1500);
+          setTemporaryButtonText(btn, "Failed");
         },
       );
     });

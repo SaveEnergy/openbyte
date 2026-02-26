@@ -11,9 +11,13 @@ import (
 )
 
 const (
-	loopbackIP  = "127.0.0.1"
-	ipPrimary   = "10.0.0.1"
-	ipSecondary = "10.0.0.2"
+	loopbackIP      = "127.0.0.1"
+	ipPrimary       = "10.0.0.1"
+	ipSecondary     = "10.0.0.2"
+	cleanupTestIP   = "10.0.0.99"
+	thirdUniqueIP   = "10.0.0.3"
+	ipPrefixPrimary = "10.0.0.%d"
+	ipPrefixWorkers = "10.0.%d.%d"
 )
 
 func waitUntilAllowed(t *testing.T, timeout time.Duration, allow func() bool, msg string) {
@@ -110,17 +114,17 @@ func TestRateLimiterCleanupRemovesExpired(t *testing.T) {
 	rl.SetCleanupPolicy(10*time.Millisecond, 50*time.Millisecond)
 
 	// Create entry
-	rl.Allow("10.0.0.99")
+	rl.Allow(cleanupTestIP)
 
 	// Wait past TTL + cleanup interval
 	time.Sleep(100 * time.Millisecond)
 
 	// Trigger cleanup by calling Allow (different IP)
-	rl.Allow("10.0.0.1")
+	rl.Allow(ipPrimary)
 
 	// Original IP should have full bucket (entry cleaned, fresh on next access)
 	for i := range cfg.RateLimitPerIP {
-		if !rl.Allow("10.0.0.99") {
+		if !rl.Allow(cleanupTestIP) {
 			t.Fatalf("token %d not allowed after cleanup", i)
 		}
 	}
@@ -138,7 +142,7 @@ func TestRateLimiterConcurrentAccess(t *testing.T) {
 			for range 100 {
 				rl.Allow(ip)
 			}
-		}(fmt.Sprintf("10.0.0.%d", i))
+		}(fmt.Sprintf(ipPrefixPrimary, i))
 	}
 	wg.Wait()
 	// No panic or race detected = pass (run with -race)
@@ -164,7 +168,7 @@ func TestRateLimiterCleanupConcurrentAllowStress(t *testing.T) {
 				case <-stop:
 					return
 				default:
-					ip := fmt.Sprintf("10.0.%d.%d", worker, n%64)
+					ip := fmt.Sprintf(ipPrefixWorkers, worker, n%64)
 					rl.Allow(ip)
 					n++
 				}
@@ -184,13 +188,13 @@ func TestRateLimiterBoundedIPCardinality(t *testing.T) {
 	rl := api.NewRateLimiter(cfg)
 	rl.SetMaxIPEntries(2)
 
-	if !rl.Allow("10.0.0.1") {
+	if !rl.Allow(ipPrimary) {
 		t.Fatal("first IP should be allowed")
 	}
-	if !rl.Allow("10.0.0.2") {
+	if !rl.Allow(ipSecondary) {
 		t.Fatal("second IP should be allowed")
 	}
-	if rl.Allow("10.0.0.3") {
+	if rl.Allow(thirdUniqueIP) {
 		t.Fatal("third unique IP should be rejected once map is full")
 	}
 }

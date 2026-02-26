@@ -30,6 +30,24 @@ const (
 	cacheNoStore        = "no-store"
 	statusCodeWantFmt   = "status = %d, want %d"
 	cacheControlWantFmt = "cache-control = %q, want %q"
+	plainTextType       = "text/plain"
+	abcResultID         = "abc12345"
+	invalidResultID     = "bad-id"
+	missingResultID     = "missing1"
+	saveErrorMsg        = "failed to save result"
+	internalErrorMsg    = "internal error"
+	bodyTooLargeMsg     = "request body too large"
+	sampleResultPayload = `{
+		"download_mbps": 100,
+		"upload_mbps": 50,
+		"latency_ms": 10,
+		"jitter_ms": 1,
+		"loaded_latency_ms": 12,
+		"bufferbloat_grade": "A",
+		"ipv4": "203.0.113.10",
+		"ipv6": "",
+		"server_name": "test"
+	}`
 )
 
 func (fw *failingResponseWriter) Header() http.Header {
@@ -86,17 +104,7 @@ func TestSaveReturnsInternalErrorWhenStoreFails(t *testing.T) {
 
 	h := results.NewHandler(store)
 
-	body := `{
-		"download_mbps": 100,
-		"upload_mbps": 50,
-		"latency_ms": 10,
-		"jitter_ms": 1,
-		"loaded_latency_ms": 12,
-		"bufferbloat_grade": "A",
-		"ipv4": "203.0.113.10",
-		"ipv6": "",
-		"server_name": "test"
-	}`
+	body := sampleResultPayload
 
 	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
@@ -112,8 +120,8 @@ func TestSaveReturnsInternalErrorWhenStoreFails(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if got := resp["error"]; got != "failed to save result" {
-		t.Fatalf("error = %q, want %q", got, "failed to save result")
+	if got := resp["error"]; got != saveErrorMsg {
+		t.Fatalf("error = %q, want %q", got, saveErrorMsg)
 	}
 
 	_ = os.Remove(dbPath)
@@ -168,8 +176,8 @@ func TestGetReturnsNotFoundForMissingResult(t *testing.T) {
 	defer store.Close()
 
 	h := results.NewHandler(store)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/results/abc12345", nil)
-	req.SetPathValue("id", "abc12345")
+	req := httptest.NewRequest(http.MethodGet, resultsPath+"/"+abcResultID, nil)
+	req.SetPathValue("id", abcResultID)
 	rec := httptest.NewRecorder()
 	h.Get(rec, req)
 
@@ -189,8 +197,8 @@ func TestGetRejectsInvalidResultID(t *testing.T) {
 	defer store.Close()
 
 	h := results.NewHandler(store)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/results/bad-id", nil)
-	req.SetPathValue("id", "bad-id")
+	req := httptest.NewRequest(http.MethodGet, resultsPath+"/"+invalidResultID, nil)
+	req.SetPathValue("id", invalidResultID)
 	rec := httptest.NewRecorder()
 	h.Get(rec, req)
 
@@ -210,17 +218,7 @@ func TestSaveSucceedsReturns201WithIDAndURL(t *testing.T) {
 	defer store.Close()
 
 	h := results.NewHandler(store)
-	body := `{
-		"download_mbps": 100,
-		"upload_mbps": 50,
-		"latency_ms": 10,
-		"jitter_ms": 1,
-		"loaded_latency_ms": 12,
-		"bufferbloat_grade": "A",
-		"ipv4": "203.0.113.10",
-		"ipv6": "",
-		"server_name": "test"
-	}`
+	body := sampleResultPayload
 	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
@@ -259,7 +257,7 @@ func TestHandlerSaveRejectsWrongContentTypeDrainsBody(t *testing.T) {
 	tb := &trackingBody{data: []byte(`{"download_mbps":1}`)}
 	req := httptest.NewRequest(http.MethodPost, resultsPath, nil)
 	req.Body = tb
-	req.Header.Set(contentTypeHeader, "text/plain")
+	req.Header.Set(contentTypeHeader, plainTextType)
 	rec := httptest.NewRecorder()
 
 	h.Save(rec, req)
@@ -286,8 +284,8 @@ func TestGetReturnsInternalErrorWhenStoreFails(t *testing.T) {
 	store.Close()
 
 	h := results.NewHandler(store)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/results/abc12345", nil)
-	req.SetPathValue("id", "abc12345")
+	req := httptest.NewRequest(http.MethodGet, resultsPath+"/"+abcResultID, nil)
+	req.SetPathValue("id", abcResultID)
 	rec := httptest.NewRecorder()
 	h.Get(rec, req)
 
@@ -298,8 +296,8 @@ func TestGetReturnsInternalErrorWhenStoreFails(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if got := resp["error"]; got != "internal error" {
-		t.Fatalf("error = %q, want %q", got, "internal error")
+	if got := resp["error"]; got != internalErrorMsg {
+		t.Fatalf("error = %q, want %q", got, internalErrorMsg)
 	}
 }
 
@@ -313,17 +311,7 @@ func TestSaveWithWriteFailureStillSetsCreatedStatus(t *testing.T) {
 	defer store.Close()
 
 	h := results.NewHandler(store)
-	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(`{
-		"download_mbps": 100,
-		"upload_mbps": 50,
-		"latency_ms": 10,
-		"jitter_ms": 1,
-		"loaded_latency_ms": 12,
-		"bufferbloat_grade": "A",
-		"ipv4": "203.0.113.10",
-		"ipv6": "",
-		"server_name": "test"
-	}`))
+	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(sampleResultPayload))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	fw := &failingResponseWriter{}
 
@@ -362,8 +350,8 @@ func TestHandlerSaveBodyTooLarge(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if got := resp["error"]; got != "request body too large" {
-		t.Fatalf("error = %q, want %q", got, "request body too large")
+	if got := resp["error"]; got != bodyTooLargeMsg {
+		t.Fatalf("error = %q, want %q", got, bodyTooLargeMsg)
 	}
 }
 
@@ -414,17 +402,7 @@ func TestResultsResponsesSetNoStore(t *testing.T) {
 
 	h := results.NewHandler(store)
 
-	saveReq := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(`{
-		"download_mbps": 100,
-		"upload_mbps": 50,
-		"latency_ms": 10,
-		"jitter_ms": 1,
-		"loaded_latency_ms": 12,
-		"bufferbloat_grade": "A",
-		"ipv4": "203.0.113.10",
-		"ipv6": "",
-		"server_name": "test"
-	}`))
+	saveReq := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(sampleResultPayload))
 	saveReq.Header.Set(contentTypeHeader, applicationJSON)
 	saveRec := httptest.NewRecorder()
 	h.Save(saveRec, saveReq)
@@ -432,8 +410,8 @@ func TestResultsResponsesSetNoStore(t *testing.T) {
 		t.Fatalf("save cache-control = %q, want %q", saveRec.Header().Get(cacheControlHeader), cacheNoStore)
 	}
 
-	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/results/missing1", nil)
-	getReq.SetPathValue("id", "missing1")
+	getReq := httptest.NewRequest(http.MethodGet, resultsPath+"/"+missingResultID, nil)
+	getReq.SetPathValue("id", missingResultID)
 	getRec := httptest.NewRecorder()
 	h.Get(getRec, getReq)
 	if getRec.Header().Get(cacheControlHeader) != cacheNoStore {

@@ -2,6 +2,7 @@ package api
 
 import (
 	"bufio"
+	"compress/gzip"
 	"fmt"
 	"net"
 	"net/http"
@@ -80,13 +81,13 @@ func (r *Router) SetRuntimeMetricsHandler(handler http.HandlerFunc) {
 	r.runtimeMetrics = handler
 }
 
-// RouteRegistrar allows external packages to register routes on the
+// RoutesRegistrar allows external packages to register routes on the
 // ServeMux before middleware wrapping, without importing gorilla/mux.
-type RouteRegistrar interface {
+type RoutesRegistrar interface {
 	RegisterRoutes(mux *http.ServeMux)
 }
 
-func (r *Router) SetupRoutes(registrars ...RouteRegistrar) http.Handler {
+func (r *Router) SetupRoutes(registrars ...RoutesRegistrar) http.Handler {
 	mux := http.NewServeMux()
 	webFS := r.resolveWebFS()
 	v1 := r.newV1Registrar(mux)
@@ -105,7 +106,9 @@ func (r *Router) SetupRoutes(registrars ...RouteRegistrar) http.Handler {
 
 	r.registerResultsPageRoute(mux, webFS)
 
-	mux.Handle("/", staticCacheMiddleware(newStaticAllowlistHandler(webFS)))
+	staticHandler := staticCacheMiddleware(newStaticAllowlistHandler(webFS))
+	mux.Handle("/", gzipMiddleware(staticHandler))
+
 
 	// Let external registrars add routes before middleware wrapping
 	for _, reg := range registrars {
@@ -232,10 +235,24 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 		"results.html":  true,
 		"skill.html":    true,
 		"openbyte.js":   true,
+		"state.js":      true,
+		"utils.js":      true,
+		"network.js":    true,
+		"speedtest.js":     true,
+		"speedtest-http.js": true,
+		"speedtest-latency.js": true,
+		"settings.js":   true,
+		"ui.js":         true,
 		"download.js":   true,
 		"results.js":    true,
 		"skill.js":      true,
 		"style.css":     true,
+		"base.css":      true,
+		"download.css":  true,
+		"speed.css":     true,
+		"modal.css":     true,
+		"skill.css":     true,
+		"motion.css":    true,
 		"favicon.svg":   true,
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -480,6 +497,39 @@ func staticCacheMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// gzipMiddleware compresses static responses when client accepts gzip.
+// Skips compression for small responses (<512 bytes) to avoid overhead.
+func gzipMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		gzW := gzip.NewWriter(w)
+		defer gzW.Close()
+		w.Header().Set("Content-Encoding", "gzip")
+		next.ServeHTTP(&gzipResponseWriter{ResponseWriter: w, Writer: gzW}, r)
+	})
+}
+
+type gzipResponseWriter struct {
+	http.ResponseWriter
+	Writer *gzip.Writer
+}
+
+func (g *gzipResponseWriter) Write(b []byte) (int, error) {
+	return g.Writer.Write(b)
+}
+
+func (g *gzipResponseWriter) WriteHeader(code int) {
+	g.Header().Del("Content-Length")
+	g.ResponseWriter.WriteHeader(code)
 }
 
 // resolveWebFS returns the web file system to use for static assets.

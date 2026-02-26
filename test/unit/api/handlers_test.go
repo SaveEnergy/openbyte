@@ -24,17 +24,54 @@ const (
 	cancelSuffix     = "/cancel"
 	resultsSuffix    = "/results"
 
-	contentTypeHeader = "Content-Type"
-	applicationJSON   = "application/json"
-	textPlain         = "text/plain"
-	statusCodeWantFmt = "status = %d, want %d"
+	contentTypeHeader              = "Content-Type"
+	applicationJSON                = "application/json"
+	textPlain                      = "text/plain"
+	marshalPayloadErr              = "marshal payload: %v"
+	statusCodeWantFmt              = "status = %d, want %d"
+	handlersProtocolKey            = "protocol"
+	handlersDirectionKey           = "direction"
+	handlersDurationKey            = "duration"
+	handlersStreamsKey             = "streams"
+	handlersProtocolTCP            = "tcp"
+	handlersDirDownload            = "download"
+	handlersStreamIDKey            = "stream_id"
+	handlersModeKey                = "mode"
+	handlersPacketSizeKey          = "packet_size"
+	handlersInvalidValue           = "invalid"
+	handlersSidewaysValue          = "sideways"
+	handlersClientMode             = "client"
+	handlersPaddingKey             = "padding"
+	handlersUnknownFieldJSON       = `{"protocol":"tcp","direction":"download","duration":10,"streams":1,"unknown":1}`
+	handlersExpectedBodyDrainedErr = "expected request body to be drained"
+	handlersExpectedBodyClosedErr  = "expected request body to be closed"
+	handlersTestServerTCPKey       = "test_server_tcp"
+	handlersTestServerUDPKey       = "test_server_udp"
+	handlersTestServerTCPAddr      = "127.0.0.1:8081"
+	handlersTestServerUDPAddr      = "127.0.0.1:8082"
+	handlersCreateStreamStatusFmt  = "createTestStream: status = %d, body: %s"
+	handlersDecodeStartStreamFmt   = "decode start stream response: %v"
+	handlersStreamIDInvalidFmt     = "stream_id missing or invalid: %#v"
+	handlersDurationWithinMaxFmt   = "duration within max: status = %d, want %d"
+	handlersDurationBeyondMaxFmt   = "duration beyond max: status = %d, want %d"
+	handlersMaxStreams32Fmt        = "32 streams with MaxStreams=32: status = %d, want %d; body: %s"
+	handlersMaxStreams33Fmt        = "33 streams with MaxStreams=32: status = %d, want %d"
+	handlersInvalidProtocolFmt     = "invalid protocol: status = %d, want %d"
+	handlersInvalidDirectionFmt    = "invalid direction: status = %d, want %d"
+	handlersInvalidModeFmt         = "invalid mode: status = %d, want %d"
+	handlersSmallPacketFmt         = "small packet: status = %d, want %d"
+	handlersFirstStreamStatusFmt   = "first stream status = %d, want %d"
+	handlersSecondStreamStatusFmt  = "second stream status = %d, want %d; body: %s"
+	handlersDecodeResponseFmt      = "decode response: %v"
+	handlersTestServerTCPFmt       = "test_server_tcp = %#v, want %q"
+	handlersTestServerUDPFmt       = "test_server_udp = %#v, want %q"
 )
 
 func mustMarshalJSON(t *testing.T, v any) []byte {
 	t.Helper()
 	body, err := json.Marshal(v)
 	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
+		t.Fatalf(marshalPayloadErr, err)
 	}
 	return body
 }
@@ -64,10 +101,10 @@ func (tb *trackingBody) Close() error {
 func assertTrackingBodyDrained(t *testing.T, tb *trackingBody) {
 	t.Helper()
 	if tb.reads == 0 {
-		t.Fatalf("expected request body to be drained")
+		t.Fatalf(handlersExpectedBodyDrainedErr)
 	}
 	if !tb.closed {
-		t.Fatalf("expected request body to be closed")
+		t.Fatalf(handlersExpectedBodyClosedErr)
 	}
 }
 
@@ -75,8 +112,8 @@ func assertTrackingBodyDrained(t *testing.T, tb *trackingBody) {
 func createTestStream(t *testing.T, handler *api.Handler) string {
 	t.Helper()
 	payload := map[string]any{
-		"protocol": "tcp", "direction": "download",
-		"duration": 10, "streams": 1,
+		handlersProtocolKey: handlersProtocolTCP, handlersDirectionKey: handlersDirDownload,
+		handlersDurationKey: 10, handlersStreamsKey: 1,
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
@@ -84,15 +121,15 @@ func createTestStream(t *testing.T, handler *api.Handler) string {
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
 	if rec.Code != http.StatusCreated {
-		t.Fatalf("createTestStream: status = %d, body: %s", rec.Code, rec.Body.String())
+		t.Fatalf(handlersCreateStreamStatusFmt, rec.Code, rec.Body.String())
 	}
 	var resp map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode start stream response: %v", err)
+		t.Fatalf(handlersDecodeStartStreamFmt, err)
 	}
-	streamID, ok := resp["stream_id"].(string)
+	streamID, ok := resp[handlersStreamIDKey].(string)
 	if !ok || streamID == "" {
-		t.Fatalf("stream_id missing or invalid: %#v", resp["stream_id"])
+		t.Fatalf(handlersStreamIDInvalidFmt, resp[handlersStreamIDKey])
 	}
 	return streamID
 }
@@ -102,15 +139,15 @@ func TestStartStreamRejectsLargeBody(t *testing.T) {
 	handler := api.NewHandler(manager)
 
 	payload := map[string]any{
-		"protocol":  "tcp",
-		"direction": "download",
-		"duration":  10,
-		"streams":   1,
-		"padding":   strings.Repeat("a", (1<<20)+256),
+		handlersProtocolKey:  handlersProtocolTCP,
+		handlersDirectionKey: handlersDirDownload,
+		handlersDurationKey:  10,
+		handlersStreamsKey:   1,
+		handlersPaddingKey:   strings.Repeat("a", (1<<20)+256),
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
+		t.Fatalf(marshalPayloadErr, err)
 	}
 
 	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
@@ -129,8 +166,8 @@ func TestStartStreamRejectsWrongContentType(t *testing.T) {
 	handler := api.NewHandler(manager)
 
 	payload := map[string]any{
-		"protocol": "tcp", "direction": "download",
-		"duration": 10, "streams": 1,
+		handlersProtocolKey: handlersProtocolTCP, handlersDirectionKey: handlersDirDownload,
+		handlersDurationKey: 10, handlersStreamsKey: 1,
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
@@ -149,8 +186,8 @@ func TestStartStreamRequiresContentType(t *testing.T) {
 	handler := api.NewHandler(manager)
 
 	payload := map[string]any{
-		"protocol": "tcp", "direction": "download",
-		"duration": 10, "streams": 1,
+		handlersProtocolKey: handlersProtocolTCP, handlersDirectionKey: handlersDirDownload,
+		handlersDurationKey: 10, handlersStreamsKey: 1,
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
@@ -167,7 +204,7 @@ func TestStartStreamRejectsUnknownFields(t *testing.T) {
 	manager := stream.NewManager(10, 10)
 	handler := api.NewHandler(manager)
 
-	req := httptest.NewRequest(http.MethodPost, streamStartPath, strings.NewReader(`{"protocol":"tcp","direction":"download","duration":10,"streams":1,"unknown":1}`))
+	req := httptest.NewRequest(http.MethodPost, streamStartPath, strings.NewReader(handlersUnknownFieldJSON))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
@@ -183,10 +220,10 @@ func TestStartStreamRejectsWrongContentTypeDrainsBody(t *testing.T) {
 
 	tb := &trackingBody{
 		data: mustMarshalJSON(t, map[string]any{
-			"protocol":  "tcp",
-			"direction": "download",
-			"duration":  10,
-			"streams":   1,
+			handlersProtocolKey:  handlersProtocolTCP,
+			handlersDirectionKey: handlersDirDownload,
+			handlersDurationKey:  10,
+			handlersStreamsKey:   1,
 		}),
 	}
 	req := httptest.NewRequest(http.MethodPost, streamStartPath, nil)
@@ -200,10 +237,10 @@ func TestStartStreamRejectsWrongContentTypeDrainsBody(t *testing.T) {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusUnsupportedMediaType)
 	}
 	if tb.reads == 0 {
-		t.Fatalf("expected request body to be drained")
+		t.Fatalf(handlersExpectedBodyDrainedErr)
 	}
 	if !tb.closed {
-		t.Fatalf("expected request body to be closed")
+		t.Fatalf(handlersExpectedBodyClosedErr)
 	}
 }
 
@@ -217,10 +254,10 @@ func TestStartStreamRespectsMaxTestDuration(t *testing.T) {
 
 	// Duration within the configured max should succeed
 	payload := map[string]any{
-		"protocol":  "tcp",
-		"direction": "download",
-		"duration":  50,
-		"streams":   1,
+		handlersProtocolKey:  handlersProtocolTCP,
+		handlersDirectionKey: handlersDirDownload,
+		handlersDurationKey:  50,
+		handlersStreamsKey:   1,
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
@@ -229,11 +266,11 @@ func TestStartStreamRespectsMaxTestDuration(t *testing.T) {
 	handler.StartStream(rec, req)
 
 	if rec.Code != http.StatusCreated {
-		t.Fatalf("duration within max: status = %d, want %d", rec.Code, http.StatusCreated)
+		t.Fatalf(handlersDurationWithinMaxFmt, rec.Code, http.StatusCreated)
 	}
 
 	// Duration exceeding the configured max should be rejected
-	payload["duration"] = 120
+	payload[handlersDurationKey] = 120
 	body = mustMarshalJSON(t, payload)
 	req = httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
@@ -241,7 +278,7 @@ func TestStartStreamRespectsMaxTestDuration(t *testing.T) {
 	handler.StartStream(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("duration beyond max: status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf(handlersDurationBeyondMaxFmt, rec.Code, http.StatusBadRequest)
 	}
 }
 
@@ -257,10 +294,10 @@ func TestStartStreamRespectsMaxStreams(t *testing.T) {
 
 	// 32 streams should succeed
 	payload := map[string]any{
-		"protocol":  "tcp",
-		"direction": "download",
-		"duration":  10,
-		"streams":   32,
+		handlersProtocolKey:  handlersProtocolTCP,
+		handlersDirectionKey: handlersDirDownload,
+		handlersDurationKey:  10,
+		handlersStreamsKey:   32,
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
@@ -269,11 +306,11 @@ func TestStartStreamRespectsMaxStreams(t *testing.T) {
 	handler.StartStream(rec, req)
 
 	if rec.Code != http.StatusCreated {
-		t.Fatalf("32 streams with MaxStreams=32: status = %d, want %d; body: %s", rec.Code, http.StatusCreated, rec.Body.String())
+		t.Fatalf(handlersMaxStreams32Fmt, rec.Code, http.StatusCreated, rec.Body.String())
 	}
 
 	// 33 streams should be rejected
-	payload["streams"] = 33
+	payload[handlersStreamsKey] = 33
 	body = mustMarshalJSON(t, payload)
 	req = httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
@@ -281,7 +318,7 @@ func TestStartStreamRespectsMaxStreams(t *testing.T) {
 	handler.StartStream(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("33 streams with MaxStreams=32: status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf(handlersMaxStreams33Fmt, rec.Code, http.StatusBadRequest)
 	}
 }
 
@@ -290,8 +327,8 @@ func TestStartStreamInvalidProtocol(t *testing.T) {
 	handler := api.NewHandler(mgr)
 
 	payload := map[string]any{
-		"protocol": "invalid", "direction": "download",
-		"duration": 10, "streams": 1,
+		handlersProtocolKey: "invalid", handlersDirectionKey: handlersDirDownload,
+		handlersDurationKey: 10, handlersStreamsKey: 1,
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
@@ -300,7 +337,7 @@ func TestStartStreamInvalidProtocol(t *testing.T) {
 	handler.StartStream(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("invalid protocol: status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf(handlersInvalidProtocolFmt, rec.Code, http.StatusBadRequest)
 	}
 }
 
@@ -309,8 +346,8 @@ func TestStartStreamInvalidDirection(t *testing.T) {
 	handler := api.NewHandler(mgr)
 
 	payload := map[string]any{
-		"protocol": "tcp", "direction": "sideways",
-		"duration": 10, "streams": 1,
+		handlersProtocolKey: handlersProtocolTCP, handlersDirectionKey: handlersSidewaysValue,
+		handlersDurationKey: 10, handlersStreamsKey: 1,
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
@@ -319,7 +356,7 @@ func TestStartStreamInvalidDirection(t *testing.T) {
 	handler.StartStream(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("invalid direction: status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf(handlersInvalidDirectionFmt, rec.Code, http.StatusBadRequest)
 	}
 }
 
@@ -328,8 +365,8 @@ func TestStartStreamInvalidMode(t *testing.T) {
 	handler := api.NewHandler(mgr)
 
 	payload := map[string]any{
-		"protocol": "tcp", "direction": "download",
-		"duration": 10, "streams": 1, "mode": "invalid",
+		handlersProtocolKey: handlersProtocolTCP, handlersDirectionKey: handlersDirDownload,
+		handlersDurationKey: 10, handlersStreamsKey: 1, handlersModeKey: handlersInvalidValue,
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
@@ -338,7 +375,7 @@ func TestStartStreamInvalidMode(t *testing.T) {
 	handler.StartStream(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("invalid mode: status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf(handlersInvalidModeFmt, rec.Code, http.StatusBadRequest)
 	}
 }
 
@@ -347,8 +384,8 @@ func TestStartStreamInvalidPacketSize(t *testing.T) {
 	handler := api.NewHandler(mgr)
 
 	payload := map[string]any{
-		"protocol": "tcp", "direction": "download",
-		"duration": 10, "streams": 1, "packet_size": 10,
+		handlersProtocolKey: handlersProtocolTCP, handlersDirectionKey: handlersDirDownload,
+		handlersDurationKey: 10, handlersStreamsKey: 1, handlersPacketSizeKey: 10,
 	}
 	body := mustMarshalJSON(t, payload)
 	req := httptest.NewRequest(http.MethodPost, streamStartPath, bytes.NewReader(body))
@@ -357,7 +394,7 @@ func TestStartStreamInvalidPacketSize(t *testing.T) {
 	handler.StartStream(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("small packet: status = %d, want %d", rec.Code, http.StatusBadRequest)
+		t.Fatalf(handlersSmallPacketFmt, rec.Code, http.StatusBadRequest)
 	}
 }
 
@@ -369,10 +406,10 @@ func TestStartStreamReturnsServiceUnavailableWhenAtCapacity(t *testing.T) {
 	handler := api.NewHandler(mgr)
 
 	payload := map[string]any{
-		"protocol":  "tcp",
-		"direction": "download",
-		"duration":  10,
-		"streams":   1,
+		handlersProtocolKey:  handlersProtocolTCP,
+		handlersDirectionKey: handlersDirDownload,
+		handlersDurationKey:  10,
+		handlersStreamsKey:   1,
 	}
 
 	body := mustMarshalJSON(t, payload)
@@ -381,7 +418,7 @@ func TestStartStreamReturnsServiceUnavailableWhenAtCapacity(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.StartStream(rec, req)
 	if rec.Code != http.StatusCreated {
-		t.Fatalf("first stream status = %d, want %d", rec.Code, http.StatusCreated)
+		t.Fatalf(handlersFirstStreamStatusFmt, rec.Code, http.StatusCreated)
 	}
 
 	body = mustMarshalJSON(t, payload)
@@ -390,7 +427,7 @@ func TestStartStreamReturnsServiceUnavailableWhenAtCapacity(t *testing.T) {
 	rec = httptest.NewRecorder()
 	handler.StartStream(rec, req)
 	if rec.Code != http.StatusServiceUnavailable {
-		t.Fatalf("second stream status = %d, want %d; body: %s", rec.Code, http.StatusServiceUnavailable, rec.Body.String())
+		t.Fatalf(handlersSecondStreamStatusFmt, rec.Code, http.StatusServiceUnavailable, rec.Body.String())
 	}
 }
 
@@ -408,11 +445,11 @@ func TestStartStreamClientModeIgnoresRequestHostWhenProxyUntrusted(t *testing.T)
 	handler.SetConfig(cfg)
 
 	payload := map[string]any{
-		"protocol":  "tcp",
-		"direction": "download",
-		"duration":  10,
-		"streams":   1,
-		"mode":      "client",
+		handlersProtocolKey:  handlersProtocolTCP,
+		handlersDirectionKey: handlersDirDownload,
+		handlersDurationKey:  10,
+		handlersStreamsKey:   1,
+		handlersModeKey:      handlersClientMode,
 	}
 
 	body := mustMarshalJSON(t, payload)
@@ -428,12 +465,12 @@ func TestStartStreamClientModeIgnoresRequestHostWhenProxyUntrusted(t *testing.T)
 
 	var resp map[string]any
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
+		t.Fatalf(handlersDecodeResponseFmt, err)
 	}
-	if got, ok := resp["test_server_tcp"].(string); !ok || got != "127.0.0.1:8081" {
-		t.Fatalf("test_server_tcp = %#v, want %q", resp["test_server_tcp"], "127.0.0.1:8081")
+	if got, ok := resp[handlersTestServerTCPKey].(string); !ok || got != handlersTestServerTCPAddr {
+		t.Fatalf(handlersTestServerTCPFmt, resp[handlersTestServerTCPKey], handlersTestServerTCPAddr)
 	}
-	if got, ok := resp["test_server_udp"].(string); !ok || got != "127.0.0.1:8082" {
-		t.Fatalf("test_server_udp = %#v, want %q", resp["test_server_udp"], "127.0.0.1:8082")
+	if got, ok := resp[handlersTestServerUDPKey].(string); !ok || got != handlersTestServerUDPAddr {
+		t.Fatalf(handlersTestServerUDPFmt, resp[handlersTestServerUDPKey], handlersTestServerUDPAddr)
 	}
 }

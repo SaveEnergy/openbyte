@@ -8,6 +8,13 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+const (
+	emptySamplesName  = "empty samples"
+	singleSampleName  = "single sample"
+	zeroFloat64       = 0.0
+	singleSampleCount = 1
+)
+
 func TestCalculateLatency(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -16,12 +23,12 @@ func TestCalculateLatency(t *testing.T) {
 		wantZero bool
 	}{
 		{
-			name:     "empty samples",
+			name:     emptySamplesName,
 			samples:  []time.Duration{},
 			wantZero: true,
 		},
 		{
-			name:    "single sample",
+			name:    singleSampleName,
 			samples: []time.Duration{10 * time.Millisecond},
 			want: types.LatencyMetrics{
 				MinMs: 10.0,
@@ -30,7 +37,7 @@ func TestCalculateLatency(t *testing.T) {
 				P50Ms: 10.0,
 				P95Ms: 10.0,
 				P99Ms: 10.0,
-				Count: 1,
+				Count: singleSampleCount,
 			},
 		},
 		{
@@ -86,14 +93,14 @@ func TestCalculateJitter(t *testing.T) {
 		want    float64
 	}{
 		{
-			name:    "empty samples",
+			name:    emptySamplesName,
 			samples: []time.Duration{},
-			want:    0.0,
+			want:    zeroFloat64,
 		},
 		{
-			name:    "single sample",
+			name:    singleSampleName,
 			samples: []time.Duration{10 * time.Millisecond},
-			want:    0.0,
+			want:    zeroFloat64,
 		},
 		{
 			name: "constant delay",
@@ -102,7 +109,7 @@ func TestCalculateJitter(t *testing.T) {
 				10 * time.Millisecond,
 				10 * time.Millisecond,
 			},
-			want: 0.0,
+			want: zeroFloat64,
 		},
 		{
 			name: "varying delay",
@@ -118,12 +125,12 @@ func TestCalculateJitter(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := metrics.CalculateJitter(tt.samples)
-			if tt.name == "empty samples" || tt.name == "single sample" {
+			if tt.name == emptySamplesName || tt.name == singleSampleName {
 				if got != tt.want {
 					t.Errorf("calculateJitter() = %v, want %v", got, tt.want)
 				}
 			} else {
-				if tt.want == 0.0 && got != 0.0 {
+				if tt.want == zeroFloat64 && got != zeroFloat64 {
 					t.Errorf("calculateJitter() = %v, want %v", got, tt.want)
 				}
 			}

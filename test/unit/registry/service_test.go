@@ -9,6 +9,16 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+const (
+	serverIDPrimary   = "s1"
+	serverIDSecondary = "s2"
+	serverIDTertiary  = "s3"
+	serverMissingID   = "missing"
+	serverNameOne     = "Server 1"
+	serverNameBefore  = "Before"
+	serverNameAfter   = "After"
+)
+
 func testInfo(id, name string) types.ServerInfo {
 	return types.ServerInfo{
 		ID:       id,
@@ -24,15 +34,15 @@ func testInfo(id, name string) types.ServerInfo {
 func TestServiceRegisterAndGet(t *testing.T) {
 	svc := registry.NewService(30*time.Second, 10*time.Second)
 
-	info := testInfo("s1", "Server 1")
+	info := testInfo(serverIDPrimary, serverNameOne)
 	svc.Register(info)
 
-	got, ok := svc.Get("s1")
+	got, ok := svc.Get(serverIDPrimary)
 	if !ok {
 		t.Fatal("expected server to exist after Register")
 	}
-	if got.Name != "Server 1" {
-		t.Errorf("name = %q, want %q", got.Name, "Server 1")
+	if got.Name != serverNameOne {
+		t.Errorf("name = %q, want %q", got.Name, serverNameOne)
 	}
 	if got.LastSeen.IsZero() {
 		t.Error("LastSeen should be set")
@@ -45,7 +55,7 @@ func TestServiceRegisterAndGet(t *testing.T) {
 func TestServiceGetNotFound(t *testing.T) {
 	svc := registry.NewService(30*time.Second, 10*time.Second)
 
-	_, ok := svc.Get("nonexistent")
+	_, ok := svc.Get(serverMissingID)
 	if ok {
 		t.Fatal("expected false for nonexistent server")
 	}
@@ -53,12 +63,12 @@ func TestServiceGetNotFound(t *testing.T) {
 
 func TestServiceGetReturnsCopy(t *testing.T) {
 	svc := registry.NewService(30*time.Second, 10*time.Second)
-	svc.Register(testInfo("s1", "Original"))
+	svc.Register(testInfo(serverIDPrimary, "Original"))
 
-	got, _ := svc.Get("s1")
+	got, _ := svc.Get(serverIDPrimary)
 	got.Name = "Modified"
 
-	got2, _ := svc.Get("s1")
+	got2, _ := svc.Get(serverIDPrimary)
 	if got2.Name != "Original" {
 		t.Errorf("Get should return a copy; name = %q, want Original", got2.Name)
 	}
@@ -66,17 +76,17 @@ func TestServiceGetReturnsCopy(t *testing.T) {
 
 func TestServiceUpdate(t *testing.T) {
 	svc := registry.NewService(30*time.Second, 10*time.Second)
-	svc.Register(testInfo("s1", "Before"))
+	svc.Register(testInfo(serverIDPrimary, serverNameBefore))
 
-	updated := testInfo("s1", "After")
+	updated := testInfo(serverIDPrimary, serverNameAfter)
 	updated.MaxTests = 99
-	if !svc.Update("s1", updated) {
+	if !svc.Update(serverIDPrimary, updated) {
 		t.Fatal("Update should return true for existing server")
 	}
 
-	got, _ := svc.Get("s1")
-	if got.Name != "After" {
-		t.Errorf("name = %q, want After", got.Name)
+	got, _ := svc.Get(serverIDPrimary)
+	if got.Name != serverNameAfter {
+		t.Errorf("name = %q, want %s", got.Name, serverNameAfter)
 	}
 	if got.MaxTests != 99 {
 		t.Errorf("max_tests = %d, want 99", got.MaxTests)
@@ -86,16 +96,16 @@ func TestServiceUpdate(t *testing.T) {
 func TestServiceUpdateNotFound(t *testing.T) {
 	svc := registry.NewService(30*time.Second, 10*time.Second)
 
-	if svc.Update("missing", testInfo("missing", "X")) {
+	if svc.Update(serverMissingID, testInfo(serverMissingID, "X")) {
 		t.Fatal("Update should return false for missing server")
 	}
 }
 
 func TestServiceDeregister(t *testing.T) {
 	svc := registry.NewService(30*time.Second, 10*time.Second)
-	svc.Register(testInfo("s1", "Server 1"))
+	svc.Register(testInfo(serverIDPrimary, serverNameOne))
 
-	if !svc.Deregister("s1") {
+	if !svc.Deregister(serverIDPrimary) {
 		t.Fatal("Deregister should return true for existing server")
 	}
 	if svc.Count() != 0 {
@@ -106,16 +116,16 @@ func TestServiceDeregister(t *testing.T) {
 func TestServiceDeregisterNotFound(t *testing.T) {
 	svc := registry.NewService(30*time.Second, 10*time.Second)
 
-	if svc.Deregister("missing") {
+	if svc.Deregister(serverMissingID) {
 		t.Fatal("Deregister should return false for missing server")
 	}
 }
 
 func TestServiceList(t *testing.T) {
 	svc := registry.NewService(30*time.Second, 10*time.Second)
-	svc.Register(testInfo("s1", "A"))
-	svc.Register(testInfo("s2", "B"))
-	svc.Register(testInfo("s3", "C"))
+	svc.Register(testInfo(serverIDPrimary, "A"))
+	svc.Register(testInfo(serverIDSecondary, "B"))
+	svc.Register(testInfo(serverIDTertiary, "C"))
 
 	list := svc.List()
 	if len(list) != 3 {
@@ -134,11 +144,11 @@ func TestServiceListEmpty(t *testing.T) {
 func TestServiceListHealthy(t *testing.T) {
 	svc := registry.NewService(30*time.Second, 10*time.Second)
 
-	healthy := testInfo("s1", "Healthy")
+	healthy := testInfo(serverIDPrimary, "Healthy")
 	healthy.Health = "healthy"
 	svc.Register(healthy)
 
-	unhealthy := testInfo("s2", "Unhealthy")
+	unhealthy := testInfo(serverIDSecondary, "Unhealthy")
 	unhealthy.Health = "degraded"
 	svc.Register(unhealthy)
 
@@ -146,8 +156,8 @@ func TestServiceListHealthy(t *testing.T) {
 	if len(list) != 1 {
 		t.Fatalf("ListHealthy len = %d, want 1", len(list))
 	}
-	if list[0].ID != "s1" {
-		t.Errorf("healthy server ID = %q, want s1", list[0].ID)
+	if list[0].ID != serverIDPrimary {
+		t.Errorf("healthy server ID = %q, want %s", list[0].ID, serverIDPrimary)
 	}
 }
 
@@ -157,8 +167,8 @@ func TestServiceCount(t *testing.T) {
 		t.Fatalf("empty count = %d, want 0", svc.Count())
 	}
 
-	svc.Register(testInfo("s1", "A"))
-	svc.Register(testInfo("s2", "B"))
+	svc.Register(testInfo(serverIDPrimary, "A"))
+	svc.Register(testInfo(serverIDSecondary, "B"))
 	if svc.Count() != 2 {
 		t.Fatalf("count = %d, want 2", svc.Count())
 	}
@@ -183,7 +193,7 @@ func TestServiceStartIdempotent(t *testing.T) {
 func TestServiceCleanupExpired(t *testing.T) {
 	// TTL of 50ms + short cleanup interval
 	svc := registry.NewService(50*time.Millisecond, 20*time.Millisecond)
-	svc.Register(testInfo("s1", "Expiring"))
+	svc.Register(testInfo(serverIDPrimary, "Expiring"))
 	svc.Start()
 
 	// Wait for cleanup to fire
@@ -197,8 +207,8 @@ func TestServiceCleanupExpired(t *testing.T) {
 
 func TestServiceDefaultTTL(t *testing.T) {
 	svc := registry.NewService(0, 0)
-	svc.Register(testInfo("s1", "Default"))
-	got, ok := svc.Get("s1")
+	svc.Register(testInfo(serverIDPrimary, "Default"))
+	got, ok := svc.Get(serverIDPrimary)
 	if !ok {
 		t.Fatal("expected server to exist")
 	}
