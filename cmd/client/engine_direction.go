@@ -36,30 +36,29 @@ func (e *TestEngine) runReadLoop(ctx context.Context, conn net.Conn, timeout tim
 	lastRTTSample := time.Now()
 	rttSampleInterval := 500 * time.Millisecond
 	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			conn.SetReadDeadline(time.Now().Add(timeout))
-			readStart := time.Now()
-			n, err := conn.Read(buf)
-			readDuration := time.Since(readStart)
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					return nil
-				}
-				if isTimeoutError(err) {
-					continue
-				}
-				return err
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		conn.SetReadDeadline(time.Now().Add(timeout))
+		readStart := time.Now()
+		n, err := conn.Read(buf)
+		readDuration := time.Since(readStart)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
 			}
-			if n > 0 {
-				onRead(n, readDuration)
-				if time.Since(lastRTTSample) > rttSampleInterval && e.pastWarmUp() {
-					e.rttCollector.AddSample(readDuration.Seconds() * 1000)
-					lastRTTSample = time.Now()
-				}
+			if isTimeoutError(err) {
+				continue
 			}
+			return err
+		}
+		if n <= 0 {
+			continue
+		}
+		onRead(n, readDuration)
+		if time.Since(lastRTTSample) > rttSampleInterval && e.pastWarmUp() {
+			e.rttCollector.AddSample(readDuration.Seconds() * 1000)
+			lastRTTSample = time.Now()
 		}
 	}
 }

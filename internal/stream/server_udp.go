@@ -175,6 +175,39 @@ type udpClientState struct {
 	lastSeenUnix int64
 }
 
+func udpClientExpired(client *udpClientState) bool {
+	lastSeen := time.Unix(0, atomic.LoadInt64(&client.lastSeenUnix))
+	return time.Since(lastSeen) > 30*time.Second
+}
+
+func udpRefreshWriteDeadline(conn *net.UDPConn, writesSinceDeadline *int, refreshEvery int) {
+	if *writesSinceDeadline != 0 && *writesSinceDeadline < refreshEvery {
+		return
+	}
+	if conn != nil {
+		_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	}
+	if *writesSinceDeadline >= refreshEvery {
+		*writesSinceDeadline = 0
+	}
+}
+
+func udpSendDownloadPacket(s *Server, packet []byte, client *udpClientState) error {
+	_, err := s.udpConn.WriteToUDP(packet, client.addr)
+	if err != nil {
+		logging.Warn("UDP send error", logging.Field{Key: "error", Value: err})
+	}
+	return err
+}
+
+func udpMaybeYield(lastYield *time.Time) {
+	if time.Since(*lastYield) <= 2*time.Millisecond {
+		return
+	}
+	runtime.Gosched()
+	*lastYield = time.Now()
+}
+
 func (s *Server) udpSender(clients *udpClients, clientKey string, client *udpClientState) {
 	defer s.wg.Done()
 	defer atomic.AddInt64(&s.activeUDPSenders, -1)
@@ -198,31 +231,19 @@ func (s *Server) udpSender(clients *udpClients, clientKey string, client *udpCli
 		case <-s.stopCh:
 			return
 		default:
-			lastSeen := time.Unix(0, atomic.LoadInt64(&client.lastSeenUnix))
-			if time.Since(lastSeen) > 30*time.Second {
+			if udpClientExpired(client) {
 				return
 			}
-			if atomic.LoadInt32(&client.downloading) == 1 {
-				if writesSinceDeadline == 0 || writesSinceDeadline >= deadlineRefreshPackets {
-					if s.udpConn != nil {
-						_ = s.udpConn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-					}
-					if writesSinceDeadline >= deadlineRefreshPackets {
-						writesSinceDeadline = 0
-					}
-				}
-				if _, err := s.udpConn.WriteToUDP(packet, client.addr); err != nil {
-					logging.Warn("UDP send error", logging.Field{Key: "error", Value: err})
-					return
-				}
-				writesSinceDeadline++
-				if time.Since(lastYield) > 2*time.Millisecond {
-					runtime.Gosched()
-					lastYield = time.Now()
-				}
+			if atomic.LoadInt32(&client.downloading) != 1 {
+				time.Sleep(10 * time.Millisecond)
 				continue
 			}
-			time.Sleep(10 * time.Millisecond)
+			udpRefreshWriteDeadline(s.udpConn, &writesSinceDeadline, deadlineRefreshPackets)
+			if err := udpSendDownloadPacket(s, packet, client); err != nil {
+				return
+			}
+			writesSinceDeadline++
+			udpMaybeYield(&lastYield)
 		}
 	}
 }

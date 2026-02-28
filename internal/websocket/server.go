@@ -119,60 +119,78 @@ func (s *Server) HandleStream(w http.ResponseWriter, r *http.Request, streamID s
 
 func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 	isTerminal := isTerminalStreamStatus(state.Status)
+	clientList, hasClients := s.snapshotClients(streamID)
+	if !hasClients {
+		s.cleanupTerminalStatus(streamID, isTerminal)
+		return
+	}
+	msgType := websocketMessageType(state.Status)
+	if isTerminal && !s.markTerminalOnce(streamID, state.Status) {
+		return
+	}
 
+	msg := buildWebsocketMessage(streamID, state, msgType)
+
+	buf, err := s.marshalMessage(msg)
+	if err != nil {
+		logging.Warn("WebSocket metrics marshal failed",
+			logging.Field{Key: "stream_id", Value: streamID},
+			logging.Field{Key: "error", Value: err})
+		return
+	}
+	data := bytes.TrimSuffix(buf.Bytes(), []byte{'\n'})
+	s.broadcastToClients(streamID, clientList, data, isTerminal)
+	s.jsonBufPool.Put(buf)
+
+}
+
+func (s *Server) snapshotClients(streamID string) ([]*clientConn, bool) {
 	s.mu.RLock()
 	clients := s.clients[streamID]
 	if clients == nil {
 		s.mu.RUnlock()
-		// Clean up sentStatus for streams with no clients on terminal status
-		if isTerminal {
-			s.mu.Lock()
-			delete(s.sentStatus, streamID)
-			s.mu.Unlock()
-		}
-		return
+		return nil, false
 	}
-
 	clientList := make([]*clientConn, 0, len(clients))
 	for _, client := range clients {
 		clientList = append(clientList, client)
 	}
 	s.mu.RUnlock()
+	return clientList, true
+}
 
-	var msgType string
-	switch state.Status {
+func (s *Server) cleanupTerminalStatus(streamID string, isTerminal bool) {
+	if !isTerminal {
+		return
+	}
+	s.mu.Lock()
+	delete(s.sentStatus, streamID)
+	s.mu.Unlock()
+}
+
+func websocketMessageType(status types.StreamStatus) string {
+	switch status {
 	case types.StreamStatusCompleted:
-		msgType = wsTypeComplete
+		return wsTypeComplete
 	case types.StreamStatusFailed:
-		msgType = wsTypeError
+		return wsTypeError
 	default:
-		msgType = wsTypeMetrics
+		return wsTypeMetrics
 	}
+}
 
-	if isTerminal {
-		// Deduplicate terminal events atomically under one lock to avoid races
-		// where concurrent broadcasts can both read "not sent yet" and both emit.
-		s.mu.Lock()
-		if s.sentStatus[streamID] == state.Status {
-			s.mu.Unlock()
-			return
-		}
-		s.sentStatus[streamID] = state.Status
-		s.mu.Unlock()
+func (s *Server) markTerminalOnce(streamID string, status types.StreamStatus) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.sentStatus[streamID] == status {
+		return false
 	}
+	s.sentStatus[streamID] = status
+	return true
+}
 
-	elapsed := float64(0)
-	remaining := float64(0)
-	if !state.StartTime.IsZero() {
-		elapsed = time.Since(state.StartTime).Seconds()
-		if state.Config.Duration > 0 {
-			remaining = state.Config.Duration.Seconds() - elapsed
-			if remaining < 0 {
-				remaining = 0
-			}
-		}
-	}
-
+func buildWebsocketMessage(streamID string, state types.StreamSnapshot, msgType string) wsMessage {
+	elapsed, remaining := streamElapsedAndRemaining(state)
 	msg := wsMessage{
 		Type:             msgType,
 		StreamID:         streamID,
@@ -183,49 +201,60 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 		Metrics:          state.Metrics,
 		Time:             time.Now().Unix(),
 	}
-
 	if state.Status == types.StreamStatusCompleted {
-		msg.Results = &wsResults{
-			StreamID: streamID,
-			Status:   string(state.Status),
-			Config: wsResultConfig{
-				Protocol:   string(state.Config.Protocol),
-				Direction:  string(state.Config.Direction),
-				Duration:   int(state.Config.Duration.Seconds()),
-				Streams:    state.Config.Streams,
-				PacketSize: state.Config.PacketSize,
-			},
-			Results: wsResultMetrics{
-				ThroughputMbps:    state.Metrics.ThroughputMbps,
-				ThroughputAvgMbps: state.Metrics.ThroughputAvgMbps,
-				Latency:           state.Metrics.Latency,
-				JitterMs:          state.Metrics.JitterMs,
-				PacketLossPercent: state.Metrics.PacketLossPercent,
-				BytesTransferred:  state.Metrics.BytesTransferred,
-				PacketsSent:       state.Metrics.PacketsSent,
-				PacketsReceived:   state.Metrics.PacketsReceived,
-			},
-			StartTime:       state.StartTime.Format("2006-01-02T15:04:05Z07:00"),
-			EndTime:         time.Now().Format("2006-01-02T15:04:05Z07:00"),
-			DurationSeconds: time.Since(state.StartTime).Seconds(),
-		}
+		msg.Results = buildWebsocketResults(streamID, state)
 	}
-
 	if state.Status == types.StreamStatusFailed && state.Error != nil {
 		msg.Error = state.Error.Error()
 		msg.Message = state.Error.Error()
 	}
+	return msg
+}
 
-	buf, err := s.marshalMessage(msg)
-	if err != nil {
-		logging.Warn("WebSocket metrics marshal failed",
-			logging.Field{Key: "stream_id", Value: streamID},
-			logging.Field{Key: "error", Value: err})
-		return
+func streamElapsedAndRemaining(state types.StreamSnapshot) (float64, float64) {
+	if state.StartTime.IsZero() {
+		return 0, 0
 	}
-	data := bytes.TrimSuffix(buf.Bytes(), []byte{'\n'})
+	elapsed := time.Since(state.StartTime).Seconds()
+	if state.Config.Duration <= 0 {
+		return elapsed, 0
+	}
+	remaining := state.Config.Duration.Seconds() - elapsed
+	if remaining < 0 {
+		remaining = 0
+	}
+	return elapsed, remaining
+}
 
-	for _, client := range clientList {
+func buildWebsocketResults(streamID string, state types.StreamSnapshot) *wsResults {
+	return &wsResults{
+		StreamID: streamID,
+		Status:   string(state.Status),
+		Config: wsResultConfig{
+			Protocol:   string(state.Config.Protocol),
+			Direction:  string(state.Config.Direction),
+			Duration:   int(state.Config.Duration.Seconds()),
+			Streams:    state.Config.Streams,
+			PacketSize: state.Config.PacketSize,
+		},
+		Results: wsResultMetrics{
+			ThroughputMbps:    state.Metrics.ThroughputMbps,
+			ThroughputAvgMbps: state.Metrics.ThroughputAvgMbps,
+			Latency:           state.Metrics.Latency,
+			JitterMs:          state.Metrics.JitterMs,
+			PacketLossPercent: state.Metrics.PacketLossPercent,
+			BytesTransferred:  state.Metrics.BytesTransferred,
+			PacketsSent:       state.Metrics.PacketsSent,
+			PacketsReceived:   state.Metrics.PacketsReceived,
+		},
+		StartTime:       state.StartTime.Format("2006-01-02T15:04:05Z07:00"),
+		EndTime:         time.Now().Format("2006-01-02T15:04:05Z07:00"),
+		DurationSeconds: time.Since(state.StartTime).Seconds(),
+	}
+}
+
+func (s *Server) broadcastToClients(streamID string, clients []*clientConn, data []byte, isTerminal bool) {
+	for _, client := range clients {
 		if client.writeMessage(websocket.TextMessage, data) != nil {
 			s.removeClient(streamID, client.conn)
 			client.conn.Close()
@@ -236,8 +265,6 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 			client.conn.Close()
 		}
 	}
-	s.jsonBufPool.Put(buf)
-
 }
 
 func (s *Server) marshalMessage(msg wsMessage) (*bytes.Buffer, error) {

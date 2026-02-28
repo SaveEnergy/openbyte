@@ -21,6 +21,8 @@ var jsonBufPool = sync.Pool{
 	New: func() any { return &bytes.Buffer{} },
 }
 
+const loopbackIPv4 = "127.0.0.1"
+
 func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any, limit int64) error {
 	if limit > 0 {
 		r.Body = http.MaxBytesReader(w, r.Body, limit)
@@ -134,7 +136,7 @@ func respondError(w http.ResponseWriter, err error, statusCode int) {
 
 func normalizeHost(host string) string {
 	if host == "" {
-		return "127.0.0.1"
+		return loopbackIPv4
 	}
 	trimmed := host
 	if h, _, err := net.SplitHostPort(host); err == nil {
@@ -144,7 +146,7 @@ func normalizeHost(host string) string {
 		}
 	}
 	if trimmed == "" || trimmed == "localhost" {
-		return "127.0.0.1"
+		return loopbackIPv4
 	}
 	return trimmed
 }
@@ -197,5 +199,5 @@ func responseHostForEndpoint(r *http.Request, cfg *config.Config) string {
 	if r != nil && r.Host != "" {
 		return r.Host
 	}
-	return "127.0.0.1"
+	return loopbackIPv4
 }

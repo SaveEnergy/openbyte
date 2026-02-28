@@ -59,14 +59,7 @@ function classifyDownloadStreamError(e, signal, streamState) {
 }
 
 async function handleDownloadStreamCatch(e, options) {
-  const {
-    attemptIndex,
-    attemptsLength,
-    signal,
-    maxNetworkRetries,
-    retryDelayMs,
-    streamState,
-  } = options;
+  const { attemptIndex, attemptsLength, signal, streamState } = options;
   const action = classifyDownloadStreamError(e, signal, streamState);
   if (action === "aborted") return { done: true, result: "aborted" };
   if (action === "overloaded") {
@@ -284,11 +277,7 @@ export async function runDownloadTest(duration, onProgress, signal) {
     noStreams: "Download failed. No stream completed successfully.",
   });
 
-  const stopReason = signal.aborted
-    ? "aborted"
-    : endTimeRef.value < nominalEndTime - 500
-      ? "early_stable"
-      : "duration";
+  const stopReason = resolveStopReason(signal, endTimeRef, nominalEndTime);
   const diag = diagnostics.finish(stopReason);
   state.diagnostics = state.diagnostics || {};
   state.diagnostics.download = diag;
@@ -386,8 +375,6 @@ async function processUploadResponse(res, options) {
     blob,
     metricsState,
     retryAfterMs,
-    maxNetworkRetries,
-    retryDelayMs,
     warmUp,
     startTime,
     onProgress,
@@ -416,6 +403,51 @@ async function processUploadResponse(res, options) {
   return { ok: false, retry: true };
 }
 
+async function continueUploadAfterResponse(
+  response,
+  context,
+  consecutiveErrors,
+  maxNetworkRetries,
+  retryDelayMs,
+) {
+  const pr = await processUploadResponse(response, context);
+  if (pr.ok) {
+    return { breakLoop: false, nextErrors: 0 };
+  }
+  if (pr.overload) {
+    return { breakLoop: true, nextErrors: consecutiveErrors };
+  }
+  const nextErrors = consecutiveErrors + 1;
+  if (nextErrors > maxNetworkRetries) {
+    return { breakLoop: true, nextErrors };
+  }
+  await sleep(retryDelayMs);
+  return { breakLoop: false, nextErrors };
+}
+
+async function continueUploadAfterCatch(
+  error,
+  metricsState,
+  consecutiveErrors,
+  maxNetworkRetries,
+  retryDelayMs,
+) {
+  const hc = handleUploadCatchError(
+    error,
+    metricsState,
+    consecutiveErrors,
+    maxNetworkRetries,
+  );
+  if (hc.action === "break") {
+    return { breakLoop: true, nextErrors: consecutiveErrors };
+  }
+  if (hc.action === "retry") {
+    await sleep(retryDelayMs);
+    return { breakLoop: false, nextErrors: hc.next };
+  }
+  throw error;
+}
+
 async function runSingleUploadStream(options) {
   const {
     delay,
@@ -437,41 +469,45 @@ async function runSingleUploadStream(options) {
   while (performance.now() < endTimeRef.value && !signal.aborted) {
     try {
       const res = await sendUploadRequest(blob, duration, signal);
-      const pr = await processUploadResponse(res, {
-        blob,
-        metricsState,
-        retryAfterMs,
+      const responseState = await continueUploadAfterResponse(
+        res,
+        {
+          blob,
+          metricsState,
+          retryAfterMs,
+          warmUp,
+          startTime,
+          onProgress,
+          extra,
+        },
+        consecutiveErrors,
         maxNetworkRetries,
         retryDelayMs,
-        warmUp,
-        startTime,
-        onProgress,
-        extra,
-      });
-      if (pr.ok) {
-        consecutiveErrors = 0;
-        continue;
+      );
+      consecutiveErrors = responseState.nextErrors;
+      if (responseState.breakLoop) {
+        break;
       }
-      if (pr.overload) break;
-      consecutiveErrors += 1;
-      if (consecutiveErrors > maxNetworkRetries) break;
-      await sleep(retryDelayMs);
     } catch (e) {
-      const hc = handleUploadCatchError(
+      const catchState = await continueUploadAfterCatch(
         e,
         metricsState,
         consecutiveErrors,
         maxNetworkRetries,
+        retryDelayMs,
       );
-      if (hc.action === "break") break;
-      if (hc.action === "retry") {
-        consecutiveErrors = hc.next;
-        await sleep(retryDelayMs);
-        continue;
+      consecutiveErrors = catchState.nextErrors;
+      if (catchState.breakLoop) {
+        break;
       }
-      throw e;
     }
   }
+}
+
+function resolveStopReason(signal, endTimeRef, nominalEndTime) {
+  if (signal.aborted) return "aborted";
+  if (endTimeRef.value < nominalEndTime - 500) return "early_stable";
+  return "duration";
 }
 
 export async function runUploadTest(duration, onProgress, signal) {
@@ -548,11 +584,7 @@ export async function runUploadTest(duration, onProgress, signal) {
     noStreams: "Upload failed. No stream completed successfully.",
   });
 
-  const stopReason = signal.aborted
-    ? "aborted"
-    : endTimeRef.value < nominalEndTime - 500
-      ? "early_stable"
-      : "duration";
+  const stopReason = resolveStopReason(signal, endTimeRef, nominalEndTime);
   const diag = diagnostics.finish(stopReason);
   state.diagnostics = state.diagnostics || {};
   state.diagnostics.upload = diag;

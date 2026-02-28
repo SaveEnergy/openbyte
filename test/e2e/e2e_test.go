@@ -384,6 +384,36 @@ func TestWebSocketOriginRejected(t *testing.T) {
 	}
 }
 
+func resolveWebSocketURL(baseURL, wsURL string) string {
+	if strings.HasPrefix(wsURL, "/") {
+		return strings.Replace(baseURL, httpPrefix, wsPrefix, 1) + wsURL
+	}
+	wsURL = strings.Replace(wsURL, httpPrefix, wsPrefix, 1)
+	wsURL = strings.Replace(wsURL, httpsPrefix, wssPrefix, 1)
+	return wsURL
+}
+
+func readWebSocketMessages(t *testing.T, conn *websocket.Conn, timeout time.Duration) int {
+	t.Helper()
+	messageCount := 0
+	deadline := time.Now().Add(timeout)
+	conn.SetReadDeadline(deadline)
+	for time.Now().Before(deadline) {
+		var msg map[string]any
+		if err := conn.ReadJSON(&msg); err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				t.Logf(wsErrorLogFmt, err)
+			}
+			break
+		}
+		messageCount++
+		if msg["type"] == nil {
+			t.Error(msgMissingTypeErr)
+		}
+	}
+	return messageCount
+}
+
 func TestFullFlow(t *testing.T) {
 	skipIfShort(t)
 	ts := NewTestServer(t)
@@ -435,12 +465,7 @@ func TestFullFlow(t *testing.T) {
 	if !ok || wsURL == "" {
 		t.Fatalf(wsURLInvalidRespFmt, startResp[websocketURLKey])
 	}
-	if strings.HasPrefix(wsURL, "/") {
-		wsURL = strings.Replace(ts.baseURL, httpPrefix, wsPrefix, 1) + wsURL
-	} else {
-		wsURL = strings.Replace(wsURL, httpPrefix, wsPrefix, 1)
-		wsURL = strings.Replace(wsURL, httpsPrefix, wssPrefix, 1)
-	}
+	wsURL = resolveWebSocketURL(ts.baseURL, wsURL)
 
 	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
@@ -448,25 +473,7 @@ func TestFullFlow(t *testing.T) {
 	}
 	defer conn.Close()
 
-	messageCount := 0
-	deadline := time.Now().Add(3 * time.Second)
-	conn.SetReadDeadline(deadline)
-
-	for time.Now().Before(deadline) {
-		var msg map[string]any
-		if err := conn.ReadJSON(&msg); err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				t.Logf(wsErrorLogFmt, err)
-			}
-			break
-		}
-		messageCount++
-
-		if msg["type"] == nil {
-			t.Error(msgMissingTypeErr)
-		}
-	}
-
+	messageCount := readWebSocketMessages(t, conn, 3*time.Second)
 	if messageCount == 0 {
 		t.Error(noWSMessagesErr)
 	}

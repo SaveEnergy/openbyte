@@ -15,6 +15,22 @@ const (
 	singleSampleCount = 1
 )
 
+func assertLatencyMetrics(t *testing.T, got, want types.LatencyMetrics) {
+	t.Helper()
+	if got.MinMs != want.MinMs {
+		t.Errorf("calculateLatency() MinMs = %v, want %v", got.MinMs, want.MinMs)
+	}
+	if got.MaxMs != want.MaxMs {
+		t.Errorf("calculateLatency() MaxMs = %v, want %v", got.MaxMs, want.MaxMs)
+	}
+	if got.AvgMs != want.AvgMs {
+		t.Errorf("calculateLatency() AvgMs = %v, want %v", got.AvgMs, want.AvgMs)
+	}
+	if got.Count != want.Count {
+		t.Errorf("calculateLatency() Count = %v, want %v", got.Count, want.Count)
+	}
+}
+
 func TestCalculateLatency(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -70,18 +86,7 @@ func TestCalculateLatency(t *testing.T) {
 				}
 				return
 			}
-			if got.MinMs != tt.want.MinMs {
-				t.Errorf("calculateLatency() MinMs = %v, want %v", got.MinMs, tt.want.MinMs)
-			}
-			if got.MaxMs != tt.want.MaxMs {
-				t.Errorf("calculateLatency() MaxMs = %v, want %v", got.MaxMs, tt.want.MaxMs)
-			}
-			if got.AvgMs != tt.want.AvgMs {
-				t.Errorf("calculateLatency() AvgMs = %v, want %v", got.AvgMs, tt.want.AvgMs)
-			}
-			if got.Count != tt.want.Count {
-				t.Errorf("calculateLatency() Count = %v, want %v", got.Count, tt.want.Count)
-			}
+			assertLatencyMetrics(t, got, tt.want)
 		})
 	}
 }
@@ -129,10 +134,10 @@ func TestCalculateJitter(t *testing.T) {
 				if got != tt.want {
 					t.Errorf("calculateJitter() = %v, want %v", got, tt.want)
 				}
-			} else {
-				if tt.want == zeroFloat64 && got != zeroFloat64 {
-					t.Errorf("calculateJitter() = %v, want %v", got, tt.want)
-				}
+				return
+			}
+			if tt.want == zeroFloat64 && got != zeroFloat64 {
+				t.Errorf("calculateJitter() = %v, want %v", got, tt.want)
 			}
 		})
 	}

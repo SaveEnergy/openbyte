@@ -12,8 +12,10 @@ import (
 )
 
 const (
-	versionEndpoint = "/api/v1/version"
-	serversEndpoint = "/api/v1/servers"
+	versionEndpoint     = "/api/v1/version"
+	serversEndpoint     = "/api/v1/servers"
+	decodeServersErrFmt = "decode servers response: %v"
+	serversLenErrFmt    = "servers = %d, want 1"
 )
 
 func TestGetVersion(t *testing.T) {
@@ -89,10 +91,10 @@ func TestGetServers(t *testing.T) {
 
 	var resp api.ServersResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode servers response: %v", err)
+		t.Fatalf(decodeServersErrFmt, err)
 	}
 	if len(resp.Servers) != 1 {
-		t.Fatalf("servers = %d, want 1", len(resp.Servers))
+		t.Fatalf(serversLenErrFmt, len(resp.Servers))
 	}
 	if resp.Servers[0].Name != "Test Server" {
 		t.Errorf("server name = %q, want Test Server", resp.Servers[0].Name)
@@ -123,10 +125,10 @@ func TestGetServersIgnoresRequestHostWhenProxyUntrusted(t *testing.T) {
 
 	var resp api.ServersResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode servers response: %v", err)
+		t.Fatalf(decodeServersErrFmt, err)
 	}
 	if len(resp.Servers) != 1 {
-		t.Fatalf("servers = %d, want 1", len(resp.Servers))
+		t.Fatalf(serversLenErrFmt, len(resp.Servers))
 	}
 	if resp.Servers[0].APIEndpoint != "http://127.0.0.1:8080" {
 		t.Fatalf("api endpoint = %q, want %q", resp.Servers[0].APIEndpoint, "http://127.0.0.1:8080")
@@ -152,10 +154,10 @@ func TestGetServersPreservesProxyPort(t *testing.T) {
 
 	var resp api.ServersResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode servers response: %v", err)
+		t.Fatalf(decodeServersErrFmt, err)
 	}
 	if len(resp.Servers) != 1 {
-		t.Fatalf("servers = %d, want 1", len(resp.Servers))
+		t.Fatalf(serversLenErrFmt, len(resp.Servers))
 	}
 	want := "https://proxy.example.com:8443"
 	if resp.Servers[0].APIEndpoint != want {

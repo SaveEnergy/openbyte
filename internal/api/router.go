@@ -72,13 +72,13 @@ func (r *Router) SetRuntimeMetricsHandler(handler http.HandlerFunc) {
 	r.runtimeMetrics = handler
 }
 
-// RouteRegistrar allows external packages to register routes on the
+// RouteRegisterer allows external packages to register routes on the
 // ServeMux before middleware wrapping, without importing gorilla/mux.
-type RouteRegistrar interface {
+type RouteRegisterer interface {
 	RegisterRoutes(mux *http.ServeMux)
 }
 
-func (r *Router) SetupRoutes(registrars ...RouteRegistrar) http.Handler {
+func (r *Router) SetupRoutes(registrars ...RouteRegisterer) http.Handler {
 	mux := http.NewServeMux()
 	webFS := r.resolveWebFS()
 	v1 := r.newV1Registrar(mux)

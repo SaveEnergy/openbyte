@@ -137,12 +137,9 @@ function renderResult(d) {
   }
 }
 
-async function init() {
-  if (!loadingView || !resultView || !errorView) {
-    console.error("Results page missing required view elements");
-    return;
-  }
-
+if (!loadingView || !resultView || !errorView) {
+  console.error("Results page missing required view elements");
+} else {
   const parts = globalThis.location.pathname
     .replace(/\/+$/, "")
     .split("/")
@@ -150,29 +147,23 @@ async function init() {
   const id = parts.at(-1);
   if (!id || !RESULT_ID_REGEX.test(id)) {
     showError("Result ID format is invalid.");
-    return;
-  }
-
-  loadingView.classList.remove("hidden");
-  resultView.classList.add("hidden");
-
-  try {
-    const data = await loadResult(id);
-    loadingView.classList.add("hidden");
-    resultView.classList.remove("hidden");
-    renderResult(data);
-  } catch (err) {
-    console.error("Results fetch failed:", err);
-    if (err?.name === "AbortError") {
-      showError("Request timed out. Please try again.");
-      return;
+  } else {
+    loadingView.classList.remove("hidden");
+    resultView.classList.add("hidden");
+    try {
+      const data = await loadResult(id);
+      loadingView.classList.add("hidden");
+      resultView.classList.remove("hidden");
+      renderResult(data);
+    } catch (err) {
+      console.error("Results fetch failed:", err);
+      if (err?.name === "AbortError") {
+        showError("Request timed out. Please try again.");
+      } else if (err?.userSafe && err?.message) {
+        showError(err.message);
+      } else {
+        showError("Unable to load result.");
+      }
     }
-    if (err?.userSafe && err?.message) {
-      showError(err.message);
-      return;
-    }
-    showError("Unable to load result.");
   }
 }
-
-init();

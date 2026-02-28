@@ -219,7 +219,7 @@ func setupRuntimeResources(cfg *config.Config, version string, resources *server
 		router.SetRuntimeMetricsHandler(runtimeMetricsHandler())
 	}
 
-	var registrars []api.RouteRegistrar
+	var registrars []api.RouteRegisterer
 	if cfg.RegistryMode {
 		logging.Info("Starting in registry mode")
 		resources.registryService = registry.NewService(cfg.RegistryServerTTL, 30*time.Second)
@@ -363,36 +363,47 @@ func buildServerFlagSet(cfg *config.Config) (*flag.FlagSet, *serverFlagValues) {
 	return fs, fv
 }
 
-func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFlagValues) error {
-	applyCSV := func(raw string) []string {
-		if strings.TrimSpace(raw) == "" {
-			return nil
-		}
-		parts := strings.Split(raw, ",")
-		out := make([]string, 0, len(parts))
-		for _, p := range parts {
-			s := strings.TrimSpace(p)
-			if s != "" {
-				out = append(out, s)
-			}
-		}
-		return out
-	}
-	parseDuration := func(key, raw string) (time.Duration, error) {
-		d, err := time.ParseDuration(raw)
-		if err != nil {
-			return 0, fmt.Errorf("invalid --%s %q: %w", key, raw, err)
-		}
-		return d, nil
-	}
-	setDuration := func(key, raw string, target *time.Duration) error {
-		d, err := parseDuration(key, raw)
-		if err != nil {
-			return err
-		}
-		*target = d
+func parseCSV(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
 		return nil
 	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		s := strings.TrimSpace(p)
+		if s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func parseFlagDuration(key, raw string) (time.Duration, error) {
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, fmt.Errorf("invalid --%s %q: %w", key, raw, err)
+	}
+	return d, nil
+}
+
+func setFlagDuration(key, raw string, target *time.Duration) error {
+	d, err := parseFlagDuration(key, raw)
+	if err != nil {
+		return err
+	}
+	*target = d
+	return nil
+}
+
+func applyOverrideForFlag(name string, overrides map[string]func() error) error {
+	override, ok := overrides[name]
+	if !ok {
+		return nil
+	}
+	return override()
+}
+
+func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFlagValues) error {
 
 	overrides := map[string]func() error{
 		"port":                  func() error { cfg.Port = *fv.port; return nil },
@@ -408,24 +419,30 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 		"max-concurrent-tests":  func() error { cfg.MaxConcurrentTests = *fv.maxConcurrentTests; return nil },
 		"max-concurrent-per-ip": func() error { cfg.MaxConcurrentPerIP = *fv.maxConcurrentPerIP; return nil },
 		"max-streams":           func() error { cfg.MaxStreams = *fv.maxStreams; return nil },
-		flagMaxTestDuration:     func() error { return setDuration(flagMaxTestDuration, *fv.maxTestDuration, &cfg.MaxTestDuration) },
+		flagMaxTestDuration:     func() error { return setFlagDuration(flagMaxTestDuration, *fv.maxTestDuration, &cfg.MaxTestDuration) },
 		"rate-limit-per-ip":     func() error { cfg.RateLimitPerIP = *fv.rateLimitPerIP; return nil },
 		"global-rate-limit":     func() error { cfg.GlobalRateLimit = *fv.globalRateLimit; return nil },
-		"allowed-origins":       func() error { cfg.AllowedOrigins = applyCSV(*fv.allowedOrigins); return nil },
+		"allowed-origins":       func() error { cfg.AllowedOrigins = parseCSV(*fv.allowedOrigins); return nil },
 		"trust-proxy-headers":   func() error { cfg.TrustProxyHeaders = *fv.trustProxyHeaders; return nil },
-		"trusted-proxy-cidrs":   func() error { cfg.TrustedProxyCIDRs = applyCSV(*fv.trustedProxyCIDRs); return nil },
+		"trusted-proxy-cidrs":   func() error { cfg.TrustedProxyCIDRs = parseCSV(*fv.trustedProxyCIDRs); return nil },
 		"data-dir":              func() error { cfg.DataDir = *fv.dataDir; return nil },
 		"max-stored-results":    func() error { cfg.MaxStoredResults = *fv.maxStoredResults; return nil },
 		"web-root":              func() error { cfg.WebRoot = *fv.webRoot; return nil },
 		"pprof-enabled":         func() error { cfg.PprofEnabled = *fv.pprofEnabled; return nil },
 		"pprof-addr":            func() error { cfg.PprofAddress = *fv.pprofAddress; return nil },
-		flagPerfStatsInterval:   func() error { return setDuration(flagPerfStatsInterval, *fv.perfStatsInterval, &cfg.PerfStatsInterval) },
-		"runtime-metrics":       func() error { cfg.RuntimeMetrics = *fv.runtimeMetrics; return nil },
-		"registry-enabled":      func() error { cfg.RegistryEnabled = *fv.registryEnabled; return nil },
-		"registry-mode":         func() error { cfg.RegistryMode = *fv.registryMode; return nil },
-		"registry-url":          func() error { cfg.RegistryURL = *fv.registryURL; return nil },
-		flagRegistryInterval:    func() error { return setDuration(flagRegistryInterval, *fv.registryInterval, &cfg.RegistryInterval) },
-		flagRegistryServerTTL:   func() error { return setDuration(flagRegistryServerTTL, *fv.registryServerTTL, &cfg.RegistryServerTTL) },
+		flagPerfStatsInterval: func() error {
+			return setFlagDuration(flagPerfStatsInterval, *fv.perfStatsInterval, &cfg.PerfStatsInterval)
+		},
+		"runtime-metrics":  func() error { cfg.RuntimeMetrics = *fv.runtimeMetrics; return nil },
+		"registry-enabled": func() error { cfg.RegistryEnabled = *fv.registryEnabled; return nil },
+		"registry-mode":    func() error { cfg.RegistryMode = *fv.registryMode; return nil },
+		"registry-url":     func() error { cfg.RegistryURL = *fv.registryURL; return nil },
+		flagRegistryInterval: func() error {
+			return setFlagDuration(flagRegistryInterval, *fv.registryInterval, &cfg.RegistryInterval)
+		},
+		flagRegistryServerTTL: func() error {
+			return setFlagDuration(flagRegistryServerTTL, *fv.registryServerTTL, &cfg.RegistryServerTTL)
+		},
 	}
 
 	var applyErr error
@@ -433,11 +450,7 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 		if applyErr != nil {
 			return
 		}
-		override, ok := overrides[f.Name]
-		if !ok {
-			return
-		}
-		if err := override(); err != nil {
+		if err := applyOverrideForFlag(f.Name, overrides); err != nil {
 			applyErr = err
 		}
 	})

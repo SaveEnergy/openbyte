@@ -1,7 +1,5 @@
 /** Skill page: copy-to-clipboard for CLI/API/SDK snippets. */
 
-export {};
-
 function fallbackCopy(text) {
   const ta = document.createElement("textarea");
   ta.value = text;
