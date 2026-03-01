@@ -3,10 +3,11 @@ package registry
 import (
 	"bytes"
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/big"
 	"net"
 	"net/http"
 	"sync"
@@ -36,8 +37,6 @@ type Client struct {
 	mu         sync.RWMutex
 	started    bool
 	registered bool
-	rngMu      sync.Mutex
-	rng        *rand.Rand
 }
 
 func NewClient(cfg *config.Config, logger *logging.Logger) *Client {
@@ -57,7 +56,6 @@ func NewClient(cfg *config.Config, logger *logging.Logger) *Client {
 		},
 		logger: logger,
 		stopCh: make(chan struct{}),
-		rng:    rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 }
 
@@ -288,10 +286,12 @@ func (c *Client) randomInt63n(n int64) int64 {
 	if n <= 0 {
 		return 0
 	}
-	c.rngMu.Lock()
-	v := c.rng.Int63n(n)
-	c.rngMu.Unlock()
-	return v
+	v, err := cryptorand.Int(cryptorand.Reader, big.NewInt(n))
+	if err != nil {
+		// Deterministic fallback: keep behavior stable if entropy is unavailable.
+		return n / 2
+	}
+	return v.Int64()
 }
 
 func drainAndClose(resp *http.Response, logger *logging.Logger) {

@@ -13,6 +13,21 @@ import {
   fetchWithTimeout,
 } from "./utils.js";
 
+function trimTrailingSlashes(value) {
+  if (typeof value !== "string" || value.length === 0) return value;
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
+
+function startsWithDigit(value) {
+  if (!value || typeof value !== "string") return false;
+  const code = value.charCodeAt(0);
+  return code >= 48 && code <= 57;
+}
+
 export function resolveServerName() {
   if (state.selectedServer?.name) return state.selectedServer.name;
   if (state.servers?.length) {
@@ -41,7 +56,7 @@ export function getHealthURL(server) {
       ) {
         apiURL.protocol = "https:";
       }
-      apiURL.pathname = apiURL.pathname.replace(/\/+$/, "") + "/health";
+      apiURL.pathname = trimTrailingSlashes(apiURL.pathname) + "/health";
       return apiURL.toString();
     } catch (e) {
       console.debug("failed to parse server api_endpoint", e);
@@ -88,7 +103,7 @@ export function detectNetworkInfo() {
     !hostname.startsWith("v4.") &&
     !hostname.startsWith("v6.") &&
     !hostname.startsWith("[") &&
-    !/^\d/.test(hostname);
+    !startsWithDigit(hostname);
 
   const probeOpts = { cache: "no-store", credentials: "omit", mode: "cors" };
   const proto = globalThis.location.protocol;

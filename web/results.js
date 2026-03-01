@@ -10,6 +10,15 @@ const resultView = document.getElementById("resultView");
 const errorView = document.getElementById("errorView");
 const errorMessage = document.querySelector("#errorView .error-message");
 
+function trimTrailingSlashes(value) {
+  if (typeof value !== "string" || value.length === 0) return value;
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
+
 function userError(message) {
   const err = new Error(message);
   err.userSafe = true;
@@ -140,10 +149,8 @@ function renderResult(d) {
 if (!loadingView || !resultView || !errorView) {
   console.error("Results page missing required view elements");
 } else {
-  const parts = globalThis.location.pathname
-    .replace(/\/+$/, "")
-    .split("/")
-    .filter(Boolean);
+  const normalizedPath = trimTrailingSlashes(globalThis.location.pathname);
+  const parts = normalizedPath.split("/").filter(Boolean);
   const id = parts.at(-1);
   if (!id || !RESULT_ID_REGEX.test(id)) {
     showError("Result ID format is invalid.");

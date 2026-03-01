@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
-	"math/rand"
 	"net"
 	"net/url"
 	"os"
@@ -417,7 +417,10 @@ func runWebSocket(ctx context.Context, cfg config, worker int) error {
 	}
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 10 * time.Second,
-		TLSClientConfig:  &tls.Config{},
+		TLSClientConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			ServerName: parsed.Hostname(),
+		},
 	}
 	conn, _, err := dialer.DialContext(ctx, parsed.String(), nil)
 	if err != nil {
@@ -443,8 +446,11 @@ func runWebSocket(ctx context.Context, cfg config, worker int) error {
 }
 
 func fillRandom(buf []byte, seed int) {
-	r := rand.New(rand.NewSource(time.Now().UnixNano() + int64(seed)))
+	if _, err := cryptorand.Read(buf); err == nil {
+		return
+	}
+	// Fallback keeps function total while avoiding all-zero payloads.
 	for i := range buf {
-		buf[i] = byte(r.Intn(256))
+		buf[i] = byte((i + seed) % 251)
 	}
 }
