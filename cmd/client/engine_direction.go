@@ -39,28 +39,58 @@ func (e *TestEngine) runReadLoop(ctx context.Context, conn net.Conn, timeout tim
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		conn.SetReadDeadline(time.Now().Add(timeout))
-		readStart := time.Now()
-		n, err := conn.Read(buf)
-		readDuration := time.Since(readStart)
+		n, readDuration, err := readWithDeadline(conn, buf, timeout)
 		if err != nil {
-			if errors.Is(err, io.EOF) {
+			done, retry, retErr := handleReadLoopError(err)
+			if done {
 				return nil
 			}
-			if isTimeoutError(err) {
+			if retry {
 				continue
 			}
-			return err
+			return retErr
 		}
 		if n <= 0 {
 			continue
 		}
 		onRead(n, readDuration)
-		if time.Since(lastRTTSample) > rttSampleInterval && e.pastWarmUp() {
-			e.rttCollector.AddSample(readDuration.Seconds() * 1000)
-			lastRTTSample = time.Now()
-		}
+		lastRTTSample = updateRTTSampleIfNeeded(
+			e,
+			lastRTTSample,
+			rttSampleInterval,
+			readDuration,
+		)
 	}
+}
+
+func handleReadLoopError(err error) (done bool, retry bool, retErr error) {
+	if errors.Is(err, io.EOF) {
+		return true, false, nil
+	}
+	if isTimeoutError(err) {
+		return false, true, nil
+	}
+	return false, false, err
+}
+
+func readWithDeadline(conn net.Conn, buf []byte, timeout time.Duration) (int, time.Duration, error) {
+	conn.SetReadDeadline(time.Now().Add(timeout))
+	readStart := time.Now()
+	n, err := conn.Read(buf)
+	return n, time.Since(readStart), err
+}
+
+func updateRTTSampleIfNeeded(
+	e *TestEngine,
+	lastRTTSample time.Time,
+	interval time.Duration,
+	readDuration time.Duration,
+) time.Time {
+	if time.Since(lastRTTSample) <= interval || !e.pastWarmUp() {
+		return lastRTTSample
+	}
+	e.rttCollector.AddSample(readDuration.Seconds() * 1000)
+	return time.Now()
 }
 
 func (e *TestEngine) runUpload(ctx context.Context, conn net.Conn) error {

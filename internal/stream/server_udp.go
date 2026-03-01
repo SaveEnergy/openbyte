@@ -239,7 +239,7 @@ func (s *Server) udpSender(clients *udpClients, clientKey string, client *udpCli
 				continue
 			}
 			udpRefreshWriteDeadline(s.udpConn, &writesSinceDeadline, deadlineRefreshPackets)
-			if err := udpSendDownloadPacket(s, packet, client); err != nil {
+			if udpSendDownloadPacket(s, packet, client) != nil {
 				return
 			}
 			writesSinceDeadline++
