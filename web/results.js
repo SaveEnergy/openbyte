@@ -13,7 +13,7 @@ const errorMessage = document.querySelector("#errorView .error-message");
 function trimTrailingSlashes(value) {
   if (typeof value !== "string" || value.length === 0) return value;
   let end = value.length;
-  while (end > 0 && value.charCodeAt(end - 1) === 47) {
+  while (end > 0 && value.codePointAt(end - 1) === 47) {
     end -= 1;
   }
   return value.slice(0, end);
