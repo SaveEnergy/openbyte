@@ -24,6 +24,7 @@ const (
 	pathCancel         = "/cancel"
 	pathComplete       = "/complete"
 	statusCompleted    = "completed"
+	maxErrorBodyBytes  = 8 * 1024
 )
 
 func startStream(ctx context.Context, config *Config) (*StreamResponse, error) {
@@ -65,11 +66,14 @@ func startStream(ctx context.Context, config *Config) (*StreamResponse, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		body, readErr := io.ReadAll(resp.Body)
+		body, readErr := readBoundedErrorBody(resp.Body, maxErrorBodyBytes)
 		if readErr != nil {
 			return nil, fmt.Errorf("read error response: %w", readErr)
 		}
-		return nil, fmt.Errorf("server error: %d %s", resp.StatusCode, string(body))
+		if body == "" {
+			body = http.StatusText(resp.StatusCode)
+		}
+		return nil, fmt.Errorf("server error: %d %s", resp.StatusCode, body)
 	}
 
 	var streamResp StreamResponse
@@ -280,6 +284,28 @@ func processWebSocketMessage(formatter OutputFormatter, msg *WebSocketMessage, r
 		return false, fmt.Errorf("test failed: %s", msg.Message)
 	}
 	return false, nil
+}
+
+func readBoundedErrorBody(body io.Reader, limit int64) (string, error) {
+	if body == nil {
+		return "", nil
+	}
+	data, err := io.ReadAll(io.LimitReader(body, limit+1))
+	if err != nil {
+		return "", err
+	}
+	if _, err := io.Copy(io.Discard, body); err != nil {
+		return "", err
+	}
+	truncated := int64(len(data)) > limit
+	if truncated {
+		data = data[:limit]
+	}
+	message := strings.TrimSpace(string(data))
+	if truncated && message != "" {
+		message += "... (truncated)"
+	}
+	return message, nil
 }
 
 func newHTTPClient(timeout time.Duration) *http.Client {

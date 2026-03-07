@@ -61,7 +61,9 @@ async function startTest() {
       const message = e.message || "Test failed";
       showError(message);
     }
-    resetToIdle();
+    if (state.abortController?.signal === signal) {
+      resetToIdle();
+    }
   } finally {
     if (state.abortController?.signal === signal) {
       state.isRunning = false;
@@ -201,7 +203,9 @@ function promptShareUrl(url) {
 
 function init() {
   loadSettings();
-  loadServers();
+  loadServers().catch((err) => {
+    showError(err?.message || "Failed to load servers");
+  });
   bindEvents({
     startTest,
     resetToIdle,

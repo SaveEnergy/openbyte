@@ -1,9 +1,11 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -231,6 +233,76 @@ func TestRunCancelStreamError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "cancel cleanup failed") {
 		t.Fatalf("error = %q, want cancel cleanup context", err.Error())
+	}
+}
+
+func TestRunClientSideTestCancelsStreamOnFormatterError(t *testing.T) {
+	cancelCalled := make(chan struct{}, 1)
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/api/v1/stream/s1/cancel" {
+			select {
+			case cancelCalled <- struct{}{}:
+			default:
+			}
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer apiServer.Close()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen test server: %v", err)
+	}
+	defer listener.Close()
+
+	go func() {
+		conn, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			return
+		}
+		defer conn.Close()
+		cmd := make([]byte, 1)
+		if _, readErr := io.ReadFull(conn, cmd); readErr != nil {
+			return
+		}
+		payload := bytes.Repeat([]byte("x"), 1024)
+		for {
+			if _, writeErr := conn.Write(payload); writeErr != nil {
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+
+	cfg := &Config{
+		Protocol:  "tcp",
+		Direction: "download",
+		Duration:  5,
+		Streams:   1,
+		ServerURL: apiServer.URL,
+		Timeout:   2,
+	}
+	streamResp := &StreamResponse{
+		StreamID:      "s1",
+		TestServerTCP: listener.Addr().String(),
+	}
+	formatter := &formatterWithErr{err: errors.New("stdout closed")}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = runClientSideTest(ctx, cfg, formatter, streamResp)
+	if err == nil {
+		t.Fatal("expected formatter error")
+	}
+	if !strings.Contains(err.Error(), "formatter output failed") {
+		t.Fatalf("error = %q, want formatter output failed", err.Error())
+	}
+	select {
+	case <-cancelCalled:
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected cancel cleanup request after formatter error")
 	}
 }
 

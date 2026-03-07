@@ -252,6 +252,10 @@ select.setting-input {
   z-index: 100;
 }
 
+.toast-success {
+  background: var(--accent-primary);
+}
+
 .toast-icon {
   font-size: 1rem;
 }

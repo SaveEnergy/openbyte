@@ -1,6 +1,7 @@
 package stream_test
 
 import (
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -180,6 +181,37 @@ func TestManagerFailStream(t *testing.T) {
 	}
 	if m.ActiveCount() != 0 {
 		t.Errorf("active = %d, want 0 after fail", m.ActiveCount())
+	}
+}
+
+func TestManagerFailStreamWithErrorStoresReason(t *testing.T) {
+	m := newTestManager()
+	defer m.Stop()
+
+	streamState, _ := m.CreateStream(testConfig(types.DirectionUpload))
+	if err := m.StartStream(streamState.Config.ID); err != nil {
+		t.Fatalf(startStreamErrFmt, err)
+	}
+
+	cause := errors.New("upload stream stalled")
+	if err := m.FailStreamWithError(
+		streamState.Config.ID,
+		types.Metrics{BytesTransferred: 128},
+		cause,
+	); err != nil {
+		t.Fatalf("FailStreamWithError: %v", err)
+	}
+
+	got, _ := m.GetStream(streamState.Config.ID)
+	snap := got.GetState()
+	if snap.Error == nil {
+		t.Fatal("stream error = nil, want failure reason")
+	}
+	if snap.Error.Error() != cause.Error() {
+		t.Fatalf("stream error = %q, want %q", snap.Error.Error(), cause.Error())
+	}
+	if snap.Status != types.StreamStatusFailed {
+		t.Fatalf("status = %v, want Failed", snap.Status)
 	}
 }
 

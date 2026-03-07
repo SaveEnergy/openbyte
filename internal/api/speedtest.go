@@ -20,20 +20,32 @@ type SpeedTestHandler struct {
 	activeDownloads    int64
 	activeUploads      int64
 	maxConcurrent      int64
+	maxConcurrentPerIP int
 	maxDurationSec     int
 	clientIPResolver   *ClientIPResolver
 	randomData         []byte
 	uploadBufPool      sync.Pool
 	fallbackRandomPool sync.Pool
+	ipMu               sync.Mutex
+	activeByIP         map[string]*speedtestIPCounts
+}
+
+type speedtestIPCounts struct {
+	downloads int
+	uploads   int
 }
 
 const (
-	speedtestRandomSize       = 4 * 1024 * 1024
-	uploadReadBufferSize      = 256 * 1024
-	deadlineCheckWriteSpacing = 64
-	headerContentType         = "Content-Type"
-	contentTypeJSON           = "application/json"
-	contentTypeOctetStream    = "application/octet-stream"
+	speedtestRandomSize    = 4 * 1024 * 1024
+	uploadReadBufferSize   = 256 * 1024
+	headerContentType      = "Content-Type"
+	contentTypeJSON        = "application/json"
+	contentTypeOctetStream = "application/octet-stream"
+)
+
+const (
+	speedtestIOIdleTimeout = 5 * time.Second
+	speedtestCloseGrace    = 1 * time.Second
 )
 
 func NewSpeedTestHandler(maxConcurrent, maxDurationSec int) *SpeedTestHandler {
@@ -45,6 +57,7 @@ func NewSpeedTestHandler(maxConcurrent, maxDurationSec int) *SpeedTestHandler {
 		maxConcurrent:  int64(maxConcurrent),
 		maxDurationSec: maxDurationSec,
 		randomData:     make([]byte, speedtestRandomSize),
+		activeByIP:     make(map[string]*speedtestIPCounts),
 		uploadBufPool: sync.Pool{
 			New: func() any { return make([]byte, uploadReadBufferSize) },
 		},
@@ -64,6 +77,15 @@ func (h *SpeedTestHandler) SetClientIPResolver(resolver *ClientIPResolver) {
 	h.clientIPResolver = resolver
 }
 
+func (h *SpeedTestHandler) SetMaxConcurrentPerIP(limit int) {
+	if limit < 0 {
+		limit = 0
+	}
+	h.ipMu.Lock()
+	h.maxConcurrentPerIP = limit
+	h.ipMu.Unlock()
+}
+
 func respondSpeedtestError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(code)
@@ -73,13 +95,13 @@ func respondSpeedtestError(w http.ResponseWriter, msg string, code int) {
 }
 
 func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
-	if atomic.AddInt64(&h.activeDownloads, 1) > h.maxConcurrent {
-		atomic.AddInt64(&h.activeDownloads, -1)
+	clientIP := h.resolveClientIP(r)
+	if !h.tryAcquireSpeedtestSlot(clientIP, true) {
 		drainRequestBody(r)
 		respondSpeedtestError(w, "too many concurrent downloads", http.StatusServiceUnavailable)
 		return
 	}
-	defer atomic.AddInt64(&h.activeDownloads, -1)
+	defer h.releaseSpeedtestSlot(clientIP, true)
 
 	duration, chunkSize, parseErr := parseDownloadParams(r, h.maxDurationSec)
 	if parseErr != nil {
@@ -105,17 +127,17 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	defer drainRequestBody(r)
 
-	if atomic.AddInt64(&h.activeUploads, 1) > h.maxConcurrent {
-		atomic.AddInt64(&h.activeUploads, -1)
+	clientIP := h.resolveClientIP(r)
+	if !h.tryAcquireSpeedtestSlot(clientIP, false) {
 		respondSpeedtestError(w, "too many concurrent uploads", http.StatusServiceUnavailable)
 		return
 	}
-	defer atomic.AddInt64(&h.activeUploads, -1)
+	defer h.releaseSpeedtestSlot(clientIP, false)
 
 	startTime := time.Now()
 	deadline := uploadReadDeadline(startTime, h.maxDurationSec)
 	controller := http.NewResponseController(w)
-	_ = controller.SetReadDeadline(deadline)
+	_ = refreshReadDeadline(controller, deadline)
 	readCtx, cancel := context.WithDeadline(r.Context(), deadline)
 	defer cancel()
 	var closeBodyOnce sync.Once
@@ -128,7 +150,7 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	totalBytes, readFailed := readUploadBody(readCtx, r.Body, deadline, &h.uploadBufPool)
+	totalBytes, readFailed := readUploadBody(readCtx, r.Body, controller, deadline, &h.uploadBufPool)
 	if readFailed {
 		respondSpeedtestError(w, "upload failed", http.StatusInternalServerError)
 		return
@@ -144,30 +166,31 @@ func uploadReadDeadline(start time.Time, maxDurationSec int) time.Time {
 	return start.Add(time.Duration(maxDurationSec) * time.Second)
 }
 
-func readUploadBody(readCtx context.Context, body io.Reader, deadline time.Time, pool *sync.Pool) (totalBytes int64, readFailed bool) {
+func readUploadBody(
+	readCtx context.Context,
+	body io.Reader,
+	controller *http.ResponseController,
+	deadline time.Time,
+	pool *sync.Pool,
+) (totalBytes int64, readFailed bool) {
 	buf := getUploadBuf(pool)
 	if pool != nil {
 		defer pool.Put(buf)
 	}
-	now := time.Now()
-	readIterations := 0
 	for {
 		select {
 		case <-readCtx.Done():
 			return totalBytes, false
 		default:
 		}
+		if time.Now().After(deadline) {
+			return totalBytes, false
+		}
+		_ = refreshReadDeadline(controller, deadline)
 		n, err := body.Read(buf)
 		totalBytes += int64(n)
 		if err != nil {
 			return totalBytes, !errors.Is(err, io.EOF)
-		}
-		readIterations++
-		if readIterations%32 == 0 {
-			now = time.Now()
-		}
-		if now.After(deadline) {
-			return totalBytes, false
 		}
 	}
 }
@@ -263,30 +286,28 @@ func (h *SpeedTestHandler) resolveRandomSource() ([]byte, func(), error) {
 
 func streamDownload(w http.ResponseWriter, r *http.Request, randomSource []byte, chunkSize int, duration time.Duration) {
 	flusher, canFlush := w.(http.Flusher)
-	deadline := time.Now().Add(duration)
+	streamDeadline := time.Now().Add(duration)
+	writeDeadline := streamDeadline.Add(speedtestCloseGrace)
 	controller := http.NewResponseController(w)
-	_ = controller.SetWriteDeadline(deadline.Add(5 * time.Second))
 	writeCount := 0
 	flushInterval := 8
 	offset := 0
-	now := time.Now()
 
-	for now.Before(deadline) {
+	for time.Now().Before(streamDeadline) {
 		if r.Context().Err() != nil {
 			return
 		}
+		_ = refreshWriteDeadline(controller, writeDeadline)
 		if writeChunkFromSource(w, randomSource, chunkSize, &offset) != nil {
 			return
 		}
 		writeCount++
-		if writeCount%deadlineCheckWriteSpacing == 0 {
-			now = time.Now()
-		}
 		if canFlush && writeCount%flushInterval == 0 {
 			flusher.Flush()
 		}
 	}
 	if canFlush {
+		_ = refreshWriteDeadline(controller, writeDeadline)
 		flusher.Flush()
 	}
 }
@@ -347,4 +368,104 @@ func writeChunkFromSource(w http.ResponseWriter, source []byte, chunkSize int, o
 		}
 	}
 	return nil
+}
+
+func (h *SpeedTestHandler) tryAcquireSpeedtestSlot(clientIP string, isDownload bool) bool {
+	counter := &h.activeUploads
+	if isDownload {
+		counter = &h.activeDownloads
+	}
+	if atomic.AddInt64(counter, 1) > h.maxConcurrent {
+		atomic.AddInt64(counter, -1)
+		return false
+	}
+	if !h.tryAcquirePerIP(clientIP, isDownload) {
+		atomic.AddInt64(counter, -1)
+		return false
+	}
+	return true
+}
+
+func (h *SpeedTestHandler) releaseSpeedtestSlot(clientIP string, isDownload bool) {
+	if isDownload {
+		atomic.AddInt64(&h.activeDownloads, -1)
+	} else {
+		atomic.AddInt64(&h.activeUploads, -1)
+	}
+	h.releasePerIP(clientIP, isDownload)
+}
+
+func (h *SpeedTestHandler) tryAcquirePerIP(clientIP string, isDownload bool) bool {
+	if clientIP == "" {
+		return true
+	}
+	h.ipMu.Lock()
+	defer h.ipMu.Unlock()
+	if h.maxConcurrentPerIP <= 0 {
+		return true
+	}
+	counts := h.activeByIP[clientIP]
+	if counts == nil {
+		counts = &speedtestIPCounts{}
+	}
+	current := counts.uploads
+	if isDownload {
+		current = counts.downloads
+	}
+	if current >= h.maxConcurrentPerIP {
+		return false
+	}
+	if h.activeByIP[clientIP] == nil {
+		h.activeByIP[clientIP] = counts
+	}
+	if isDownload {
+		counts.downloads++
+	} else {
+		counts.uploads++
+	}
+	return true
+}
+
+func (h *SpeedTestHandler) releasePerIP(clientIP string, isDownload bool) {
+	if clientIP == "" {
+		return
+	}
+	h.ipMu.Lock()
+	defer h.ipMu.Unlock()
+	counts := h.activeByIP[clientIP]
+	if counts == nil {
+		return
+	}
+	if isDownload {
+		if counts.downloads > 0 {
+			counts.downloads--
+		}
+	} else if counts.uploads > 0 {
+		counts.uploads--
+	}
+	if counts.downloads == 0 && counts.uploads == 0 {
+		delete(h.activeByIP, clientIP)
+	}
+}
+
+func speedtestIdleDeadline(absoluteDeadline time.Time) time.Time {
+	idleDeadline := time.Now().Add(speedtestIOIdleTimeout)
+	if idleDeadline.After(absoluteDeadline) {
+		return absoluteDeadline
+	}
+	return idleDeadline
+}
+
+func refreshReadDeadline(controller *http.ResponseController, absoluteDeadline time.Time) error {
+	if controller == nil {
+		return nil
+	}
+	return controller.SetReadDeadline(speedtestIdleDeadline(absoluteDeadline))
+}
+
+func refreshWriteDeadline(controller *http.ResponseController, absoluteDeadline time.Time) error {
+	if controller == nil {
+		return nil
+	}
+	return controller.SetWriteDeadline(speedtestIdleDeadline(absoluteDeadline))
 }

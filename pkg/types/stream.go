@@ -90,6 +90,12 @@ func (ss *StreamState) UpdateMetrics(m Metrics) {
 	}
 }
 
+func (ss *StreamState) SetError(err error) {
+	ss.mu.Lock()
+	defer ss.mu.Unlock()
+	ss.Error = err
+}
+
 func (ss *StreamState) GetState() StreamSnapshot {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()

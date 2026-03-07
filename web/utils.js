@@ -32,6 +32,55 @@ export async function consumeErrorBody(res) {
   }
 }
 
+function normalizeMessage(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function responseMessageFromJSON(payload) {
+  if (!payload || typeof payload !== "object") return "";
+  return (
+    normalizeMessage(payload.error) ||
+    normalizeMessage(payload.message) ||
+    normalizeMessage(payload.detail)
+  );
+}
+
+export async function readErrorResponseMessage(res, fallbackMessage) {
+  if (!res) return normalizeMessage(fallbackMessage);
+
+  const fallback = normalizeMessage(fallbackMessage) || `HTTP ${res.status}`;
+  const contentType = res.headers.get("Content-Type") || "";
+  const isJSON = contentType.includes("application/json");
+  const responseClone = typeof res.clone === "function" ? res.clone() : null;
+  let parseFailed = false;
+
+  try {
+    if (isJSON) {
+      const payload = await res.json();
+      const message = responseMessageFromJSON(payload);
+      return message || fallback;
+    } else {
+      const text = normalizeMessage(await res.text());
+      if (text) return text;
+      return fallback;
+    }
+  } catch (err) {
+    parseFailed = true;
+    console.debug("failed to parse error response body", err);
+  }
+
+  if (responseClone && parseFailed) {
+    try {
+      const text = normalizeMessage(await responseClone.text());
+      if (text) return text;
+    } catch (err) {
+      console.debug("failed to read fallback error response body", err);
+    }
+  }
+
+  return fallback;
+}
+
 export function retryAfterMs(
   response,
   fallbackMs = TEST_CONFIG.RETRY_AFTER_DEFAULT_MS,

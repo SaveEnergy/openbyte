@@ -13,6 +13,8 @@ import (
 
 const errStreamAlreadyFinalized = "stream already finalized"
 
+const defaultFailureReason = "reported_failed_status"
+
 type Manager struct {
 	streams               map[string]*types.StreamState
 	activeStreams         map[string]string
@@ -210,6 +212,10 @@ func (m *Manager) CompleteStream(streamID string, metrics types.Metrics) error {
 }
 
 func (m *Manager) FailStream(streamID string, metrics types.Metrics) error {
+	return m.FailStreamWithError(streamID, metrics, nil)
+}
+
+func (m *Manager) FailStreamWithError(streamID string, metrics types.Metrics, cause error) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -226,13 +232,27 @@ func (m *Manager) FailStream(streamID string, metrics types.Metrics) error {
 		return errors.ErrInvalidConfig(errStreamAlreadyFinalized, nil)
 	}
 	state.UpdateMetrics(metrics)
+	state.SetError(cause)
 	state.UpdateStatus(types.StreamStatusFailed)
 	m.releaseActiveStreamLocked(streamID)
 
 	logging.Info("Stream failed",
-		logging.Field{Key: "id", Value: streamID})
+		logging.Field{Key: "id", Value: streamID},
+		logging.Field{Key: "throughput_mbps", Value: metrics.ThroughputMbps},
+		logging.Field{Key: "bytes_transferred", Value: metrics.BytesTransferred},
+		logging.Field{Key: "reason", Value: failureReason(cause)})
 
 	return nil
+}
+
+func failureReason(cause error) string {
+	if cause == nil {
+		return defaultFailureReason
+	}
+	if message := cause.Error(); message != "" {
+		return message
+	}
+	return defaultFailureReason
 }
 
 func (m *Manager) UpdateMetrics(streamID string, metrics types.Metrics) error {

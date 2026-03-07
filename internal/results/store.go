@@ -1,6 +1,7 @@
 package results
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"errors"
@@ -17,11 +18,13 @@ import (
 )
 
 const (
-	retentionDays   = 90
-	cleanupInterval = 1 * time.Hour
-	idLength        = 8
-	idCharset       = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	idBase          = len(idCharset)
+	retentionDays      = 90
+	cleanupInterval    = 1 * time.Hour
+	idLength           = 8
+	idCharset          = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	idBase             = len(idCharset)
+	sqliteMaxOpenConns = 3
+	sqliteBusyTimeout  = 5000
 )
 
 var ErrStoreRetryable = errors.New("results store retryable")
@@ -54,22 +57,17 @@ func New(dbPath string, maxResults int) (*Store, error) {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
 
-	db.SetMaxOpenConns(3)
-	db.SetMaxIdleConns(2)
+	db.SetMaxOpenConns(sqliteMaxOpenConns)
+	db.SetMaxIdleConns(sqliteMaxOpenConns)
 
 	if err := db.Ping(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
 
-	// modernc.org/sqlite requires explicit PRAGMAs (not query-string params)
-	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
+	if err := configureSQLitePool(db, sqliteMaxOpenConns); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("set WAL mode: %w", err)
-	}
-	if _, err := db.Exec("PRAGMA busy_timeout=5000"); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("set busy_timeout: %w", err)
+		return nil, err
 	}
 
 	if err := migrate(db); err != nil {
@@ -319,4 +317,44 @@ func generateID() (string, error) {
 		}
 	}
 	return string(b), nil
+}
+
+type sqliteExecContext interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+func configureSQLitePool(db *sql.DB, count int) error {
+	ctx := context.Background()
+	conns := make([]*sql.Conn, 0, count)
+	defer func() {
+		for _, conn := range conns {
+			if conn != nil {
+				_ = conn.Close()
+			}
+		}
+	}()
+	for i := 0; i < count; i++ {
+		conn, err := db.Conn(ctx)
+		if err != nil {
+			return fmt.Errorf("open sqlite connection %d: %w", i+1, err)
+		}
+		conns = append(conns, conn)
+		if err := configureSQLitePragmas(ctx, conn); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func configureSQLitePragmas(ctx context.Context, execer sqliteExecContext) error {
+	if _, err := execer.ExecContext(ctx, "PRAGMA journal_mode=WAL"); err != nil {
+		return fmt.Errorf("set WAL mode: %w", err)
+	}
+	if _, err := execer.ExecContext(ctx, "PRAGMA synchronous=NORMAL"); err != nil {
+		return fmt.Errorf("set synchronous mode: %w", err)
+	}
+	if _, err := execer.ExecContext(ctx, fmt.Sprintf("PRAGMA busy_timeout=%d", sqliteBusyTimeout)); err != nil {
+		return fmt.Errorf("set busy_timeout: %w", err)
+	}
+	return nil
 }

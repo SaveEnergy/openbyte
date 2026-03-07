@@ -16,11 +16,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Validate SemVer tag early
         run: |
           set -euo pipefail
           echo "${GITHUB_REF_NAME}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "invalid release tag format: ${GITHUB_REF_NAME}"; exit 1; }
+
+      - name: Verify release tag ancestry
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          TAG_COMMIT="$(git rev-list -n1 "${GITHUB_REF_NAME}")"
+          git merge-base --is-ancestor "$TAG_COMMIT" origin/main || {
+            echo "release tag must point to a commit reachable from origin/main"
+            exit 1
+          }
 
       - name: Set up Go
         uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
@@ -29,10 +41,10 @@ jobs:
           cache: true
 
       - name: Test (release gate)
-        run: go test -short ./...
+        run: go test ./...
 
       - name: Race tests (release gate)
-        run: go test -race -short ./... -p 1
+        run: go test -race ./... -p 1
 
       - name: OpenAPI lint
         run: npx @redocly/cli@2.18.1 lint api/openapi.yaml --config redocly.yaml
@@ -139,12 +151,13 @@ jobs:
 
   deploy:
     needs: release
-    if: vars.SSH_HOST != '' && vars.SSH_USER != '' && vars.REMOTE_DIR != '' && vars.GHCR_USERNAME != '' && needs.release.outputs.image_pushed == 'true'
+    if: vars.SSH_HOST != '' && vars['SSH_HOST_FINGERPRINT'] != '' && vars.SSH_USER != '' && vars.REMOTE_DIR != '' && vars.GHCR_USERNAME != '' && needs.release.outputs.image_pushed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     env:
       SSH_HOST: ${{ vars.SSH_HOST }}
+      SSH_HOST_FINGERPRINT: ${{ vars['SSH_HOST_FINGERPRINT'] }}
       SSH_USER: ${{ vars.SSH_USER }}
       SSH_PORT: ${{ vars.SSH_PORT }}
       REMOTE_DIR: ${{ vars.REMOTE_DIR }}
@@ -155,6 +168,7 @@ jobs:
       - name: Validate deploy configuration
         run: |
           [ -n "${SSH_HOST}" ] || { echo "SSH_HOST not set"; exit 1; }
+          [ -n "${SSH_HOST_FINGERPRINT}" ] || { echo "SSH_HOST_FINGERPRINT not set"; exit 1; }
           [ -n "${SSH_USER}" ] || { echo "SSH_USER not set"; exit 1; }
           [ -n "${REMOTE_DIR}" ] || { echo "REMOTE_DIR not set"; exit 1; }
           [ -n "${GHCR_USERNAME}" ] || { echo "GHCR_USERNAME not set"; exit 1; }
@@ -167,6 +181,7 @@ jobs:
       - name: Sync compose files to server
         env:
           SSH_HOST: ${{ env.SSH_HOST }}
+          SSH_HOST_FINGERPRINT: ${{ env.SSH_HOST_FINGERPRINT }}
           SSH_USER: ${{ env.SSH_USER }}
           SSH_PORT: ${{ env.SSH_PORT }}
           REMOTE_DIR: ${{ env.REMOTE_DIR }}
@@ -179,8 +194,15 @@ jobs:
           printf '%s\n' "$SSH_KEY" > "$SSH_TMP_DIR/id_rsa"
           chmod 600 "$SSH_TMP_DIR/id_rsa"
           touch "$SSH_TMP_DIR/known_hosts"
-          timeout 15 ssh-keyscan -p "${SSH_PORT:-22}" -H "$SSH_HOST" > "$SSH_TMP_DIR/known_hosts.tmp"
-          [ -s "$SSH_TMP_DIR/known_hosts.tmp" ] || { echo "ssh-keyscan returned no host keys"; exit 1; }
+          timeout 15 ssh-keyscan -t ed25519 -p "${SSH_PORT:-22}" -H "$SSH_HOST" > "$SSH_TMP_DIR/known_hosts.tmp"
+          [ -s "$SSH_TMP_DIR/known_hosts.tmp" ] || { echo "ssh-keyscan returned no ed25519 host keys"; exit 1; }
+          scanned_fingerprint="$(ssh-keygen -lf "$SSH_TMP_DIR/known_hosts.tmp" -E sha256 | awk 'NR==1 {print $2}')"
+          [ "$scanned_fingerprint" = "$SSH_HOST_FINGERPRINT" ] || {
+            echo "ssh host fingerprint mismatch"
+            echo "expected=$SSH_HOST_FINGERPRINT"
+            echo "got=${scanned_fingerprint:-missing}"
+            exit 1
+          }
           cat "$SSH_TMP_DIR/known_hosts.tmp" >> "$SSH_TMP_DIR/known_hosts"
           rm -f "$SSH_TMP_DIR/known_hosts.tmp"
           ssh -i "$SSH_TMP_DIR/id_rsa" -o UserKnownHostsFile="$SSH_TMP_DIR/known_hosts" -p "${SSH_PORT:-22}" "${SSH_USER}@${SSH_HOST}" "mkdir -p \"${REMOTE_DIR}/docker\""
@@ -207,6 +229,7 @@ jobs:
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ env.SSH_HOST }}
+          fingerprint: ${{ env.SSH_HOST_FINGERPRINT }}
           username: ${{ env.SSH_USER }}
           key: ${{ env.SSH_KEY }}
           port: ${{ env.SSH_PORT || 22 }}

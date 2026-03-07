@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/config"
@@ -312,6 +313,7 @@ func (h *Handler) CompleteStream(w http.ResponseWriter, r *http.Request, streamI
 	var req struct {
 		Status  string        `json:"status"`
 		Metrics types.Metrics `json:"metrics"`
+		Error   string        `json:"error,omitempty"`
 	}
 	if err := decodeJSONBody(w, r, &req, maxJSONBodyBytes); err != nil {
 		respondJSONBodyError(w, err)
@@ -328,7 +330,11 @@ func (h *Handler) CompleteStream(w http.ResponseWriter, r *http.Request, streamI
 			return
 		}
 	} else if req.Status == "failed" {
-		if err := h.manager.FailStream(streamID, req.Metrics); err != nil {
+		var cause error
+		if reason := strings.TrimSpace(req.Error); reason != "" {
+			cause = stdErrors.New(reason)
+		}
+		if err := h.manager.FailStreamWithError(streamID, req.Metrics, cause); err != nil {
 			respondError(w, err, http.StatusNotFound)
 			return
 		}

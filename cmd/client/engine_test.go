@@ -142,7 +142,7 @@ func TestRunUploadSendsCommandAndPayloadUntilContextDone(t *testing.T) {
 	}
 }
 
-func TestRunBidirectionalSendsCommandAndReturnsOnPeerClose(t *testing.T) {
+func TestRunBidirectionalSendsCommandAndReturnsErrorOnPeerClose(t *testing.T) {
 	engine := newEngineForUnitTest(0)
 	clientConn, serverConn := net.Pipe()
 	t.Cleanup(func() {
@@ -160,8 +160,40 @@ func TestRunBidirectionalSendsCommandAndReturnsOnPeerClose(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	t.Cleanup(cancel)
-	if err := engine.runBidirectional(ctx, clientConn); err != nil {
-		t.Fatalf("runBidirectional: %v", err)
+	if err := engine.runBidirectional(ctx, clientConn); err == nil {
+		t.Fatal("runBidirectional error = nil, want transport failure")
+	}
+	if cmd := <-gotCommand; cmd != 'B' {
+		t.Fatalf("bidirectional command = %q, want %q", cmd, 'B')
+	}
+}
+
+func TestRunBidirectionalReturnsContextErrorOnTimeout(t *testing.T) {
+	engine := newEngineForUnitTest(0)
+	clientConn, serverConn := net.Pipe()
+	t.Cleanup(func() {
+		_ = clientConn.Close()
+		_ = serverConn.Close()
+	})
+
+	gotCommand := make(chan byte, 1)
+	go func() {
+		cmd := make([]byte, 1)
+		_, _ = io.ReadFull(serverConn, cmd)
+		gotCommand <- cmd[0]
+		buf := make([]byte, 1024)
+		for {
+			if _, err := serverConn.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	err := engine.runBidirectional(ctx, clientConn)
+	if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+		t.Fatalf("runBidirectional error = %v, want context cancellation", err)
 	}
 	if cmd := <-gotCommand; cmd != 'B' {
 		t.Fatalf("bidirectional command = %q, want %q", cmd, 'B')
@@ -254,8 +286,8 @@ func TestRunStreamWorkerDispatchBidirectional(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	t.Cleanup(cancel)
-	if err := engine.runStreamWorker(ctx, clientConn); err != nil {
-		t.Fatalf("runStreamWorker(bidirectional): %v", err)
+	if err := engine.runStreamWorker(ctx, clientConn); err == nil {
+		t.Fatal("runStreamWorker(bidirectional) error = nil, want non-nil from peer close")
 	}
 	if cmd := <-gotCommand; cmd != 'B' {
 		t.Fatalf("bidirectional command = %q, want %q", cmd, 'B')

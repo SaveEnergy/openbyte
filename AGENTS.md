@@ -82,7 +82,7 @@
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| _none_ | - | - | - | Active queue clear after Sonar closure pass. | Reopened rows `20260226-sonar-07/08/09` implemented with local green gates and moved to closed history. | Re-open only if next Sonar refresh still reports residual OPEN items. |
+| _none_ | - | - | - | No remaining active backlog rows after the 2026-03-07 closure wave. | Runtime, frontend, CI/security, docs, and observability items from the last implementation spree were landed and verified locally. | `go test ./internal/api ./internal/stream ./test/unit/api ./test/unit/stream` and `bunx playwright test test/e2e/ui/basic.spec.js` |
 
 ### Check Hold (manual/external)
 
@@ -94,8 +94,9 @@
 
 - Strict OPEN filter parity maintained with Cloud:
   - Query: `projects=[SaveEnergy_openbyte]`, `issueStatuses=[OPEN]`, `ps=500`
-  - Total OPEN: `23` (last remote scan snapshot before latest local closure pass)
-  - Current top tracked rules: `go:S3776=6`, `javascript:S1854=4`, `javascript:S1481=4`, `go:S1192=3`, `javascript:S3358=2`, `javascript:S3776=1`, `javascript:S7785=1`, `javascript:S7787=1`, `godre:S8196=1` (MCP live fetch on 2026-02-26; project `SaveEnergy_openbyte`)
+  - Total OPEN: `0` (MCP live fetch on 2026-03-01; all issues closed)
+  - Previous snapshot: `23` (2026-02-26); all resolved via sonar-07/08/09 closure wave
+  - Current top tracked rules: none (all `0`)
   - Rule-to-backlog mapping refreshed:
     - `go:S3776`, `godre:S8196` -> closed in `20260226-sonar-07` (pending remote rescan parity)
     - `go:S1192` -> closed in `20260226-sonar-08` (pending remote rescan parity)
@@ -109,8 +110,9 @@
 ### Recently Closed IDs
 
 - Most historical IDs intentionally pruned for readability; canonical record remains in git history.
-- Recent close: `20260226-web-05`.
+- Recent close: `20260301-doc-02`.
 - Latest completed wave (moved `Check -> Done -> removed`):
+  - `20260228-sec-06`, `20260228-go-32`, `20260228-ui-09`, `20260228-go-33`, `20260301-web-07`, `20260301-a11y-02`, `20260301-ui-10`, `20260301-go-34`, `20260301-go-35`, `20260301-api-04`, `20260301-ws-02`, `20260301-ci-11`, `20260301-sec-07`, `20260301-web-06`, `20260301-web-08`, `20260301-ops-01`, `20260301-doc-02`
   - `20260217-web-02`, `20260217-go-02`, `20260217-go-03`, `20260217-go-04`, `20260217-go-05`, `20260217-go-06`, `20260217-go-07`, `20260217-go-08`, `20260217-go-09`
   - `20260217-test-02`, `20260217-test-03`, `20260217-test-04`, `20260217-test-05`, `20260217-test-06`, `20260217-test-07`
   - `20260217-sec-01`, `20260218-go-12`, `20260218-go-13`, `20260219-ui-01`, `20260219-ui-02`, `20260219-web-02`, `20260219-web-05`, `20260219-web-06`, `20260219-ui-03`, `20260219-cli-03`, `20260219-go-16`, `20260219-cli-01`, `20260219-cli-02`, `20260219-ui-04`, `20260219-ui-05`, `20260219-go-15`, `20260217-test-09`, `20260217-test-10`, `20260219-go-17`, `20260219-go-18`, `20260219-go-19`, `20260219-ci-01`, `20260219-doc-01`, `20260219-ui-06`, `20260219-ui-07`, `20260219-go-20`, `20260219-go-21`, `20260220-sec-01`, `20260220-api-01`, `20260219-go-22`, `20260220-web-01`, `20260220-meta-01`, `20260219-sdk-01`, `20260219-reg-01`, `20260219-test-13`, `20260219-test-11`, `20260219-test-12`, `20260226-sec-02`, `20260226-sonar-01`, `20260226-sonar-02`, `20260226-ci-10`, `20260226-go-24`, `20260226-go-25`, `20260226-go-26`, `20260226-sonar-03`, `20260226-api-02`, `20260226-web-03`, `20260226-go-04`, `20260226-web-04`, `20260226-sonar-04`, `20260226-sonar-05`, `20260226-sonar-06`, `20260226-sonar-07`, `20260226-sonar-08`, `20260226-sonar-09`, `20260226-perf-03`, `20260226-perf-05`, `20260226-perf-06`, `20260226-sec-03`, `20260226-sec-04`, `20260226-go-27`, `20260226-go-28`, `20260226-go-29`, `20260226-api-03`, `20260226-web-05`
@@ -130,6 +132,10 @@
 - Prefer behavior-preserving refactors + targeted regression tests over broad rewrites.
 - Active backlog rows keep unresolved/external items only; this marathon closed all currently open rows (`Done` or `Cancelled`) and folded completion history into `Recently Closed IDs`.
 - A1 fifth-pass analysis (2026-02-26): security/reliability findings (ClientIP spoofing chain, missing HSTS, UDP deadline syscall overhead, SDK timeout defaults, proxy port stripping) were implemented and verified in marathon wave.
+- 2026-03-01 A2 pass-5: Sonar OPEN confirmed `0` (MCP live fetch); identified cancel-restart race in `startTest` catch (behavioral bug), frontend resilience gaps (loadServers timeout, localStorage.getItem guard, error body parsing), observability blind spots (stream failure reason logging, speed test request logging exclusion), `.env.example` missing 23 runtime env vars; browser baseline established at Safari 15.4 / Chrome 93 / Firefox 101.
+- 2026-03-07 A0 closure wave: drained the active queue by landing the remaining runtime/web/docs/observability rows. `loadServers()` now times out and surfaces structured server errors, `loadSettings()` tolerates `localStorage.getItem` failures, failed stream completion can carry/stash explicit reasons for logs/status payloads, request logging now retains websocket + download visibility and logs only abnormal/slow upload requests while still skipping noisy `/ping`, and `.env.example` now documents the missing runtime/server/registry/TLS knobs. Focused verification green: `go test ./internal/api ./internal/stream ./test/unit/api ./test/unit/stream`, `bunx playwright test test/e2e/ui/basic.spec.js`.
+- A1 sixth-pass analysis (2026-02-28): Deep dive into HTTP stream timeouts, SQLite performance, and client error handling. Identified a Slowloris vulnerability in HTTP test endpoints due to absolute timeouts. Found missing `PRAGMA synchronous=NORMAL` causing slow SQLite WAL inserts. Discovered uncaught `localStorage` exceptions breaking the web UI in incognito mode. Identified a client-side bug where IO errors leave orphaned streams running on the server. Added to active queue.
+- A0 multi-pass critique (2026-03-01, skills-guided): added unique frontend/runtime/CI backlog rows (`20260301-web-07`, `20260301-a11y-02`, `20260301-ui-10`, `20260301-go-34`, `20260301-go-35`, `20260301-api-04`, `20260301-ws-02`, `20260301-ci-11`, `20260301-sec-07`) with evidence and focused checks; intentionally excluded overlaps with active A1 rows.
 
 ### Verification Baseline
 

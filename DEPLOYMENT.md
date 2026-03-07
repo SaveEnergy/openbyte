@@ -42,6 +42,7 @@ Workflow lives at `.github/workflows/ci.yml`:
 **Repository variables**
 
 - `SSH_HOST` — server hostname/IP
+- `SSH_HOST_FINGERPRINT` — SSH host key fingerprint in SHA256 form (for example `SHA256:abcd...`)
 - `SSH_USER` — SSH user
 - `SSH_PORT` — optional (default 22)
 - `REMOTE_DIR` — path containing `docker/docker-compose.ghcr.yaml` (e.g., `/opt/openbyte`)
@@ -51,6 +52,13 @@ Notes:
 
 - CI/release workflows derive `GHCR_OWNER` from the repository owner.
 - CI deploy sets `IMAGE_TAG` to the commit SHA; release deploy sets `IMAGE_TAG` to the semver tag.
+- CI/release deploys fail closed if the scanned SSH host key fingerprint does not match `SSH_HOST_FINGERPRINT`.
+
+Record the fingerprint out-of-band before enabling deploys:
+
+```bash
+ssh-keyscan -t ed25519 your-server.example.com | ssh-keygen -lf - -E sha256
+```
 
 **GHCR pull on server**
 
@@ -114,6 +122,8 @@ SemVer release workflow: `.github/workflows/release.yml`.
 git tag v1.2.3
 git push origin v1.2.3
 ```
+
+Release tags must point to commits already reachable from `origin/main`; the release workflow verifies tag ancestry before publishing artifacts.
 
 ### 2. Outputs
 

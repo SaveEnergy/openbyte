@@ -1,7 +1,7 @@
 /** Latency measurement and loaded-latency probe. */
 
 import { getApiBase, state, TEST_CONFIG } from "./state.js";
-import { sleep } from "./utils.js";
+import { fetchWithTimeout } from "./utils.js";
 import { updateNetworkDisplay } from "./network.js";
 import { updateProgress, updateSpeed } from "./ui.js";
 
@@ -43,35 +43,72 @@ function computeJitter(samples) {
   return sumDiff / (samples.length - 1);
 }
 
+function sleepWithSignal(ms, signal) {
+  if (ms <= 0 || !signal) return Promise.resolve();
+  if (signal.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    let settled = false;
+    const complete = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal.removeEventListener("abort", complete);
+      resolve();
+    };
+    const timer = setTimeout(complete, ms);
+    signal.addEventListener("abort", complete, { once: true });
+  });
+}
+
 export function startLoadedLatencyProbe(signal) {
   const samples = [];
   let running = true;
+  const probeController = new AbortController();
+  const onAbort = () => probeController.abort();
+  if (signal.aborted) {
+    probeController.abort();
+  } else {
+    signal.addEventListener("abort", onAbort, { once: true });
+  }
 
   const loop = async () => {
-    while (running && !signal.aborted) {
-      const start = performance.now();
-      try {
-        const res = await fetch(`${getApiBase()}/ping`, {
-          method: "GET",
-          cache: "no-store",
-          signal,
-        });
-        samples.push(performance.now() - start);
-        await res.text().catch(() => {});
-      } catch (err) {
-        console.debug("loaded latency probe ping failed", err);
-        if (!running) break;
+    try {
+      while (running && !signal.aborted) {
+        const start = performance.now();
+        try {
+          const res = await fetchWithTimeout(
+            `${getApiBase()}/ping`,
+            {
+              method: "GET",
+              cache: "no-store",
+              signal: probeController.signal,
+            },
+            TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
+          );
+          samples.push(performance.now() - start);
+          await res.text().catch(() => {});
+        } catch (err) {
+          console.debug("loaded latency probe ping failed", err);
+          if (!running || signal.aborted || probeController.signal.aborted)
+            break;
+        }
+        await sleepWithSignal(
+          TEST_CONFIG.LOADED_LATENCY_POLL_MS,
+          probeController.signal,
+        );
       }
-      await sleep(TEST_CONFIG.LOADED_LATENCY_POLL_MS);
+    } finally {
+      signal.removeEventListener("abort", onAbort);
     }
   };
 
   const promise = loop();
 
   return {
-    stop() {
+    async stop() {
       running = false;
-      return promise;
+      probeController.abort();
+      await promise;
     },
     getMedian() {
       if (samples.length === 0) return 0;

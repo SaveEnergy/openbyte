@@ -35,3 +35,9 @@ func TestCleanupRemovesExpiredPendingStream(t *testing.T) {
 		t.Fatalf("active count after cleanup = %d, want 0", got)
 	}
 }
+
+func TestFailureReasonDefaults(t *testing.T) {
+	if got := failureReason(nil); got != defaultFailureReason {
+		t.Fatalf("failureReason(nil) = %q, want %q", got, defaultFailureReason)
+	}
+}

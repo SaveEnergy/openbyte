@@ -194,6 +194,7 @@ func setupRuntimeResources(cfg *config.Config, version string, resources *server
 	resources.wsServer = websocket.NewServer()
 	resources.wsServer.SetAllowedOrigins(cfg.AllowedOrigins)
 	resources.wsServer.SetPingInterval(cfg.WebSocketPingInterval)
+	resources.wsServer.SetConnectionLimits(cfg.MaxConcurrentTests, cfg.MaxConcurrentPerIP)
 
 	if err := os.MkdirAll(cfg.DataDir, 0755); err != nil {
 		logging.Error("Failed to create data directory", logging.Field{Key: "error", Value: err})

@@ -291,6 +291,65 @@ func TestDownloadAtCapacityDrainsBodyBefore503(t *testing.T) {
 	}
 }
 
+func TestDownloadPerIPLimitRejectsSameIPAllowsDifferentIP(t *testing.T) {
+	handler := api.NewSpeedTestHandler(4, 300)
+	handler.SetMaxConcurrentPerIP(2)
+
+	sameIP := "203.0.113.10:1234"
+	otherIP := "203.0.113.11:1234"
+	cancels := make([]context.CancelFunc, 2)
+	done := make(chan struct{}, 2)
+	started := make([]chan struct{}, 2)
+
+	for i := range cancels {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancels[i] = cancel
+		started[i] = make(chan struct{})
+		go func(ch chan struct{}) {
+			defer func() { done <- struct{}{} }()
+			req := httptest.NewRequest(http.MethodGet, downloadEndpointBase+speedtestQueryDur60Chunk, nil)
+			req = req.WithContext(ctx)
+			req.RemoteAddr = sameIP
+			sw := &signalWriter{ResponseRecorder: httptest.NewRecorder(), started: ch}
+			handler.Download(sw, req)
+		}(started[i])
+	}
+
+	for _, ch := range started {
+		select {
+		case <-ch:
+		case <-time.After(speedtestWaitTimeout):
+			t.Fatal(speedtestWaitDownloadStartTimeout)
+		}
+	}
+
+	sameReq := httptest.NewRequest(http.MethodGet, downloadEndpointBase+speedtestQueryDur1Chunk, nil)
+	sameReq.RemoteAddr = sameIP
+	sameRec := httptest.NewRecorder()
+	handler.Download(sameRec, sameReq)
+	if sameRec.Code != statusServiceUnavailable {
+		t.Fatalf(speedtestExpected503AtLimitFmt, sameRec.Code)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	t.Cleanup(cancel)
+	otherReq := httptest.NewRequest(http.MethodGet, downloadEndpointBase+speedtestQueryDur1Chunk, nil)
+	otherReq = otherReq.WithContext(ctx)
+	otherReq.RemoteAddr = otherIP
+	otherRec := httptest.NewRecorder()
+	handler.Download(otherRec, otherReq)
+	if otherRec.Code != http.StatusOK {
+		t.Fatalf(speedtestExpected200AfterCancelFmt, otherRec.Code)
+	}
+
+	for _, cancel := range cancels {
+		cancel()
+	}
+	for range cancels {
+		<-done
+	}
+}
+
 func TestDownloadValidationRejectsDrainBody(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 
@@ -412,6 +471,67 @@ func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 	handler.Upload(recAfter, reqAfter)
 	if recAfter.Code != http.StatusOK {
 		t.Fatalf(speedtestExpected200AfterCancelFmt, recAfter.Code)
+	}
+}
+
+func TestUploadPerIPLimitRejectsSameIPAllowsDifferentIP(t *testing.T) {
+	handler := api.NewSpeedTestHandler(4, 300)
+	handler.SetMaxConcurrentPerIP(2)
+
+	sameIP := "203.0.113.10:1234"
+	otherIP := "203.0.113.11:1234"
+	cancels := make([]context.CancelFunc, 2)
+	done := make(chan struct{}, 2)
+	started := make([]chan struct{}, 2)
+
+	for i := range cancels {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancels[i] = cancel
+		started[i] = make(chan struct{})
+		go func(ch chan struct{}) {
+			defer func() { done <- struct{}{} }()
+			pr, pw := io.Pipe()
+			go func() {
+				<-ctx.Done()
+				_ = pw.Close()
+			}()
+			body := &signalReader{ReadCloser: io.NopCloser(pr), started: ch}
+			req := httptest.NewRequest(http.MethodPost, uploadEndpoint, body)
+			req.RemoteAddr = sameIP
+			rec := httptest.NewRecorder()
+			handler.Upload(rec, req)
+		}(started[i])
+	}
+
+	for _, ch := range started {
+		select {
+		case <-ch:
+		case <-time.After(speedtestWaitTimeout):
+			t.Fatal(speedtestWaitUploadStartTimeout)
+		}
+	}
+
+	sameReq := httptest.NewRequest(http.MethodPost, uploadEndpoint, bytes.NewReader([]byte("data")))
+	sameReq.RemoteAddr = sameIP
+	sameRec := httptest.NewRecorder()
+	handler.Upload(sameRec, sameReq)
+	if sameRec.Code != statusServiceUnavailable {
+		t.Fatalf(speedtestExpected503AtLimitFmt, sameRec.Code)
+	}
+
+	otherReq := httptest.NewRequest(http.MethodPost, uploadEndpoint, bytes.NewReader(bytes.Repeat([]byte("x"), 1024)))
+	otherReq.RemoteAddr = otherIP
+	otherRec := httptest.NewRecorder()
+	handler.Upload(otherRec, otherReq)
+	if otherRec.Code != http.StatusOK {
+		t.Fatalf(speedtestExpected200AfterCancelFmt, otherRec.Code)
+	}
+
+	for _, cancel := range cancels {
+		cancel()
+	}
+	for range cancels {
+		<-done
 	}
 }
 

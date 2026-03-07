@@ -157,6 +157,43 @@ func TestCompleteStreamFailed(t *testing.T) {
 	}
 }
 
+func TestCompleteStreamFailedStoresReason(t *testing.T) {
+	mgr := stream.NewManager(10, 10)
+	mgr.Start()
+	defer mgr.Stop()
+
+	handler := api.NewHandler(mgr)
+	streamID := createTestStream(t, handler)
+
+	const failureReason = "client aborted during upload"
+	payload := map[string]any{
+		"status":  "failed",
+		"metrics": map[string]any{},
+		"error":   failureReason,
+	}
+	body := mustMarshalJSON(t, payload)
+	req := httptest.NewRequest(http.MethodPost, streamPathPrefix+streamID+completeSuffix, bytes.NewReader(body))
+	req.Header.Set(contentTypeHeader, applicationJSON)
+	rec := httptest.NewRecorder()
+	handler.CompleteStream(rec, req, streamID)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
+	}
+
+	state, err := mgr.GetStream(streamID)
+	if err != nil {
+		t.Fatalf("GetStream: %v", err)
+	}
+	snapshot := state.GetState()
+	if snapshot.Error == nil {
+		t.Fatal("stream error = nil, want stored failure reason")
+	}
+	if snapshot.Error.Error() != failureReason {
+		t.Fatalf("stream error = %q, want %q", snapshot.Error.Error(), failureReason)
+	}
+}
+
 func TestCompleteStreamInvalidStatus(t *testing.T) {
 	mgr := stream.NewManager(10, 10)
 	mgr.Start()

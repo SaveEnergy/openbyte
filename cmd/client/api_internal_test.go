@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -69,6 +70,36 @@ func TestCompleteStreamReturnsServerError(t *testing.T) {
 	err := completeStream(context.Background(), cfg, "stream-id", EngineMetrics{})
 	if err == nil {
 		t.Fatal("expected error for non-2xx completion status")
+	}
+}
+
+func TestStartStreamBoundsErrorBody(t *testing.T) {
+	body := strings.Repeat("x", int(maxErrorBodyBytes)+128) + "TAIL-MARKER"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(body))
+	}))
+	defer server.Close()
+
+	cfg := &Config{
+		ServerURL:  server.URL,
+		Protocol:   "tcp",
+		Direction:  "download",
+		Duration:   1,
+		Streams:    1,
+		PacketSize: 1400,
+		Timeout:    2,
+	}
+
+	_, err := startStream(context.Background(), cfg)
+	if err == nil {
+		t.Fatal("expected startStream error")
+	}
+	if strings.Contains(err.Error(), "TAIL-MARKER") {
+		t.Fatalf("error unexpectedly included unbounded response tail: %q", err.Error())
+	}
+	if !strings.Contains(err.Error(), "(truncated)") {
+		t.Fatalf("error = %q, want truncated marker", err.Error())
 	}
 }
 

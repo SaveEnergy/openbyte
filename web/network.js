@@ -11,6 +11,7 @@ import {
   parseJSONOrThrow,
   isSameOriginURL,
   fetchWithTimeout,
+  readErrorResponseMessage,
 } from "./utils.js";
 
 function trimTrailingSlashes(value) {
@@ -136,12 +137,29 @@ export function detectNetworkInfo() {
   );
 }
 
+function loadServersErrorMessage(err) {
+  if (err?.name === "AbortError") {
+    return "Timed out while loading servers";
+  }
+  if (typeof err?.message === "string" && err.message.trim() !== "") {
+    return err.message;
+  }
+  return "Failed to load servers";
+}
+
 export async function loadServers() {
   try {
-    const res = await fetch(`${getApiBase()}/servers`);
+    const res = await fetchWithTimeout(
+      `${getApiBase()}/servers`,
+      {},
+      TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
+    );
     if (!res.ok) {
-      await res.text().catch(() => {});
-      throw new Error(`Failed to load servers: HTTP ${res.status}`);
+      const message = await readErrorResponseMessage(
+        res,
+        `Failed to load servers: HTTP ${res.status}`,
+      );
+      throw new Error(message);
     }
     let data;
     try {
@@ -170,6 +188,7 @@ export async function loadServers() {
     populateServerSelect();
     updateServerName();
     checkServer();
+    throw new Error(loadServersErrorMessage(e));
   }
 }
 

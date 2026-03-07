@@ -25,6 +25,8 @@ type Router struct {
 
 var validResultID = regexp.MustCompile(`^[0-9a-zA-Z]{8}$`)
 
+const internalWSClientIPHeader = "X-OpenByte-Client-IP"
+
 func (r *Router) GetLimiter() *RateLimiter {
 	return r.limiter
 }
@@ -34,9 +36,11 @@ func NewRouter(handler *Handler, cfg *config.Config) *Router {
 	if cfg.MaxTestDuration > 0 {
 		maxDur = int(cfg.MaxTestDuration.Seconds())
 	}
+	speedtest := NewSpeedTestHandler(cfg.MaxConcurrentHTTP(), maxDur)
+	speedtest.SetMaxConcurrentPerIP(cfg.MaxConcurrentPerIP)
 	return &Router{
 		handler:   handler,
-		speedtest: NewSpeedTestHandler(cfg.MaxConcurrentHTTP(), maxDur),
+		speedtest: speedtest,
 	}
 }
 
@@ -154,6 +158,21 @@ func (r *Router) registerWebSocketStreamRoute(v1 func(method, route string, hand
 			respondJSON(w, map[string]string{"error": errStreamIDRequired}, http.StatusBadRequest)
 			return
 		}
+		if !isValidStreamID(streamID) {
+			respondJSON(w, map[string]string{"error": errInvalidStreamID}, http.StatusBadRequest)
+			return
+		}
+		if r.handler == nil || r.handler.manager == nil {
+			respondJSON(w, map[string]string{"error": errNotFound}, http.StatusNotFound)
+			return
+		}
+		if _, err := r.handler.manager.GetStream(streamID); err != nil {
+			respondJSON(w, map[string]string{"error": errNotFound}, http.StatusNotFound)
+			return
+		}
+		req = req.Clone(req.Context())
+		req.Header = req.Header.Clone()
+		req.Header.Set(internalWSClientIPHeader, r.resolveClientIP(req))
 		wsHandler(w, req, streamID)
 	})
 }

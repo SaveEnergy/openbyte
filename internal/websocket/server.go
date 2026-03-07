@@ -22,26 +22,34 @@ const (
 )
 
 type Server struct {
-	upgrader       websocket.Upgrader
-	clients        map[string]map[*websocket.Conn]*clientConn
-	sentStatus     map[string]types.StreamStatus
-	allowedOrigins []string
-	pingInterval   time.Duration
-	stopCh         chan struct{}
-	stopOnce       sync.Once
-	wg             sync.WaitGroup
-	jsonBufPool    sync.Pool
-	mu             sync.RWMutex
+	upgrader        websocket.Upgrader
+	clients         map[string]map[*websocket.Conn]*clientConn
+	clientCounts    map[string]int
+	sentStatus      map[string]types.StreamStatus
+	allowedOrigins  []string
+	pingInterval    time.Duration
+	maxClients      int
+	maxClientsPerIP int
+	activeClients   int
+	stopCh          chan struct{}
+	stopOnce        sync.Once
+	wg              sync.WaitGroup
+	jsonBufPool     sync.Pool
+	mu              sync.RWMutex
 }
 
 type clientConn struct {
 	conn *websocket.Conn
+	ip   string
 	mu   sync.Mutex
 }
+
+const internalWSClientIPHeader = "X-OpenByte-Client-IP"
 
 func NewServer() *Server {
 	server := &Server{
 		clients:      make(map[string]map[*websocket.Conn]*clientConn),
+		clientCounts: make(map[string]int),
 		sentStatus:   make(map[string]types.StreamStatus),
 		pingInterval: 30 * time.Second,
 		stopCh:       make(chan struct{}),
@@ -77,9 +85,28 @@ func (s *Server) SetPingInterval(interval time.Duration) {
 	s.pingInterval = interval
 }
 
+func (s *Server) SetConnectionLimits(maxClients, maxClientsPerIP int) {
+	if maxClients < 0 {
+		maxClients = 0
+	}
+	if maxClientsPerIP < 0 {
+		maxClientsPerIP = 0
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.maxClients = maxClients
+	s.maxClientsPerIP = maxClientsPerIP
+}
+
 func (s *Server) HandleStream(w http.ResponseWriter, r *http.Request, streamID string) {
+	clientIP := websocketClientIP(r)
+	if !s.reserveConnectionSlot(clientIP) {
+		http.Error(w, "too many websocket clients", http.StatusServiceUnavailable)
+		return
+	}
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		s.releaseConnectionSlot(clientIP)
 		logging.Error("WebSocket upgrade error",
 			logging.Field{Key: "error", Value: err},
 			logging.Field{Key: "stream_id", Value: streamID})
@@ -94,7 +121,7 @@ func (s *Server) HandleStream(w http.ResponseWriter, r *http.Request, streamID s
 	if s.clients[streamID] == nil {
 		s.clients[streamID] = make(map[*websocket.Conn]*clientConn)
 	}
-	client := &clientConn{conn: conn}
+	client := &clientConn{conn: conn, ip: clientIP}
 	s.clients[streamID][conn] = client
 	s.mu.Unlock()
 
@@ -353,7 +380,11 @@ func (s *Server) removeClient(streamID string, conn *websocket.Conn) {
 	if s.clients[streamID] == nil {
 		return
 	}
+	client := s.clients[streamID][conn]
 	delete(s.clients[streamID], conn)
+	if client != nil {
+		s.releaseConnectionSlotLocked(client.ip)
+	}
 	if len(s.clients[streamID]) == 0 {
 		delete(s.clients, streamID)
 		delete(s.sentStatus, streamID)
@@ -485,6 +516,8 @@ func (s *Server) closeActiveConnections() {
 		}
 		delete(s.clients, streamID)
 	}
+	s.activeClients = 0
+	s.clientCounts = make(map[string]int)
 	s.sentStatus = make(map[string]types.StreamStatus)
 	s.mu.Unlock()
 
@@ -495,4 +528,51 @@ func (s *Server) closeActiveConnections() {
 
 func isTerminalStreamStatus(status types.StreamStatus) bool {
 	return status == types.StreamStatusCompleted || status == types.StreamStatusFailed
+}
+
+func (s *Server) reserveConnectionSlot(clientIP string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.maxClients > 0 && s.activeClients >= s.maxClients {
+		return false
+	}
+	if clientIP != "" && s.maxClientsPerIP > 0 && s.clientCounts[clientIP] >= s.maxClientsPerIP {
+		return false
+	}
+	s.activeClients++
+	if clientIP != "" {
+		s.clientCounts[clientIP]++
+	}
+	return true
+}
+
+func (s *Server) releaseConnectionSlot(clientIP string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.releaseConnectionSlotLocked(clientIP)
+}
+
+func (s *Server) releaseConnectionSlotLocked(clientIP string) {
+	if s.activeClients > 0 {
+		s.activeClients--
+	}
+	if clientIP == "" {
+		return
+	}
+	count := s.clientCounts[clientIP]
+	if count <= 1 {
+		delete(s.clientCounts, clientIP)
+		return
+	}
+	s.clientCounts[clientIP] = count - 1
+}
+
+func websocketClientIP(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	if clientIP := r.Header.Get(internalWSClientIPHeader); clientIP != "" {
+		return clientIP
+	}
+	return types.StripHostPort(r.RemoteAddr)
 }

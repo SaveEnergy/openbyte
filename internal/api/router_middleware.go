@@ -13,6 +13,8 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+const uploadRequestLogMinDuration = time.Second
+
 func registryRateLimitMiddleware(limiter *RateLimiter, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, apiV1RegistryPrefix) {
@@ -134,29 +136,40 @@ func (rw *responseWriter) Flush() {
 	}
 }
 
+func shouldSkipRequestLog(path string) bool {
+	return strings.HasSuffix(path, "/ping")
+}
+
+func shouldLogRequest(path string, status int, duration time.Duration) bool {
+	if !strings.HasPrefix(path, "/api/") || shouldSkipRequestLog(path) {
+		return false
+	}
+	if strings.HasSuffix(path, "/upload") {
+		return status >= http.StatusBadRequest || duration >= uploadRequestLogMinDuration
+	}
+	return true
+}
+
 func (r *Router) LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		path := req.URL.Path
 
-		skipLog := strings.HasSuffix(path, "/stream") ||
-			strings.HasSuffix(path, "/download") ||
-			strings.HasSuffix(path, "/upload") ||
-			strings.HasSuffix(path, "/ping")
-
-		if strings.HasPrefix(path, "/api/") && !skipLog {
+		if strings.HasPrefix(path, "/api/") && !shouldSkipRequestLog(path) {
 			start := time.Now()
 			rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 
 			next.ServeHTTP(rw, req)
 
 			duration := time.Since(start)
-			logging.Info("HTTP request",
-				logging.Field{Key: "method", Value: req.Method},
-				logging.Field{Key: "path", Value: path},
-				logging.Field{Key: "status", Value: rw.statusCode},
-				logging.Field{Key: "duration_ms", Value: float64(duration.Microseconds()) / 1000},
-				logging.Field{Key: "ip", Value: r.resolveClientIP(req)},
-			)
+			if shouldLogRequest(path, rw.statusCode, duration) {
+				logging.Info("HTTP request",
+					logging.Field{Key: "method", Value: req.Method},
+					logging.Field{Key: "path", Value: path},
+					logging.Field{Key: "status", Value: rw.statusCode},
+					logging.Field{Key: "duration_ms", Value: float64(duration.Microseconds()) / 1000},
+					logging.Field{Key: "ip", Value: r.resolveClientIP(req)},
+				)
+			}
 		} else {
 			next.ServeHTTP(w, req)
 		}

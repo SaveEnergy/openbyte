@@ -86,6 +86,206 @@ test.describe("openByte UI", () => {
     expect(downloadMbps).toBeGreaterThanOrEqual(0);
   });
 
+  test("settings save tolerates localStorage write failures", async ({
+    page,
+  }) => {
+    const pageErrors = [];
+    page.on("pageerror", (err) => pageErrors.push(err.message));
+    await page.addInitScript(() => {
+      const originalSetItem = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key, value) {
+        if (key === "obyte-settings") {
+          throw new DOMException("quota", "QuotaExceededError");
+        }
+        return originalSetItem.call(this, key, value);
+      };
+    });
+
+    await page.goto("/");
+    await page.locator("#showSettings").click();
+    await expect(page.locator("#settingsModal")).toBeVisible();
+    await page.selectOption("#duration", "5");
+    await expect(page.locator("#duration")).toHaveValue("5");
+    await expect(page.locator("#successToast")).toBeHidden();
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("settings load tolerates localStorage read failures", async ({
+    page,
+  }) => {
+    const pageErrors = [];
+    page.on("pageerror", (err) => pageErrors.push(err.message));
+    await page.addInitScript(() => {
+      const originalGetItem = Storage.prototype.getItem;
+      Storage.prototype.getItem = function (key) {
+        if (key === "obyte-settings") {
+          throw new DOMException("blocked", "SecurityError");
+        }
+        return originalGetItem.call(this, key);
+      };
+    });
+
+    await page.goto("/");
+    await expect(page.locator("#idleState")).toBeVisible();
+    await expect(page.locator("#duration")).toHaveValue("30");
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("server list JSON errors surface to users", async ({ page }) => {
+    await page.route("**/api/v1/servers", async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "registry temporarily unavailable" }),
+      });
+    });
+
+    await page.goto("/");
+    await expect(page.locator("#errorToast")).toBeVisible();
+    await expect(page.locator("#errorToast")).toContainText(
+      /registry temporarily unavailable/i,
+    );
+  });
+
+  test("server list timeout surfaces user message", async ({ page }) => {
+    const pageErrors = [];
+    page.on("pageerror", (err) => pageErrors.push(err.message));
+    await page.addInitScript(() => {
+      const originalFetch = globalThis.fetch.bind(globalThis);
+      globalThis.fetch = (input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/api/v1/servers")) {
+          return new Promise((resolve, reject) => {
+            const signal = init?.signal;
+            const abort = () => {
+              signal?.removeEventListener("abort", abort);
+              reject(new DOMException("Aborted", "AbortError"));
+            };
+            if (signal?.aborted) {
+              abort();
+              return;
+            }
+            signal?.addEventListener("abort", abort, { once: true });
+          });
+        }
+        return originalFetch(input, init);
+      };
+    });
+
+    await page.goto("/");
+    await expect(page.locator("#errorToast")).toContainText(
+      /timed out while loading servers/i,
+      {
+        timeout: 10_000,
+      },
+    );
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("settings saved uses polite toast region", async ({ page }) => {
+    await page.goto("/");
+    await page.locator("#showSettings").click();
+    await expect(page.locator("#settingsModal")).toBeVisible();
+    await page.selectOption("#duration", "5");
+
+    await expect(page.locator("#successToast")).toBeVisible();
+    await expect(page.locator("#successToast")).toContainText(
+      /settings saved/i,
+    );
+    await expect(page.locator("#successToast")).toHaveAttribute(
+      "role",
+      "status",
+    );
+    await expect(page.locator("#successToast")).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
+    await expect(page.locator("#errorToast")).toHaveAttribute("role", "alert");
+    await expect(page.locator("#errorToast")).toHaveAttribute(
+      "aria-live",
+      "assertive",
+    );
+    await expect(page.locator("#errorToast")).toBeHidden();
+  });
+
+  test("settings modal reopen is idempotent and focus follows state", async ({
+    page,
+  }) => {
+    const pageErrors = [];
+    page.on("pageerror", (err) => pageErrors.push(err.message));
+
+    await page.goto("/");
+    await page.locator("#showSettings").click();
+    await expect(page.locator("#settingsModal")).toBeVisible();
+    await page.evaluate(() => document.getElementById("showSettings").click());
+    await expect(page.locator("#settingsModal")).toBeVisible();
+    await expect(page.locator("#duration")).toBeFocused();
+    expect(pageErrors).toEqual([]);
+
+    await page.selectOption("#duration", "5");
+    await page.selectOption("#streams", "1");
+    await page.locator("#closeSettings").click();
+
+    await page.locator("#startBtn").click();
+    await expect(page.locator("#testingState")).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("#cancelBtn")).toBeFocused();
+
+    await page.locator("#cancelBtn").click();
+    await expect(page.locator("#idleState")).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("#startBtn")).toBeFocused();
+
+    await page.locator("#startBtn").click();
+    await expect(page.locator("#resultsState")).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(page.locator("#restartBtn")).toBeFocused();
+  });
+
+  test("loaded latency probe aborts hung ping during completion", async ({
+    page,
+  }) => {
+    const pageErrors = [];
+    page.on("pageerror", (err) => pageErrors.push(err.message));
+    await page.addInitScript(() => {
+      const originalFetch = globalThis.fetch.bind(globalThis);
+      let pingCount = 0;
+      globalThis.fetch = (input, init) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/api/v1/ping")) {
+          pingCount += 1;
+          if (pingCount > 35) {
+            return new Promise((resolve, reject) => {
+              const signal = init && init.signal;
+              const abort = () => {
+                signal?.removeEventListener("abort", abort);
+                reject(new DOMException("Aborted", "AbortError"));
+              };
+              if (signal?.aborted) {
+                abort();
+                return;
+              }
+              signal?.addEventListener("abort", abort, { once: true });
+            });
+          }
+        }
+        return originalFetch(input, init);
+      };
+    });
+
+    await page.goto("/");
+    await page.locator("#showSettings").click();
+    await expect(page.locator("#settingsModal")).toBeVisible();
+    await page.selectOption("#duration", "5");
+    await page.selectOption("#streams", "1");
+    await page.locator("#closeSettings").click();
+
+    await page.locator("#startBtn").click();
+    await expect(page.locator("#resultsState")).toBeVisible({
+      timeout: 20_000,
+    });
+    expect(pageErrors).toEqual([]);
+  });
+
   test("saves result only when share is clicked", async ({ page }) => {
     let saveRequests = 0;
     page.on("dialog", async (dialog) => {
@@ -129,9 +329,12 @@ test.describe("openByte UI", () => {
 
     await page.locator("#startBtn").click();
     await expect(page.locator("#testingState")).toBeVisible({ timeout: 10000 });
-    await page.locator("#cancelBtn").click();
-    await expect(page.locator("#idleState")).toBeVisible({ timeout: 10000 });
-    await page.locator("#startBtn").click();
+    await page.evaluate(() => {
+      document.getElementById("cancelBtn").click();
+      setTimeout(() => {
+        document.getElementById("startBtn").click();
+      }, 25);
+    });
 
     await expect(page.locator("#resultsState")).toBeVisible({
       timeout: 60_000,

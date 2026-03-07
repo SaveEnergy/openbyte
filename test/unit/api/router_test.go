@@ -160,6 +160,52 @@ func TestRouterRejectsInvalidStreamID(t *testing.T) {
 	}
 }
 
+func TestWebSocketRouteRejectsInvalidStreamID(t *testing.T) {
+	manager := stream.NewManager(10, 10)
+	handler := api.NewHandler(manager)
+	router := api.NewRouter(handler, config.DefaultConfig())
+	called := false
+	router.SetWebSocketHandler(func(w http.ResponseWriter, r *http.Request, streamID string) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	h := router.SetupRoutes()
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/api/v1/stream/bad/stream", nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf(statusWantFmt, rec.Code, http.StatusBadRequest)
+	}
+	if called {
+		t.Fatalf(routerInvalidIDCalledErr)
+	}
+}
+
+func TestWebSocketRouteRejectsUnknownStreamBeforeUpgrade(t *testing.T) {
+	manager := stream.NewManager(10, 10)
+	handler := api.NewHandler(manager)
+	router := api.NewRouter(handler, config.DefaultConfig())
+	called := false
+	router.SetWebSocketHandler(func(w http.ResponseWriter, r *http.Request, streamID string) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	})
+
+	h := router.SetupRoutes()
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+streamWSAPIPath, nil)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf(statusWantFmt, rec.Code, http.StatusNotFound)
+	}
+	if called {
+		t.Fatal("websocket handler should not be called for unknown stream")
+	}
+}
+
 func TestStaticHTMLUsesNoStoreCacheControl(t *testing.T) {
 	manager := stream.NewManager(10, 10)
 	handler := api.NewHandler(manager)

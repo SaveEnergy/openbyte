@@ -14,6 +14,44 @@ import { updateNetworkDisplay } from "./network.js";
 let visualProgress = 0;
 let progressAnimationFrame = 0;
 
+function focusStateAction(stateName) {
+  if (elements.settingsModal?.open) return;
+  const targets = {
+    idle: elements.startBtn,
+    testing: elements.cancelBtn,
+    results: elements.restartBtn,
+  };
+  const target = targets[stateName];
+  if (!target || typeof target.focus !== "function") return;
+  requestAnimationFrame(() => {
+    if (!target.classList.contains("hidden")) {
+      target.focus();
+    }
+  });
+}
+
+function clearToastTimer() {
+  if (toast.timer) {
+    clearTimeout(toast.timer);
+    toast.timer = null;
+  }
+}
+
+function getToastElements(isError) {
+  if (isError) {
+    return {
+      toastEl: elements.errorToast,
+      messageEl: elements.errorMessage,
+      duration: TEST_CONFIG.TOAST_ERROR_MS,
+    };
+  }
+  return {
+    toastEl: elements.successToast,
+    messageEl: elements.successMessage,
+    duration: TEST_CONFIG.TOAST_SUCCESS_MS,
+  };
+}
+
 function formatLatencyMs(val) {
   if (typeof val === "number" && Number.isFinite(val) && val > 0) {
     return `${val.toFixed(1)} ms`;
@@ -157,6 +195,7 @@ export function showState(stateName) {
       elements.resultsState.classList.remove("hidden");
       break;
   }
+  focusStateAction(stateName);
 }
 
 export function showResults() {
@@ -206,32 +245,19 @@ export function showResults() {
 }
 
 export function showError(message, isError = true) {
-  if (!elements.errorToast || !elements.errorMessage) return;
-  elements.errorMessage.textContent = message;
-  const icon = elements.errorToast.querySelector(".toast-icon");
-  if (toast.timer) {
-    clearTimeout(toast.timer);
-    toast.timer = null;
-  }
-  if (isError) {
-    if (icon) icon.textContent = "⚠";
-    elements.errorToast.classList.remove("hidden");
-    elements.errorToast.style.background = "";
-    toast.timer = setTimeout(hideError, TEST_CONFIG.TOAST_ERROR_MS);
-  } else {
-    if (icon) icon.textContent = "✓";
-    elements.errorToast.classList.remove("hidden");
-    elements.errorToast.style.background = "var(--accent-primary)";
-    toast.timer = setTimeout(() => {
-      hideError();
-      elements.errorToast.style.background = "";
-    }, TEST_CONFIG.TOAST_SUCCESS_MS);
-  }
+  const { toastEl, messageEl, duration } = getToastElements(isError);
+  if (!toastEl || !messageEl) return;
+  clearToastTimer();
+  hideError();
+  messageEl.textContent = message;
+  toastEl.classList.remove("hidden");
+  toast.timer = setTimeout(hideError, duration);
 }
 
 export function hideError() {
-  if (!elements.errorToast) return;
-  elements.errorToast.classList.add("hidden");
+  clearToastTimer();
+  elements.errorToast?.classList.add("hidden");
+  elements.successToast?.classList.add("hidden");
 }
 
 export function notifySettingsSaved() {

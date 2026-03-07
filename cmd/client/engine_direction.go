@@ -7,12 +7,14 @@ import (
 	"io"
 	"net"
 	"slices"
-	"sync"
 	"sync/atomic"
 	"time"
 )
 
-const sendCmdFmt = "send command: %w"
+const (
+	sendCmdFmt              = "send command: %w"
+	bidirectionalLoopTimout = 500 * time.Millisecond
+)
 
 func (e *TestEngine) runDownload(ctx context.Context, conn net.Conn) error {
 	if _, err := conn.Write([]byte(cmdDownload)); err != nil {
@@ -145,25 +147,36 @@ func (e *TestEngine) runBidirectional(ctx context.Context, conn net.Conn) error 
 		return fmt.Errorf(sendCmdFmt, err)
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(2)
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
+	errCh := make(chan error, 2)
 	go func() {
-		defer wg.Done()
-		e.runBidirectionalReadLoop(ctx, conn)
+		errCh <- e.runBidirectionalReadLoop(runCtx, conn)
+	}()
+	go func() {
+		errCh <- e.runBidirectionalWriteLoop(runCtx, conn)
 	}()
 
-	go func() {
-		defer wg.Done()
-		e.runBidirectionalWriteLoop(ctx, conn)
-	}()
-
-	wg.Wait()
-	return nil
+	var runErr error
+	for range 2 {
+		err := <-errCh
+		if shouldIgnoreBidirectionalError(err) {
+			continue
+		}
+		if runErr == nil {
+			runErr = err
+			cancel()
+		}
+	}
+	if runErr != nil {
+		return runErr
+	}
+	return ctx.Err()
 }
 
-func (e *TestEngine) runBidirectionalReadLoop(ctx context.Context, conn net.Conn) {
-	e.runBidiReadLoop(ctx, conn, func(n int, d time.Duration) {
+func (e *TestEngine) runBidirectionalReadLoop(ctx context.Context, conn net.Conn) error {
+	return e.runBidiReadLoop(ctx, conn, func(n int, d time.Duration) {
 		atomic.AddInt64(&e.metrics.BytesReceived, int64(n))
 		e.addBytes(int64(n))
 		if e.pastWarmUp() {
@@ -172,7 +185,7 @@ func (e *TestEngine) runBidirectionalReadLoop(ctx context.Context, conn net.Conn
 	})
 }
 
-func (e *TestEngine) runBidiReadLoop(ctx context.Context, conn net.Conn, onRead func(n int, d time.Duration)) {
+func (e *TestEngine) runBidiReadLoop(ctx context.Context, conn net.Conn, onRead func(n int, d time.Duration)) error {
 	buf, ok := e.bufferPool.Get().([]byte)
 	if !ok {
 		buf = make([]byte, 64*1024)
@@ -180,57 +193,68 @@ func (e *TestEngine) runBidiReadLoop(ctx context.Context, conn net.Conn, onRead 
 	defer e.bufferPool.Put(buf)
 	lastRTTSample := time.Now()
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
-			readStart := time.Now()
-			n, err := conn.Read(buf)
-			readDuration := time.Since(readStart)
-			if err != nil {
-				if isTimeoutError(err) {
-					continue
-				}
-				return
-			}
-			if n <= 0 {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		n, readDuration, err := readWithDeadline(conn, buf, bidirectionalLoopTimout)
+		if err != nil {
+			retry, retErr := handleBidirectionalLoopError(ctx, err)
+			if retry {
 				continue
 			}
-			onRead(n, readDuration)
-			if time.Since(lastRTTSample) > 500*time.Millisecond && e.pastWarmUp() {
-				e.rttCollector.AddSample(readDuration.Seconds() * 1000)
-				lastRTTSample = time.Now()
-			}
+			return retErr
 		}
+		if n <= 0 {
+			continue
+		}
+		onRead(n, readDuration)
+		lastRTTSample = updateRTTSampleIfNeeded(
+			e,
+			lastRTTSample,
+			bidirectionalLoopTimout,
+			readDuration,
+		)
 	}
 }
 
-func (e *TestEngine) runBidirectionalWriteLoop(ctx context.Context, conn net.Conn) {
+func (e *TestEngine) runBidirectionalWriteLoop(ctx context.Context, conn net.Conn) error {
 	buf, ok := e.bufferPool.Get().([]byte)
 	if !ok {
 		buf = make([]byte, 64*1024)
 	}
 	defer e.bufferPool.Put(buf)
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			conn.SetWriteDeadline(time.Now().Add(500 * time.Millisecond))
-			n, err := conn.Write(buf)
-			if err != nil {
-				if isTimeoutError(err) {
-					continue
-				}
-				return
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		conn.SetWriteDeadline(time.Now().Add(bidirectionalLoopTimout))
+		n, err := conn.Write(buf)
+		if err != nil {
+			retry, retErr := handleBidirectionalLoopError(ctx, err)
+			if retry {
+				continue
 			}
-			if n > 0 {
-				atomic.AddInt64(&e.metrics.BytesSent, int64(n))
-				e.addBytes(int64(n))
-			}
+			return retErr
+		}
+		if n > 0 {
+			atomic.AddInt64(&e.metrics.BytesSent, int64(n))
+			e.addBytes(int64(n))
 		}
 	}
+}
+
+func handleBidirectionalLoopError(ctx context.Context, err error) (retry bool, retErr error) {
+	if isTimeoutError(err) {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return false, ctxErr
+		}
+		return true, nil
+	}
+	return false, err
+}
+
+func shouldIgnoreBidirectionalError(err error) bool {
+	return err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 func isTimeoutError(err error) bool {

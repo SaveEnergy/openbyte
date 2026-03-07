@@ -70,6 +70,8 @@ export const elements = {
   serverStatus: document.getElementById("serverStatus"),
   errorToast: document.getElementById("errorToast"),
   errorMessage: document.getElementById("errorMessage"),
+  successToast: document.getElementById("successToast"),
+  successMessage: document.getElementById("successMessage"),
   shareBtn: document.getElementById("shareBtn"),
 };
 

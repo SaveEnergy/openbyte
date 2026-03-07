@@ -89,7 +89,7 @@ func runClientSideTest(ctx context.Context, config *Config, formatter OutputForm
 		case <-metricsTicker.C:
 			if err := emitCurrentProgress(formatter, startTime, totalRunTime, engine.GetMetrics()); err != nil {
 				cancel()
-				return err
+				return cancelStreamWithCleanup(ctx, config, streamResp.StreamID, err)
 			}
 
 		case <-ctx.Done():

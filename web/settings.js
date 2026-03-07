@@ -26,6 +26,10 @@ function initSettingsModal() {
   };
 
   const openModal = () => {
+    if (elements.settingsModal.open) {
+      requestAnimationFrame(focusFirstSetting);
+      return;
+    }
     modal.lastTrigger = document.activeElement;
     elements.settingsModal.showModal();
     lockBodyScroll();
@@ -33,6 +37,7 @@ function initSettingsModal() {
   };
 
   const closeModal = () => {
+    if (!elements.settingsModal.open) return;
     elements.settingsModal.close();
     if (modal.lastTrigger && typeof modal.lastTrigger.focus === "function") {
       modal.lastTrigger.focus();
@@ -52,7 +57,13 @@ function initSettingsModal() {
 }
 
 export function loadSettings() {
-  const saved = localStorage.getItem("obyte-settings");
+  let saved = null;
+  try {
+    saved = localStorage.getItem("obyte-settings");
+  } catch (e) {
+    console.warn("Failed to read saved settings:", e);
+    return;
+  }
   if (saved) {
     try {
       const s = JSON.parse(saved);
@@ -84,8 +95,12 @@ export function saveSettings() {
   const s = Number.parseInt(elements.streams.value, 10);
   if (Number.isFinite(d) && d > 0) state.settings.duration = d;
   if (Number.isFinite(s) && s > 0) state.settings.streams = s;
-  localStorage.setItem("obyte-settings", JSON.stringify(state.settings));
-  notifySettingsSaved();
+  try {
+    localStorage.setItem("obyte-settings", JSON.stringify(state.settings));
+    notifySettingsSaved();
+  } catch (e) {
+    console.warn("Failed to save settings:", e);
+  }
 }
 
 export function bindEvents(extraHandlers) {
