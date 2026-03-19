@@ -13,22 +13,15 @@ import {
   fetchWithTimeout,
   readErrorResponseMessage,
 } from "./utils.js";
+import {
+  getHealthURL,
+  loadServersErrorMessage,
+  serverLoadFactor,
+  startsWithDigit,
+} from "./network-helpers.js";
+import { isHealthyServerCandidate } from "./network-health.js";
 
-function trimTrailingSlashes(value) {
-  if (typeof value !== "string" || value.length === 0) return value;
-  let end = value.length;
-  while (end > 0 && value.codePointAt(end - 1) === 47) {
-    end -= 1;
-  }
-  return value.slice(0, end);
-}
-
-function startsWithDigit(value) {
-  if (!value || typeof value !== "string") return false;
-  const code = value.codePointAt(0);
-  if (typeof code !== "number") return false;
-  return code >= 48 && code <= 57;
-}
+export { getHealthURL };
 
 export function resolveServerName() {
   if (state.selectedServer?.name) return state.selectedServer.name;
@@ -46,27 +39,6 @@ export function setSelectedServer(server) {
   } else {
     setApiBase("/api/v1");
   }
-}
-
-export function getHealthURL(server) {
-  if (server.api_endpoint) {
-    try {
-      const apiURL = new URL(server.api_endpoint);
-      if (
-        globalThis.location.protocol === "https:" &&
-        apiURL.protocol === "http:"
-      ) {
-        apiURL.protocol = "https:";
-      }
-      apiURL.pathname = trimTrailingSlashes(apiURL.pathname) + "/health";
-      return apiURL.toString();
-    } catch (e) {
-      console.debug("failed to parse server api_endpoint", e);
-      return `${server.api_endpoint}/health`;
-    }
-  }
-  const protocol = globalThis.location.protocol || "http:";
-  return `${protocol}//${server.host}/health`;
 }
 
 export function updateNetworkDisplay() {
@@ -135,16 +107,6 @@ export function detectNetworkInfo() {
   Promise.allSettled([mainPing, v4Ping, v6Ping]).then(() =>
     updateNetworkDisplay(),
   );
-}
-
-function loadServersErrorMessage(err) {
-  if (err?.name === "AbortError") {
-    return "Timed out while loading servers";
-  }
-  if (typeof err?.message === "string" && err.message.trim() !== "") {
-    return err.message;
-  }
-  return "Failed to load servers";
 }
 
 export async function loadServers() {
@@ -244,14 +206,9 @@ export async function selectFastestServer() {
     return;
   }
 
-  const loadFactor = (s) => {
-    const max = Math.max(1, s.max_tests ?? 1);
-    const active = s.active_tests ?? 0;
-    return 1 + 0.3 * (active / max);
-  };
   reachable.sort((a, b) => {
-    const scoreA = a.latency * loadFactor(a.server);
-    const scoreB = b.latency * loadFactor(b.server);
+    const scoreA = a.latency * serverLoadFactor(a.server);
+    const scoreB = b.latency * serverLoadFactor(b.server);
     return scoreA - scoreB;
   });
   setSelectedServer(reachable[0].server);
@@ -343,36 +300,6 @@ function setServerOfflineUI() {
   if (elements.serverStatus) {
     elements.serverStatus.textContent = "Offline";
     elements.serverStatus.className = "server-status error";
-  }
-}
-
-async function isHealthyServerCandidate(url) {
-  try {
-    const res = await fetchWithTimeout(
-      url,
-      {},
-      TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-      await res.text().catch(() => {});
-      return false;
-    }
-
-    let data;
-    try {
-      data = await res.json();
-    } catch (err) {
-      console.debug("failed to parse health response", err);
-      await res.text().catch(() => {});
-      return false;
-    }
-
-    return (
-      data.status === "ok" || data.status === "healthy" || data.pong === true
-    );
-  } catch (err) {
-    console.debug("server health candidate failed", err);
-    return false;
   }
 }
 

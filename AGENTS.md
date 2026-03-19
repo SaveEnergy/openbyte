@@ -43,6 +43,8 @@
 - UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.
 - Speed test UI: primary logic in `speedtest*.js`; `openbyte.js` wires orchestration and server selection—keep new probe/state changes localized to those modules.
 - HTTP speed test: **`speedtest-http.js`** re-exports **`speedtest-http-download.js`** / **`speedtest-http-upload.js`**; shared helpers in **`speedtest-http-shared.js`** (same public API for `speedtest.js`).
+- Download page: **`download-platform.js`** (release URLs, **`platforms`** / **`archLabels`**, UA detection, asset lookup), **`download-github.js`** (`fetchLatestRelease`), **`download.js`** (render + clipboard + top-level load); **`download.html`** entry unchanged.
+- Network UI: **`network-helpers.js`** (URL trim, health URL, **`serverLoadFactor`**), **`network-health.js`** (`isHealthyServerCandidate`), **`network.js`** keeps orchestration + same exports (**`getHealthURL`** re-exported).
 
 ### Storage
 
@@ -95,18 +97,17 @@
 
 ### Refactor analysis intake (2026-03-20 pass)
 
-- **Executive snapshot**: No **critical** reliability/security defects surfaced in static LOC/churn scan; highest **maintainability** friction is **`cmd/client`** (large CLI + run stack) and **web** **`download.js`** / **`network.js`** (long single-file modules). **Test** weight is concentrated in **`test/unit/api/speedtest_test.go`** (~685 LOC).
+- **Executive snapshot**: No **critical** reliability/security defects surfaced in static LOC/churn scan; **web** **`download*`** / **`network*`** split landed (**`20260320-refactor-15`**). Remaining large file: **`test/unit/api/speedtest_test.go`** (~685 LOC); optional **`internal/stream/server.go`** split (**`20260320-refactor-16`**).
 - **Evidence (LOC, `wc`, top of tree)**:
   - **Go (runtime)**: `cmd/client` (`cli_flags.go`, `cli_usage.go`, `cli_validate.go`, `cli_servers.go`, `run.go`), `http_engine.go` (~370), `internal/stream/server.go` (~372), `test/unit/api/speedtest_test.go` (~685), `router_test.go` (~531).
-  - **Web**: `web/download.js` (~432), `web/network.js` (~399), `speedtest-http-upload.js` (~312).
+  - **Web**: `download.js` (~307) + `download-platform.js` (~122) + `download-github.js` (~20); `network.js` (~326) + `network-helpers.js` (~54) + `network-health.js` (~34); `speedtest-http-upload.js` (~312).
 - **Assumptions**: `TODO`/`FIXME` grep empty in repo; **Sonar** QG **OK**; advanced telemetry remains **policy-only** (Architecture § Performance).
-- **Action plan**: **Now** — none mandatory (behavior-preserving splits only when touching those areas). **Next** — **`download.js`** / **`network.js`** extract platform table + fetch helpers; optional **`internal/stream/server.go`** TCP seam. **Later** — **`pkg/client`** SDK file split (already noted in Open/Deferred).
+- **Action plan**: **Now** — optional **`internal/stream/server.go`** TCP seam (**`20260320-refactor-16`**). **Later** — **`pkg/client`** SDK file split (already noted in Open/Deferred).
 
 ### Live Queue (active only)
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| `20260320-refactor-15` | web | - | Planned | Reduce **`download.js`** / **`network.js`** coupling: extract platform constants + pure helpers; keep `openbyte.js` orchestration boundary. | **~432** / **~399** LOC. | `npx prettier --check web/*.js`; `bunx playwright test test/e2e/ui/basic.spec.js` |
 | `20260320-refactor-16` | stream | - | Planned | Optional: split **`internal/stream/server.go`** along TCP accept/read/write vs lifecycle helpers (same `Server` API). | **~372** LOC; **`server_udp.go`** already split. | `go test ./internal/stream/... ./test/unit/stream/...` |
 
 ### Check Hold (manual/external)
@@ -127,8 +128,9 @@
 ### Recently Closed IDs
 
 - Most historical IDs intentionally pruned for readability; canonical record remains in git history.
-- Recent close: `20260319-refactor-01`..`13` (refactor wave); `20260320-refactor-14` (**`cmd/client`** **`cli.go`** → **`cli_{flags,usage,validate,servers}.go`**).
+- Recent close: `20260319-refactor-01`..`13` (refactor wave); `20260320-refactor-14` (**`cmd/client`** **`cli.go`** → **`cli_{flags,usage,validate,servers}.go`**); `20260320-refactor-15` (**`web`** **`download*`** / **`network*`** split).
 - Latest completed wave (moved `Check -> Done -> removed`):
+  - `20260320-refactor-15` (**`web`**: **`download-platform.js`**, **`download-github.js`**, **`network-helpers.js`**, **`network-health.js`** + slim **`download.js`**/**`network.js`**; **`router_static.go`** allowlist; Prettier clean)
   - `20260320-refactor-14` (**`cmd/client`**: behavior-preserving split of former **`cli.go`** into **`cli_flags.go`**, **`cli_usage.go`**, **`cli_validate.go`**, **`cli_servers.go`**; `go test ./cmd/client/...` green)
   - `20260320-ci-01`, `20260320-ci-02` (CI **`govulncheck`**; **Redocly** pinned in **`package.json`**, **`bun run lint:openapi`** in **`ci.yml`**/**`release.yml`**, single **`bun install`** before OpenAPI + Playwright)
   - `20260320-ci-03` (documented **CI** vs **nightly** race matrix: **`-short`** + **`-p 1`** on **`main`**; full **`go test -race ./...`** nightly; workflow comments)
@@ -146,8 +148,9 @@
 
 ### Recent Decision Notes
 
+- 2026-03-20: **`20260320-refactor-15` Done** — **`web`**: **`download-platform.js`** (URLs, **`platforms`**/**`archLabels`**, UA detection, asset helpers), **`download-github.js`** (`fetchLatestRelease`), **`network-helpers.js`**, **`network-health.js`**; **`network.js`** re-exports **`getHealthURL`**; **`internal/api/router_static.go`** allowlist for new modules; Prettier **`web/*.js`** clean.
 - 2026-03-20: **`20260320-refactor-14` Done** — **`cmd/client`**: split former **`cli.go`** into **`cli_flags.go`**, **`cli_usage.go`**, **`cli_validate.go`**, **`cli_servers.go`** (same **`package client`**); **`run.go`** unchanged; `go test ./cmd/client/...` green.
-- 2026-03-20: **Refactor analysis (pass)** — **Refactor analysis intake** + Live Queue **`20260320-refactor-15`**..**`16`** ( **`web`** **`download.js`**/**`network.js`**, **`internal/stream/server.go`** split optional); evidence **`wc`**, empty **`TODO`** grep, **Sonar** QG **OK**.
+- 2026-03-20: **Refactor analysis (pass)** — **Refactor analysis intake** + Live Queue **`20260320-refactor-16`** (optional **`internal/stream/server.go`**); evidence **`wc`**, empty **`TODO`** grep, **Sonar** QG **OK**.
 - 2026-03-20: **Sonar follow-up** — **QG `OK`** on Cloud (**hotspots** **`100%`**); **`javascript:S6582`** in **`basic.spec.js`** resolved with **`init?.signal`** / **`signal?.`** (not `&&`); **Sonar Snapshot** updated.
 - 2026-03-20: **Sonar OPEN fixes landed** — **`shelldre`**, **`go:S100`**, **`go:S1192`**, **`javascript:S3358`**, **`godre:S8196`**, **`Web:S6819`** + first **`S6582`** pass (see **Sonar Snapshot**).
 - 2026-03-20: **`20260320-perf-03` Done** — **Advanced telemetry** guardrail documented under Architecture § Performance (internal/server-first, default UI unchanged, opt-in only for client-visible detail); defers implementation; ties to marathon **`20260226-perf-02`**/**`04`** intent without reviving marathons.
