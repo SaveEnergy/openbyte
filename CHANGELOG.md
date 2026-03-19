@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **AGENTS.md**: **Refactor analysis intake (2026-03-20)** + Live Queue **`20260320-refactor-14`**..**`16`** ( **`cmd/client`**, **`web`** download/network, **`internal/stream/server.go`** optional split).
+- **AGENTS.md**: **Refactor analysis intake (2026-03-20)** + Live Queue **`20260320-refactor-15`**..**`16`** ( **`web`** download/network, **`internal/stream/server.go`** optional split); **`20260320-refactor-14`** (**`cmd/client`** **`cli.go`** split) **Done**.
 - **AGENTS.md**: Architecture § Performance **advanced telemetry** policy (**`20260320-perf-03`**): server/internal-first, minimal default Web UI, explicit opt-in for user-visible detail; implementation remains deferred.
 - **Benchmarks**: **`internal/api`** (**`respondJSON`**, **`validateMetricsPayload`**, **`normalizeHost`**) and **`internal/jsonbody`** (**`DecodeSingleObject`**); **`Makefile`** **`perf-bench`** runs them with existing unit benches; **AGENTS.md** documents **`benchstat`** comparison (manual).
 - **Playwright**: **`playwright.config.js`** sets **`workers`** to **`2`** when **`GITHUB_ACTIONS`** is set (GitHub-hosted runners); optional **`PLAYWRIGHT_WORKERS`** override.
@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **cmd/client**: split former **`cli.go`** into **`cli_flags.go`**, **`cli_usage.go`**, **`cli_validate.go`**, **`cli_servers.go`** (behavior-preserving; same **`package client`**).
 - **Nightly** (`nightly.yml`): **`make perf-bench`** runs on each schedule unless repo variable **`PERF_BENCH`** is **`false`** (replaces **`PERF_SMOKE == 'true'`** gate); **`make perf-leakcheck`** still **`vars.LEAK_PROFILE_SMOKE == 'true'`**.
 - **CI** (`ci.yml`): **`cancel-in-progress`** only when **`github.event_name == 'pull_request'`** — **`main`** / tags / **`workflow_dispatch`** no longer cancel an in-flight run (avoids aborting **`deploy`**); next run **queues** on the same ref. **`AGENTS.md`** documents tradeoff (possible **`main`** backlog).
 - **cmd/server**: split monolithic `main.go` into `flags.go` and `runtime.go` (behavior-preserving; easier navigation).
