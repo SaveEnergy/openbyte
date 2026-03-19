@@ -44,8 +44,16 @@ jobs:
       - name: Race tests (release gate)
         run: go test -race ./... -p 1
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "latest"
+
+      - name: Install JS devDependencies (Redocly)
+        run: bun install --no-save
+
       - name: OpenAPI lint
-        run: npx @redocly/cli@2.18.1 lint api/openapi.yaml --config redocly.yaml
+        run: bun run lint:openapi
 
       - name: OpenAPI route contract
         run: go test ./test/unit/api -run TestOpenAPIRouteContract

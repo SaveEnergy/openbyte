@@ -1,4 +1,4 @@
-.PHONY: build openbyte loadtest test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench perf-leakcheck ci-test ci-lint
+.PHONY: build openbyte loadtest test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench perf-leakcheck ci-test ci-lint lint-openapi
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
@@ -35,6 +35,10 @@ ci-lint:
 	@echo "Running CI lint..."
 	@unformatted=$$(gofmt -l .); if [ -n "$$unformatted" ]; then echo "gofmt needed:"; echo "$$unformatted"; exit 1; fi
 	@go vet ./...
+
+# Requires Bun + `bun install` (same as CI `bun run lint:openapi`)
+lint-openapi:
+	@bun run lint:openapi
 
 test-e2e:
 	@echo "Running e2e tests..."
@@ -131,6 +135,7 @@ help:
 	@echo "  test-ui       - Run Playwright UI tests"
 	@echo "  ci-test       - Run CI test suite (short)"
 	@echo "  ci-lint       - Run CI lint checks"
+	@echo "  lint-openapi  - Lint api/openapi.yaml (Bun + devDependencies)"
 	@echo "  test-race     - Run tests with race detector"
 	@echo "  test-coverage - Generate coverage report"
 	@echo "  perf-bench    - Run perf benchmarks"

@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **AGENTS.md** Live Queue: CI/perf backlog rows `20260320-ci-01`..`05`, `20260320-perf-01`..`03` (govulncheck, OpenAPI step optimization, race parity, Playwright workers, concurrency review, nightly benches, bench expansion, telemetry guardrail).
+- **CI**: **`govulncheck`** in **`checks`** (`go run golang.org/x/vuln/cmd/govulncheck@latest ./...`); **Redocly** pinned as **`@redocly/cli@2.18.1`** with **`bun run lint:openapi`** (replaces cold **`npx @redocly/cli`** per run); **`Makefile`** **`lint-openapi`** for local parity.
+- **AGENTS.md** Live Queue: remaining CI/perf rows `20260320-ci-03`..`05`, `20260320-perf-01`..`03` (race parity, Playwright workers, concurrency review, nightly benches, bench expansion, telemetry guardrail).
 
 ### Fixed
 

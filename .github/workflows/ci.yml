@@ -71,8 +71,19 @@ jobs:
       - name: Lint
         run: make ci-lint
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "latest"
+
+      - name: Install JS devDependencies (Playwright + Redocly)
+        run: bun install --no-save
+
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
       - name: OpenAPI lint
-        run: npx @redocly/cli@2.18.1 lint api/openapi.yaml --config redocly.yaml
+        run: bun run lint:openapi
 
       - name: OpenAPI route contract
         run: go test ./test/unit/api -run TestOpenAPIRouteContract
@@ -93,16 +104,6 @@ jobs:
       - name: Race tests (main/tags)
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
         run: go test ./... -race -short -p 1
-
-      - name: Set up Bun
-        if: github.event_name != 'pull_request' || needs.changes.outputs.web == 'true'
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: "latest"
-
-      - name: Install Playwright deps
-        if: github.event_name != 'pull_request' || needs.changes.outputs.web == 'true'
-        run: bun install --no-save
 
       - name: Get Playwright version
         if: github.event_name != 'pull_request' || needs.changes.outputs.web == 'true'
