@@ -58,6 +58,7 @@
 ### Build / CI / Deploy
 
 - Manual CI recovery: Actions → `ci` workflow → **Run workflow** on `main` if a push-triggered run is stuck (cancel the zombie run first). Same `checks` job as push; `build-push` still needs a real push or `workflow_dispatch` with **force build** where applicable.
+- If `git fetch origin` fails (SSH agent): refresh `origin/main` with `git fetch https://github.com/SaveEnergy/openbyte.git +main:refs/remotes/origin/main`, or set `origin` to HTTPS and run `gh auth setup-git`.
 - CI main builds/pushes `edge` + `sha`; release pipeline publishes semver + `latest`.
 - Deploy path syncs compose files before remote execution to prevent server-side drift.
 - Deploy runs `docker compose pull` + `up -d --force-recreate`, then verifies expected image/container state.
