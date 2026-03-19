@@ -89,7 +89,6 @@
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| `20260319-refactor-12` | `internal/api` | - | Planned | Split `router_middleware.go`: **rate limit** (`registryRateLimitMiddleware`, `applyRateLimit`) vs **logging** (`LoggingMiddleware`, `responseWriter`) vs **security/CORS** (`SecurityHeadersMiddleware`, `CORSMiddleware`, helpers); same package. | `internal/api/router_middleware.go` ~216 LOC; `router_middleware_internal_test.go` exists for behavior pinning. | `go test ./internal/api/... ./test/unit/api/...` |
 | `20260319-refactor-13` | `internal/stream` | - | Planned | Split `manager.go` along lifecycle seams: **registry maps + limits** vs **finalize/metrics broadcast** vs **cleanup**; unexported helpers; mutex boundaries unchanged. | `internal/stream/manager.go` ~419 LOC; hot concurrency path; `test/unit/stream/manager_test.go` ~507 LOC for regression. | `go test ./internal/stream/... ./test/unit/stream/...` |
 
 ### Check Hold (manual/external)
@@ -118,9 +117,9 @@
 ### Recently Closed IDs
 
 - Most historical IDs intentionally pruned for readability; canonical record remains in git history.
-- Recent close: `20260319-refactor-01`..`11` (refactor wave).
+- Recent close: `20260319-refactor-01`..`12` (refactor wave).
 - Latest completed wave (moved `Check -> Done -> removed`):
-  - `20260319-refactor-01`, `20260319-refactor-02`, `20260319-refactor-03`, `20260319-refactor-04`, `20260319-refactor-05`, `20260319-refactor-06`, `20260319-refactor-07`, `20260319-refactor-08`, `20260319-refactor-09`, `20260319-refactor-10`, `20260319-refactor-11`
+  - `20260319-refactor-01`, `20260319-refactor-02`, `20260319-refactor-03`, `20260319-refactor-04`, `20260319-refactor-05`, `20260319-refactor-06`, `20260319-refactor-07`, `20260319-refactor-08`, `20260319-refactor-09`, `20260319-refactor-10`, `20260319-refactor-11`, `20260319-refactor-12`
   - `20260228-sec-06`, `20260228-go-32`, `20260228-ui-09`, `20260228-go-33`, `20260301-web-07`, `20260301-a11y-02`, `20260301-ui-10`, `20260301-go-34`, `20260301-go-35`, `20260301-api-04`, `20260301-ws-02`, `20260301-ci-11`, `20260301-sec-07`, `20260301-web-06`, `20260301-web-08`, `20260301-ops-01`, `20260301-doc-02`
   - `20260217-web-02`, `20260217-go-02`, `20260217-go-03`, `20260217-go-04`, `20260217-go-05`, `20260217-go-06`, `20260217-go-07`, `20260217-go-08`, `20260217-go-09`
   - `20260217-test-02`, `20260217-test-03`, `20260217-test-04`, `20260217-test-05`, `20260217-test-06`, `20260217-test-07`
@@ -129,6 +128,7 @@
 
 ### Recent Decision Notes
 
+- 2026-03-19: **`20260319-refactor-12` Done** — `internal/api`: replaced `router_middleware.go` with `router_middleware_ratelimit.go`, `router_middleware_cors.go`, `router_middleware_logging.go`, `router_middleware_security.go` (Deadline + security headers); `router.go` wrap order unchanged; `go test ./internal/api/... ./test/unit/api/...` green.
 - 2026-03-19: **`20260319-refactor-11` Done** — `web/speedtest-http.js` split: `speedtest-http-shared.js`, `speedtest-http-download.js`, `speedtest-http-upload.js`, barrel `speedtest-http.js`; Prettier clean; `speedtest.js` import unchanged.
 - 2026-03-19: **`20260319-refactor-10` Done** — `internal/results`: `store.go` (types, `New`, `Close`), `store_migrate.go` (schema + PRAGMA pool), `store_id.go` (`generateID`), `store_crud.go` (`Save`/`Get`, busy/unique helpers), `store_cleanup.go` (retention loop); `go test ./internal/results/... ./test/unit/results/...` green.
 - 2026-03-19: **`20260319-refactor-09` Done** — CI + `release.yml` **`deploy`** jobs call shared **`scripts/deploy/*.sh`** (validate, sync compose, remote pull/up); `DEPLOY_TAG` from `github.sha` (CI) or `GITHUB_REF_NAME` semver strip (release); `bash -n` on scripts locally.
