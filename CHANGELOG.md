@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **AGENTS.md**: **Refactor analysis intake (2026-03-22)** — deep pass: test-suite **LOC** hotspots (**`router_test`**, **`store_test`**, **`manager_test`**, **`e2e_test`**), **`cmd/client`** engine/formatter, **`internal/registry`**, optional **`speedtest.go`**, **web** **`ui`/`openbyte`**, **MCP/loadtest**; **Live Queue** **`20260322-refactor-01`**..**`09`** with checks.
 - **AGENTS.md**: **Refactor analysis intake (2026-03-20)** + backlog **`20260320-refactor-14`**..**`16`** (**`cmd/client`**, **`web`**, **`internal/stream` `Server`**) **Done**.
 - **AGENTS.md**: Architecture § Performance **advanced telemetry** policy (**`20260320-perf-03`**): server/internal-first, minimal default Web UI, explicit opt-in for user-visible detail; implementation remains deferred.
 - **Benchmarks**: **`internal/api`** (**`respondJSON`**, **`validateMetricsPayload`**, **`normalizeHost`**) and **`internal/jsonbody`** (**`DecodeSingleObject`**); **`Makefile`** **`perf-bench`** runs them with existing unit benches; **AGENTS.md** documents **`benchstat`** comparison (manual).
