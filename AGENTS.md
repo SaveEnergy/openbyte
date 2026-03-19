@@ -128,6 +128,7 @@
 - 2026-03-19: Security hygiene: `go 1.26.1`, indirect `github.com/buger/jsonparser v1.1.2` (Dependabot alert on transitive `mcp-go` → `jsonschema` → `go-ordered-map`), `docker/Dockerfile` builder `golang:1.26.1-alpine`; `govulncheck ./...` clean for reachable symbols.
 - 2026-03-19: Dependency refresh: `golang.org/x/term v0.41.0`, `modernc.org/sqlite v1.47.0` (plus transitive `x/sys`, `modernc.org/libc`); supersedes open Dependabot PRs for those direct deps.
 - 2026-03-19: CI: `workflow_dispatch` on `main` now runs **race** tests (same as `push`); push-triggered run `23316903684` was cancelled after stuck `checks`; dispatch run `23317250010` completed green.
+- 2026-03-19: **v0.8.0**: root **CHANGELOG.md** added; tag follows **v*.*.*** → `release.yml` (assets, GH Release, images).
 - 2026-03-19: Deep refactor analysis intake — Live Queue rows `20260319-refactor-01`..`06` (shared JSON decode, file splits for websocket/api/sdk, web module clarity); staged behavior-preserving refactors per Engineering Guardrails.
 - Adopted Go 1.26.1 baseline (`go.mod`, Docker builder); CI uses `1.26.x` toolchain.
 - Sonar reporting uses strict OPEN parity query (`projects=SaveEnergy_openbyte`, `issueStatuses=OPEN`).
