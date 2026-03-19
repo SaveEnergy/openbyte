@@ -27,8 +27,9 @@ jobs:
       - name: E2E tests
         run: go test ./test/e2e -timeout 5m
 
-      - name: Perf bench (optional)
-        if: ${{ vars.PERF_SMOKE == 'true' }}
+      # Default nightly (20260320-perf-01). Opt-out: set repo var PERF_BENCH to "false".
+      - name: Perf bench
+        if: ${{ vars.PERF_BENCH != 'false' }}
         run: make perf-bench
 
       - name: Goroutine leak profile smoke (optional)
