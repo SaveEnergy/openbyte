@@ -91,7 +91,7 @@ jobs:
         run: go test ./...
 
       - name: Race tests (main/tags)
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
         run: go test ./... -race -short -p 1
 
       - name: Set up Bun
