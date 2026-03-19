@@ -91,7 +91,6 @@
 
 | ID | Area | Plan | Check |
 | --- | --- | --- | --- |
-| `20260322-refactor-04` | cmd/client | Split `engine.go` / `engine_direction.go` / `formatter.go` (TCP/UDP vs output); stable exports. | `go test ./cmd/client/...` |
 | `20260322-refactor-05` | registry | Split `internal/registry/handler.go` vs `client.go` (HTTP vs sync helpers). | `go test ./internal/registry/... ./test/unit/registry/...` |
 | `20260322-refactor-06` | internal/api | Optional: `speedtest.go` vs `speedtest_*.go` — extract validation/deadline helpers only. | `go test ./internal/api/... ./test/unit/api/...` |
 | `20260322-refactor-07` | e2e | Split `test/e2e/e2e_test.go` (~480): harness vs stream/WS vs helpers. | `go test ./test/e2e/... -short` |
@@ -132,6 +131,7 @@
 - **2026-03-24**: **`20260322-refactor-01` Done** — router tests split (CORS/stream ID / static+CSP+rate-limit / results+registry+404 / allowlist+fonts+smoke); same `package api_test`, shared constants in `router_test_common_test.go`.
 - **2026-03-24**: **`20260322-refactor-02` Done** — store tests split: CRUD + id charset, retention/trim, busy locks, mux handler routes (`store_handler_routes_test.go` vs `handler_test.go` direct handler tests).
 - **2026-03-24**: **`20260322-refactor-03` Done** — `Manager` tests split: lifecycle, limits/concurrency, metrics channel fanout, terminal-state invariants.
+- **2026-03-24**: **`20260322-refactor-04` Done** — TCP/UDP dial + connection lifecycle in `engine_dial.go`; download/upload read/write loops in `engine_readwrite.go`; bidirectional in `engine_bidirectional.go`; latency/jitter + timeout helper in `engine_latency.go`; formatters split by output mode + `formatter_classify.go`.
 - **2026-03-23**: Complementary refactor scan → Live Queue `20260323-refactor-01`..`10` (parallel to `20260322-*`).
 - **2026-03-22**: Deep LOC scan → `20260322-refactor-01`..`09`; tests first, then client/registry/e2e/web/tools.
 - **2026-03-21**: `20260321-refactor-01`..`03` Done (speedtest tests, `pkg/client` files, `cmd/client` run + `http_engine_*`).
