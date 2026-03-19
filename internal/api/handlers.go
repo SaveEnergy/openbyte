@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/config"
+	"github.com/saveenergy/openbyte/internal/jsonbody"
 	"github.com/saveenergy/openbyte/internal/logging"
 	"github.com/saveenergy/openbyte/internal/stream"
 	"github.com/saveenergy/openbyte/pkg/errors"
@@ -48,10 +48,6 @@ func (h *Handler) SetVersion(version string) {
 	h.version = version
 }
 
-type VersionResponse struct {
-	Version string `json:"version"`
-}
-
 type StartStreamRequest struct {
 	Protocol   string `json:"protocol"`
 	Direction  string `json:"direction"`
@@ -68,31 +64,6 @@ type StartStreamResponse struct {
 	TestServerUDP string `json:"test_server_udp,omitempty"`
 	Status        string `json:"status"`
 	Mode          string `json:"mode"`
-}
-
-type ServersResponse struct {
-	Servers []types.ServerInfo `json:"servers"`
-}
-
-type streamConfigResponse struct {
-	ID         string `json:"id"`
-	Protocol   string `json:"protocol"`
-	Direction  string `json:"direction"`
-	Duration   int    `json:"duration"`
-	Streams    int    `json:"streams"`
-	PacketSize int    `json:"packet_size"`
-	ClientIP   string `json:"client_ip,omitempty"`
-}
-
-type streamSnapshotResponse struct {
-	Config    streamConfigResponse `json:"config"`
-	Status    string               `json:"status"`
-	Progress  float64              `json:"progress"`
-	Metrics   types.Metrics        `json:"metrics"`
-	Network   *types.NetworkInfo   `json:"network,omitempty"`
-	StartTime time.Time            `json:"start_time"`
-	EndTime   time.Time            `json:"end_time"`
-	Error     string               `json:"error,omitempty"`
 }
 
 func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
@@ -147,7 +118,7 @@ func (h *Handler) StartStream(w http.ResponseWriter, r *http.Request) {
 
 func decodeAndValidateStartRequest(w http.ResponseWriter, r *http.Request) (StartStreamRequest, string, bool) {
 	var req StartStreamRequest
-	if err := decodeJSONBody(w, r, &req, maxJSONBodyBytes); err != nil {
+	if err := jsonbody.DecodeSingleObject(w, r, &req, maxJSONBodyBytes); err != nil {
 		respondJSONBodyError(w, err)
 		return StartStreamRequest{}, "", false
 	}
@@ -194,222 +165,6 @@ func (h *Handler) startCreatedStream(streamID string) error {
 		return err
 	}
 	return nil
-}
-
-func (h *Handler) GetServers(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		drainRequestBody(r)
-		respondJSON(w, map[string]string{"error": methodNotAllowedErr}, http.StatusMethodNotAllowed)
-		return
-	}
-
-	host := responseHost(r, h.config)
-
-	serverID := "default"
-	serverName := "OpenByte Server"
-	serverLocation := host
-	serverRegion := ""
-	tcpPort := 8081
-	udpPort := 8082
-	capacityGbps := 25
-	maxTests := 10
-	activeTests := 0
-
-	if h.config != nil {
-		serverID = h.config.ServerID
-		serverName = h.config.ServerName
-		serverLocation = h.config.ServerLocation
-		serverRegion = h.config.ServerRegion
-		tcpPort = h.config.TCPTestPort
-		udpPort = h.config.UDPTestPort
-		capacityGbps = h.config.CapacityGbps
-		maxTests = h.config.MaxConcurrentTests
-
-		if h.config.PublicHost != "" {
-			host = h.config.PublicHost
-		}
-	}
-
-	if h.manager != nil {
-		activeTests = h.manager.ActiveCount()
-	}
-
-	scheme := requestScheme(r, h.config)
-	hostForEndpoint := responseHostForEndpoint(r, h.config)
-	apiEndpoint := scheme + "://" + hostForEndpoint
-
-	resp := ServersResponse{
-		Servers: []types.ServerInfo{
-			{
-				ID:           serverID,
-				Name:         serverName,
-				Location:     serverLocation,
-				Region:       serverRegion,
-				Host:         host,
-				TCPPort:      tcpPort,
-				UDPPort:      udpPort,
-				APIEndpoint:  apiEndpoint,
-				Health:       "healthy",
-				CapacityGbps: capacityGbps,
-				ActiveTests:  activeTests,
-				MaxTests:     maxTests,
-			},
-		},
-	}
-
-	respondJSON(w, resp, http.StatusOK)
-}
-
-func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
-	drainRequestBody(r)
-	version := h.version
-	if version == "" {
-		version = "dev"
-	}
-	respondJSON(w, VersionResponse{Version: version}, http.StatusOK)
-}
-
-func (h *Handler) ReportMetrics(w http.ResponseWriter, r *http.Request, streamID string) {
-	if r.Method != http.MethodPost {
-		drainRequestBody(r)
-		respondJSON(w, map[string]string{"error": methodNotAllowedErr}, http.StatusMethodNotAllowed)
-		return
-	}
-	if !isJSONContentType(r) {
-		drainRequestBody(r)
-		respondJSON(w, map[string]string{"error": contentTypeJSONErr}, http.StatusUnsupportedMediaType)
-		return
-	}
-
-	var metrics types.Metrics
-	if err := decodeJSONBody(w, r, &metrics, maxJSONBodyBytes); err != nil {
-		respondJSONBodyError(w, err)
-		return
-	}
-	if err := validateMetricsPayload(metrics); err != nil {
-		respondError(w, err, http.StatusBadRequest)
-		return
-	}
-
-	if err := h.manager.UpdateMetrics(streamID, metrics); err != nil {
-		respondError(w, err, http.StatusNotFound)
-		return
-	}
-	respondJSON(w, map[string]string{"status": "accepted"}, http.StatusAccepted)
-}
-
-func (h *Handler) CompleteStream(w http.ResponseWriter, r *http.Request, streamID string) {
-	if r.Method != http.MethodPost {
-		drainRequestBody(r)
-		respondJSON(w, map[string]string{"error": methodNotAllowedErr}, http.StatusMethodNotAllowed)
-		return
-	}
-	if !isJSONContentType(r) {
-		drainRequestBody(r)
-		respondJSON(w, map[string]string{"error": contentTypeJSONErr}, http.StatusUnsupportedMediaType)
-		return
-	}
-
-	var req struct {
-		Status  string        `json:"status"`
-		Metrics types.Metrics `json:"metrics"`
-		Error   string        `json:"error,omitempty"`
-	}
-	if err := decodeJSONBody(w, r, &req, maxJSONBodyBytes); err != nil {
-		respondJSONBodyError(w, err)
-		return
-	}
-	if err := validateMetricsPayload(req.Metrics); err != nil {
-		respondError(w, err, http.StatusBadRequest)
-		return
-	}
-
-	if req.Status == "completed" {
-		if err := h.manager.CompleteStream(streamID, req.Metrics); err != nil {
-			respondError(w, err, http.StatusNotFound)
-			return
-		}
-	} else if req.Status == "failed" {
-		var cause error
-		if reason := strings.TrimSpace(req.Error); reason != "" {
-			cause = stdErrors.New(reason)
-		}
-		if err := h.manager.FailStreamWithError(streamID, req.Metrics, cause); err != nil {
-			respondError(w, err, http.StatusNotFound)
-			return
-		}
-	} else {
-		respondError(w, errors.ErrInvalidConfig("status must be 'completed' or 'failed'", nil), http.StatusBadRequest)
-		return
-	}
-
-	respondJSON(w, map[string]string{"status": "ok"}, http.StatusOK)
-}
-
-func (h *Handler) GetStreamStatus(w http.ResponseWriter, r *http.Request, streamID string) {
-	drainRequestBody(r)
-	state, err := h.manager.GetStream(streamID)
-	if err != nil {
-		respondError(w, err, http.StatusNotFound)
-		return
-	}
-
-	respondJSON(w, toStreamSnapshotResponse(state.GetState()), http.StatusOK)
-}
-
-func (h *Handler) GetStreamResults(w http.ResponseWriter, r *http.Request, streamID string) {
-	drainRequestBody(r)
-	state, err := h.manager.GetStream(streamID)
-	if err != nil {
-		respondError(w, err, http.StatusNotFound)
-		return
-	}
-
-	snapshot := state.GetState()
-	if snapshot.Status != types.StreamStatusCompleted && snapshot.Status != types.StreamStatusFailed {
-		respondJSON(w, map[string]string{
-			"status": "stream not completed",
-		}, http.StatusAccepted)
-		return
-	}
-
-	respondJSON(w, toStreamSnapshotResponse(snapshot), http.StatusOK)
-}
-
-func toStreamSnapshotResponse(snapshot types.StreamSnapshot) streamSnapshotResponse {
-	resp := streamSnapshotResponse{
-		Config: streamConfigResponse{
-			ID:         snapshot.Config.ID,
-			Protocol:   string(snapshot.Config.Protocol),
-			Direction:  string(snapshot.Config.Direction),
-			Duration:   int(snapshot.Config.Duration.Seconds()),
-			Streams:    snapshot.Config.Streams,
-			PacketSize: snapshot.Config.PacketSize,
-			ClientIP:   snapshot.Config.ClientIP,
-		},
-		Status:    string(snapshot.Status),
-		Progress:  snapshot.Progress,
-		Metrics:   snapshot.Metrics,
-		Network:   snapshot.Network,
-		StartTime: snapshot.StartTime,
-		EndTime:   snapshot.EndTime,
-	}
-	if snapshot.Error != nil {
-		resp.Error = snapshot.Error.Error()
-	}
-	return resp
-}
-
-func (h *Handler) CancelStream(w http.ResponseWriter, r *http.Request, streamID string) {
-	drainRequestBody(r)
-	if err := h.manager.CancelStream(streamID); err != nil {
-		respondError(w, err, http.StatusNotFound)
-		return
-	}
-
-	respondJSON(w, map[string]string{
-		"status": "cancelled",
-	}, http.StatusOK)
 }
 
 func (h *Handler) validateConfig(req StartStreamRequest, clientIP string) (types.StreamConfig, error) {

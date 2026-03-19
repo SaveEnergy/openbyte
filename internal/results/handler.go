@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/saveenergy/openbyte/internal/jsonbody"
 	"github.com/saveenergy/openbyte/internal/logging"
 )
 
@@ -69,24 +70,18 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxResultBodyBytes)
-
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
 	var req saveRequest
-	if err := decoder.Decode(&req); err != nil {
-		io.Copy(io.Discard, r.Body)
+	if err := jsonbody.DecodeSingleObject(w, r, &req, maxResultBodyBytes); err != nil {
 		var maxBytesErr *http.MaxBytesError
 		if errors.As(err, &maxBytesErr) {
 			respondJSONError(w, "request body too large", http.StatusRequestEntityTooLarge)
 			return
 		}
+		if errors.Is(err, jsonbody.ErrTrailingJSON) {
+			respondJSONError(w, "request body must contain a single JSON object", http.StatusBadRequest)
+			return
+		}
 		respondJSONError(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		io.Copy(io.Discard, r.Body)
-		respondJSONError(w, "request body must contain a single JSON object", http.StatusBadRequest)
 		return
 	}
 

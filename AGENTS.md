@@ -26,7 +26,7 @@
 
 - CORS wildcard matching enforces safe dot-boundary behavior.
 - CSP is strict (`script-src 'self'`), with JS moved to external files only.
-- JSON API handlers enforce size limits and single-object decoding for POST/PUT payloads.
+- JSON API handlers enforce size limits and single-object decoding for POST/PUT payloads (`internal/jsonbody.DecodeSingleObject` shared by API + results).
 - Registry auth uses constant-time compare for bearer token validation.
 - Config validation includes port collision checks and trusted CIDR parsing.
 
@@ -39,6 +39,7 @@
   - no synthetic "Current Server" mode,
   - selector hidden when <=1 reachable server.
 - UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.
+- Speed test UI: primary logic in `speedtest*.js`; `openbyte.js` wires orchestration and server selection—keep new probe/state changes localized to those modules.
 
 ### Storage
 
@@ -82,7 +83,7 @@
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| _none_ | - | - | - | No remaining active backlog rows after the 2026-03-07 closure wave. | Runtime, frontend, CI/security, docs, and observability items from the last implementation spree were landed and verified locally. | `go test ./internal/api ./internal/stream ./test/unit/api ./test/unit/stream` and `bunx playwright test test/e2e/ui/basic.spec.js` |
+| _none_ | - | - | - | No active queued rows. | `20260319-refactor-01`..`06` landed 2026-03-19 (see Decision Notes). | N/A |
 
 ### Check Hold (manual/external)
 
@@ -110,8 +111,9 @@
 ### Recently Closed IDs
 
 - Most historical IDs intentionally pruned for readability; canonical record remains in git history.
-- Recent close: `20260301-doc-02`.
+- Recent close: `20260319-refactor-01`..`06` (refactor wave).
 - Latest completed wave (moved `Check -> Done -> removed`):
+  - `20260319-refactor-01`, `20260319-refactor-02`, `20260319-refactor-03`, `20260319-refactor-04`, `20260319-refactor-05`, `20260319-refactor-06`
   - `20260228-sec-06`, `20260228-go-32`, `20260228-ui-09`, `20260228-go-33`, `20260301-web-07`, `20260301-a11y-02`, `20260301-ui-10`, `20260301-go-34`, `20260301-go-35`, `20260301-api-04`, `20260301-ws-02`, `20260301-ci-11`, `20260301-sec-07`, `20260301-web-06`, `20260301-web-08`, `20260301-ops-01`, `20260301-doc-02`
   - `20260217-web-02`, `20260217-go-02`, `20260217-go-03`, `20260217-go-04`, `20260217-go-05`, `20260217-go-06`, `20260217-go-07`, `20260217-go-08`, `20260217-go-09`
   - `20260217-test-02`, `20260217-test-03`, `20260217-test-04`, `20260217-test-05`, `20260217-test-06`, `20260217-test-07`
@@ -120,6 +122,9 @@
 
 ### Recent Decision Notes
 
+- 2026-03-19: Landed `20260319-refactor-01`..`06`: package `internal/jsonbody`; websocket files `origin.go`/`broadcast.go`/`limits.go`/`ping.go`/`lifecycle.go`/`message_types.go` + slim `server.go`; `speedtest_{download,upload,deadline}.go`; `handlers_meta.go`/`handlers_stream.go`; SDK `client_http.go`; `refactor-06` = AGENTS frontend ownership note only (no JS moves).
+- 2026-03-19: Post-refactor gates green: `gofmt` on `internal/api/speedtest_download.go`, `make ci-lint`, `make ci-test`, Redocly lint + `TestOpenAPIRouteContract`, `go mod tidy` clean, `go test ./... -race -short -p 1`, full `bunx playwright test`.
+- 2026-03-19: Deep refactor analysis intake — Live Queue rows `20260319-refactor-01`..`06` (shared JSON decode, file splits for websocket/api/sdk, web module clarity); staged behavior-preserving refactors per Engineering Guardrails.
 - Adopted Go 1.26 baseline across runtime and CI/release workflows.
 - Sonar reporting uses strict OPEN parity query (`projects=SaveEnergy_openbyte`, `issueStatuses=OPEN`).
 - 2026-02-28 Sonar closure pass: implemented targeted fixes for rows `20260226-sonar-07/08/09` (Go complexity/naming, Go literals, web JS cleanup + module consistency) with green checks (`go test -short ./cmd/server ./cmd/client ./internal/stream ./internal/websocket ./internal/api ./test/e2e ./test/unit/metrics ./test/unit/api`, `npx prettier --check web/*.js`, `bunx playwright test`); awaiting next remote Sonar analysis for count parity.

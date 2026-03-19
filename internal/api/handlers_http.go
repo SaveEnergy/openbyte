@@ -23,23 +23,6 @@ var jsonBufPool = sync.Pool{
 
 const loopbackIPv4 = "127.0.0.1"
 
-func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any, limit int64) error {
-	if limit > 0 {
-		r.Body = http.MaxBytesReader(w, r.Body, limit)
-	}
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(dst); err != nil {
-		io.Copy(io.Discard, r.Body)
-		return err
-	}
-	if err := decoder.Decode(&struct{}{}); !stdErrors.Is(err, io.EOF) {
-		io.Copy(io.Discard, r.Body)
-		return stdErrors.New("request body must contain a single JSON object")
-	}
-	return nil
-}
-
 func isJSONContentType(r *http.Request) bool {
 	ct := r.Header.Get("Content-Type")
 	return strings.HasPrefix(ct, "application/json")
