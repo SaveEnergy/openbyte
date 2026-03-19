@@ -143,6 +143,28 @@
 | `20260322-refactor-08` | web | - | Planned | Reduce **`ui.js`** / **`openbyte.js`** coupling: extract pure UI helpers or lifecycle module; **minimal** default UI change (Architecture § Performance guardrail). | **`ui.js`** **~267**, **`openbyte.js`** **~222** | `npx prettier --check web/*.js`; `bunx playwright test test/e2e/ui/basic.spec.js` |
 | `20260322-refactor-09` | mcp / tools | - | Planned | Lower priority when touched: split **`cmd/mcp/main.go`** (stdio + tool registration) and/or **`cmd/loadtest/main.go`** (phases/flags). | **`mcp`** **~262**, **`loadtest`** **~456** | `go test ./cmd/mcp/... ./test/unit/mcp/...`; `go build ./cmd/loadtest` |
 
+### Refactor analysis intake (2026-03-23 pass — deep, complementary)
+
+- **Executive snapshot**: **`20260322`** queue already covers **`router_test`**, **`store_test`**, **`manager_test`**, **`cmd/client`** engine/formatter, **`registry`**, **`speedtest.go`**, **`e2e_test`**, **web** **`ui`/`openbyte`**, **mcp/loadtest**. This pass adds **non-overlapping** high-value targets: remaining **large test files** (**`handlers_test`**, **`diagnostic_test`**, **`websocket/server_test`**, **`results/handler_test`**, **`registry/handler_test`**), **`internal/metrics`** (**`aggregator`/`collector`**), **`pkg/diagnostic`**, **`cmd/client`** **`config`/`api`** (separate from engine/formatter), **`internal/api`** **`router`/`handlers`** seam, **web** **`speedtest-http-*`** / **`results.js`**, **`test/unit/client`** SDK tests, **`cmd/check`**. **`TODO`/`FIXME`**: empty. **Sonar**: still **last** Cloud snapshot — optional **`hotspots`** / **`complexity`** drill on next run.
+- **Evidence (LOC, `wc`, 2026-03-23)**:
+  - **Tests (not in `20260322` queue)**: `test/unit/api/handlers_test.go` (**476**), `test/unit/diagnostic/diagnostic_test.go` (**505**), `test/unit/websocket/server_test.go` (**430**), `test/unit/results/handler_test.go` (**454**), `test/unit/registry/handler_test.go` (**472**), `test/unit/client/sdk_test.go` (**378**), `test/unit/mcp/mcp_test.go` (**276**), `test/unit/api/ratelimit_test.go` (**218**).
+  - **Runtime**: `internal/metrics/aggregator.go` + `collector.go` (**213** + **231**); `pkg/diagnostic/diagnostic.go` (**222**); `internal/api/router.go` (**270**) + `handlers.go` (**235**); `cmd/client/config.go` (**345**), `api.go` (**324**); `cmd/check/main.go` (**237**).
+  - **Web**: `speedtest-http-upload.js` (**312**), `results.js` (**176**).
+- **Prioritization**: **Tests** still first (parallel to **`20260322`** rows — **different files**); **metrics** + **diagnostic** packages when observability churn; **router/handlers** only with **OpenAPI** parity check; **`cmd/check`** low churn.
+
+| ID | Area | Agent | Status | Plan | Evidence | Check |
+| --- | --- | --- | --- | --- | --- | --- |
+| `20260323-refactor-01` | test | - | Planned | Split **`test/unit/api/handlers_test.go`** (~476) + align with **`handlers_*_test.go`**: meta vs stream vs results routes; same **`package api_test`**. | Complements **`20260322-refactor-01`** (router) | `go test ./test/unit/api/...` |
+| `20260323-refactor-02` | test | - | Planned | Split **`test/unit/diagnostic/diagnostic_test.go`** (~505) by interpretation tiers vs edge cases. | Single large diagnostic suite | `go test ./test/unit/diagnostic/...` |
+| `20260323-refactor-03` | test | - | Planned | Split **`test/unit/websocket/server_test.go`** (~430) by **`origin`/broadcast/limits/ping`** seams (match **`internal/websocket`** split). | Mirrors prod websocket modules | `go test ./test/unit/websocket/...` |
+| `20260323-refactor-04` | test | - | Planned | Split **`test/unit/results/handler_test.go`** (~454) vs **`store_test`** concerns (HTTP vs SQLite); same **`test/unit/results`** package. | Complements **`20260322-refactor-02`** | `go test ./test/unit/results/...` |
+| `20260323-refactor-05` | metrics | - | Planned | Split **`internal/metrics`** **`aggregator.go`** / **`collector.go`** vs public types + wiring; **atomic** hot paths unchanged. | Two **~220** LOC files + metrics fanout | `go test ./internal/metrics/... ./test/unit/metrics/...` |
+| `20260323-refactor-06` | diagnostic | - | Planned | Split **`pkg/diagnostic/diagnostic.go`** (~222): interpretation vs thresholds vs exported **`Interpret`** API. | Shared by **CLI + SDK + web** | `go test ./pkg/diagnostic/...` |
+| `20260323-refactor-07` | cmd/client | - | Planned | Split **`config.go`** (env/flags) vs **`api.go`** (REST client calls) — **orthogonal** to **`20260322-refactor-04`** (engine/formatter). | **~345** + **~324** LOC | `go test ./cmd/client/...` |
+| `20260323-refactor-08` | internal/api | - | Planned | Optional: thin **`router.go`** vs **`handlers.go`** re-exports or split **`handlers.go`** by resource (**`20260319`** pattern); **OpenAPI** contract test must stay green. | **`router`** **+** **`handlers`** **~505** combined | `go test ./internal/api/...`; `go test ./test/unit/api/... -run TestOpenAPIRouteContract` |
+| `20260323-refactor-09` | web | - | Planned | **Further** trim **`speedtest-http-upload.js`** / **`speedtest-http-download.js`** (barrel + **`speedtest-http-shared.js`** already landed in **`20260319-refactor-11`**): move remaining duplicated helpers into shared, or slim **`results.js`** wiring. | **~312** + **~266** LOC | `npx prettier --check web/*.js`; `bunx playwright test test/e2e/ui/basic.spec.js` |
+| `20260323-refactor-10` | test / tools | - | Planned | Split **`test/unit/registry/handler_test.go`** (~472) vs **`service_test.go`**; optional **`cmd/check/main.go`** (~237) when `check` churns. | Registry tests + **check** binary | `go test ./test/unit/registry/...`; `go test ./cmd/check/...` |
+
 ### Check Hold (manual/external)
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
@@ -185,6 +207,7 @@
 
 ### Recent Decision Notes
 
+- 2026-03-23: **Refactor analysis (pass 4 — complementary)** — **`wc`** on remaining **470+** LOC test files + **`metrics`**, **`pkg/diagnostic`**, **`cmd/client`** **`config`/`api`**, **`router`/`handlers`**, web **speedtest-http-*** follow-up, **`registry`** tests + **`cmd/check`**. **Live Queue** **`20260323-refactor-01`**..**`10`**; does **not** duplicate **`20260322`** rows (parallel backlog).
 - 2026-03-22: **Refactor analysis (pass 3 — deep)** — Static **LOC** + module coupling scan post-**`20260321`**. **Live Queue** **`20260322-refactor-01`**..**`09`**: prioritize **large unit tests** (**`router`/`store`/`manager`** suites), then **`cmd/client`** engine/formatter, **`internal/registry`**, optional **`internal/api/speedtest`**, **`test/e2e`** split, **web** **`ui`/`openbyte`**, **MCP/loadtest** on churn. **Churn** verification deferred to **`git log --stat`** per file before execution.
 - 2026-03-21: **`20260321-refactor-03` Done** — **`cmd/client`**: stream orchestration vs HTTP mode vs progress vs results/buildResults; **`HTTPTestEngine`** download/upload/misc + ping; **`run.go`** removed; `go test ./cmd/client/...` green.
 - 2026-03-21: **`20260321-refactor-02` Done** — **`pkg/client`**: **`client.go`** = **`New`** + options + path constants; HTTP helpers split **`client_health`**, **`client_latency`**, **`client_download`**, **`client_upload`**; public flows **`client_check`**, **`client_speedtest`**, **`client_diagnose`**; **`client_http.go`** removed; `go test ./pkg/client/...` `./test/unit/client/...` green.
