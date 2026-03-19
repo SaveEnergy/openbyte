@@ -57,7 +57,7 @@
 ### Agent & API Surface
 
 - MCP server available via `openbyte mcp` (stdio transport).
-- Go SDK (`pkg/client`) exposes `Check`, `SpeedTest`, `Diagnose`, `Healthy`.
+- Go SDK (`pkg/client`) exposes `Check`, `SpeedTest`, `Diagnose`, `Healthy`; implementation split: **`client.go`** (`New`, options), **`client_check.go`**, **`client_speedtest.go`**, **`client_diagnose.go`**, **`client_health.go`**, **`client_latency.go`**, **`client_download.go`**, **`client_upload.go`** (same exported API).
 - OpenAPI spec lives at `api/openapi.yaml`; CI/release lint it.
 - JSON output supports schema versioning and structured error contracts.
 
@@ -111,7 +111,7 @@
 - **Evidence (LOC, `wc`, 2026-03-21)**:
   - **Tests (largest)**: `test/unit/api` speedtest split into **`speedtest_*_test.go`** (helpers + download + upload + ping); `test/unit/results/store_test.go` (**604**), `test/unit/api/router_test.go` (**531**), `test/unit/stream/manager_test.go` (**507**), `test/unit/diagnostic/diagnostic_test.go` (**505**), `test/e2e/e2e_test.go` (**480**), `test/unit/api/handlers_test.go` (**476**).
   - **cmd/client**: `run.go` (**416**), `http_engine.go` (**370**), `engine_test.go` (**352**), `config.go` (**345**), `api.go` (**324**), `engine.go` (**309**), `engine_direction.go` (**306**).
-  - **pkg/client**: `client.go` (**292**), `client_http.go` (**197**) — partial split already; remainder aligns with **Open / Deferred** SDK polish.
+  - **pkg/client**: slim **`client.go`** + **`client_{check,speedtest,diagnose,health,latency,download,upload}.go`** (see Architecture § Agent & API Surface).
   - **internal/api**: `speedtest.go` (**261**), `router.go` (**270**), `handlers.go` (**235**), `ratelimit.go` (**227**).
   - **Other tools**: `cmd/loadtest/main.go` (**456**).
 - **Assumptions**: **Sonar** QG unchanged vs last snapshot; no production incident signals in this pass.
@@ -121,7 +121,6 @@
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| `20260321-refactor-02` | sdk | - | Planned | Optional: further split **`pkg/client`** (`client.go` vs streams/health/speed) — **no** exported symbol renames without semver minor; overlaps **Open / Deferred**. | **`client.go`** ~292 + **`client_http.go`** ~197 | `go test ./pkg/client/...` |
 | `20260321-refactor-03` | cmd/client | - | Planned | Optional: extract **`http_engine.go`** or **`run.go`** internal helpers (metrics, stream IO) into unexported files; minimal API churn. | **`run.go`** ~416, **`http_engine.go`** ~370 | `go test ./cmd/client/...` |
 
 ### Check Hold (manual/external)
@@ -142,8 +141,9 @@
 ### Recently Closed IDs
 
 - Most historical IDs intentionally pruned for readability; canonical record remains in git history.
-- Recent close: `20260319-refactor-01`..`13` (refactor wave); `20260320-refactor-14`..`16` (**`cmd/client`**, **`web`**, **`internal/stream` `Server`** TCP split); `20260321-refactor-01` (**`test/unit/api`** speedtest tests split).
+- Recent close: `20260319-refactor-01`..`13` (refactor wave); `20260320-refactor-14`..`16` (**`cmd/client`**, **`web`**, **`internal/stream` `Server`** TCP split); `20260321-refactor-01` (**`test/unit/api`** speedtest tests split); `20260321-refactor-02` (**`pkg/client`** file split).
 - Latest completed wave (moved `Check -> Done -> removed`):
+  - `20260321-refactor-02` (**`pkg/client`**: **`client_{check,speedtest,diagnose,health,latency,download,upload}.go`** + slim **`client.go`**; removed **`client_http.go`**; no export renames; `go test ./pkg/client/...` + `./test/unit/client/...` green)
   - `20260321-refactor-01` (**`test/unit/api`**: replaced monolithic **`speedtest_test.go`** with **`speedtest_helpers_test.go`**, **`speedtest_download_test.go`**, **`speedtest_upload_test.go`**, **`speedtest_ping_test.go`**; `go test ./test/unit/api/...` green)
   - `20260320-refactor-16` (**`internal/stream`**: **`server_tcp.go`** TCP accept + workload loops; slim **`server.go`** lifecycle + shared **`isTimeoutError`**; `go test ./internal/stream/... ./test/unit/stream/...` green)
   - `20260320-refactor-15` (**`web`**: **`download-platform.js`**, **`download-github.js`**, **`network-helpers.js`**, **`network-health.js`** + slim **`download.js`**/**`network.js`**; **`router_static.go`** allowlist; Prettier clean)
@@ -164,8 +164,9 @@
 
 ### Recent Decision Notes
 
+- 2026-03-21: **`20260321-refactor-02` Done** — **`pkg/client`**: **`client.go`** = **`New`** + options + path constants; HTTP helpers split **`client_health`**, **`client_latency`**, **`client_download`**, **`client_upload`**; public flows **`client_check`**, **`client_speedtest`**, **`client_diagnose`**; **`client_http.go`** removed; `go test ./pkg/client/...` `./test/unit/client/...` green.
 - 2026-03-21: **`20260321-refactor-01` Done** — **`test/unit/api`**: speedtest tests split into **`speedtest_helpers_test.go`** (constants + **`signalWriter`**/**`signalReader`** + test bodies), **`speedtest_download_test.go`**, **`speedtest_upload_test.go`**, **`speedtest_ping_test.go`**; `go test ./test/unit/api/...` green.
-- 2026-03-21: **Refactor analysis (pass 2)** — Post-**`20260320-refactor-14`**..**`16`** static scan: highlighted **`test/unit/api`** weight, **`cmd/client`** depth, **`pkg/client`**. Live Queue **`20260321-refactor-02`**..**`03`** (SDK / CLI optional); **Open / Deferred** unchanged for SDKs from OpenAPI / packaging.
+- 2026-03-21: **Refactor analysis (pass 2)** — Post-**`20260320-refactor-14`**..**`16`** static scan: highlighted **`test/unit/api`** weight, **`cmd/client`** depth, **`pkg/client`**. Live Queue **`20260321-refactor-03`** (CLI optional); **Open / Deferred** unchanged for SDKs from OpenAPI / packaging.
 - 2026-03-20: **`20260320-refactor-15` Done** — **`web`**: **`download-platform.js`** (URLs, **`platforms`**/**`archLabels`**, UA detection, asset helpers), **`download-github.js`** (`fetchLatestRelease`), **`network-helpers.js`**, **`network-health.js`**; **`network.js`** re-exports **`getHealthURL`**; **`internal/api/router_static.go`** allowlist for new modules; Prettier **`web/*.js`** clean.
 - 2026-03-20: **`20260320-refactor-14` Done** — **`cmd/client`**: split former **`cli.go`** into **`cli_flags.go`**, **`cli_usage.go`**, **`cli_validate.go`**, **`cli_servers.go`** (same **`package client`**); **`run.go`** unchanged; `go test ./cmd/client/...` green.
 - 2026-03-20: **`20260320-refactor-16` Done** — **`internal/stream`**: **`server_tcp.go`** holds TCP accept + download/upload/bidirectional/echo + read/write helpers; **`server.go`** keeps **`NewServer`**, **`Close`**, recv buffer pool, **`isTimeoutError`** (shared with **`server_udp.go`**); same **`Server`** API; `go test ./internal/stream/... ./test/unit/stream/...` green.
