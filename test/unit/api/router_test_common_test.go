@@ -1,0 +1,66 @@
+package api_test
+
+import "net/http"
+
+const (
+	statusWantFmt             = "status = %d, want %d"
+	exampleBaseURL            = "http://example.com"
+	allowedOriginKey          = "Access-Control-Allow-Origin"
+	cacheControlKey           = "Cache-Control"
+	noStoreHeader             = "no-store"
+	fooOrigin                 = "https://foo.example.com"
+	fooOriginWithPort         = "https://foo.example.com:8443"
+	resultsDBPath             = "/results.db"
+	resultsNewErrFmt          = "results.New: %v"
+	resultsPagePath           = "/results/abc12345"
+	apiUnknownPath            = "/api/v1/nonexistent"
+	registryHealthAPI         = "/api/v1/registry/health"
+	versionAPIPath            = "/api/v1/version"
+	pingAPIPath               = "/api/v1/ping"
+	downloadAPIPath           = "/api/v1/download"
+	uploadAPIPath             = "/api/v1/upload"
+	streamWSAPIPath           = "/api/v1/stream/550e8400-e29b-41d4-a716-446655440000/stream"
+	healthRoutePath           = "/health"
+	evilOrigin                = "https://evilexample.com"
+	routerOctetStreamType     = "application/octet-stream"
+	routerContentTypeKey      = "Content-Type"
+	routerAllowOriginFmt      = "allow origin = %q, want %q"
+	routerContentTypeJSON     = "application/json"
+	routerContentTypeHTML     = "text/html"
+	routerCacheRootFmt        = "cache-control for / = %q, want %q"
+	routerCacheHTMLFmt        = "cache-control for html = %q, want %q"
+	routerFirstVersionReq     = "first version request "
+	routerFirstRegistryReq    = "first registry request "
+	routerSecondRegistryReq   = "second registry request "
+	routerFirstResultsReq     = "first results page "
+	routerSecondResultsReq    = "second results page "
+	routerEvilBypassFmt       = "evilexample.com should be rejected, got Allow-Origin = %q"
+	routerInvalidIDCalledErr  = "handler should not be called for invalid stream id"
+	routerJSNoStoreErr        = "cache-control for js should not be no-store"
+	routerCSPHeaderMissingErr = "content-security-policy header missing"
+	routerCSPScriptSrcFmt     = "csp missing script-src self: %q"
+	routerCSPConnectSrcFmt    = "csp missing expected connect-src policy: %q"
+	routerCSPWildcardErrFmt   = "csp should not allow wildcard connect-src: %q"
+	routerPingBypassErr       = "ping endpoint should bypass rate limit"
+	routerDownloadBypassErr   = "download endpoint should bypass rate limit"
+	routerUploadBypassErr     = "upload endpoint should bypass rate limit"
+	routerStreamRateLimitFmt  = "stream websocket endpoint should be rate limited, got %d"
+	routerCacheControlFmt     = "cache-control = %q, want %q"
+	routerBodyNotFoundFmt     = "body = %q, want not found JSON"
+	routerContentTypeWantFmt  = "content-type = %q, want %s"
+	routerMkdirFontsFmt       = "mkdir fonts: %v"
+	routerWriteIndexFmt       = "write index.html: %v"
+	routerWriteFontFmt        = "write font: %v"
+	routerFontServedFmt       = "font should be served, got %d"
+	routerEmbedDeniedFmt      = "embed.go should be denied by allowlist, got %d"
+	routerSkillServedFmt      = "skill.html should be served, got %d"
+)
+
+type testRegistryRegistrar struct{}
+
+func (testRegistryRegistrar) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/registry/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+}

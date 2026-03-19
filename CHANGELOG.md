@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **test/unit/results**: split **`store_test.go`** into **`store_test_common_test.go`**, **`store_crud_test.go`**, **`store_retention_test.go`**, **`store_busy_test.go`**, **`store_handler_routes_test.go`**; **`20260322-refactor-02`** Done (`go test ./test/unit/results/...`).
+- **test/unit/api**: split **`router_test.go`** into **`router_test_common_test.go`** (constants + registry test stub), **`router_middleware_stream_test.go`**, **`router_static_cache_ratelimit_test.go`**, **`router_results_api_routes_test.go`**, **`router_static_allowlist_test.go`**; **`20260322-refactor-01`** Done (`go test ./test/unit/api/...`).
 - **AGENTS.md**: compacted — merged refactor intake narratives into short backlog notes; single slimmer Live Queue table; trimmed Sonar/closed-ID/decision-note walls; **~280 → ~154 lines** (detail remains in CHANGELOG / git history).
 
 ### Added
