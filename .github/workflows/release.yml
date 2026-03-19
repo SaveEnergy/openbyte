@@ -11,8 +11,6 @@ jobs:
     permissions:
       contents: write
       packages: write
-    outputs:
-      image_pushed: ${{ steps.push.outcome == 'success' }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -151,7 +149,7 @@ jobs:
 
   deploy:
     needs: release
-    if: vars.SSH_HOST != '' && vars['SSH_HOST_FINGERPRINT'] != '' && vars.SSH_USER != '' && vars.REMOTE_DIR != '' && vars.GHCR_USERNAME != '' && needs.release.outputs.image_pushed == 'true'
+    if: vars.SSH_HOST != '' && vars['SSH_HOST_FINGERPRINT'] != '' && vars.SSH_USER != '' && vars.REMOTE_DIR != '' && vars.GHCR_USERNAME != '' && needs.release.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read

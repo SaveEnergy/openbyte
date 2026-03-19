@@ -61,6 +61,7 @@
 - If `git fetch origin` fails (SSH agent): refresh `origin/main` with `git fetch https://github.com/SaveEnergy/openbyte.git +main:refs/remotes/origin/main`, or set `origin` to HTTPS and run `gh auth setup-git`.
 - CI **`build-push`** + **`deploy`** run on **every** push to `main` (after `checks`); path `changes` only gates Playwright install on PRs—not Docker, so doc-only commits still publish images and can roll the test host.
 - CI main builds/pushes `edge` + `sha`; release pipeline publishes semver + `latest`.
+- **`release.yml` `deploy`** (test host) requires the same repo **`vars`** + secrets as CI **`deploy`**, and **`needs.release.result == 'success'`** (aligned with CI `deploy` ↔ `build-push`—do not gate deploy on a derived boolean job output; string coercion caused skipped deploys after green releases).
 - Deploy path syncs compose files before remote execution to prevent server-side drift.
 - Deploy runs `docker compose pull` + `up -d --force-recreate`, then verifies expected image/container state.
 - Traefik deploy uses external `traefik` network; workflows ensure network presence.
