@@ -87,7 +87,13 @@
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| _none_ | - | - | - | No active queued rows. | `20260319-refactor-01`..`06` landed 2026-03-19 (see Decision Notes). | N/A |
+| `20260319-refactor-07` | `cmd/server` | - | Planned | Split `main.go` along seams: **flags** (`serverFlagValues`, `buildServerFlagSet`, `applyServerFlagOverrides`, helpers) vs **wiring** (`setupRuntimeResources`, HTTP/TLS start, shutdown, `stopServerDependencies`, `broadcastMetrics`) vs thin **Run**; no behavior change. | `cmd/server/main.go` ~478 LOC; distinct clusters; file limit guardrail proximity. | `go test ./cmd/server/...` |
+| `20260319-refactor-08` | `internal/config` | - | Planned | Split `env.go` by domain (e.g. core/bind/ports, limits/network, registry, TLS) **or** table-driven loaders; keep `Config` + `Validate` in `config.go`; reduce Sonar CC risk on env paths. | `internal/config/env.go` ~247 LOC; many `load*Env` funcs; historical `go:S3776` hotspot on `loadCoreEnv`. | `go test ./test/unit/config/...` `./internal/config/...` |
+| `20260319-refactor-09` | CI / ops | - | Planned | Deduplicate **Sync compose** + **Deploy via SSH** between `ci.yml` and `release.yml`: composite action under `.github/actions/…` **or** repo `scripts/deploy-remote.sh` + minimal YAML glue; preserve env/secret contract; shellcheck + dry-run doc. | Near-duplicate blocks ~`ci.yml` L213+ / `release.yml` L179+; drift risk on security-sensitive SSH. | Review workflow YAML; optional manual `workflow_dispatch` smoke on test host |
+| `20260319-refactor-10` | `internal/results` | - | Planned | Split `store.go`: **migrations/schema** vs **CRUD/query** vs **ID generation** (private helpers); keep exported `Store` API; easier targeted tests. | `internal/results/store.go` ~360 LOC; mixed migration + runtime SQL; `test/unit/results/store_test.go` already large—hook new seams. | `go test ./internal/results/... ./test/unit/results/...` |
+| `20260319-refactor-11` | web | - | Planned | Split `speedtest-http.js` by concern (e.g. schedule/phases, fetch/upload loops, UI/DOM, shared utils); align with `refactor-06` ownership note; minimal UX change. | `web/speedtest-http.js` ~593 LOC (largest web module). | `bunx playwright test test/e2e/...`, `npx prettier --check web/*.js` |
+| `20260319-refactor-12` | `internal/api` | - | Planned | Split `router_middleware.go`: **rate limit** (`registryRateLimitMiddleware`, `applyRateLimit`) vs **logging** (`LoggingMiddleware`, `responseWriter`) vs **security/CORS** (`SecurityHeadersMiddleware`, `CORSMiddleware`, helpers); same package. | `internal/api/router_middleware.go` ~216 LOC; `router_middleware_internal_test.go` exists for behavior pinning. | `go test ./internal/api/... ./test/unit/api/...` |
+| `20260319-refactor-13` | `internal/stream` | - | Planned | Split `manager.go` along lifecycle seams: **registry maps + limits** vs **finalize/metrics broadcast** vs **cleanup**; unexported helpers; mutex boundaries unchanged. | `internal/stream/manager.go` ~419 LOC; hot concurrency path; `test/unit/stream/manager_test.go` ~507 LOC for regression. | `go test ./internal/stream/... ./test/unit/stream/...` |
 
 ### Check Hold (manual/external)
 
@@ -126,6 +132,7 @@
 
 ### Recent Decision Notes
 
+- 2026-03-19 (deep analysis): Added Live Queue `20260319-refactor-07`..`13` — prioritized by **maintainability × testability** (evidence: LOC clusters, duplicate workflows, existing unit/E2E hooks); **no** overlap with completed `01`..`06` scope; staged behavior-preserving splits per Engineering Guardrails.
 - 2026-03-19: Landed `20260319-refactor-01`..`06`: package `internal/jsonbody`; websocket files `origin.go`/`broadcast.go`/`limits.go`/`ping.go`/`lifecycle.go`/`message_types.go` + slim `server.go`; `speedtest_{download,upload,deadline}.go`; `handlers_meta.go`/`handlers_stream.go`; SDK `client_http.go`; `refactor-06` = AGENTS frontend ownership note only (no JS moves).
 - 2026-03-19: Post-refactor gates green: `gofmt` on `internal/api/speedtest_download.go`, `make ci-lint`, `make ci-test`, Redocly lint + `TestOpenAPIRouteContract`, `go mod tidy` clean, `go test ./... -race -short -p 1`, full `bunx playwright test`.
 - 2026-03-19: Security hygiene: `go 1.26.1`, indirect `github.com/buger/jsonparser v1.1.2` (Dependabot alert on transitive `mcp-go` → `jsonschema` → `go-ordered-map`), `docker/Dockerfile` builder `golang:1.26.1-alpine`; `govulncheck ./...` clean for reachable symbols.
