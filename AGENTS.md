@@ -63,6 +63,7 @@
 - CI main builds/pushes `edge` + `sha`; release pipeline publishes semver + `latest`.
 - **`release.yml` `deploy`** (test host) requires the same repo **`vars`** + secrets as CI **`deploy`**, and **`needs.release.result == 'success'`** (aligned with CI `deploy` ↔ `build-push`—do not gate deploy on a derived boolean job output; string coercion caused skipped deploys after green releases).
 - Deploy path syncs compose files before remote execution to prevent server-side drift.
+- Shared deploy shell: **`scripts/deploy/validate_env.sh`**, **`sync_compose.sh`**, **`deploy_remote.sh`** — invoked from **`ci.yml`** and **`release.yml`** (`DEPLOY_TAG` = `github.sha` vs semver tag without `v`); edit scripts once to update both pipelines.
 - Deploy runs `docker compose pull` + `up -d --force-recreate`, then verifies expected image/container state.
 - Traefik deploy uses external `traefik` network; workflows ensure network presence.
 - Workflow gates require required deploy vars/secrets and fail fast on missing config.
@@ -87,7 +88,6 @@
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| `20260319-refactor-09` | CI / ops | - | Planned | Deduplicate **Sync compose** + **Deploy via SSH** between `ci.yml` and `release.yml`: composite action under `.github/actions/…` **or** repo `scripts/deploy-remote.sh` + minimal YAML glue; preserve env/secret contract; shellcheck + dry-run doc. | Near-duplicate blocks ~`ci.yml` L213+ / `release.yml` L179+; drift risk on security-sensitive SSH. | Review workflow YAML; optional manual `workflow_dispatch` smoke on test host |
 | `20260319-refactor-10` | `internal/results` | - | Planned | Split `store.go`: **migrations/schema** vs **CRUD/query** vs **ID generation** (private helpers); keep exported `Store` API; easier targeted tests. | `internal/results/store.go` ~360 LOC; mixed migration + runtime SQL; `test/unit/results/store_test.go` already large—hook new seams. | `go test ./internal/results/... ./test/unit/results/...` |
 | `20260319-refactor-11` | web | - | Planned | Split `speedtest-http.js` by concern (e.g. schedule/phases, fetch/upload loops, UI/DOM, shared utils); align with `refactor-06` ownership note; minimal UX change. | `web/speedtest-http.js` ~593 LOC (largest web module). | `bunx playwright test test/e2e/...`, `npx prettier --check web/*.js` |
 | `20260319-refactor-12` | `internal/api` | - | Planned | Split `router_middleware.go`: **rate limit** (`registryRateLimitMiddleware`, `applyRateLimit`) vs **logging** (`LoggingMiddleware`, `responseWriter`) vs **security/CORS** (`SecurityHeadersMiddleware`, `CORSMiddleware`, helpers); same package. | `internal/api/router_middleware.go` ~216 LOC; `router_middleware_internal_test.go` exists for behavior pinning. | `go test ./internal/api/... ./test/unit/api/...` |
@@ -119,9 +119,9 @@
 ### Recently Closed IDs
 
 - Most historical IDs intentionally pruned for readability; canonical record remains in git history.
-- Recent close: `20260319-refactor-01`..`08` (refactor wave).
+- Recent close: `20260319-refactor-01`..`09` (refactor wave).
 - Latest completed wave (moved `Check -> Done -> removed`):
-  - `20260319-refactor-01`, `20260319-refactor-02`, `20260319-refactor-03`, `20260319-refactor-04`, `20260319-refactor-05`, `20260319-refactor-06`, `20260319-refactor-07`, `20260319-refactor-08`
+  - `20260319-refactor-01`, `20260319-refactor-02`, `20260319-refactor-03`, `20260319-refactor-04`, `20260319-refactor-05`, `20260319-refactor-06`, `20260319-refactor-07`, `20260319-refactor-08`, `20260319-refactor-09`
   - `20260228-sec-06`, `20260228-go-32`, `20260228-ui-09`, `20260228-go-33`, `20260301-web-07`, `20260301-a11y-02`, `20260301-ui-10`, `20260301-go-34`, `20260301-go-35`, `20260301-api-04`, `20260301-ws-02`, `20260301-ci-11`, `20260301-sec-07`, `20260301-web-06`, `20260301-web-08`, `20260301-ops-01`, `20260301-doc-02`
   - `20260217-web-02`, `20260217-go-02`, `20260217-go-03`, `20260217-go-04`, `20260217-go-05`, `20260217-go-06`, `20260217-go-07`, `20260217-go-08`, `20260217-go-09`
   - `20260217-test-02`, `20260217-test-03`, `20260217-test-04`, `20260217-test-05`, `20260217-test-06`, `20260217-test-07`
@@ -130,6 +130,7 @@
 
 ### Recent Decision Notes
 
+- 2026-03-19: **`20260319-refactor-09` Done** — CI + `release.yml` **`deploy`** jobs call shared **`scripts/deploy/*.sh`** (validate, sync compose, remote pull/up); `DEPLOY_TAG` from `github.sha` (CI) or `GITHUB_REF_NAME` semver strip (release); `bash -n` on scripts locally.
 - 2026-03-19: **`20260319-refactor-08` Done** — `internal/config`: replaced single `env.go` with `env_helpers.go` (shared parsers + `EnvDebug`), `env_core.go` (ports/bind/meta/capacity), `env_extended.go` (runtime, limits/network, storage, registry, TLS); `LoadFromEnv` unchanged in `config.go`; `go test ./test/unit/config/...` + `./... -short` green.
 - 2026-03-19: **`20260319-refactor-07` Done** — `cmd/server`: `flags.go` (CLI + overrides), `runtime.go` (wiring, HTTP, shutdown, `broadcastMetrics`), thin `main.go` (`Run`); `go test ./cmd/server/...` + `go test ./... -short` green.
 - 2026-03-19 (deep analysis): Added Live Queue `20260319-refactor-07`..`13` — prioritized by **maintainability × testability** (evidence: LOC clusters, duplicate workflows, existing unit/E2E hooks); **no** overlap with completed `01`..`06` scope; staged behavior-preserving splits per Engineering Guardrails.
