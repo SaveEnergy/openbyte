@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **AGENTS.md**: compacted — merged refactor intake narratives into short backlog notes; single slimmer Live Queue table; trimmed Sonar/closed-ID/decision-note walls; **~280 → ~154 lines** (detail remains in CHANGELOG / git history).
+
 ### Added
 
 - **AGENTS.md**: **Refactor analysis intake (2026-03-23)** — complementary deep pass: large tests (**`handlers_test`**, **`diagnostic_test`**, **`websocket/server_test`**, **`results/handler_test`**, **`registry/handler_test`**), **`internal/metrics`**, **`pkg/diagnostic`**, **`cmd/client`** **`config`/`api`**, **`router`/`handlers`**, web **HTTP speed** further dedupe, **`cmd/check`**; **Live Queue** **`20260323-refactor-01`**..**`10`** with checks.
