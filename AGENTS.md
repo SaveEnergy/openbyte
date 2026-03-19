@@ -109,10 +109,10 @@
 
 - Strict OPEN filter parity maintained with Cloud:
   - Query: `projects=[SaveEnergy_openbyte]`, `issueStatuses=[OPEN]`, `ps=500`
-  - **2026-03-20 code fixes** (targets prior **27** OPEN list): **`[[`** in **`scripts/deploy/{validate_env,sync_compose,deploy_remote}.sh`**; **`TestDecodeSingleObject*`** renames in **`internal/jsonbody/decode_test.go`**; **`errFmtBidirectionalCommand`** / **`testPathAPIUpload`** for **go:S1192**; **`resolvePlaywrightWorkers()`** in **`playwright.config.js`**; **`execContexter`** in **`internal/results/store_migrate.go`**; explicit **`signal`** handling in **`test/e2e/ui/basic.spec.js`**; success toast **`<output>`** in **`web/index.html`** + matching assertion in **`basic.spec.js`**. **Re-run SonarCloud on `main`** to confirm OPEN count (parity).
-  - Historical MCP snapshots: **`27`** OPEN (**2026-03-20**); **`0`** OPEN (**2026-03-01**); **`23`** OPEN (**2026-02-26**)
-- **Quality gate** (`get_project_quality_gate_status`, `projectKey=SaveEnergy_openbyte`): last MCP check **`ERROR`** on **`new_security_hotspots_reviewed`** (**`92.3%`** vs **`100%`** required) — clear via **Sonar UI** hotspot review; code metrics were **OK**.
-- Sonar MCP exposes issue search + metrics + QG status; **hotspot review** transitions are **UI/API** (not MCP).
+  - **2026-03-20 code fixes** (prior **27** OPEN wave): **`[[`** in **`scripts/deploy/{validate_env,sync_compose,deploy_remote}.sh`**; **`TestDecodeSingleObject*`** in **`internal/jsonbody/decode_test.go`**; **`go:S1192`** constants; **`resolvePlaywrightWorkers()`** in **`playwright.config.js`**; **`execContexter`** in **`internal/results/store_migrate.go`**; **`init?.signal`** / **`signal?.`** in **`test/e2e/ui/basic.spec.js`** (**`javascript:S6582`**); success toast **`<output>`** in **`web/index.html`** + assertion.
+  - **Post-analysis (MCP)**: **Quality gate `OK`** — including **`new_security_hotspots_reviewed`** = **`100%`**; **`javascript:S6582`** on **`basic.spec.js`** addressed with **`?.`** (re-verify OPEN count after next Cloud analysis).
+  - Historical: **`27`** OPEN (**2026-03-20** pre-fix); **`0`** OPEN (**2026-03-01**); **`23`** OPEN (**2026-02-26**)
+- Sonar MCP exposes issue search + metrics + QG status; **hotspot review** is also available in **Sonar UI**.
 
 ### Recently Closed IDs
 
@@ -135,7 +135,8 @@
 
 ### Recent Decision Notes
 
-- 2026-03-20: **Sonar OPEN fixes landed** — **`shelldre`**, **`go:S100`**, **`go:S1192`**, **`javascript:S3358`**, **`godre:S8196`**, **`javascript:S6582`**, **`Web:S6819`** (see **Sonar Snapshot**); **QG** hotspot **`100%`** review remains **Sonar UI**; next **Cloud** analysis should confirm issue **OPEN** count.
+- 2026-03-20: **Sonar follow-up** — **QG `OK`** on Cloud (**hotspots** **`100%`**); **`javascript:S6582`** in **`basic.spec.js`** resolved with **`init?.signal`** / **`signal?.`** (not `&&`); **Sonar Snapshot** updated.
+- 2026-03-20: **Sonar OPEN fixes landed** — **`shelldre`**, **`go:S100`**, **`go:S1192`**, **`javascript:S3358`**, **`godre:S8196`**, **`Web:S6819`** + first **`S6582`** pass (see **Sonar Snapshot**).
 - 2026-03-20: **`20260320-perf-03` Done** — **Advanced telemetry** guardrail documented under Architecture § Performance (internal/server-first, default UI unchanged, opt-in only for client-visible detail); defers implementation; ties to marathon **`20260226-perf-02`**/**`04`** intent without reviving marathons.
 - 2026-03-20: **`20260320-perf-02` Done** — **`internal/api/handlers_bench_test.go`**, **`internal/jsonbody/decode_bench_test.go`**; **`Makefile`** **`perf-bench`** extended; **benchstat** compare documented in **AGENTS** (manual).
 - 2026-03-20: **`20260320-perf-01` Done** — **`nightly.yml`**: **`make perf-bench`** runs unless repo **`vars.PERF_BENCH`** is **`false`** (replaces **`PERF_SMOKE`** gate); **`perf-leakcheck`** still **`vars.LEAK_PROFILE_SMOKE == 'true'`**.

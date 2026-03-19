@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **SonarQube** (targets **2026-03-20** OPEN list): **`[[`** conditionals in **`scripts/deploy/*.sh`**; **`TestDecodeSingleObject*`** names in **`internal/jsonbody/decode_test.go`**; **`go:S1192`** via shared format / path constants in tests; **`playwright.config.js`** **`resolvePlaywrightWorkers()`** (no nested ternary); **`execContexter`** in **`internal/results/store_migrate.go`**; **`test/e2e/ui/basic.spec.js`** fetch mock without `?.`; success toast **`<output>`** in **`web/index.html`** + assertion update. **Quality gate** hotspot review (**`100%`**) still **Sonar UI**. **AGENTS.md** Sonar snapshot updated.
+- **SonarQube** (targets **2026-03-20** OPEN list): **`[[`** conditionals in **`scripts/deploy/*.sh`**; **`TestDecodeSingleObject*`** names in **`internal/jsonbody/decode_test.go`**; **`go:S1192`** via shared format / path constants in tests; **`playwright.config.js`** **`resolvePlaywrightWorkers()`** (no nested ternary); **`execContexter`** in **`internal/results/store_migrate.go`**; **`test/e2e/ui/basic.spec.js`** fetch mock: **`init?.signal`** / **`signal?.`** for **`javascript:S6582`**; success toast **`<output>`** in **`web/index.html`** + assertion update. **AGENTS.md** Sonar snapshot updated.
 - **CI**: `build-push` / `deploy` no longer skipped on docs-only `main` pushes (removed `paths-filter` `docker` gate from image job; `changes` still used for PR Playwright gating).
 - **Release**: `deploy` no longer gated on `image_pushed` job output (boolean→string mismatch with `'true'` could skip SSH deploy after a successful `release` job); use `needs.release.result == 'success'` like CI `deploy`.
 

@@ -255,20 +255,16 @@ test.describe("openByte UI", () => {
           pingCount += 1;
           if (pingCount > 35) {
             return new Promise((resolve, reject) => {
-              const signal = init && init.signal;
+              const signal = init?.signal;
               const abort = () => {
-                if (signal) {
-                  signal.removeEventListener("abort", abort);
-                }
+                signal?.removeEventListener("abort", abort);
                 reject(new DOMException("Aborted", "AbortError"));
               };
-              if (signal && signal.aborted) {
+              if (signal?.aborted) {
                 abort();
                 return;
               }
-              if (signal) {
-                signal.addEventListener("abort", abort, { once: true });
-              }
+              signal?.addEventListener("abort", abort, { once: true });
             });
           }
         }
