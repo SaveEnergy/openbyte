@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **CI**: `build-push` / `deploy` no longer skipped on docs-only `main` pushes (removed `paths-filter` `docker` gate from image job; `changes` still used for PR Playwright gating).
+
 ## [0.8.0] - 2026-03-19
 
 ### Security

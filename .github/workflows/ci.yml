@@ -130,9 +130,9 @@ jobs:
         run: env -u NO_COLOR bunx playwright test
 
   build-push:
-    needs: [checks, changes]
+    needs: checks
     if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.docker == 'true') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && inputs.force_build)
     runs-on: ubuntu-latest
     permissions:
