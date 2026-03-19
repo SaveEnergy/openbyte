@@ -100,28 +100,28 @@
 
 - **Executive snapshot**: No **critical** reliability/security defects surfaced in static LOC/churn scan; **`20260320-refactor-14`**..**`16`** wave complete (**`cmd/client`**, **`web`**, **`internal/stream` `Server`**). (Subsequent **`20260321-refactor-01`** split **`speedtest_test.go`**.)
 - **Evidence (LOC, `wc`, top of tree)**:
-  - **Go (runtime)**: `cmd/client` (`cli_*.go`, `run.go`), `http_engine.go` (~370), `internal/stream/server.go` (~137) + `server_tcp.go` (~248) + `server_udp.go`, `test/unit/api` (see **`20260321`** pass for speedtest file split), `router_test.go` (~531).
+  - **Go (runtime)**: `cmd/client` (`cli_*.go`, `run_{stream,http,progress,results}.go`, `http_engine*.go`), `internal/stream/server.go` (~137) + `server_tcp.go` (~248) + `server_udp.go`, `test/unit/api` (speedtest split), `router_test.go` (~531).
   - **Web**: `download.js` (~307) + `download-platform.js` (~122) + `download-github.js` (~20); `network.js` (~326) + `network-helpers.js` (~54) + `network-health.js` (~34); `speedtest-http-upload.js` (~312).
 - **Assumptions**: `TODO`/`FIXME` grep empty in repo; **Sonar** QG **OK**; advanced telemetry remains **policy-only** (Architecture § Performance).
 - **Action plan**: **Later** — **`pkg/client`** SDK file split (already noted in Open/Deferred).
 
 ### Refactor analysis intake (2026-03-21 pass)
 
-- **Executive snapshot**: Runtime **`internal/api`**, **`internal/websocket`**, **`cmd/server`** are **modular** (largest single files **~270** LOC in **`router.go`** / **`speedtest.go`**). **Primary friction** is **test weight** (**`router_test.go`** **~531**, **`store_test.go`** **~604**; speedtest tests split per **`20260321-refactor-01`**) and **CLI depth** (**`cmd/client`**: **`run.go`** **~416**, **`http_engine.go`** **~370**, **`api.go`**/**`config.go`**/**`engine*.go`** **~300** each). **Web** post-split: no file **>330** LOC. **`TODO`/`FIXME`** grep still empty. **Churn** not measured this pass (static LOC only); use `git log --follow --stat` on hotspots before large edits.
+- **Executive snapshot**: Runtime **`internal/api`**, **`internal/websocket`**, **`cmd/server`** are **modular** (largest single files **~270** LOC in **`router.go`** / **`speedtest.go`**). **Primary friction** is **test weight** (**`router_test.go`** **~531**, **`store_test.go`** **~604**; speedtest tests split per **`20260321-refactor-01`**) and remaining **`cmd/client`** non-run files (**`api.go`**/**`config.go`**/**`engine*.go`** **~300** each; **`run`/`http_engine`** split per **`03`**). **Web** post-split: no file **>330** LOC. **`TODO`/`FIXME`** grep still empty. **Churn** not measured this pass (static LOC only); use `git log --follow --stat` on hotspots before large edits.
 - **Evidence (LOC, `wc`, 2026-03-21)**:
   - **Tests (largest)**: `test/unit/api` speedtest split into **`speedtest_*_test.go`** (helpers + download + upload + ping); `test/unit/results/store_test.go` (**604**), `test/unit/api/router_test.go` (**531**), `test/unit/stream/manager_test.go` (**507**), `test/unit/diagnostic/diagnostic_test.go` (**505**), `test/e2e/e2e_test.go` (**480**), `test/unit/api/handlers_test.go` (**476**).
-  - **cmd/client**: `run.go` (**416**), `http_engine.go` (**370**), `engine_test.go` (**352**), `config.go` (**345**), `api.go` (**324**), `engine.go` (**309**), `engine_direction.go` (**306**).
+  - **cmd/client**: `run_{stream,http,progress,results}.go` + `http_engine.go` (**~123**) + `http_engine_{download,upload,misc}.go`, `engine_test.go` (**352**), `config.go` (**345**), `api.go` (**324**), `engine.go` (**309**), `engine_direction.go` (**306**).
   - **pkg/client**: slim **`client.go`** + **`client_{check,speedtest,diagnose,health,latency,download,upload}.go`** (see Architecture § Agent & API Surface).
   - **internal/api**: `speedtest.go` (**261**), `router.go` (**270**), `handlers.go` (**235**), `ratelimit.go` (**227**).
   - **Other tools**: `cmd/loadtest/main.go` (**456**).
 - **Assumptions**: **Sonar** QG unchanged vs last snapshot; no production incident signals in this pass.
-- **Action plan**: **Next** — optional **`pkg/client`** file seam per **Open / Deferred** (no exported renames without semver); **later** — **`cmd/client`** sub-splits only with **`go test ./cmd/client/...`** + benchmark parity; **`cmd/loadtest`** only if load harness churn returns.
+- **Action plan**: **Later** — **`pkg/client`** / packaging per **Open / Deferred**; **`cmd/loadtest`** only if load harness churn returns; **`test/unit/api`**/**`router_test.go`** hygiene when touching those suites.
 
 ### Live Queue (active only)
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| `20260321-refactor-03` | cmd/client | - | Planned | Optional: extract **`http_engine.go`** or **`run.go`** internal helpers (metrics, stream IO) into unexported files; minimal API churn. | **`run.go`** ~416, **`http_engine.go`** ~370 | `go test ./cmd/client/...` |
+| _none_ | - | - | - | No active refactor rows; optional follow-ups in **Open / Deferred**. | **`20260321-refactor-01`**..**`03`** landed | N/A |
 
 ### Check Hold (manual/external)
 
@@ -141,8 +141,9 @@
 ### Recently Closed IDs
 
 - Most historical IDs intentionally pruned for readability; canonical record remains in git history.
-- Recent close: `20260319-refactor-01`..`13` (refactor wave); `20260320-refactor-14`..`16` (**`cmd/client`**, **`web`**, **`internal/stream` `Server`** TCP split); `20260321-refactor-01` (**`test/unit/api`** speedtest tests split); `20260321-refactor-02` (**`pkg/client`** file split).
+- Recent close: `20260319-refactor-01`..`13` (refactor wave); `20260320-refactor-14`..`16` (**`cmd/client`**, **`web`**, **`internal/stream` `Server`** TCP split); `20260321-refactor-01`..`03` (**`test/unit/api`**, **`pkg/client`**, **`cmd/client`** run/http engine split).
 - Latest completed wave (moved `Check -> Done -> removed`):
+  - `20260321-refactor-03` (**`cmd/client`**: **`run_stream.go`**, **`run_http.go`**, **`run_progress.go`**, **`run_results.go`** (replaces monolithic **`run.go`**); **`http_engine_download.go`**, **`http_engine_upload.go`**, **`http_engine_misc.go`** + slim **`http_engine.go`**; `go test ./cmd/client/...` green)
   - `20260321-refactor-02` (**`pkg/client`**: **`client_{check,speedtest,diagnose,health,latency,download,upload}.go`** + slim **`client.go`**; removed **`client_http.go`**; no export renames; `go test ./pkg/client/...` + `./test/unit/client/...` green)
   - `20260321-refactor-01` (**`test/unit/api`**: replaced monolithic **`speedtest_test.go`** with **`speedtest_helpers_test.go`**, **`speedtest_download_test.go`**, **`speedtest_upload_test.go`**, **`speedtest_ping_test.go`**; `go test ./test/unit/api/...` green)
   - `20260320-refactor-16` (**`internal/stream`**: **`server_tcp.go`** TCP accept + workload loops; slim **`server.go`** lifecycle + shared **`isTimeoutError`**; `go test ./internal/stream/... ./test/unit/stream/...` green)
@@ -164,9 +165,10 @@
 
 ### Recent Decision Notes
 
+- 2026-03-21: **`20260321-refactor-03` Done** — **`cmd/client`**: stream orchestration vs HTTP mode vs progress vs results/buildResults; **`HTTPTestEngine`** download/upload/misc + ping; **`run.go`** removed; `go test ./cmd/client/...` green.
 - 2026-03-21: **`20260321-refactor-02` Done** — **`pkg/client`**: **`client.go`** = **`New`** + options + path constants; HTTP helpers split **`client_health`**, **`client_latency`**, **`client_download`**, **`client_upload`**; public flows **`client_check`**, **`client_speedtest`**, **`client_diagnose`**; **`client_http.go`** removed; `go test ./pkg/client/...` `./test/unit/client/...` green.
 - 2026-03-21: **`20260321-refactor-01` Done** — **`test/unit/api`**: speedtest tests split into **`speedtest_helpers_test.go`** (constants + **`signalWriter`**/**`signalReader`** + test bodies), **`speedtest_download_test.go`**, **`speedtest_upload_test.go`**, **`speedtest_ping_test.go`**; `go test ./test/unit/api/...` green.
-- 2026-03-21: **Refactor analysis (pass 2)** — Post-**`20260320-refactor-14`**..**`16`** static scan: highlighted **`test/unit/api`** weight, **`cmd/client`** depth, **`pkg/client`**. Live Queue **`20260321-refactor-03`** (CLI optional); **Open / Deferred** unchanged for SDKs from OpenAPI / packaging.
+- 2026-03-21: **Refactor analysis (pass 2)** — Post-**`20260320-refactor-14`**..**`16`** static scan: highlighted **`test/unit/api`** weight, **`cmd/client`** depth, **`pkg/client`**. Live Queue cleared via **`20260321-refactor-01`**..**`03`**; **Open / Deferred** unchanged for SDKs from OpenAPI / packaging.
 - 2026-03-20: **`20260320-refactor-15` Done** — **`web`**: **`download-platform.js`** (URLs, **`platforms`**/**`archLabels`**, UA detection, asset helpers), **`download-github.js`** (`fetchLatestRelease`), **`network-helpers.js`**, **`network-health.js`**; **`network.js`** re-exports **`getHealthURL`**; **`internal/api/router_static.go`** allowlist for new modules; Prettier **`web/*.js`** clean.
 - 2026-03-20: **`20260320-refactor-14` Done** — **`cmd/client`**: split former **`cli.go`** into **`cli_flags.go`**, **`cli_usage.go`**, **`cli_validate.go`**, **`cli_servers.go`** (same **`package client`**); **`run.go`** unchanged; `go test ./cmd/client/...` green.
 - 2026-03-20: **`20260320-refactor-16` Done** — **`internal/stream`**: **`server_tcp.go`** holds TCP accept + download/upload/bidirectional/echo + read/write helpers; **`server.go`** keeps **`NewServer`**, **`Close`**, recv buffer pool, **`isTimeoutError`** (shared with **`server_udp.go`**); same **`Server`** API; `go test ./internal/stream/... ./test/unit/stream/...` green.

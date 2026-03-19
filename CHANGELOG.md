@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **cmd/client**: replaced monolithic **`run.go`** with **`run_stream.go`**, **`run_http.go`**, **`run_progress.go`**, **`run_results.go`**; split **`http_engine.go`** into **`http_engine_download.go`**, **`http_engine_upload.go`**, **`http_engine_misc.go`** (ping + stream helpers) + slim core **`http_engine.go`**.
 - **pkg/client**: replaced **`client_http.go`** with **`client_{check,speedtest,diagnose,health,latency,download,upload}.go`** + slim **`client.go`** (same exported API).
 - **test/unit/api**: split **`speedtest_test.go`** into **`speedtest_helpers_test.go`**, **`speedtest_download_test.go`**, **`speedtest_upload_test.go`**, **`speedtest_ping_test.go`** (same **`package api_test`**; no assertion changes).
 - **internal/stream**: split TCP workload path out of **`server.go`** into **`server_tcp.go`** (**`server.go`** keeps **`NewServer`**, **`Close`**, buffer pool, **`isTimeoutError`** for UDP + TCP); **`server_udp.go`** unchanged.
