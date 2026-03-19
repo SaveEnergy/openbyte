@@ -109,18 +109,9 @@
 
 - Strict OPEN filter parity maintained with Cloud:
   - Query: `projects=[SaveEnergy_openbyte]`, `issueStatuses=[OPEN]`, `ps=500`
-  - Total OPEN: **`27`** (MCP live fetch on **2026-03-20**; supersedes prior **`0`** snapshot on **2026-03-01** after new analyses and code churn)
-  - Previous snapshot in this doc: **`0`** OPEN (**2026-03-01**); historical **`23`** OPEN (**2026-02-26**, pre–sonar-07/08/09 wave)
-- **Quality gate** (`get_project_quality_gate_status`, `projectKey=SaveEnergy_openbyte`): **`ERROR`** — condition **`new_security_hotspots_reviewed`** actual **`92.3%`** vs required **`100%`**; `new_reliability_rating`, `new_security_rating`, `new_maintainability_rating`, `new_duplicated_lines_density` **OK**.
-- **OPEN** composition (by rule, counts approximate):
-  - **`shelldre:S7688`** — **17** (`scripts/deploy/*.sh`: prefer `[[` over `[` for tests)
-  - **`go:S100`** — **4** (`internal/jsonbody/decode_test.go`: test name style vs Sonar regex)
-  - **`go:S1192`** — **2** (**CRITICAL**): `cmd/client/engine_test.go`, `internal/api/router_middleware_internal_test.go` (duplicate string literals)
-  - **`javascript:S3358`** — **1** (**MAJOR**): `playwright.config.js` nested ternary (workers)
-  - **`godre:S8196`** — **1** (**MINOR**): `internal/results/store_migrate.go` single-method interface naming
-  - **`javascript:S6582`** — **1** (**MAJOR**): `test/e2e/ui/basic.spec.js` optional chaining
-  - **`Web:S6819`** — **1** (**MAJOR**): `web/index.html` (`<output>` vs status role)
-- **Remediation hints** (not a backlog row): finish **security hotspot** review in Sonar UI to clear QG; batch **`[[`** in deploy scripts; refactor **`playwright.config.js`** workers; constants for **go:S1192**; rename test helpers or **NOSCAN** policy for **go:S100** if desired.
+  - **2026-03-20 code fixes** (targets prior **27** OPEN list): **`[[`** in **`scripts/deploy/{validate_env,sync_compose,deploy_remote}.sh`**; **`TestDecodeSingleObject*`** renames in **`internal/jsonbody/decode_test.go`**; **`errFmtBidirectionalCommand`** / **`testPathAPIUpload`** for **go:S1192**; **`resolvePlaywrightWorkers()`** in **`playwright.config.js`**; **`execContexter`** in **`internal/results/store_migrate.go`**; explicit **`signal`** handling in **`test/e2e/ui/basic.spec.js`**; success toast **`<output>`** in **`web/index.html`** + matching assertion in **`basic.spec.js`**. **Re-run SonarCloud on `main`** to confirm OPEN count (parity).
+  - Historical MCP snapshots: **`27`** OPEN (**2026-03-20**); **`0`** OPEN (**2026-03-01**); **`23`** OPEN (**2026-02-26**)
+- **Quality gate** (`get_project_quality_gate_status`, `projectKey=SaveEnergy_openbyte`): last MCP check **`ERROR`** on **`new_security_hotspots_reviewed`** (**`92.3%`** vs **`100%`** required) — clear via **Sonar UI** hotspot review; code metrics were **OK**.
 - Sonar MCP exposes issue search + metrics + QG status; **hotspot review** transitions are **UI/API** (not MCP).
 
 ### Recently Closed IDs
@@ -144,7 +135,7 @@
 
 ### Recent Decision Notes
 
-- 2026-03-20: **Sonar recheck** — OPEN **`27`** (MCP **`search_sonar_issues_in_projects`**); QG **`ERROR`** on **`new_security_hotspots_reviewed`** (**`92.3%`** vs **`100%`**); rule breakdown recorded in **Sonar Snapshot** (deploy scripts **`shelldre:S7688`**, **`go:S1192`**/**`go:S100`**, **`playwright.config.js`** **`javascript:S3358`**, etc.); prior **`0`** OPEN (**2026-03-01**) stale.
+- 2026-03-20: **Sonar OPEN fixes landed** — **`shelldre`**, **`go:S100`**, **`go:S1192`**, **`javascript:S3358`**, **`godre:S8196`**, **`javascript:S6582`**, **`Web:S6819`** (see **Sonar Snapshot**); **QG** hotspot **`100%`** review remains **Sonar UI**; next **Cloud** analysis should confirm issue **OPEN** count.
 - 2026-03-20: **`20260320-perf-03` Done** — **Advanced telemetry** guardrail documented under Architecture § Performance (internal/server-first, default UI unchanged, opt-in only for client-visible detail); defers implementation; ties to marathon **`20260226-perf-02`**/**`04`** intent without reviving marathons.
 - 2026-03-20: **`20260320-perf-02` Done** — **`internal/api/handlers_bench_test.go`**, **`internal/jsonbody/decode_bench_test.go`**; **`Makefile`** **`perf-bench`** extended; **benchstat** compare documented in **AGENTS** (manual).
 - 2026-03-20: **`20260320-perf-01` Done** — **`nightly.yml`**: **`make perf-bench`** runs unless repo **`vars.PERF_BENCH`** is **`false`** (replaces **`PERF_SMOKE`** gate); **`perf-leakcheck`** still **`vars.LEAK_PROFILE_SMOKE == 'true'`**.

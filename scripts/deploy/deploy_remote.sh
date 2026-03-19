@@ -3,9 +3,9 @@
 # Required env: SSH_HOST, SSH_HOST_FINGERPRINT, SSH_USER, SSH_PORT, REMOTE_DIR, SSH_KEY,
 # GHCR_USERNAME, GHCR_TOKEN, DEPLOY_TAG, GITHUB_REPOSITORY_OWNER
 set -euo pipefail
-[ -n "${REMOTE_DIR:-}" ] || { echo "REMOTE_DIR not set"; exit 1; }
-[ -n "${DEPLOY_TAG:-}" ] || { echo "DEPLOY_TAG not set"; exit 1; }
-[ -n "${GITHUB_REPOSITORY_OWNER:-}" ] || { echo "GITHUB_REPOSITORY_OWNER not set"; exit 1; }
+[[ -n "${REMOTE_DIR:-}" ]] || { echo "REMOTE_DIR not set"; exit 1; }
+[[ -n "${DEPLOY_TAG:-}" ]] || { echo "DEPLOY_TAG not set"; exit 1; }
+[[ -n "${GITHUB_REPOSITORY_OWNER:-}" ]] || { echo "GITHUB_REPOSITORY_OWNER not set"; exit 1; }
 
 SSH_TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$SSH_TMP_DIR"' EXIT
@@ -13,9 +13,9 @@ printf '%s\n' "$SSH_KEY" > "$SSH_TMP_DIR/id_rsa"
 chmod 600 "$SSH_TMP_DIR/id_rsa"
 touch "$SSH_TMP_DIR/known_hosts"
 timeout 15 ssh-keyscan -t ed25519 -p "${SSH_PORT:-22}" -H "$SSH_HOST" > "$SSH_TMP_DIR/known_hosts.tmp"
-[ -s "$SSH_TMP_DIR/known_hosts.tmp" ] || { echo "ssh-keyscan returned no ed25519 host keys"; exit 1; }
+[[ -s "$SSH_TMP_DIR/known_hosts.tmp" ]] || { echo "ssh-keyscan returned no ed25519 host keys"; exit 1; }
 scanned_fingerprint="$(ssh-keygen -lf "$SSH_TMP_DIR/known_hosts.tmp" -E sha256 | awk 'NR==1 {print $2}')"
-[ "$scanned_fingerprint" = "$SSH_HOST_FINGERPRINT" ] || {
+[[ "$scanned_fingerprint" == "$SSH_HOST_FINGERPRINT" ]] || {
   echo "ssh host fingerprint mismatch"
   echo "expected=$SSH_HOST_FINGERPRINT"
   echo "got=${scanned_fingerprint:-missing}"

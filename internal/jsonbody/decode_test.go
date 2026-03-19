@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestDecodeSingleObject_ok(t *testing.T) {
+func TestDecodeSingleObjectOK(t *testing.T) {
 	var dst struct {
 		A int `json:"a"`
 	}
@@ -22,7 +22,7 @@ func TestDecodeSingleObject_ok(t *testing.T) {
 	}
 }
 
-func TestDecodeSingleObject_unknownField(t *testing.T) {
+func TestDecodeSingleObjectUnknownField(t *testing.T) {
 	var dst struct {
 		A int `json:"a"`
 	}
@@ -34,7 +34,7 @@ func TestDecodeSingleObject_unknownField(t *testing.T) {
 	}
 }
 
-func TestDecodeSingleObject_trailingJSON(t *testing.T) {
+func TestDecodeSingleObjectTrailingJSON(t *testing.T) {
 	var dst struct {
 		A int `json:"a"`
 	}
@@ -46,7 +46,7 @@ func TestDecodeSingleObject_trailingJSON(t *testing.T) {
 	}
 }
 
-func TestDecodeSingleObject_maxBytes(t *testing.T) {
+func TestDecodeSingleObjectMaxBytes(t *testing.T) {
 	var dst struct {
 		A int `json:"a"`
 	}

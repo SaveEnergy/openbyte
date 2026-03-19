@@ -192,9 +192,9 @@ test.describe("openByte UI", () => {
     await expect(page.locator("#successToast")).toContainText(
       /settings saved/i,
     );
-    await expect(page.locator("#successToast")).toHaveAttribute(
-      "role",
-      "status",
+    await expect(page.locator("#successToast")).toHaveJSProperty(
+      "tagName",
+      "OUTPUT",
     );
     await expect(page.locator("#successToast")).toHaveAttribute(
       "aria-live",
@@ -257,14 +257,18 @@ test.describe("openByte UI", () => {
             return new Promise((resolve, reject) => {
               const signal = init && init.signal;
               const abort = () => {
-                signal?.removeEventListener("abort", abort);
+                if (signal) {
+                  signal.removeEventListener("abort", abort);
+                }
                 reject(new DOMException("Aborted", "AbortError"));
               };
-              if (signal?.aborted) {
+              if (signal && signal.aborted) {
                 abort();
                 return;
               }
-              signal?.addEventListener("abort", abort, { once: true });
+              if (signal) {
+                signal.addEventListener("abort", abort, { once: true });
+              }
             });
           }
         }

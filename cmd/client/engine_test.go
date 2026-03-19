@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const errFmtBidirectionalCommand = "bidirectional command = %q, want %q"
+
 func newEngineForUnitTest(warmUp time.Duration) *TestEngine {
 	engine := NewTestEngine(&TestEngineConfig{
 		Protocol:  "tcp",
@@ -164,7 +166,7 @@ func TestRunBidirectionalSendsCommandAndReturnsErrorOnPeerClose(t *testing.T) {
 		t.Fatal("runBidirectional error = nil, want transport failure")
 	}
 	if cmd := <-gotCommand; cmd != 'B' {
-		t.Fatalf("bidirectional command = %q, want %q", cmd, 'B')
+		t.Fatalf(errFmtBidirectionalCommand, cmd, 'B')
 	}
 }
 
@@ -196,7 +198,7 @@ func TestRunBidirectionalReturnsContextErrorOnTimeout(t *testing.T) {
 		t.Fatalf("runBidirectional error = %v, want context cancellation", err)
 	}
 	if cmd := <-gotCommand; cmd != 'B' {
-		t.Fatalf("bidirectional command = %q, want %q", cmd, 'B')
+		t.Fatalf(errFmtBidirectionalCommand, cmd, 'B')
 	}
 }
 
@@ -290,7 +292,7 @@ func TestRunStreamWorkerDispatchBidirectional(t *testing.T) {
 		t.Fatal("runStreamWorker(bidirectional) error = nil, want non-nil from peer close")
 	}
 	if cmd := <-gotCommand; cmd != 'B' {
-		t.Fatalf("bidirectional command = %q, want %q", cmd, 'B')
+		t.Fatalf(errFmtBidirectionalCommand, cmd, 'B')
 	}
 }
 

@@ -11,7 +11,7 @@ const (
 	sqliteBusyTimeout  = 5000
 )
 
-type sqliteExecContext interface {
+type execContexter interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }
 
@@ -59,7 +59,7 @@ func configureSQLitePool(db *sql.DB, count int) error {
 	return nil
 }
 
-func configureSQLitePragmas(ctx context.Context, execer sqliteExecContext) error {
+func configureSQLitePragmas(ctx context.Context, execer execContexter) error {
 	if _, err := execer.ExecContext(ctx, "PRAGMA journal_mode=WAL"); err != nil {
 		return fmt.Errorf("set WAL mode: %w", err)
 	}
