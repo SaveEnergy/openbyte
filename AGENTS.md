@@ -93,11 +93,22 @@
 - Keep entries attributable (`Agent`, `Evidence`, `Check`).
 - Resolve overlaps explicitly in `Decision Notes` (no silent overwrite).
 
+### Refactor analysis intake (2026-03-20 pass)
+
+- **Executive snapshot**: No **critical** reliability/security defects surfaced in static LOC/churn scan; highest **maintainability** friction is **`cmd/client`** (large CLI + run stack) and **web** **`download.js`** / **`network.js`** (long single-file modules). **Test** weight is concentrated in **`test/unit/api/speedtest_test.go`** (~685 LOC).
+- **Evidence (LOC, `wc`, top of tree)**:
+  - **Go (runtime)**: `cmd/client/cli.go` (~428), `run.go` (~416), `http_engine.go` (~370), `internal/stream/server.go` (~372), `test/unit/api/speedtest_test.go` (~685), `router_test.go` (~531).
+  - **Web**: `web/download.js` (~432), `web/network.js` (~399), `speedtest-http-upload.js` (~312).
+- **Assumptions**: `TODO`/`FIXME` grep empty in repo; **Sonar** QG **OK**; advanced telemetry remains **policy-only** (Architecture § Performance).
+- **Action plan**: **Now** — none mandatory (behavior-preserving splits only when touching those areas). **Next** — optional **`cli.go`** seam: flags/help vs dispatch; **`download.js`** extract platform table + fetch helpers. **Later** — **`pkg/client`** SDK file split (already noted in Open/Deferred); **`stream/server`** TCP path split if churn grows.
+
 ### Live Queue (active only)
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| _none_ | - | - | - | No active queue rows. | **`20260320-perf-03`** closed (telemetry policy in Architecture § Performance). | N/A |
+| `20260320-refactor-14` | cmd/client | - | Planned | Behavior-preserving split: **`cli.go`** flags/help/usage vs thin **`run.go`** entry; optional **`cli_help.go`** or **`flags.go`** to cap file size. | **~428** + **~416** LOC; single package. | `go test ./cmd/client/...` |
+| `20260320-refactor-15` | web | - | Planned | Reduce **`download.js`** / **`network.js`** coupling: extract platform constants + pure helpers; keep `openbyte.js` orchestration boundary. | **~432** / **~399** LOC. | `npx prettier --check web/*.js`; `bunx playwright test test/e2e/ui/basic.spec.js` |
+| `20260320-refactor-16` | stream | - | Planned | Optional: split **`internal/stream/server.go`** along TCP accept/read/write vs lifecycle helpers (same `Server` API). | **~372** LOC; **`server_udp.go`** already split. | `go test ./internal/stream/... ./test/unit/stream/...` |
 
 ### Check Hold (manual/external)
 
@@ -135,6 +146,7 @@
 
 ### Recent Decision Notes
 
+- 2026-03-20: **Refactor analysis (pass)** — **Refactor analysis intake** + Live Queue **`20260320-refactor-14`**..**`16`** ( **`cmd/client`** LOC, **`web`** **`download.js`**/**`network.js`**, **`internal/stream/server.go`** split optional); evidence **`wc`**, empty **`TODO`** grep, **Sonar** QG **OK**.
 - 2026-03-20: **Sonar follow-up** — **QG `OK`** on Cloud (**hotspots** **`100%`**); **`javascript:S6582`** in **`basic.spec.js`** resolved with **`init?.signal`** / **`signal?.`** (not `&&`); **Sonar Snapshot** updated.
 - 2026-03-20: **Sonar OPEN fixes landed** — **`shelldre`**, **`go:S100`**, **`go:S1192`**, **`javascript:S3358`**, **`godre:S8196`**, **`Web:S6819`** + first **`S6582`** pass (see **Sonar Snapshot**).
 - 2026-03-20: **`20260320-perf-03` Done** — **Advanced telemetry** guardrail documented under Architecture § Performance (internal/server-first, default UI unchanged, opt-in only for client-visible detail); defers implementation; ties to marathon **`20260226-perf-02`**/**`04`** intent without reviving marathons.
