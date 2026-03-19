@@ -54,11 +54,14 @@ test-coverage:
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "✓ Coverage report: coverage.html"
 
+# benchstat (optional): go test <pkg> -run '^$' -bench . -benchmem -count=5 > /tmp/bench.txt — see AGENTS.md
 perf-bench:
 	@echo "Running perf benchmarks..."
 	@go test ./test/unit/metrics -run ^$$ -bench . -benchtime=1s
 	@go test ./test/unit/websocket -run ^$$ -bench . -benchtime=1s
 	@go test ./test/unit/stream -run ^$$ -bench . -benchtime=1s
+	@go test ./internal/api -run ^$$ -bench . -benchtime=1s
+	@go test ./internal/jsonbody -run ^$$ -bench . -benchtime=1s
 
 # Development
 run:
