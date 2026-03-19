@@ -20,6 +20,7 @@ jobs:
           go-version: "1.26.x"
           cache: true
 
+      # Full race (no -short): complements ci.yml main-branch go test -race -short -p 1.
       - name: Race tests
         run: go test -race ./...
 

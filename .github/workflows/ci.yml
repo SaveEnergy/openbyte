@@ -101,6 +101,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: go test ./...
 
+      # -short: skip heavy tests (e.g. test/e2e skipIfShort). -p 1: serial packages, cap memory on GHA under race.
       - name: Race tests (main/tags)
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
         run: go test ./... -race -short -p 1
