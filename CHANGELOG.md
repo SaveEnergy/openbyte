@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **AGENTS.md** Live Queue: CI/perf backlog rows `20260320-ci-01`..`05`, `20260320-perf-01`..`03` (govulncheck, OpenAPI step optimization, race parity, Playwright workers, concurrency review, nightly benches, bench expansion, telemetry guardrail).
+
 ### Fixed
 
 - **CI**: `build-push` / `deploy` no longer skipped on docs-only `main` pushes (removed `paths-filter` `docker` gate from image job; `changes` still used for PR Playwright gating).

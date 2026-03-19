@@ -69,6 +69,7 @@
 - Deploy runs `docker compose pull` + `up -d --force-recreate`, then verifies expected image/container state.
 - Traefik deploy uses external `traefik` network; workflows ensure network presence.
 - Workflow gates require required deploy vars/secrets and fail fast on missing config.
+- Broader **CI / perf** backlog: Live Queue rows **`20260320-ci-01`**..**`05`**, **`20260320-perf-01`**..**`03`** (govulncheck, OpenAPI step cost, race parity, Playwright workers, concurrency review, nightly benches, bench expansion, telemetry guardrail).
 
 ## Engineering Guardrails
 
@@ -90,7 +91,14 @@
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| _none_ | - | - | - | No active queued rows. | `20260319-refactor-01`..`13` landed 2026-03-19 (see Decision Notes). | N/A |
+| `20260320-ci-01` | CI / security | - | Planned | Add **`govulncheck`** to **`checks`** (main + optionally PR): `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` or pinned `govulncheck` action; fail on **reachable** vulns; document skip/false-positive policy. | `govulncheck` cited in Decision Notes as manual hygiene; **not** in `.github/workflows/*.yml`. | `govulncheck ./...` clean; CI step green |
+| `20260320-ci-02` | CI / DX | - | Planned | Speed up OpenAPI lint: pin **Redocly** in **`package.json`** devDependencies (or cache `~/.npm` / `npx` cache key) so `npx @redocly/cli@…` is not a cold download every run. | `ci.yml` runs `npx @redocly/cli@2.18.1 lint` each `checks` job. | `make ci-lint` + OpenAPI step; compare CI time |
+| `20260320-ci-03` | CI / tests | - | Planned | Align **race** coverage intent: **`nightly`** runs `go test -race ./...` (full); **`ci`** runs `go test ./... -race -short -p 1` — document matrix (why `-short` + `-p 1`) or add `-short` to nightly if redundant runtime is noise. | `nightly.yml` L23–24 vs `ci.yml` L93–95. | `go test -race` green locally + nightly |
+| `20260320-ci-04` | CI / e2e | - | Planned | **Playwright** throughput: set explicit `workers` in **`playwright.config.js`** (or matrix shard) for GHA; tradeoff: speed vs flake rate; keep `reuseExistingServer` + trace-on-retry. | Default workers implicit; `test/e2e/ui` can be long on cold runners. | `bunx playwright test`; watch flake rate |
+| `20260320-ci-05` | CI / ops | - | Planned | Review **`concurrency: cancel-in-progress`** for **`main`**: rapid pushes cancel in-flight **`ci`** (including **`deploy`** if queued) — confirm acceptable; optional `deploy`-only concurrency group or path filter. | `ci.yml` L16–18 can cancel overlapping runs. | Team policy + incident review |
+| `20260320-perf-01` | perf / CI | - | Planned | **`nightly`**: run **`make perf-bench`** by default (or weekly schedule) instead of only when **`vars.PERF_SMOKE == 'true'`**; keep **`perf-leakcheck`** behind flag (`LEAK_PROFILE_SMOKE`) if slow. | `nightly.yml` L29–35 optional jobs. | Nightly duration budget; Makefile `perf-bench` |
+| `20260320-perf-02` | perf | - | Planned | Extend **`perf-bench`** / benchmarks: add **`internal/api`** or hot-path benches if missing; optional **benchstat** compare vs `main` (artifact or manual). | `Makefile` `perf-bench` only `test/unit/metrics`, `websocket`, `stream`. | `go test -bench` packages; no UX change |
+| `20260320-perf-03` | perf / product | - | Planned | Revisit deferred **advanced telemetry** wave (`20260226-perf-02` / `perf-04` per AGENTS): internal/details-only metrics; **minimal-UX** guardrail for default UI. | AGENTS Marathon deferred `20260226-perf-02`, `20260226-perf-04`. | Design doc + opt-in only |
 
 ### Check Hold (manual/external)
 
@@ -129,6 +137,7 @@
 
 ### Recent Decision Notes
 
+- 2026-03-20: **CI/perf backlog intake** — Added Live Queue **`20260320-ci-01`**..**`05`**, **`20260320-perf-01`**..**`03`**: evidence from `ci.yml`, `nightly.yml`, `Makefile`, `playwright.config.js`, AGENTS deferred perf rows; prioritize **`ci-01`** (govulncheck automation) and **`ci-02`** (OpenAPI lint cost) for security + minutes.
 - 2026-03-19: **`20260319-refactor-13` Done** — `internal/stream`: split `manager.go` into `manager_streams.go`, `manager_cleanup.go`, `manager_broadcast.go` + slim `manager.go`; `go test ./internal/stream/... ./test/unit/stream/...` green.
 - 2026-03-19: **`20260319-refactor-12` Done** — `internal/api`: replaced `router_middleware.go` with `router_middleware_ratelimit.go`, `router_middleware_cors.go`, `router_middleware_logging.go`, `router_middleware_security.go` (Deadline + security headers); `router.go` wrap order unchanged; `go test ./internal/api/... ./test/unit/api/...` green.
 - 2026-03-19: **`20260319-refactor-11` Done** — `web/speedtest-http.js` split: `speedtest-http-shared.js`, `speedtest-http-download.js`, `speedtest-http-upload.js`, barrel `speedtest-http.js`; Prettier clean; `speedtest.js` import unchanged.
