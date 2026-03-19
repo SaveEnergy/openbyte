@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **test/unit/api**: split **`speedtest_test.go`** into **`speedtest_helpers_test.go`**, **`speedtest_download_test.go`**, **`speedtest_upload_test.go`**, **`speedtest_ping_test.go`** (same **`package api_test`**; no assertion changes).
 - **internal/stream**: split TCP workload path out of **`server.go`** into **`server_tcp.go`** (**`server.go`** keeps **`NewServer`**, **`Close`**, buffer pool, **`isTimeoutError`** for UDP + TCP); **`server_udp.go`** unchanged.
 - **Web**: split **`download.js`** into **`download-platform.js`**, **`download-github.js`**, and slim **`download.js`**; split **`network.js`** into **`network-helpers.js`**, **`network-health.js`**, and slim **`network.js`** (**`getHealthURL`** still exported from **`network.js`**); **`internal/api/router_static.go`** allowlists the new **`*.js`** assets.
 - **cmd/client**: split former **`cli.go`** into **`cli_flags.go`**, **`cli_usage.go`**, **`cli_validate.go`**, **`cli_servers.go`** (behavior-preserving; same **`package client`**).
