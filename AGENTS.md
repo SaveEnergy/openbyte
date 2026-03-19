@@ -91,7 +91,6 @@
 
 | ID | Area | Plan | Check |
 | --- | --- | --- | --- |
-| `20260322-refactor-03` | test | Split `test/unit/stream/manager_test.go` (~507): lifecycle vs cleanup vs broadcast/metrics. | `go test ./test/unit/stream/...` |
 | `20260322-refactor-04` | cmd/client | Split `engine.go` / `engine_direction.go` / `formatter.go` (TCP/UDP vs output); stable exports. | `go test ./cmd/client/...` |
 | `20260322-refactor-05` | registry | Split `internal/registry/handler.go` vs `client.go` (HTTP vs sync helpers). | `go test ./internal/registry/... ./test/unit/registry/...` |
 | `20260322-refactor-06` | internal/api | Optional: `speedtest.go` vs `speedtest_*.go` — extract validation/deadline helpers only. | `go test ./internal/api/... ./test/unit/api/...` |
@@ -123,6 +122,7 @@
 - Full ID lists live in **git history** / **CHANGELOG**.
 - **`20260322-refactor-01` Done**: `router_test.go` → `router_test_common_test.go`, `router_middleware_stream_test.go`, `router_static_cache_ratelimit_test.go`, `router_results_api_routes_test.go`, `router_static_allowlist_test.go` (`go test ./test/unit/api/...`).
 - **`20260322-refactor-02` Done**: `store_test.go` → `store_test_common_test.go`, `store_crud_test.go`, `store_retention_test.go`, `store_busy_test.go`, `store_handler_routes_test.go` (`go test ./test/unit/results/...`).
+- **`20260322-refactor-03` Done**: `manager_test.go` → `manager_test_common_test.go`, `manager_lifecycle_test.go`, `manager_limits_test.go`, `manager_broadcast_metrics_test.go`, `manager_terminal_test.go` (`go test ./test/unit/stream/...`).
 - **2026-03**: `20260321-refactor-01`..`03` (api tests, `pkg/client`, `cmd/client` run/http); `20260320-refactor-14`..`16`, `20260320-ci-01`..`05`, `20260320-perf-01`..`03`.
 - **2026-03-19 wave**: `20260319-refactor-01`..`13` (jsonbody, websocket/api splits, web, results, stream manager, deploy scripts, config, server).
 - Deferred by design: `20260226-perf-02`, `20260226-perf-04`.
@@ -131,6 +131,7 @@
 
 - **2026-03-24**: **`20260322-refactor-01` Done** — router tests split (CORS/stream ID / static+CSP+rate-limit / results+registry+404 / allowlist+fonts+smoke); same `package api_test`, shared constants in `router_test_common_test.go`.
 - **2026-03-24**: **`20260322-refactor-02` Done** — store tests split: CRUD + id charset, retention/trim, busy locks, mux handler routes (`store_handler_routes_test.go` vs `handler_test.go` direct handler tests).
+- **2026-03-24**: **`20260322-refactor-03` Done** — `Manager` tests split: lifecycle, limits/concurrency, metrics channel fanout, terminal-state invariants.
 - **2026-03-23**: Complementary refactor scan → Live Queue `20260323-refactor-01`..`10` (parallel to `20260322-*`).
 - **2026-03-22**: Deep LOC scan → `20260322-refactor-01`..`09`; tests first, then client/registry/e2e/web/tools.
 - **2026-03-21**: `20260321-refactor-01`..`03` Done (speedtest tests, `pkg/client` files, `cmd/client` run + `http_engine_*`).
