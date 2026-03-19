@@ -71,7 +71,8 @@
 - Workflow gates require required deploy vars/secrets and fail fast on missing config.
 - **Race detector matrix**: **`ci.yml`** (push / `workflow_dispatch` on **`main`**) runs **`go test ./... -race -short -p 1`** — **`-short`** skips tests that call **`skipIfShort`** (notably heavy **`test/e2e`** cases); **`-p 1`** runs packages serially to cap memory and contention on shared runners under race. **`nightly.yml`** runs **`go test -race ./...`** without **`-short`** (full race over all packages, including non-short e2e). Nightly also runs **`go test ./test/e2e`** separately (timeout budget) without race.
 - **Playwright**: **`playwright.config.js`** sets **`workers`** to **`2`** when **`GITHUB_ACTIONS`** is set (typical GHA **2 vCPU**); otherwise Playwright default. Optional override: **`PLAYWRIGHT_WORKERS`**. **`trace: 'on-first-retry'`** and **`webServer.reuseExistingServer`** unchanged.
-- Broader **CI / perf** backlog: Live Queue rows **`20260320-ci-05`**, **`20260320-perf-01`**..**`03`** (concurrency review, nightly benches, bench expansion, telemetry guardrail); **`20260320-ci-01`**..**`04`** Done.
+- **CI concurrency**: **`ci.yml`** uses **`cancel-in-progress: true`** only for **`pull_request`**; **`push`** ( **`main`** / tags ) and **`workflow_dispatch`** **do not** cancel an in-flight run — the next run **queues** on the same **`ref`**, so **`deploy`** is not aborted mid-job by a new push. Tradeoff: busy **`main`** can backlog sequential runs (prefer batching or squash if queue latency matters).
+- Broader **CI / perf** backlog: Live Queue rows **`20260320-perf-01`**..**`03`** (nightly benches, bench expansion, telemetry guardrail); **`20260320-ci-01`**..**`05`** Done.
 
 ## Engineering Guardrails
 
@@ -93,7 +94,6 @@
 
 | ID | Area | Agent | Status | Plan | Evidence | Check |
 | --- | --- | --- | --- | --- | --- | --- |
-| `20260320-ci-05` | CI / ops | - | Planned | Review **`concurrency: cancel-in-progress`** for **`main`**: rapid pushes cancel in-flight **`ci`** (including **`deploy`** if queued) — confirm acceptable; optional `deploy`-only concurrency group or path filter. | `ci.yml` L16–18 can cancel overlapping runs. | Team policy + incident review |
 | `20260320-perf-01` | perf / CI | - | Planned | **`nightly`**: run **`make perf-bench`** by default (or weekly schedule) instead of only when **`vars.PERF_SMOKE == 'true'`**; keep **`perf-leakcheck`** behind flag (`LEAK_PROFILE_SMOKE`) if slow. | `nightly.yml` L29–35 optional jobs. | Nightly duration budget; Makefile `perf-bench` |
 | `20260320-perf-02` | perf | - | Planned | Extend **`perf-bench`** / benchmarks: add **`internal/api`** or hot-path benches if missing; optional **benchstat** compare vs `main` (artifact or manual). | `Makefile` `perf-bench` only `test/unit/metrics`, `websocket`, `stream`. | `go test -bench` packages; no UX change |
 | `20260320-perf-03` | perf / product | - | Planned | Revisit deferred **advanced telemetry** wave (`20260226-perf-02` / `perf-04` per AGENTS): internal/details-only metrics; **minimal-UX** guardrail for default UI. | AGENTS Marathon deferred `20260226-perf-02`, `20260226-perf-04`. | Design doc + opt-in only |
@@ -129,6 +129,7 @@
   - `20260320-ci-01`, `20260320-ci-02` (CI **`govulncheck`**; **Redocly** pinned in **`package.json`**, **`bun run lint:openapi`** in **`ci.yml`**/**`release.yml`**, single **`bun install`** before OpenAPI + Playwright)
   - `20260320-ci-03` (documented **CI** vs **nightly** race matrix: **`-short`** + **`-p 1`** on **`main`**; full **`go test -race ./...`** nightly; workflow comments)
   - `20260320-ci-04` (**`playwright.config.js`**: **`workers`** = **`2`** on **`GITHUB_ACTIONS`**; **`PLAYWRIGHT_WORKERS`** override)
+  - `20260320-ci-05` (**`ci.yml`**: **`cancel-in-progress`** only for **`pull_request`**; **`push`**/**`workflow_dispatch`** queue on **`ref`** — no mid-**`deploy`** cancel)
   - `20260319-refactor-01`, `20260319-refactor-02`, `20260319-refactor-03`, `20260319-refactor-04`, `20260319-refactor-05`, `20260319-refactor-06`, `20260319-refactor-07`, `20260319-refactor-08`, `20260319-refactor-09`, `20260319-refactor-10`, `20260319-refactor-11`, `20260319-refactor-12`, `20260319-refactor-13`
   - `20260228-sec-06`, `20260228-go-32`, `20260228-ui-09`, `20260228-go-33`, `20260301-web-07`, `20260301-a11y-02`, `20260301-ui-10`, `20260301-go-34`, `20260301-go-35`, `20260301-api-04`, `20260301-ws-02`, `20260301-ci-11`, `20260301-sec-07`, `20260301-web-06`, `20260301-web-08`, `20260301-ops-01`, `20260301-doc-02`
   - `20260217-web-02`, `20260217-go-02`, `20260217-go-03`, `20260217-go-04`, `20260217-go-05`, `20260217-go-06`, `20260217-go-07`, `20260217-go-08`, `20260217-go-09`
@@ -138,6 +139,7 @@
 
 ### Recent Decision Notes
 
+- 2026-03-20: **`20260320-ci-05` Done** — **`ci.yml`** **`cancel-in-progress: ${{ github.event_name == 'pull_request' }}`** — PRs still cancel superseded runs; **`main`**/tags/dispatch **queue** (same concurrency **group** + **ref**) so an in-flight **`deploy`** is not aborted by a new push; tradeoff: **`main`** backlog under burst pushes.
 - 2026-03-20: **`20260320-ci-04` Done** — **`playwright.config.js`**: explicit **`workers`** (**`2`** when **`GITHUB_ACTIONS`**); optional **`PLAYWRIGHT_WORKERS`**; **`trace`** / **`reuseExistingServer`** unchanged.
 - 2026-03-20: **`20260320-ci-03` Done** — Architecture + **`ci.yml`**/**`nightly.yml`** comments document why **`main`** race uses **`-short -p 1`** and nightly uses full **`go test -race ./...`** (no redundant **`-short`** on nightly).
 - 2026-03-20: **`20260320-ci-01`**/**`02` Done** — **`checks`** runs **`go run golang.org/x/vuln/cmd/govulncheck@latest ./...`**; **`@redocly/cli@2.18.1`** in **`package.json`** with **`lint:openapi`** script; CI/release use **`bun install --no-save`** once then **`bun run lint:openapi`** (no cold **`npx`**); **`Makefile`** **`lint-openapi`** for local parity.

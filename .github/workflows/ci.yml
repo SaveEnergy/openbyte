@@ -13,9 +13,11 @@ on:
         type: boolean
         default: false
 
+# PRs: cancel superseded runs (save minutes). main/tags/dispatch: do not cancel — avoids
+# aborting an in-flight deploy when another push lands (next run queues per group).
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   changes:
