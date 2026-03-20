@@ -60,7 +60,7 @@
 - **`build-push` + `deploy`** on every `main` push after `checks` (path filters do not skip Docker—doc-only can still roll images).
 - CI builds/pushes `edge` + `sha`; release publishes semver + `latest`.
 - **`release.yml` `deploy`**: same `vars`/secrets as CI; gate on **`needs.release.result == 'success'`** (not derived job booleans).
-- Deploy: sync compose → remote `docker compose pull` + `up -d --force-recreate` → verify; scripts in **`scripts/deploy/`** (`validate_env`, `sync_compose`, `deploy_remote`).
+- Deploy: **checkout first**, then `validate_env` → sync compose → remote `docker compose pull` + `up -d --force-recreate` → verify; scripts in **`scripts/deploy/`** (`validate_env`, `sync_compose`, `deploy_remote`).
 - Traefik deploy uses external `traefik` network; workflows ensure network presence.
 - **Race matrix**: `ci.yml` on `main`: `go test ./... -race -short -p 1`; `nightly.yml`: full `go test -race ./...` + separate `test/e2e` (timeout budget).
 - **Playwright**: `workers` = `2` on `GITHUB_ACTIONS`; optional `PLAYWRIGHT_WORKERS`; trace/reuse unchanged.
@@ -138,6 +138,7 @@
 - **2026-03-22**: Deep LOC scan → `20260322-refactor-01`..`09`; tests first, then client/registry/e2e/web/tools.
 - **2026-03-21**: `20260321-refactor-01`..`03` Done (speedtest tests, `pkg/client` files, `cmd/client` run + `http_engine_*`).
 - **2026-03-20**: Refactor `14`–`16` Done (cli split, web download/network modules, `server_tcp`); CI govulncheck + Redocly pin; race/playwright/cancel-in-progress policies; perf-bench nightly; telemetry **policy** in Architecture (not implementation).
+- **2026-03-20**: CI/release **`deploy`** — run **`actions/checkout` before `validate_env.sh`**; validate step invoked the script with no checkout → exit 127.
 - **2026-03-20**: Local/dev UI — **`responseHostForEndpoint`** prefers **`r.Host`** when bind is unspecified (**`0.0.0.0`/`::`**) so **`api_endpoint`** matches how the user opened the app; **`router_static`** allowlist + test for **`speedtest-http-{download,shared,upload}.js`** (barrel imports).
 - **2026-03-19**: Large refactor wave `01`–`13` + v0.8.0; Go 1.26.x baseline; Sonar OPEN query parity.
 - **2026-03-07 / 03-01 / 02-26**: Earlier closure waves (web resilience, Sonar targets, security/perf items)—details in CHANGELOG and old commits.
