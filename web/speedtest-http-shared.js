@@ -41,3 +41,45 @@ export function resolveStopReason(signal, endTimeRef, nominalEndTime) {
   if (endTimeRef.value < nominalEndTime - 500) return "early_stable";
   return "duration";
 }
+
+/**
+ * Shared warmup + measure accounting + progress callback for HTTP upload/download.
+ * `metricsState` must have `allBytes`, `totalBytes`, `measureStartTime`.
+ */
+export function applyHttpMeasureTick(
+  metricsState,
+  warmUp,
+  byteCount,
+  now,
+  startTime,
+  onProgress,
+  extra,
+) {
+  const measuring = warmUp.settled();
+  metricsState.allBytes += byteCount;
+  if (measuring) {
+    metricsState.totalBytes += byteCount;
+  } else {
+    warmUp.record(byteCount, now);
+    if (warmUp.settled()) {
+      metricsState.totalBytes = 0;
+      metricsState.measureStartTime = now;
+    }
+  }
+  if (extra?.diagnostics) {
+    extra.diagnostics.record(byteCount, now, measuring);
+  }
+  if (extra?.earlyStop && measuring && extra.earlyStop.record(byteCount, now)) {
+    extra.endTimeRef.value = now;
+  }
+  const elapsedSec = (now - startTime) / 1000;
+  const phaseDurationMs = Math.max(1, extra.endTimeRef.value - startTime);
+  const phaseProgress = Math.min(
+    100,
+    Math.max(0, ((now - startTime) / phaseDurationMs) * 100),
+  );
+  const displayBytes = measuring
+    ? metricsState.totalBytes
+    : metricsState.allBytes;
+  onProgress(displayBytes, elapsedSec, phaseProgress);
+}

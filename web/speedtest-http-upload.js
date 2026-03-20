@@ -15,6 +15,7 @@ import {
   detectOverheadFactor,
   throwIfZeroBytes,
   resolveStopReason,
+  applyHttpMeasureTick,
 } from "./speedtest-http-shared.js";
 
 async function sendUploadRequest(blob, duration, signal) {
@@ -41,35 +42,16 @@ function recordUploadProgress(
   onProgress,
   extra,
 ) {
-  const measuring = warmUp.settled();
-  metricsState.allBytes += blobSize;
   metricsState.successfulStreams += 1;
-
-  if (measuring) {
-    metricsState.totalBytes += blobSize;
-  } else {
-    warmUp.record(blobSize, now);
-    if (warmUp.settled()) {
-      metricsState.totalBytes = 0;
-      metricsState.measureStartTime = now;
-    }
-  }
-
-  if (extra?.diagnostics) extra.diagnostics.record(blobSize, now, measuring);
-  if (extra?.earlyStop && measuring && extra.earlyStop.record(blobSize, now)) {
-    extra.endTimeRef.value = now;
-  }
-
-  const elapsedSec = (now - startTime) / 1000;
-  const phaseDurationMs = Math.max(1, extra.endTimeRef.value - startTime);
-  const phaseProgress = Math.min(
-    100,
-    Math.max(0, ((now - startTime) / phaseDurationMs) * 100),
+  applyHttpMeasureTick(
+    metricsState,
+    warmUp,
+    blobSize,
+    now,
+    startTime,
+    onProgress,
+    extra,
   );
-  const displayBytes = measuring
-    ? metricsState.totalBytes
-    : metricsState.allBytes;
-  onProgress(displayBytes, elapsedSec, phaseProgress);
 }
 
 function handleUploadNonOkResponse(res, metricsState, retryAfterFn) {

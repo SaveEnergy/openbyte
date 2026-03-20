@@ -15,6 +15,7 @@ import {
   detectOverheadFactor,
   throwIfZeroBytes,
   resolveStopReason,
+  applyHttpMeasureTick,
 } from "./speedtest-http-shared.js";
 
 function buildDownloadChunkAttempts(chunkSize) {
@@ -122,30 +123,19 @@ async function executeDownloadAttempts(
 }
 
 function processDownloadChunk(value, now, ctx) {
-  const s = ctx.readState;
-  const measuring = ctx.warmUp.settled();
-  s.allBytes += value.length;
-  if (measuring) {
-    s.totalBytes += value.length;
-  } else {
-    ctx.warmUp.record(value.length, now);
-    if (ctx.warmUp.settled()) {
-      s.totalBytes = 0;
-      s.measureStartTime = now;
-    }
-  }
-  if (ctx.diagnostics) ctx.diagnostics.record(value.length, now, measuring);
-  if (ctx.earlyStop && measuring && ctx.earlyStop.record(value.length, now)) {
-    ctx.endTimeRef.value = now;
-  }
-  const elapsedSec = (now - ctx.startTime) / 1000;
-  const phaseDurationMs = Math.max(1, ctx.endTimeRef.value - ctx.startTime);
-  const phaseProgress = Math.min(
-    100,
-    Math.max(0, ((now - ctx.startTime) / phaseDurationMs) * 100),
+  applyHttpMeasureTick(
+    ctx.readState,
+    ctx.warmUp,
+    value.length,
+    now,
+    ctx.startTime,
+    ctx.onProgress,
+    {
+      diagnostics: ctx.diagnostics,
+      earlyStop: ctx.earlyStop,
+      endTimeRef: ctx.endTimeRef,
+    },
   );
-  const displayBytes = measuring ? s.totalBytes : s.allBytes;
-  ctx.onProgress(displayBytes, elapsedSec, phaseProgress);
 }
 
 export async function runDownloadTest(duration, onProgress, signal) {

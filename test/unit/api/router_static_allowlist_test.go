@@ -23,6 +23,9 @@ func TestRouterStaticServesSpeedtestHTTPModules(t *testing.T) {
 		"speedtest-http-download.js",
 		"speedtest-http-shared.js",
 		"speedtest-http-upload.js",
+		"network-probes.js",
+		"network-servers.js",
+		"speedtest-orchestrator.js",
 	} {
 		t.Run(name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/"+name, nil)

@@ -38,7 +38,7 @@
 - Network probe and health-check fetch paths drain non-OK and malformed JSON responses.
 - Server settings UI: no custom URL mode, no synthetic "Current Server" mode, selector hidden when ≤1 reachable server.
 - UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.
-- Speed test: `speedtest*.js` + `openbyte.js` orchestration; **`speedtest-http.js`** barrels **`speedtest-http-{shared,download,upload}.js`**; download **`download-{platform,github}.js`** + **`download.js`**; network **`network-{helpers,health}.js`** + **`network.js`** (**`getHealthURL`** re-exported). Any new top-level **`web/*.js`** (or HTML/CSS) must be added to **`internal/api/router_static.go`** allowlist or the server returns **404**.
+- Speed test: **`speedtest-orchestrator.js`** (lifecycle + share) + thin **`openbyte.js`** init; **`speedtest-http.js`** barrels **`speedtest-http-{shared,download,upload}.js`** (shared warmup/progress via **`applyHttpMeasureTick`** in **`speedtest-http-shared.js`**); download **`download-{platform,github}.js`** + **`download.js`**; network **`network-{helpers,health}.js`** + **`network.js`** (barrel: **`network-probes.js`**, **`network-servers.js`**; **`getHealthURL`** re-exported). Any new top-level **`web/*.js`** (or HTML/CSS) must be added to **`internal/api/router_static.go`** allowlist or the server returns **404**.
 
 ### Storage
 
@@ -85,26 +85,26 @@
 ### Refactor backlog notes
 
 - **Evidence**: `wc` / structure scan; before large edits use `git log --follow --stat -- <path>`. Cross-package API changes need semver + OpenAPI parity.
-- **Sonar**: re-check OPEN count after each Cloud analysis (query: `projects=SaveEnergy_openbyte`, `issueStatuses=OPEN`).
+- **Sonar**: re-check OPEN count after each Cloud analysis (query: `projects=SaveEnergy_openbyte`, `issueStatuses=OPEN`). Latest MCP pull (**2026-03-25**): **2 OPEN** — both addressed in-tree; re-run analysis to clear keys.
+
+### Refactor analysis (2026-03-20)
+
+- **Method**: LOC hotspot scan (`wc` on `internal/`, `pkg/`, `cmd/`, `web/`, `test/`) + import coupling read (`openbyte.js` → orchestrator + network barrel).
+- **Next scan targets (when growing again)**: **`router.go`** + middleware wiring; **`speedtest_{download,upload}.go`** if HTTP speedtest grows; **`pkg/client`** (already split); optional trim **`handlers_meta.go`** / **`CompleteStream`** branch helper.
+- **Web policy reminder**: new top-level **`web/*.js`** → **`internal/api/router_static.go`** allowlist + unit test (see Architecture).
 
 ### Live Queue (active)
 
 | ID | Area | Plan | Check |
 | --- | --- | --- | --- |
-| `20260322-refactor-06` | internal/api | Optional: `speedtest.go` vs `speedtest_*.go` — extract validation/deadline helpers only. | `go test ./internal/api/... ./test/unit/api/...` |
-| `20260322-refactor-07` | e2e | Split `test/e2e/e2e_test.go` (~480): harness vs stream/WS vs helpers. | `go test ./test/e2e/... -short` |
-| `20260322-refactor-08` | web | Reduce `ui.js` / `openbyte.js` coupling; minimal default UI change (telemetry policy). | `npx prettier --check web/*.js`; `bunx playwright test test/e2e/ui/basic.spec.js` |
-| `20260322-refactor-09` | mcp / tools | When touched: `cmd/mcp/main.go` and/or `cmd/loadtest/main.go`. | `go test ./cmd/mcp/... ./test/unit/mcp/...`; `go build ./cmd/loadtest` |
-| `20260323-refactor-01` | test | Split `test/unit/api/handlers_test.go` (~476); align with `handlers_*_test.go`. | `go test ./test/unit/api/...` |
-| `20260323-refactor-02` | test | Split `test/unit/diagnostic/diagnostic_test.go` (~505). | `go test ./test/unit/diagnostic/...` |
-| `20260323-refactor-03` | test | Split `test/unit/websocket/server_test.go` (~430): origin/broadcast/limits/ping. | `go test ./test/unit/websocket/...` |
-| `20260323-refactor-04` | test | Split `test/unit/results/handler_test.go` (~454) vs store concerns. | `go test ./test/unit/results/...` |
-| `20260323-refactor-05` | metrics | Split `internal/metrics` aggregator/collector vs wiring; keep atomic hot paths. | `go test ./internal/metrics/... ./test/unit/metrics/...` |
-| `20260323-refactor-06` | diagnostic | Split `pkg/diagnostic/diagnostic.go`: interpretation vs thresholds vs `Interpret`. | `go test ./pkg/diagnostic/...` |
-| `20260323-refactor-07` | cmd/client | Split `config.go` vs `api.go` (flags vs REST); orthogonal to `20260322-refactor-04`. | `go test ./cmd/client/...` |
-| `20260323-refactor-08` | internal/api | Optional: `router.go` / `handlers.go` seams; keep `TestOpenAPIRouteContract` green. | `go test ./internal/api/...`; `go test ./test/unit/api/... -run TestOpenAPIRouteContract` |
-| `20260323-refactor-09` | web | Further dedupe `speedtest-http-upload.js` / `download.js` vs `speedtest-http-shared.js`. | `npx prettier --check web/*.js`; `bunx playwright test test/e2e/ui/basic.spec.js` |
-| `20260323-refactor-10` | test / tools | Split `test/unit/registry/handler_test.go` vs `service_test.go`; optional `cmd/check/main.go`. | `go test ./test/unit/registry/...`; `go test ./cmd/check/...` |
+| — | — | **Queue drained** (2026-03-20 wave). Replenish via LOC scan + Sonar OPEN after next analysis. | — |
+
+### Sonar OPEN (inventory — verify after next analysis)
+
+| Issue key | Rule | Sev | Component | Action |
+| --- | --- | --- | --- | --- |
+| `AZ0Il3bVQcX3ClQ7_cdM` | go:S3776 | CRITICAL | was `handlers_http.go` → host helpers in **`handlers_response_host.go`** | **MCP 2026-03-20**: still **OPEN** until Cloud reanalysis; complexity target was endpoint host wiring |
+| `AZ0Il3awQcX3ClQ7_cdL` | javascript:S7763 | MINOR | `web/network.js` | **MCP 2026-03-20**: still **OPEN** (stale); file uses `export { getHealthURL } from "./network-helpers.js"` — **verify CLOSED** on next analysis |
 
 ### Check hold (manual/external)
 
@@ -113,11 +113,20 @@
 ### Sonar snapshot
 
 - **QG**: last Cloud check **OK** (hotspots reviewed). Re-verify **OPEN** count after next analysis.
+- **OPEN (MCP check 2026-03-20)**: **2** issues — see table; JS likely stale; Go may clear after reanalysis on new file layout.
 - MCP: issue search + metrics + QG; full hotspot workflow in Sonar UI.
 
 ### Recently closed (summary)
 
 - Full ID lists live in **git history** / **CHANGELOG**.
+- **2026-03-20 API handler file split**: **`handlers_response_host.go`** — `normalizeHost`, bind/proxy host wiring, **`responseHostForEndpoint`**; JSON/metrics/response helpers stay in **`handlers_http.go`**; stream snapshot DTOs + **`toStreamSnapshotResponse`** in **`handler_stream_dto.go`**, route handlers in **`handlers_stream.go`**. Checks: `go test ./internal/api/... ./test/unit/api/... -run TestOpenAPIRouteContract`.
+- **2026-03-20 optional hotspot wave Done**: **`cmd/client`**: `api_stream_http.go` (REST start/cancel/complete + HTTP client helpers) + `api_websocket.go` (WS metrics loop); **`internal/api`**: `handler_stream_start.go` (stream start + validation) + slim `handlers.go`; `ratelimit_global.go` / `ratelimit_ip.go` + slim `ratelimit.go`; `speedtest_handlers.go` (Download/Upload/Ping) + slim `speedtest.go` (state + per-IP slots); **`internal/metrics`**: `collector_getmetrics.go` + slim `collector.go`. Checks: `go build ./...`, `go test ./cmd/client/... ./internal/api/... ./test/unit/api/... -run TestOpenAPIRouteContract`.
+- **2026-03-20 backlog wave Done**: `20260326-refactor-01` **`cmd/loadtest`**: `config.go` + `workers.go` + thin `main.go`; `20260326-refactor-02` **web network**: `network-probes.js`, `network-servers.js`, barrel `network.js` + static allowlist; `20260322-refactor-06` **internal/api speedtest**: shared query parsers in `speedtest_query.go`; `20260322-refactor-07` **e2e**: `e2e_harness_test.go` + `e2e_stream_ws_test.go`; `20260322-refactor-08` **web**: `speedtest-orchestrator.js` + slim `openbyte.js`; `20260322-refactor-09` **mcp**: `run.go`, `tools.go`, `handlers.go` (package `mcp`); `20260323-refactor-05` **metrics**: `aggregator_merge.go`; `20260323-refactor-06` **diagnostic**: `types.go`, `interpret.go`, `ratings.go`, `assess.go`; `20260323-refactor-07` **cmd/client**: `config_yaml.go` + `config_merge.go`; `20260323-refactor-08` **internal/api**: `router_routes.go` + slim `router.go`; `20260323-refactor-09` **web**: `applyHttpMeasureTick` in `speedtest-http-shared.js` (upload + download). Checks: `go test ./cmd/client/... ./test/unit/...`, `go test ./test/e2e/... -short`, `go test ./test/unit/api/... -run TestOpenAPIRouteContract`, `npx prettier --check web/*.js`, `bunx playwright test test/e2e/ui/basic.spec.js`.
+- **`20260323-refactor-10` Done**: `handler_test.go` → `handler_test_common_test.go`, `handler_auth_test.go`, `handler_crud_test.go`, `handler_validation_test.go` (`go test ./test/unit/registry/...`).
+- **`20260323-refactor-01` Done**: `handlers_test.go` → `handlers_test_common_test.go` (shared stream helpers/constants) + `handlers_stream_start_test.go` (`go test ./test/unit/api/...`).
+- **`20260323-refactor-02` Done**: `diagnostic_test.go` → `diagnostic_test_common_test.go`, `diagnostic_rate_test.go`, `diagnostic_interpret_test.go` (`go test ./test/unit/diagnostic/...`).
+- **`20260323-refactor-03` Done**: `server_test.go` → `server_test_common_test.go`, `server_origin_test.go`, `server_broadcast_test.go`, `server_limits_test.go` (`go test ./test/unit/websocket/...`).
+- **`20260323-refactor-04` Done**: `handler_test.go` → `handler_test_common_test.go`, `handler_save_test.go`, `handler_get_test.go` (`go test ./test/unit/results/...`).
 - **`20260322-refactor-01` Done**: `router_test.go` → `router_test_common_test.go`, `router_middleware_stream_test.go`, `router_static_cache_ratelimit_test.go`, `router_results_api_routes_test.go`, `router_static_allowlist_test.go` (`go test ./test/unit/api/...`).
 - **`20260322-refactor-02` Done**: `store_test.go` → `store_test_common_test.go`, `store_crud_test.go`, `store_retention_test.go`, `store_busy_test.go`, `store_handler_routes_test.go` (`go test ./test/unit/results/...`).
 - **`20260322-refactor-03` Done**: `manager_test.go` → `manager_test_common_test.go`, `manager_lifecycle_test.go`, `manager_limits_test.go`, `manager_broadcast_metrics_test.go`, `manager_terminal_test.go` (`go test ./test/unit/stream/...`).
@@ -129,6 +138,10 @@
 
 ### Recent decision notes
 
+- **2026-03-20**: **`handlers_http` / stream handler seams** — host/scheme logic → **`handlers_response_host.go`**; stream JSON DTO mapping → **`handler_stream_dto.go`** (Sonar OPEN go:S3776 was still on old component key per MCP same day; re-run Cloud analysis).
+- **2026-03-20**: **Backlog wave closed** — loadtest / mcp / metrics merge / diagnostic split / speedtest query / router routes / e2e harness+stream / network modules + orchestrator / client config_yaml+merge / HTTP measure dedupe (`applyHttpMeasureTick`); **AGENTS** Live Queue drained; Architecture § Frontend updated for new modules.
+- **2026-03-26**: **Refactor analysis** — LOC + import coupling scan; Live Queue sharpened (evidence: file + ~LOC); new **`20260326-refactor-01`** (loadtest), **`20260326-refactor-02`** (`network.js` split + allowlist); **`20260322-refactor-09`** scoped to **MCP only** (loadtest carved out).
+- **2026-03-25**: **Sonar OPEN ×2** (MCP) — go:S3776 → `handlers_http.go` helpers (`appendPortIfNonDefault`, `hostWhenBindUnspecified`, `hostForUntrustedProxy`); javascript:S7763 → `export { getHealthURL } from "./network-helpers.js"`. **`20260323-refactor-10` Done** — registry `handler_*_test.go` split. (Earlier same day: **`20260323-refactor-01`..`04`** test splits.)
 - **2026-03-24**: **`20260322-refactor-01` Done** — router tests split (CORS/stream ID / static+CSP+rate-limit / results+registry+404 / allowlist+fonts+smoke); same `package api_test`, shared constants in `router_test_common_test.go`.
 - **2026-03-24**: **`20260322-refactor-02` Done** — store tests split: CRUD + id charset, retention/trim, busy locks, mux handler routes (`store_handler_routes_test.go` vs `handler_test.go` direct handler tests).
 - **2026-03-24**: **`20260322-refactor-03` Done** — `Manager` tests split: lifecycle, limits/concurrency, metrics channel fanout, terminal-state invariants.

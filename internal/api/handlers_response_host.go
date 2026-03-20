@@ -1,0 +1,117 @@
+package api
+
+import (
+	"net"
+	"net/http"
+	"strings"
+
+	"github.com/saveenergy/openbyte/internal/config"
+)
+
+const loopbackIPv4 = "127.0.0.1"
+
+func normalizeHost(host string) string {
+	if host == "" {
+		return loopbackIPv4
+	}
+	trimmed := host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		trimmed = h
+		if strings.Contains(h, ":") && strings.Contains(host, "[") {
+			trimmed = "[" + h + "]"
+		}
+	}
+	if trimmed == "" || trimmed == "localhost" {
+		return loopbackIPv4
+	}
+	return trimmed
+}
+
+// isUnspecifiedBind reports whether addr is a wildcard listen address that must
+// not appear in browser-facing URLs (fetch / WebSocket from the UI).
+func isUnspecifiedBind(addr string) bool {
+	host := strings.TrimSpace(addr)
+	if host == "" {
+		return true
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+		if strings.Contains(h, ":") && strings.Contains(addr, "[") {
+			host = "[" + h + "]"
+		}
+	}
+	switch host {
+	case "0.0.0.0", "::", "[::]":
+		return true
+	default:
+		return false
+	}
+}
+
+func requestScheme(r *http.Request, cfg *config.Config) string {
+	if r == nil {
+		return "http"
+	}
+	if cfg != nil && cfg.TrustProxyHeaders {
+		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+			if strings.EqualFold(proto, "https") {
+				return "https"
+			}
+		}
+	}
+	if r.TLS != nil {
+		return "https"
+	}
+	return "http"
+}
+
+func responseHost(r *http.Request, cfg *config.Config) string {
+	if cfg != nil {
+		if cfg.PublicHost != "" {
+			return cfg.PublicHost
+		}
+		if !cfg.TrustProxyHeaders {
+			return normalizeHost(cfg.BindAddress)
+		}
+	}
+	return normalizeHost(r.Host)
+}
+
+func appendPortIfNonDefault(host, port string) string {
+	if port == "" || port == "80" || port == "443" {
+		return host
+	}
+	return host + ":" + port
+}
+
+func hostWhenBindUnspecified(r *http.Request, port string) string {
+	if r != nil && r.Host != "" {
+		return r.Host
+	}
+	return appendPortIfNonDefault(loopbackIPv4, port)
+}
+
+func hostForUntrustedProxy(r *http.Request, cfg *config.Config) string {
+	if isUnspecifiedBind(cfg.BindAddress) {
+		return hostWhenBindUnspecified(r, cfg.Port)
+	}
+	h := normalizeHost(cfg.BindAddress)
+	return appendPortIfNonDefault(h, cfg.Port)
+}
+
+// responseHostForEndpoint returns host or host:port for API endpoint construction.
+// When proxied and using r.Host, preserves non-standard ports (e.g. proxy:8443).
+func responseHostForEndpoint(r *http.Request, cfg *config.Config) string {
+	if cfg != nil {
+		if cfg.PublicHost != "" {
+			return cfg.PublicHost
+		}
+		if !cfg.TrustProxyHeaders {
+			return hostForUntrustedProxy(r, cfg)
+		}
+	}
+	if r != nil && r.Host != "" {
+		return r.Host
+	}
+	return loopbackIPv4
+}

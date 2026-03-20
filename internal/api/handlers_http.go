@@ -6,12 +6,10 @@ import (
 	stdErrors "errors"
 	"io"
 	"math"
-	"net"
 	"net/http"
 	"strings"
 	"sync"
 
-	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/logging"
 	"github.com/saveenergy/openbyte/pkg/errors"
 	"github.com/saveenergy/openbyte/pkg/types"
@@ -20,8 +18,6 @@ import (
 var jsonBufPool = sync.Pool{
 	New: func() any { return &bytes.Buffer{} },
 }
-
-const loopbackIPv4 = "127.0.0.1"
 
 func isJSONContentType(r *http.Request) bool {
 	ct := r.Header.Get("Content-Type")
@@ -115,103 +111,4 @@ func respondError(w http.ResponseWriter, err error, statusCode int) {
 	respondJSON(w, map[string]string{
 		"error": msg,
 	}, statusCode)
-}
-
-func normalizeHost(host string) string {
-	if host == "" {
-		return loopbackIPv4
-	}
-	trimmed := host
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		trimmed = h
-		if strings.Contains(h, ":") && strings.Contains(host, "[") {
-			trimmed = "[" + h + "]"
-		}
-	}
-	if trimmed == "" || trimmed == "localhost" {
-		return loopbackIPv4
-	}
-	return trimmed
-}
-
-// isUnspecifiedBind reports whether addr is a wildcard listen address that must
-// not appear in browser-facing URLs (fetch / WebSocket from the UI).
-func isUnspecifiedBind(addr string) bool {
-	host := strings.TrimSpace(addr)
-	if host == "" {
-		return true
-	}
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-		if strings.Contains(h, ":") && strings.Contains(addr, "[") {
-			host = "[" + h + "]"
-		}
-	}
-	switch host {
-	case "0.0.0.0", "::", "[::]":
-		return true
-	default:
-		return false
-	}
-}
-
-func requestScheme(r *http.Request, cfg *config.Config) string {
-	if r == nil {
-		return "http"
-	}
-	if cfg != nil && cfg.TrustProxyHeaders {
-		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
-			if strings.EqualFold(proto, "https") {
-				return "https"
-			}
-		}
-	}
-	if r.TLS != nil {
-		return "https"
-	}
-	return "http"
-}
-
-func responseHost(r *http.Request, cfg *config.Config) string {
-	if cfg != nil {
-		if cfg.PublicHost != "" {
-			return cfg.PublicHost
-		}
-		if !cfg.TrustProxyHeaders {
-			return normalizeHost(cfg.BindAddress)
-		}
-	}
-	return normalizeHost(r.Host)
-}
-
-// responseHostForEndpoint returns host or host:port for API endpoint construction.
-// When proxied and using r.Host, preserves non-standard ports (e.g. proxy:8443).
-func responseHostForEndpoint(r *http.Request, cfg *config.Config) string {
-	if cfg != nil {
-		if cfg.PublicHost != "" {
-			return cfg.PublicHost
-		}
-		if !cfg.TrustProxyHeaders {
-			if isUnspecifiedBind(cfg.BindAddress) {
-				if r != nil && r.Host != "" {
-					return r.Host
-				}
-				h := loopbackIPv4
-				if cfg.Port != "" && cfg.Port != "80" && cfg.Port != "443" {
-					return h + ":" + cfg.Port
-				}
-				return h
-			}
-			h := normalizeHost(cfg.BindAddress)
-			if cfg.Port != "" && cfg.Port != "80" && cfg.Port != "443" {
-				return h + ":" + cfg.Port
-			}
-			return h
-		}
-	}
-	// Preserve r.Host as-is (includes port when proxied).
-	if r != nil && r.Host != "" {
-		return r.Host
-	}
-	return loopbackIPv4
 }

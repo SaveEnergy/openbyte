@@ -1,6 +1,3 @@
-// Package mcp implements the `openbyte mcp` subcommand — an MCP (Model Context
-// Protocol) server over stdio transport. Agents can spawn this process and call
-// connectivity tools directly.
 package mcp
 
 import (
@@ -8,19 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
+
 	"github.com/saveenergy/openbyte/pkg/client"
 )
 
 const (
-	defaultServerURL      = "http://localhost:8080"
-	serverURLDescPrefix   = "Speed test server URL (default: "
-	optionalAPIKeyDesc    = "Optional bearer API key for authenticated endpoints"
 	invalidServerURLFmt   = "Invalid server_url: %v"
 	jsonEncodingFailedFmt = "JSON encoding failed: %v"
 	connectivityFailedFmt = "Connectivity check failed: %v"
@@ -28,81 +21,6 @@ const (
 	speedTestFailedFmt    = "Speed test failed: %v"
 	diagnosisFailedFmt    = "Diagnosis failed: %v"
 )
-
-// Run starts the MCP stdio server. Blocks until stdin closes or signal received.
-func Run(version string) int {
-	s := server.NewMCPServer(
-		"openbyte",
-		version,
-		server.WithToolCapabilities(true),
-	)
-	registerTools(s)
-
-	if err := server.ServeStdio(s); err != nil {
-		fmt.Fprintf(os.Stderr, "openbyte mcp: error: %v\n", err)
-		return 1
-	}
-	return 0
-}
-
-func registerTools(s *server.MCPServer) {
-	s.AddTool(connectivityCheckTool(), handleConnectivityCheck)
-	s.AddTool(speedTestTool(), handleSpeedTest)
-	s.AddTool(diagnoseTool(), handleDiagnose)
-}
-
-// ToolDefinitions exposes MCP tool schemas for contract tests.
-func ToolDefinitions() []mcp.Tool {
-	return []mcp.Tool{
-		connectivityCheckTool(),
-		speedTestTool(),
-		diagnoseTool(),
-	}
-}
-
-func connectivityCheckTool() mcp.Tool {
-	return mcp.NewTool("connectivity_check",
-		mcp.WithDescription("Quick connectivity check (~3-5 seconds). Returns latency, rough download/upload speed, grade (A-F), and diagnostic interpretation. Use this for fast 'is the network OK?' checks."),
-		mcp.WithString("server_url",
-			mcp.Description(serverURLDescPrefix+defaultServerURL+")"),
-		),
-		mcp.WithString("api_key",
-			mcp.Description(optionalAPIKeyDesc),
-		),
-	)
-}
-
-func speedTestTool() mcp.Tool {
-	return mcp.NewTool("speed_test",
-		mcp.WithDescription("Full speed test with configurable duration. Returns detailed throughput, latency, jitter, and diagnostic interpretation. Use for accurate measurements."),
-		mcp.WithString("server_url",
-			mcp.Description(serverURLDescPrefix+defaultServerURL+")"),
-		),
-		mcp.WithString("direction",
-			mcp.Description("Test direction: download or upload (default: download)"),
-		),
-		mcp.WithNumber("duration",
-			mcp.Description("Test duration in seconds, 1-300 (default: 10)"),
-		),
-		mcp.WithString("api_key",
-			mcp.Description(optionalAPIKeyDesc),
-		),
-	)
-}
-
-func diagnoseTool() mcp.Tool {
-	return mcp.NewTool("diagnose",
-		mcp.WithDescription("Comprehensive network diagnosis: measures latency, download speed, upload speed, and returns bufferbloat grade, suitability assessment, and concerns. Takes ~15-20 seconds."),
-		mcp.WithString("server_url",
-			mcp.Description(serverURLDescPrefix+defaultServerURL+")"),
-		),
-		mcp.WithString("api_key",
-			mcp.Description(optionalAPIKeyDesc),
-		),
-	)
-}
-
-// --- Tool Handlers ---
 
 func handleConnectivityCheck(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	const toolName = "connectivity_check"
@@ -225,6 +143,7 @@ func clientFromRequest(serverURL string, req mcp.CallToolRequest) *client.Client
 	return client.New(serverURL, client.WithAPIKey(apiKey))
 }
 
+// ValidateServerURL parses and validates an HTTP(S) base URL for MCP tools.
 func ValidateServerURL(raw string) (string, error) {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
@@ -251,6 +170,7 @@ func ValidateServerURL(raw string) (string, error) {
 	return strings.TrimRight(u.String(), "/"), nil
 }
 
+// ValidateSpeedTestInput validates direction and duration for speed_test.
 func ValidateSpeedTestInput(direction string, duration int) error {
 	if direction != "download" && direction != "upload" {
 		return fmt.Errorf("direction must be download or upload")
