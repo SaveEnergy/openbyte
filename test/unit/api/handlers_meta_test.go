@@ -104,6 +104,37 @@ func TestGetServers(t *testing.T) {
 	}
 }
 
+func TestGetServersUsesRequestHostWhenBindAllInterfaces(t *testing.T) {
+	mgr := stream.NewManager(10, 10)
+	handler := api.NewHandler(mgr)
+	cfg := config.DefaultConfig()
+	cfg.BindAddress = "0.0.0.0"
+	cfg.Port = "8080"
+	cfg.TrustProxyHeaders = false
+	handler.SetConfig(cfg)
+
+	req := httptest.NewRequest(http.MethodGet, serversEndpoint, nil)
+	req.Host = "localhost:8080"
+	rec := httptest.NewRecorder()
+	handler.GetServers(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
+	}
+
+	var resp api.ServersResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf(decodeServersErrFmt, err)
+	}
+	if len(resp.Servers) != 1 {
+		t.Fatalf(serversLenErrFmt, len(resp.Servers))
+	}
+	want := "http://localhost:8080"
+	if resp.Servers[0].APIEndpoint != want {
+		t.Fatalf("api endpoint = %q, want %q", resp.Servers[0].APIEndpoint, want)
+	}
+}
+
 func TestGetServersIgnoresRequestHostWhenProxyUntrusted(t *testing.T) {
 	mgr := stream.NewManager(10, 10)
 	handler := api.NewHandler(mgr)

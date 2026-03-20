@@ -1,6 +1,6 @@
 /** Main entry: orchestration, test lifecycle, share. */
 
-import { state, elements, getApiBase } from "./state.js";
+import { state, elements, getApiBase, initElements } from "./state.js";
 import { computeBufferbloatGrade } from "./utils.js";
 import {
   showState,
@@ -202,6 +202,7 @@ function promptShareUrl(url) {
 }
 
 function init() {
+  initElements();
   loadSettings();
   loadServers().catch((err) => {
     showError(err?.message || "Failed to load servers");

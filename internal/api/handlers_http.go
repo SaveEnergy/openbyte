@@ -134,6 +134,27 @@ func normalizeHost(host string) string {
 	return trimmed
 }
 
+// isUnspecifiedBind reports whether addr is a wildcard listen address that must
+// not appear in browser-facing URLs (fetch / WebSocket from the UI).
+func isUnspecifiedBind(addr string) bool {
+	host := strings.TrimSpace(addr)
+	if host == "" {
+		return true
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+		if strings.Contains(h, ":") && strings.Contains(addr, "[") {
+			host = "[" + h + "]"
+		}
+	}
+	switch host {
+	case "0.0.0.0", "::", "[::]":
+		return true
+	default:
+		return false
+	}
+}
+
 func requestScheme(r *http.Request, cfg *config.Config) string {
 	if r == nil {
 		return "http"
@@ -171,6 +192,16 @@ func responseHostForEndpoint(r *http.Request, cfg *config.Config) string {
 			return cfg.PublicHost
 		}
 		if !cfg.TrustProxyHeaders {
+			if isUnspecifiedBind(cfg.BindAddress) {
+				if r != nil && r.Host != "" {
+					return r.Host
+				}
+				h := loopbackIPv4
+				if cfg.Port != "" && cfg.Port != "80" && cfg.Port != "443" {
+					return h + ":" + cfg.Port
+				}
+				return h
+			}
 			h := normalizeHost(cfg.BindAddress)
 			if cfg.Port != "" && cfg.Port != "80" && cfg.Port != "443" {
 				return h + ":" + cfg.Port

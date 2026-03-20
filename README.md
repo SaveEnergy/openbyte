@@ -117,6 +117,7 @@ Uses BEREC-compliant measurement practices:
 | `PERF_STATS_INTERVAL` | — | Log runtime stats at this interval (e.g. `10s`) |
 
 Notes:
+- With default `BIND_ADDRESS=0.0.0.0`, `GET /api/v1/servers` builds `api_endpoint` from the HTTP request `Host` so the web UI stays same-origin (e.g. open `http://localhost:8080` → endpoint uses `localhost`, not `0.0.0.0`). If you bind `127.0.0.1` only, open the UI at `http://127.0.0.1:PORT`, or set `PUBLIC_HOST` for a stable advertised host.
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
 - Default CORS allows all origins; set `ALLOWED_ORIGINS` to restrict (supports `*` and `*.example.com`).
 - If running behind a reverse proxy, increase max request body size (e.g. 35MB) and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.

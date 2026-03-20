@@ -12,6 +12,29 @@ import (
 	"github.com/saveenergy/openbyte/internal/stream"
 )
 
+func TestRouterStaticServesSpeedtestHTTPModules(t *testing.T) {
+	manager := stream.NewManager(10, 10)
+	handler := api.NewHandler(manager)
+	router := api.NewRouter(handler, config.DefaultConfig())
+	h := router.SetupRoutes()
+
+	for _, name := range []string{
+		"speedtest-http.js",
+		"speedtest-http-download.js",
+		"speedtest-http-shared.js",
+		"speedtest-http-upload.js",
+	} {
+		t.Run(name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/"+name, nil)
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("%s: status %d, want %d", name, rec.Code, http.StatusOK)
+			}
+		})
+	}
+}
+
 func TestRouterStaticFileServerAllowlist(t *testing.T) {
 	manager := stream.NewManager(10, 10)
 	handler := api.NewHandler(manager)

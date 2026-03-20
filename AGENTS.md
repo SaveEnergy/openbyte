@@ -38,7 +38,7 @@
 - Network probe and health-check fetch paths drain non-OK and malformed JSON responses.
 - Server settings UI: no custom URL mode, no synthetic "Current Server" mode, selector hidden when ≤1 reachable server.
 - UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.
-- Speed test: `speedtest*.js` + `openbyte.js` orchestration; **`speedtest-http.js`** barrels **`speedtest-http-{shared,download,upload}.js`**; download **`download-{platform,github}.js`** + **`download.js`**; network **`network-{helpers,health}.js`** + **`network.js`** (**`getHealthURL`** re-exported).
+- Speed test: `speedtest*.js` + `openbyte.js` orchestration; **`speedtest-http.js`** barrels **`speedtest-http-{shared,download,upload}.js`**; download **`download-{platform,github}.js`** + **`download.js`**; network **`network-{helpers,health}.js`** + **`network.js`** (**`getHealthURL`** re-exported). Any new top-level **`web/*.js`** (or HTML/CSS) must be added to **`internal/api/router_static.go`** allowlist or the server returns **404**.
 
 ### Storage
 
@@ -138,6 +138,7 @@
 - **2026-03-22**: Deep LOC scan → `20260322-refactor-01`..`09`; tests first, then client/registry/e2e/web/tools.
 - **2026-03-21**: `20260321-refactor-01`..`03` Done (speedtest tests, `pkg/client` files, `cmd/client` run + `http_engine_*`).
 - **2026-03-20**: Refactor `14`–`16` Done (cli split, web download/network modules, `server_tcp`); CI govulncheck + Redocly pin; race/playwright/cancel-in-progress policies; perf-bench nightly; telemetry **policy** in Architecture (not implementation).
+- **2026-03-20**: Local/dev UI — **`responseHostForEndpoint`** prefers **`r.Host`** when bind is unspecified (**`0.0.0.0`/`::`**) so **`api_endpoint`** matches how the user opened the app; **`router_static`** allowlist + test for **`speedtest-http-{download,shared,upload}.js`** (barrel imports).
 - **2026-03-19**: Large refactor wave `01`–`13` + v0.8.0; Go 1.26.x baseline; Sonar OPEN query parity.
 - **2026-03-07 / 03-01 / 02-26**: Earlier closure waves (web resilience, Sonar targets, security/perf items)—details in CHANGELOG and old commits.
 

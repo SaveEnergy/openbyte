@@ -36,44 +36,47 @@ export const state = {
   diagnostics: null,
 };
 
-export const elements = {
-  idleState: document.getElementById("idleState"),
-  testingState: document.getElementById("testingState"),
-  resultsState: document.getElementById("resultsState"),
-  startBtn: document.getElementById("startBtn"),
-  speedNumber: document.getElementById("speedNumber"),
-  speedUnit: document.getElementById("speedUnit"),
-  testType: document.getElementById("testType"),
-  progressMeter: document.getElementById("progressMeter"),
-  progressRing: document.getElementById("progressRing"),
-  downloadResult: document.getElementById("downloadResult"),
-  uploadResult: document.getElementById("uploadResult"),
-  latencyResult: document.getElementById("latencyResult"),
-  jitterResult: document.getElementById("jitterResult"),
-  loadedLatencyResult: document.getElementById("loadedLatencyResult"),
-  bufferbloatResult: document.getElementById("bufferbloatResult"),
-  serverName: document.getElementById("serverName"),
-  networkIPv4: document.getElementById("networkIPv4"),
-  networkIPv6: document.getElementById("networkIPv6"),
-  restartBtn: document.getElementById("restartBtn"),
-  cancelBtn: document.getElementById("cancelBtn"),
-  serverInfo: document.getElementById("serverInfo"),
-  serverDot: document.querySelector(".server-dot"),
-  serverText: document.querySelector(".server-text"),
-  showSettings: document.getElementById("showSettings"),
-  closeSettings: document.getElementById("closeSettings"),
-  settingsModal: document.getElementById("settingsModal"),
-  duration: document.getElementById("duration"),
-  streams: document.getElementById("streams"),
-  serverSelectGroup: document.getElementById("serverSelectGroup"),
-  serverSelect: document.getElementById("serverSelect"),
-  serverStatus: document.getElementById("serverStatus"),
-  errorToast: document.getElementById("errorToast"),
-  errorMessage: document.getElementById("errorMessage"),
-  successToast: document.getElementById("successToast"),
-  successMessage: document.getElementById("successMessage"),
-  shareBtn: document.getElementById("shareBtn"),
-};
+/** Populated by `initElements()` after the document is ready (module load can precede DOM). */
+export const elements = {};
+
+export function initElements() {
+  elements.idleState = document.getElementById("idleState");
+  elements.testingState = document.getElementById("testingState");
+  elements.resultsState = document.getElementById("resultsState");
+  elements.startBtn = document.getElementById("startBtn");
+  elements.speedNumber = document.getElementById("speedNumber");
+  elements.speedUnit = document.getElementById("speedUnit");
+  elements.testType = document.getElementById("testType");
+  elements.progressMeter = document.getElementById("progressMeter");
+  elements.progressRing = document.getElementById("progressRing");
+  elements.downloadResult = document.getElementById("downloadResult");
+  elements.uploadResult = document.getElementById("uploadResult");
+  elements.latencyResult = document.getElementById("latencyResult");
+  elements.jitterResult = document.getElementById("jitterResult");
+  elements.loadedLatencyResult = document.getElementById("loadedLatencyResult");
+  elements.bufferbloatResult = document.getElementById("bufferbloatResult");
+  elements.serverName = document.getElementById("serverName");
+  elements.networkIPv4 = document.getElementById("networkIPv4");
+  elements.networkIPv6 = document.getElementById("networkIPv6");
+  elements.restartBtn = document.getElementById("restartBtn");
+  elements.cancelBtn = document.getElementById("cancelBtn");
+  elements.serverInfo = document.getElementById("serverInfo");
+  elements.serverDot = document.querySelector(".server-dot");
+  elements.serverText = document.querySelector(".server-text");
+  elements.showSettings = document.getElementById("showSettings");
+  elements.closeSettings = document.getElementById("closeSettings");
+  elements.settingsModal = document.getElementById("settingsModal");
+  elements.duration = document.getElementById("duration");
+  elements.streams = document.getElementById("streams");
+  elements.serverSelectGroup = document.getElementById("serverSelectGroup");
+  elements.serverSelect = document.getElementById("serverSelect");
+  elements.serverStatus = document.getElementById("serverStatus");
+  elements.errorToast = document.getElementById("errorToast");
+  elements.errorMessage = document.getElementById("errorMessage");
+  elements.successToast = document.getElementById("successToast");
+  elements.successMessage = document.getElementById("successMessage");
+  elements.shareBtn = document.getElementById("shareBtn");
+}
 
 export const RING_CIRCUMFERENCE = 2 * Math.PI * 90;
 export const RING_END_OFFSET = 2;
