@@ -81,6 +81,7 @@ func respondJSON(w http.ResponseWriter, data any, statusCode int) {
 		buf.Reset()
 		jsonBufPool.Put(buf)
 	}()
+	buf.Grow(256)
 	encoder := json.NewEncoder(buf)
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(data); err != nil {
