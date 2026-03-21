@@ -12,19 +12,17 @@ To start a new run, align with the human on:
 
 1. **Agree on a run tag** — propose from today’s date (e.g. `mar20`). Branch **`autoresearch/perf-<tag>`** must not exist yet (fresh run).
 2. **Create the branch**: `git checkout -b autoresearch/perf-<tag>` from current `main` (or agreed base).
-3. **Read in-scope context** (not the whole repo; expand only as needed):
+3. **Baseline scan (mandatory on a new branch, before any perf experiment commit):** Run **`make perf-record`** once on the branch tip so **`build/perf/bench.txt`** reflects the suite before changes. If **`test/perf/bench_baseline.txt`** is missing, copy **`build/perf/bench.txt` → `test/perf/bench_baseline.txt`** (after human confirms the machine is “quiet” enough if they care, else accept as **provisional baseline**). Optionally summarize **`grep '^Benchmark' build/perf/bench.txt`**. Initialize **`test/perf/results.tsv`** with the **header row only** if the file is missing. **Do not** start the experiment loop before this scan and baseline policy are settled (see **`.cursor/commands/autoresearch.md`**).
+4. **Read in-scope context** (not the whole repo; expand only as needed):
    - **`AGENTS.md`** — Architecture § Performance, Build/CI perf notes, guardrails.
    - **`test/perf/README.md`** — how `perf-bench` / `perf-record` / `perf-compare` work.
    - **`scripts/perf/run_benchmarks.sh`** — flags, outputs (do **not** change without human OK).
    - **`test/perf/bench_packages.txt`** — which packages are in the suite (do **not** change without human OK).
    - **Hot-path code** you intend to touch (e.g. `internal/api`, `internal/websocket`, `internal/stream`, `internal/metrics`, `internal/jsonbody`) — read before editing.
-4. **Verify toolchain**:
+5. **Verify toolchain**:
    - `go test` works for benchmark packages.
    - For comparisons: `benchstat` on PATH (`go install golang.org/x/perf/cmd/benchstat@latest`).
-5. **Baseline**:
-   - If **`test/perf/bench_baseline.txt`** is missing, the **first** successful `make perf-record` establishes it: copy `build/perf/bench.txt` → `test/perf/bench_baseline.txt` (after human confirms machine is “quiet” enough, or accept first run as provisional baseline).
-6. **Initialize `results.tsv`**: create with header only (see below). First data row after the first completed experiment.
-7. **Confirm and go**: human confirms branch + baseline policy; then start the loop.
+6. **Confirm and go**: human confirms branch + baseline policy; then start the experiment loop (first **`results.tsv`** data row comes after the first completed experiment).
 
 ---
 
