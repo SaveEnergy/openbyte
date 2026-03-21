@@ -1,0 +1,6 @@
+# Packages included in perf-record / perf-bench (one import path per line).
+./test/unit/metrics
+./test/unit/websocket
+./test/unit/stream
+./internal/api
+./internal/jsonbody

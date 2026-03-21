@@ -66,7 +66,7 @@
 - **Playwright**: `workers` = `2` on `GITHUB_ACTIONS`; optional `PLAYWRIGHT_WORKERS`; trace/reuse unchanged.
 - **CI concurrency**: `cancel-in-progress` only for `pull_request`; `push`/`workflow_dispatch` queue on same `ref` (deploy not mid-aborted).
 - **Nightly**: `make perf-bench` each run unless `PERF_BENCH=false`; `perf-leakcheck` still behind `LEAK_PROFILE_SMOKE`.
-- **`make perf-bench`**: benches in `internal/api`, `internal/jsonbody`, plus listed unit packages; compare tips with `benchstat` (manual).
+- **`make perf-bench`**: runs **`scripts/perf/run_benchmarks.sh`** (package list **`test/perf/bench_packages.txt`**) to stdout; **`make perf-record`** → **`build/perf/bench.txt`** for **`benchstat`** (see **`test/perf/README.md`**).
 
 ## Engineering Guardrails
 

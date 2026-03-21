@@ -1,4 +1,4 @@
-.PHONY: build openbyte loadtest test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench perf-leakcheck ci-test ci-lint lint-openapi
+.PHONY: build openbyte loadtest test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench perf-record perf-compare perf-check perf-leakcheck ci-test ci-lint lint-openapi
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
@@ -54,14 +54,22 @@ test-coverage:
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "✓ Coverage report: coverage.html"
 
-# benchstat (optional): go test <pkg> -run '^$' -bench . -benchmem -count=5 > /tmp/bench.txt — see AGENTS.md
+# Unified suite: test/perf/bench_packages.txt + scripts/perf/run_benchmarks.sh
 perf-bench:
-	@echo "Running perf benchmarks..."
-	@go test ./test/unit/metrics -run ^$$ -bench . -benchtime=1s
-	@go test ./test/unit/websocket -run ^$$ -bench . -benchtime=1s
-	@go test ./test/unit/stream -run ^$$ -bench . -benchtime=1s
-	@go test ./internal/api -run ^$$ -bench . -benchtime=1s
-	@go test ./internal/jsonbody -run ^$$ -bench . -benchtime=1s
+	@BENCH_COUNT=$${BENCH_COUNT:-1} BENCH_TIME=$${BENCH_TIME:-1s} "$(CURDIR)/scripts/perf/run_benchmarks.sh" --stdout
+
+perf-record:
+	@BENCH_COUNT=$${BENCH_COUNT:-5} BENCH_TIME=$${BENCH_TIME:-1s} "$(CURDIR)/scripts/perf/run_benchmarks.sh"
+
+# Compare build/perf/bench.txt to test/perf/bench_baseline.txt (install: go install golang.org/x/perf/cmd/benchstat@latest)
+perf-compare:
+	@test -f test/perf/bench_baseline.txt || (echo "Missing test/perf/bench_baseline.txt — run: make perf-record && cp build/perf/bench.txt test/perf/bench_baseline.txt"; exit 1)
+	@test -f build/perf/bench.txt || (echo "Missing build/perf/bench.txt — run make perf-record first"; exit 1)
+	@command -v benchstat >/dev/null 2>&1 || (echo "Install benchstat: go install golang.org/x/perf/cmd/benchstat@latest"; exit 1)
+	@benchstat test/perf/bench_baseline.txt build/perf/bench.txt
+
+perf-check: perf-record
+	@if [ -f test/perf/bench_baseline.txt ]; then $(MAKE) perf-compare; else echo "perf-check: wrote build/perf/bench.txt (add test/perf/bench_baseline.txt to enable compare)"; fi
 
 # Development
 run:
@@ -141,7 +149,10 @@ help:
 	@echo "  lint-openapi  - Lint api/openapi.yaml (Bun + devDependencies)"
 	@echo "  test-race     - Run tests with race detector"
 	@echo "  test-coverage - Generate coverage report"
-	@echo "  perf-bench    - Run perf benchmarks"
+	@echo "  perf-bench    - Run perf benchmarks (stdout; quick count)"
+	@echo "  perf-record   - Write build/perf/bench.txt (stable; for benchstat)"
+	@echo "  perf-compare  - benchstat baseline vs build/perf/bench.txt"
+	@echo "  perf-check    - perf-record + perf-compare if baseline exists"
 	@echo "  perf-smoke    - Run perf smoke with pprof capture"
 	@echo "  perf-leakcheck - Run goroutine leak profile smoke (Go 1.26 experiment)"
 	@echo "  run           - Run server (development, port 8080)"
