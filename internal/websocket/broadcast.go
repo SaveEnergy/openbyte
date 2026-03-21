@@ -166,6 +166,9 @@ func (s *Server) marshalMessage(msg wsMessage) (*bytes.Buffer, error) {
 		buf = &bytes.Buffer{}
 	}
 	buf.Reset()
+	// Metrics/completion payloads are larger than tiny HTTP JSON; reduce encoder
+	// reallocations when the pooled buffer returns with low capacity after Reset.
+	buf.Grow(2048)
 	encoder := json.NewEncoder(buf)
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(msg); err != nil {
