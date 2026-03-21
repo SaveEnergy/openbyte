@@ -31,7 +31,10 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 			logging.Field{Key: "error", Value: err})
 		return
 	}
-	data := bytes.TrimSuffix(buf.Bytes(), []byte{'\n'})
+	data := buf.Bytes()
+	if len(data) > 0 && data[len(data)-1] == '\n' {
+		data = data[:len(data)-1]
+	}
 	s.broadcastToClients(streamID, clientList, data, isTerminal)
 	s.jsonBufPool.Put(buf)
 
