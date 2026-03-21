@@ -72,11 +72,12 @@ func percentileFromHistogram(bucketCounts []uint32, overflow uint32, bucketWidth
 
 	target := max(int64(math.Ceil(float64(count)*ratio)), 1)
 
+	bucketWidthMs := float64(bucketWidth / time.Millisecond)
 	var seen int64
 	for i, c := range bucketCounts {
 		seen += int64(c)
 		if seen >= target {
-			return float64(i+1) * float64(bucketWidth/time.Millisecond)
+			return float64(i+1) * bucketWidthMs
 		}
 	}
 
@@ -84,7 +85,7 @@ func percentileFromHistogram(bucketCounts []uint32, overflow uint32, bucketWidth
 		return maxMs
 	}
 	if len(bucketCounts) > 0 {
-		return float64(len(bucketCounts)) * float64(bucketWidth/time.Millisecond)
+		return float64(len(bucketCounts)) * bucketWidthMs
 	}
 	return 0
 }
