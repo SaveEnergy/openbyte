@@ -22,6 +22,13 @@ func normalizeHost(host string) string {
 		return host
 	}
 	trimmed := host
+	// Bracketed IPv6 with a trailing port: reuse the bracketed host substring
+	// instead of allocating "[" + h + "]" after SplitHostPort.
+	if len(host) > 0 && host[0] == '[' {
+		if close := strings.IndexByte(host, ']'); close > 1 && close+1 < len(host) && host[close+1] == ':' {
+			return host[:close+1]
+		}
+	}
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		trimmed = h
 		if strings.Contains(h, ":") && strings.Contains(host, "[") {
