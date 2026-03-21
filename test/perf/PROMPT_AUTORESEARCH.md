@@ -2,17 +2,18 @@
 
 Use this as a system or task prompt when an LLM should run **measured** perf experiments on openByte (microbenchmarks + `benchstat`), with **keep / discard / crash** logging to `results.tsv`.
 
-**Cursor:** invoke **`/autoresearch`** to inject the short command that tells the agent to read this file and follow it (see **`.cursor/commands/autoresearch.md`**).
+**Cursor:** tracked slash-command body: **`test/perf/AUTORESEARCH_CURSOR_COMMAND.md`** (copy/symlink to **`.cursor/commands/autoresearch.md`** — **`.cursor/`** is gitignored). Invoke **`/autoresearch`** so the agent reads this file and runs **`make autoresearch-preflight`** first.
 
 ---
 
 ## Setup
 
-To start a new run, align with the human on:
+To start a new run:
 
-1. **Allocate branch id** — read the integer in **`test/perf/autoresearch_counter.txt`** (one line, **next** id `N`; if the file is missing, use **`1`** and create the file). Branch **`autoresearch/perf-N`** must not already exist locally or on **`origin`** (fresh run). Do **not** invent date-based names (`perf-mar20`, etc.) unless the human overrides.
+0. **Preflight (measurable gate):** Run **`make autoresearch-preflight`**. **Exit 0** required before creating a new branch; stdout includes **`AUTORESEARCH_NEXT_N`**, **`AUTORESEARCH_BRANCH`**, and **`AUTORESEARCH_BENCHSTAT_CMD`** (aligns with **`make perf-compare`** fallback when `benchstat` is not installed). **Resume:** if you are already checked out on **`autoresearch/perf-N`** for that **`N`**, preflight passes even when **`origin`** still lists the branch.
+1. **Allocate branch id** — same as **`AUTORESEARCH_NEXT_N`** from preflight, or read **`test/perf/autoresearch_counter.txt`** (one line, **next** id `N`; if the file is missing, use **`1`** and create the file when you bump after a merge). Branch **`autoresearch/perf-N`** must not already exist locally or on **`origin`**. Do **not** invent date-based names (`perf-mar20`, etc.) unless the human overrides.
 2. **Create the branch**: `git checkout -b autoresearch/perf-N` from current **`main`** (or agreed base).
-3. **Baseline scan (mandatory on a new branch, before any perf experiment commit):** Run **`make perf-record`** once on the branch tip so **`build/perf/bench.txt`** reflects the suite before changes. If **`test/perf/bench_baseline.txt`** is missing, copy **`build/perf/bench.txt` → `test/perf/bench_baseline.txt`** (after human confirms the machine is “quiet” enough if they care, else accept as **provisional baseline**). Optionally summarize **`grep '^Benchmark' build/perf/bench.txt`**. Initialize **`test/perf/results.tsv`** with the **header row only** if the file is missing. **Do not** start the experiment loop before this scan and baseline policy are settled (see **`.cursor/commands/autoresearch.md`**).
+3. **Baseline scan (mandatory on a new branch, before any perf experiment commit):** Run **`make perf-record`** once on the branch tip so **`build/perf/bench.txt`** reflects the suite before changes. If **`test/perf/bench_baseline.txt`** is missing, copy **`build/perf/bench.txt` → `test/perf/bench_baseline.txt`** (provisional baseline unless the human asked to preserve an existing file). Optionally summarize **`grep '^Benchmark' build/perf/bench.txt`**. Initialize **`test/perf/results.tsv`** with the **header row only** if the file is missing. **Do not** start the experiment loop before this scan and baseline policy are settled.
 4. **Read in-scope context** (not the whole repo; expand only as needed):
    - **`AGENTS.md`** — Architecture § Performance, Build/CI perf notes, guardrails.
    - **`test/perf/README.md`** — how `perf-bench` / `perf-record` / `perf-compare` work.
@@ -21,8 +22,8 @@ To start a new run, align with the human on:
    - **Hot-path code** you intend to touch (e.g. `internal/api`, `internal/websocket`, `internal/stream`, `internal/metrics`, `internal/jsonbody`) — read before editing.
 5. **Verify toolchain**:
    - `go test` works for benchmark packages.
-   - For comparisons: `benchstat` on PATH (`go install golang.org/x/perf/cmd/benchstat@latest`).
-6. **Confirm and go**: human confirms branch + baseline policy; then start the experiment loop (first **`results.tsv`** data row comes after the first completed experiment).
+   - Comparisons: **`make perf-compare`** (uses **`benchstat`** on PATH, otherwise **`go run golang.org/x/perf/cmd/benchstat@latest`**). Optional: `go install golang.org/x/perf/cmd/benchstat@latest` for faster repeats.
+6. **Proceed**: **default is autonomous** — start the experiment loop without asking the human to pick a benchmark or confirm baseline, unless you are **blocked** (preflight failure, harness error, ambiguous correctness, or the human set anchors/constraints).
 
 ---
 
@@ -50,7 +51,7 @@ make perf-record 2> build/perf/record.stderr
 make perf-compare | tee build/perf/benchstat.log
 ```
 
-(or redirect `> build/perf/benchstat.log 2>&1` if you do not need it on the console.)
+(or redirect `> build/perf/benchstat.log 2>&1` if you do not need it on the console.) **No global `benchstat` install required** — the Makefile falls back to **`go run …@latest`** (same as **`AUTORESEARCH_BENCHSTAT_CMD`** from **`make autoresearch-preflight`** when `benchstat` is missing).
 
 **What you MAY do**
 
@@ -180,6 +181,7 @@ For simpler decisions, the human may name **1–3 anchor** benchmarks (e.g. `Ben
 
 ## See also
 
+- **`test/perf/AUTORESEARCH_CURSOR_COMMAND.md`** — Cursor **`/autoresearch`** body (install into **`.cursor/commands/`**).
 - **`test/perf/README.md`** — commands, baseline setup, **`autoresearch_counter.txt`**.
 - **`test/perf/autoresearch_counter.txt`** — next branch id **`N`** for **`autoresearch/perf-N`**.
 - **`AGENTS.md`** — performance architecture, nightly bench artifacts, **post-merge autoresearch cleanup** (delete branch, bump counter).

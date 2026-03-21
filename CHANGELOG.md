@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`make perf-compare`**: runs **`benchstat`** from **`PATH`** when present, otherwise **`go run golang.org/x/perf/cmd/benchstat@latest`** (no separate install required for autoresearch agents).
 - **internal/registry**: split **`handler.go`** into **`handler_list.go`** (list/get) + **`handler_mutations.go`** (register/update/deregister/health + `respondRegistryError`); split **`client.go`** into **`client_http.go`** (register/heartbeat/deregister + `drainAndClose`), **`client_loop.go`** (timer/backoff/jitter), **`client_info.go`** (`buildServerInfo`); **`20260322-refactor-05`** Done (`go test ./internal/registry/... ./test/unit/registry/...`).
 - **cmd/client**: split **`engine.go`** / removed **`engine_direction.go`** → **`engine_dial.go`** (TCP/UDP dial, capture NAT info), **`engine_readwrite.go`** (download/upload + shared read/write loops), **`engine_bidirectional.go`**, **`engine_latency.go`** (latency/jitter stats, `isTimeoutError`); split **`formatter.go`** → **`formatter_classify.go`**, **`formatter_json.go`**, **`formatter_plain.go`**, **`formatter_interactive.go`**, **`formatter_ndjson.go`**, **`formatter_helpers.go`**; **`20260322-refactor-04`** Done (`go test ./cmd/client/...`).
 - **test/unit/stream**: split **`manager_test.go`** into **`manager_test_common_test.go`**, **`manager_lifecycle_test.go`**, **`manager_limits_test.go`**, **`manager_broadcast_metrics_test.go`**, **`manager_terminal_test.go`**; **`20260322-refactor-03`** Done (`go test ./test/unit/stream/...`).
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Perf autoresearch**: **`make autoresearch-preflight`** + **`scripts/perf/autoresearch_preflight.sh`** (exit code + **`AUTORESEARCH_*`** stdout); tracked **`test/perf/AUTORESEARCH_CURSOR_COMMAND.md`** as the canonical Cursor **`/autoresearch`** body; **`PROMPT_AUTORESEARCH.md`** / **`test/perf/README.md`** / **`AGENTS.md`** aligned (resume-on-branch, autonomous default, **`make perf-compare`** fallback).
 - **AGENTS.md**: **Refactor analysis intake (2026-03-23)** — complementary deep pass: large tests (**`handlers_test`**, **`diagnostic_test`**, **`websocket/server_test`**, **`results/handler_test`**, **`registry/handler_test`**), **`internal/metrics`**, **`pkg/diagnostic`**, **`cmd/client`** **`config`/`api`**, **`router`/`handlers`**, web **HTTP speed** further dedupe, **`cmd/check`**; **Live Queue** **`20260323-refactor-01`**..**`10`** with checks.
 - **AGENTS.md**: **Refactor analysis intake (2026-03-22)** — deep pass: test-suite **LOC** hotspots (**`router_test`**, **`store_test`**, **`manager_test`**, **`e2e_test`**), **`cmd/client`** engine/formatter, **`internal/registry`**, optional **`speedtest.go`**, **web** **`ui`/`openbyte`**, **MCP/loadtest**; **Live Queue** **`20260322-refactor-01`**..**`09`** with checks.
 - **AGENTS.md**: **Refactor analysis intake (2026-03-20)** + backlog **`20260320-refactor-14`**..**`16`** (**`cmd/client`**, **`web`**, **`internal/stream` `Server`**) **Done**.

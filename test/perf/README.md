@@ -3,13 +3,14 @@
 Package list: **`bench_packages.txt`**. Runner: **`scripts/perf/run_benchmarks.sh`**.
 
 ```bash
-make perf-bench      # quick, stdout
-make perf-record     # → build/perf/bench.txt (stable; default count=5)
-make perf-compare    # needs test/perf/bench_baseline.txt + benchstat on PATH
-make perf-check      # record + compare if baseline exists
+make perf-bench              # quick, stdout
+make perf-record             # → build/perf/bench.txt (stable; default count=5)
+make perf-compare            # needs baseline + current bench.txt; benchstat or go run fallback
+make perf-check              # record + compare if baseline exists
+make autoresearch-preflight  # exit 0 + AUTORESEARCH_* lines before a new perf-N branch
 ```
 
-Install comparison tool: `go install golang.org/x/perf/cmd/benchstat@latest`
+Optional (faster repeats): `go install golang.org/x/perf/cmd/benchstat@latest` — not required; **`make perf-compare`** uses **`go run golang.org/x/perf/cmd/benchstat@latest`** when `benchstat` is missing.
 
 Establish baseline once: `make perf-record && cp build/perf/bench.txt test/perf/bench_baseline.txt`
 
@@ -23,4 +24,4 @@ Nightly CI uploads **`build/perf/bench.txt`** as an artifact (see `AGENTS.md`).
 
 See **`PROMPT_AUTORESEARCH.md`** for the full autoresearch-style prompt (branch, TSV logging, keep/discard rules).
 
-In Cursor, use slash command **`/autoresearch`** (defined in **`.cursor/commands/autoresearch.md`**) to load the playbook; it points at `PROMPT_AUTORESEARCH.md` as the source of truth.
+**Cursor:** copy **`test/perf/AUTORESEARCH_CURSOR_COMMAND.md`** to **`.cursor/commands/autoresearch.md`** (or symlink), then use **`/autoresearch`**. That playbook points at **`PROMPT_AUTORESEARCH.md`** and starts with **`make autoresearch-preflight`**.

@@ -1,4 +1,4 @@
-.PHONY: build openbyte loadtest test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench perf-record perf-compare perf-check perf-leakcheck ci-test ci-lint lint-openapi
+.PHONY: build openbyte loadtest test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench perf-record perf-compare perf-check perf-leakcheck autoresearch-preflight ci-test ci-lint lint-openapi
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
@@ -61,12 +61,19 @@ perf-bench:
 perf-record:
 	@BENCH_COUNT=$${BENCH_COUNT:-5} BENCH_TIME=$${BENCH_TIME:-1s} "$(CURDIR)/scripts/perf/run_benchmarks.sh"
 
-# Compare build/perf/bench.txt to test/perf/bench_baseline.txt (install: go install golang.org/x/perf/cmd/benchstat@latest)
+# Compare build/perf/bench.txt to test/perf/bench_baseline.txt (uses benchstat on PATH, else go run …@latest)
 perf-compare:
 	@test -f test/perf/bench_baseline.txt || (echo "Missing test/perf/bench_baseline.txt — run: make perf-record && cp build/perf/bench.txt test/perf/bench_baseline.txt"; exit 1)
 	@test -f build/perf/bench.txt || (echo "Missing build/perf/bench.txt — run make perf-record first"; exit 1)
-	@command -v benchstat >/dev/null 2>&1 || (echo "Install benchstat: go install golang.org/x/perf/cmd/benchstat@latest"; exit 1)
-	@benchstat test/perf/bench_baseline.txt build/perf/bench.txt
+	@if command -v benchstat >/dev/null 2>&1; then \
+		benchstat test/perf/bench_baseline.txt build/perf/bench.txt; \
+	else \
+		echo "perf-compare: benchstat not on PATH; using go run golang.org/x/perf/cmd/benchstat@latest"; \
+		go run golang.org/x/perf/cmd/benchstat@latest test/perf/bench_baseline.txt build/perf/bench.txt; \
+	fi
+
+autoresearch-preflight:
+	@bash "$(CURDIR)/scripts/perf/autoresearch_preflight.sh"
 
 perf-check: perf-record
 	@if [ -f test/perf/bench_baseline.txt ]; then $(MAKE) perf-compare; else echo "perf-check: wrote build/perf/bench.txt (add test/perf/bench_baseline.txt to enable compare)"; fi
@@ -151,8 +158,9 @@ help:
 	@echo "  test-coverage - Generate coverage report"
 	@echo "  perf-bench    - Run perf benchmarks (stdout; quick count)"
 	@echo "  perf-record   - Write build/perf/bench.txt (stable; for benchstat)"
-	@echo "  perf-compare  - benchstat baseline vs build/perf/bench.txt"
+	@echo "  perf-compare  - benchstat baseline vs build/perf/bench.txt (go run fallback)"
 	@echo "  perf-check    - perf-record + perf-compare if baseline exists"
+	@echo "  autoresearch-preflight - verify counter/branch + print AUTORESEARCH_* (perf agents)"
 	@echo "  perf-smoke    - Run perf smoke with pprof capture"
 	@echo "  perf-leakcheck - Run goroutine leak profile smoke (Go 1.26 experiment)"
 	@echo "  run           - Run server (development, port 8080)"
