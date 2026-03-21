@@ -25,14 +25,17 @@ func isJSONContentType(r *http.Request) bool {
 }
 
 func validateMetricsPayload(m types.Metrics) error {
-	values := []float64{
-		m.ThroughputMbps, m.ThroughputAvgMbps, m.JitterMs, m.PacketLossPercent,
-		m.Latency.MinMs, m.Latency.MaxMs, m.Latency.AvgMs, m.Latency.P50Ms, m.Latency.P95Ms, m.Latency.P99Ms,
-	}
-	for _, v := range values {
-		if math.IsNaN(v) || math.IsInf(v, 0) {
-			return errors.ErrInvalidConfig("metrics contain non-finite values", nil)
-		}
+	if math.IsNaN(m.ThroughputMbps) || math.IsInf(m.ThroughputMbps, 0) ||
+		math.IsNaN(m.ThroughputAvgMbps) || math.IsInf(m.ThroughputAvgMbps, 0) ||
+		math.IsNaN(m.JitterMs) || math.IsInf(m.JitterMs, 0) ||
+		math.IsNaN(m.PacketLossPercent) || math.IsInf(m.PacketLossPercent, 0) ||
+		math.IsNaN(m.Latency.MinMs) || math.IsInf(m.Latency.MinMs, 0) ||
+		math.IsNaN(m.Latency.MaxMs) || math.IsInf(m.Latency.MaxMs, 0) ||
+		math.IsNaN(m.Latency.AvgMs) || math.IsInf(m.Latency.AvgMs, 0) ||
+		math.IsNaN(m.Latency.P50Ms) || math.IsInf(m.Latency.P50Ms, 0) ||
+		math.IsNaN(m.Latency.P95Ms) || math.IsInf(m.Latency.P95Ms, 0) ||
+		math.IsNaN(m.Latency.P99Ms) || math.IsInf(m.Latency.P99Ms, 0) {
+		return errors.ErrInvalidConfig("metrics contain non-finite values", nil)
 	}
 	if m.ThroughputMbps < 0 || m.ThroughputAvgMbps < 0 {
 		return errors.ErrInvalidConfig("metrics throughput must be >= 0", nil)
