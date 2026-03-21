@@ -52,6 +52,14 @@ func isUnspecifiedBind(addr string) bool {
 	if !strings.Contains(host, ":") {
 		return host == "0.0.0.0"
 	}
+	// Bracketed [::] with a trailing port: slice compare only (no SplitHostPort / "["+h+"]" alloc).
+	if len(host) > 0 && host[0] == '[' {
+		if close := strings.IndexByte(host, ']'); close > 1 && close+1 < len(host) && host[close+1] == ':' {
+			if host[:close+1] == "[::]" {
+				return true
+			}
+		}
+	}
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
 		if strings.Contains(h, ":") && strings.Contains(addr, "[") {
