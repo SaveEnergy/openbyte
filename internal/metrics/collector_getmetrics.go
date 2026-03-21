@@ -62,8 +62,8 @@ func (c *Collector) GetMetrics() types.Metrics {
 	}
 
 	return types.Metrics{
-		ThroughputMbps:     throughputMbps,
-		ThroughputAvgMbps:  throughputAvgMbps,
+		ThroughputMbps:    throughputMbps,
+		ThroughputAvgMbps: throughputAvgMbps,
 		Latency:           latencyMetrics,
 		JitterMs:          jitterMs,
 		PacketLossPercent: packetLoss,
