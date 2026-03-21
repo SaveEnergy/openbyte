@@ -15,6 +15,10 @@ Establish baseline once: `make perf-record && cp build/perf/bench.txt test/perf/
 
 Nightly CI uploads **`build/perf/bench.txt`** as an artifact (see `AGENTS.md`).
 
+## Autoresearch branch counter
+
+**`autoresearch_counter.txt`** holds one integer: the **next** branch id **`N`**. New work branches are **`autoresearch/perf-N`**. After **`main`** has merged that branch, agents bump the file to **`N+1`**, commit on **`main`**, and **delete** **`autoresearch/perf-N`** locally and on **`origin`** (see **`AGENTS.md`**). If the file is missing, start at **`1`**.
+
 ## LLM experiment loop (optional)
 
 See **`PROMPT_AUTORESEARCH.md`** for the full autoresearch-style prompt (branch, TSV logging, keep/discard rules).

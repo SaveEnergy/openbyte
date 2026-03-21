@@ -67,6 +67,7 @@
 - **CI concurrency**: `cancel-in-progress` only for `pull_request`; `push`/`workflow_dispatch` queue on same `ref` (deploy not mid-aborted).
 - **Nightly**: `make perf-bench` each run unless `PERF_BENCH=false`; `perf-leakcheck` still behind `LEAK_PROFILE_SMOKE`.
 - **`make perf-bench`**: runs **`scripts/perf/run_benchmarks.sh`** (package list **`test/perf/bench_packages.txt`**) to stdout; **`make perf-record`** → **`build/perf/bench.txt`** for **`benchstat`** (see **`test/perf/README.md`**).
+- **Perf autoresearch branches**: Name **`autoresearch/perf-N`** where **`N`** is the integer in **`test/perf/autoresearch_counter.txt`** (next id to use; see **`test/perf/README.md`**). After **`main`** merges that branch, agents **delete** **`autoresearch/perf-N`** (**`git branch -d`** locally, **`git push origin --delete`** if it was pushed), then set the counter to **`N+1`** in **`autoresearch_counter.txt`** and **commit** on **`main`** so stale branches do not accumulate.
 
 ## Engineering Guardrails
 

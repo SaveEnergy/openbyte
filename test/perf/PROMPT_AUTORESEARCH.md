@@ -10,8 +10,8 @@ Use this as a system or task prompt when an LLM should run **measured** perf exp
 
 To start a new run, align with the human on:
 
-1. **Agree on a run tag** — propose from today’s date (e.g. `mar20`). Branch **`autoresearch/perf-<tag>`** must not exist yet (fresh run).
-2. **Create the branch**: `git checkout -b autoresearch/perf-<tag>` from current `main` (or agreed base).
+1. **Allocate branch id** — read the integer in **`test/perf/autoresearch_counter.txt`** (one line, **next** id `N`; if the file is missing, use **`1`** and create the file). Branch **`autoresearch/perf-N`** must not already exist locally or on **`origin`** (fresh run). Do **not** invent date-based names (`perf-mar20`, etc.) unless the human overrides.
+2. **Create the branch**: `git checkout -b autoresearch/perf-N` from current **`main`** (or agreed base).
 3. **Baseline scan (mandatory on a new branch, before any perf experiment commit):** Run **`make perf-record`** once on the branch tip so **`build/perf/bench.txt`** reflects the suite before changes. If **`test/perf/bench_baseline.txt`** is missing, copy **`build/perf/bench.txt` → `test/perf/bench_baseline.txt`** (after human confirms the machine is “quiet” enough if they care, else accept as **provisional baseline**). Optionally summarize **`grep '^Benchmark' build/perf/bench.txt`**. Initialize **`test/perf/results.tsv`** with the **header row only** if the file is missing. **Do not** start the experiment loop before this scan and baseline policy are settled (see **`.cursor/commands/autoresearch.md`**).
 4. **Read in-scope context** (not the whole repo; expand only as needed):
    - **`AGENTS.md`** — Architecture § Performance, Build/CI perf notes, guardrails.
@@ -144,7 +144,7 @@ d4e5f6g	BenchmarkRespondJSON	0	0	0	crash	nil deref in handler
 
 ## The experiment loop
 
-Branch: **`autoresearch/perf-<tag>`** (e.g. `autoresearch/perf-mar20`).
+Branch: **`autoresearch/perf-N`** where **`N`** is the id from **`test/perf/autoresearch_counter.txt`** for this run.
 
 **LOOP:**
 
@@ -180,5 +180,6 @@ For simpler decisions, the human may name **1–3 anchor** benchmarks (e.g. `Ben
 
 ## See also
 
-- **`test/perf/README.md`** — commands and baseline setup.
-- **`AGENTS.md`** — performance architecture and nightly bench artifacts.
+- **`test/perf/README.md`** — commands, baseline setup, **`autoresearch_counter.txt`**.
+- **`test/perf/autoresearch_counter.txt`** — next branch id **`N`** for **`autoresearch/perf-N`**.
+- **`AGENTS.md`** — performance architecture, nightly bench artifacts, **post-merge autoresearch cleanup** (delete branch, bump counter).
