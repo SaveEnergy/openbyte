@@ -14,6 +14,13 @@ func normalizeHost(host string) string {
 	if host == "" {
 		return loopbackIPv4
 	}
+	// No port — avoid net.SplitHostPort when the input cannot be host:port.
+	if !strings.Contains(host, ":") {
+		if host == "localhost" {
+			return loopbackIPv4
+		}
+		return host
+	}
 	trimmed := host
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		trimmed = h
