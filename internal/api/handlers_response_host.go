@@ -41,6 +41,10 @@ func isUnspecifiedBind(addr string) bool {
 	if host == "" {
 		return true
 	}
+	// No port — only literal 0.0.0.0 is unspecified among bind strings without ':'.
+	if !strings.Contains(host, ":") {
+		return host == "0.0.0.0"
+	}
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
 		if strings.Contains(h, ":") && strings.Contains(addr, "[") {
