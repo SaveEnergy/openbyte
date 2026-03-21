@@ -61,10 +61,10 @@ func isUnspecifiedBind(addr string) bool {
 		}
 	}
 	if h, _, err := net.SplitHostPort(host); err == nil {
+		// Use the split host only; do not rebuild bracketed IPv6 (alloc). Switch
+		// matches "::" and "0.0.0.0"; "[::]" remains only when addr has no port
+		// and SplitHostPort leaves the trimmed string unchanged.
 		host = h
-		if strings.Contains(h, ":") && strings.Contains(addr, "[") {
-			host = "[" + h + "]"
-		}
 	}
 	switch host {
 	case "0.0.0.0", "::", "[::]":
