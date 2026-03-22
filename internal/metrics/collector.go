@@ -71,7 +71,6 @@ func (c *Collector) RecordLatency(latency time.Duration) {
 	}
 
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.latencySum += latency
 	c.latencyCount++
 	if !c.hasLastLatency {
@@ -79,6 +78,7 @@ func (c *Collector) RecordLatency(latency time.Duration) {
 		c.latencyMax = latency
 		c.lastLatency = latency
 		c.hasLastLatency = true
+		c.mu.Unlock()
 		return
 	}
 	if latency < c.latencyMin {
@@ -94,6 +94,7 @@ func (c *Collector) RecordLatency(latency time.Duration) {
 	c.jitterSum += diff
 	c.jitterCount++
 	c.lastLatency = latency
+	c.mu.Unlock()
 }
 
 func (c *Collector) RecordPacket(sent bool) {
