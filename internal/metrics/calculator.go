@@ -50,9 +50,10 @@ func CalculateLatencyFromHistogram(bucketCounts []uint32, overflow uint32, bucke
 	maxMs := float64(max) / float64(time.Millisecond)
 	avgMs := float64(sum) / float64(count) / float64(time.Millisecond)
 
-	p50 := percentileFromHistogram(bucketCounts, overflow, bucketWidth, count, 0.50, maxMs)
-	p95 := percentileFromHistogram(bucketCounts, overflow, bucketWidth, count, 0.95, maxMs)
-	p99 := percentileFromHistogram(bucketCounts, overflow, bucketWidth, count, 0.99, maxMs)
+	bucketWidthMs := float64(bucketWidth / time.Millisecond)
+	p50 := percentileFromHistogram(bucketCounts, overflow, count, 0.50, maxMs, bucketWidthMs)
+	p95 := percentileFromHistogram(bucketCounts, overflow, count, 0.95, maxMs, bucketWidthMs)
+	p99 := percentileFromHistogram(bucketCounts, overflow, count, 0.99, maxMs, bucketWidthMs)
 
 	return types.LatencyMetrics{
 		MinMs: minMs,
@@ -65,14 +66,13 @@ func CalculateLatencyFromHistogram(bucketCounts []uint32, overflow uint32, bucke
 	}
 }
 
-func percentileFromHistogram(bucketCounts []uint32, overflow uint32, bucketWidth time.Duration, count int64, ratio float64, maxMs float64) float64 {
+func percentileFromHistogram(bucketCounts []uint32, overflow uint32, count int64, ratio float64, maxMs float64, bucketWidthMs float64) float64 {
 	if count <= 0 {
 		return 0
 	}
 
 	target := max(int64(math.Ceil(float64(count)*ratio)), 1)
 
-	bucketWidthMs := float64(bucketWidth / time.Millisecond)
 	var seen int64
 	for i, c := range bucketCounts {
 		seen += int64(c)
