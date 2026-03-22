@@ -35,16 +35,16 @@ func (h *LatencyHistogram) BucketCount() int {
 
 func (h *LatencyHistogram) Record(sample time.Duration) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	if sample < 0 {
 		sample = 0
 	}
 	index := int(sample / h.bucketWidth)
 	if index >= len(h.buckets) {
 		h.overflow++
-		return
+	} else {
+		h.buckets[index]++
 	}
-	h.buckets[index]++
+	h.mu.Unlock()
 }
 
 func (h *LatencyHistogram) Reset() {
