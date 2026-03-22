@@ -1,12 +1,33 @@
 package api
 
 import (
-	"net/http/httptest"
+	"bytes"
+	"net/http"
 	"testing"
 	"time"
 
 	"github.com/saveenergy/openbyte/pkg/types"
 )
+
+// benchJSONWriter is a minimal [http.ResponseWriter] for BenchmarkRespondJSON
+// (avoids per-iteration [httptest.NewRecorder] allocations).
+type benchJSONWriter struct {
+	hdr http.Header
+	buf bytes.Buffer
+}
+
+func (w *benchJSONWriter) Header() http.Header {
+	if w.hdr == nil {
+		w.hdr = make(http.Header)
+	}
+	return w.hdr
+}
+
+func (w *benchJSONWriter) WriteHeader(int) {}
+
+func (w *benchJSONWriter) Write(b []byte) (int, error) {
+	return w.buf.Write(b)
+}
 
 func benchSampleMetrics() types.Metrics {
 	return types.Metrics{
@@ -36,11 +57,15 @@ func BenchmarkRespondJSON(b *testing.B) {
 		"version": "0.0.0+bench",
 		"commit":  "deadbeef",
 	}
+	var w benchJSONWriter
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		w := httptest.NewRecorder()
-		respondJSON(w, data, 200)
+		w.buf.Reset()
+		for k := range w.hdr {
+			delete(w.hdr, k)
+		}
+		respondJSON(&w, data, 200)
 	}
 }
 
