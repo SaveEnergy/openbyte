@@ -1,6 +1,7 @@
 package websocket_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 	"time"
@@ -50,8 +51,20 @@ func BenchmarkEncodeMetricsMessage(b *testing.B) {
 		Time: time.Now().Unix(),
 	}
 
+	// Match internal/websocket marshalMessage: Encoder into a grown buffer, no HTML
+	// escape, strip trailing newline (BroadcastMetrics does the same before send).
+	var buf bytes.Buffer
+	buf.Grow(2048)
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
 	b.ResetTimer()
 	for range b.N {
-		_, _ = json.Marshal(msg)
+		buf.Reset()
+		if err := enc.Encode(msg); err != nil {
+			b.Fatal(err)
+		}
+		if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] == '\n' {
+			buf.Truncate(buf.Len() - 1)
+		}
 	}
 }
