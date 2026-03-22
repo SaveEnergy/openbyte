@@ -58,7 +58,8 @@ func (h *LatencyHistogram) Reset() {
 
 func (h *LatencyHistogram) CopyTo(dst []uint32) uint32 {
 	h.mu.RLock()
-	defer h.mu.RUnlock()
 	copy(dst, h.buckets)
-	return h.overflow
+	o := h.overflow
+	h.mu.RUnlock()
+	return o
 }
