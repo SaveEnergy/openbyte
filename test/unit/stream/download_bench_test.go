@@ -16,7 +16,12 @@ func BenchmarkDownloadChunkCopy(b *testing.B) {
 		if n < len(buf) {
 			copy(buf[n:], randomData[:len(buf)-n])
 		}
-		offset = (offset + len(buf)) % dataLen
+		// Equivalent to (offset+len(buf))%dataLen while offset<dataLen and len(buf)<dataLen
+		// (avoids integer division on the hot path for these bench sizes).
+		offset += len(buf)
+		if offset >= dataLen {
+			offset -= dataLen
+		}
 	}
 }
 
