@@ -1,7 +1,7 @@
 package websocket
 
 import (
-	"bytes"
+	"encoding/json"
 	"net/http"
 	"sync"
 	"time"
@@ -33,7 +33,7 @@ type Server struct {
 	stopCh          chan struct{}
 	stopOnce        sync.Once
 	wg              sync.WaitGroup
-	jsonBufPool     sync.Pool
+	wsMarshalPool   sync.Pool
 	mu              sync.RWMutex
 }
 
@@ -50,9 +50,12 @@ func NewServer() *Server {
 		sentStatus:   make(map[string]types.StreamStatus),
 		pingInterval: 30 * time.Second,
 		stopCh:       make(chan struct{}),
-		jsonBufPool: sync.Pool{
+		wsMarshalPool: sync.Pool{
 			New: func() any {
-				return &bytes.Buffer{}
+				st := &wsMarshalState{}
+				st.enc = json.NewEncoder(&st.buf)
+				st.enc.SetEscapeHTML(false)
+				return st
 			},
 		},
 	}

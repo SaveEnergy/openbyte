@@ -10,6 +10,20 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+// wsMarshalState pools a [json.Encoder] wired to an internal [bytes.Buffer] so
+// BroadcastMetrics avoids allocating a new encoder per marshal.
+type wsMarshalState struct {
+	buf bytes.Buffer
+	enc *json.Encoder
+}
+
+func newWSMarshalState() *wsMarshalState {
+	st := &wsMarshalState{}
+	st.enc = json.NewEncoder(&st.buf)
+	st.enc.SetEscapeHTML(false)
+	return st
+}
+
 func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 	isTerminal := isTerminalStreamStatus(state.Status)
 	clientList, hasClients := s.snapshotClients(streamID)
@@ -24,19 +38,19 @@ func (s *Server) BroadcastMetrics(streamID string, state types.StreamSnapshot) {
 
 	msg := buildWebsocketMessage(streamID, state, msgType)
 
-	buf, err := s.marshalMessage(msg)
+	st, err := s.marshalMessage(msg)
 	if err != nil {
 		logging.Warn("WebSocket metrics marshal failed",
 			logging.Field{Key: "stream_id", Value: streamID},
 			logging.Field{Key: "error", Value: err})
 		return
 	}
-	data := buf.Bytes()
+	data := st.buf.Bytes()
 	if len(data) > 0 && data[len(data)-1] == '\n' {
 		data = data[:len(data)-1]
 	}
 	s.broadcastToClients(streamID, clientList, data, isTerminal)
-	s.jsonBufPool.Put(buf)
+	s.wsMarshalPool.Put(st)
 
 }
 
@@ -163,22 +177,20 @@ func (s *Server) broadcastToClients(streamID string, clients []*clientConn, data
 	}
 }
 
-func (s *Server) marshalMessage(msg wsMessage) (*bytes.Buffer, error) {
-	buf, ok := s.jsonBufPool.Get().(*bytes.Buffer)
+func (s *Server) marshalMessage(msg wsMessage) (*wsMarshalState, error) {
+	st, ok := s.wsMarshalPool.Get().(*wsMarshalState)
 	if !ok {
-		buf = &bytes.Buffer{}
+		st = newWSMarshalState()
 	}
-	buf.Reset()
+	st.buf.Reset()
 	// Metrics/completion payloads are larger than tiny HTTP JSON; reduce encoder
 	// reallocations when the pooled buffer returns with low capacity after Reset.
-	buf.Grow(2048)
-	encoder := json.NewEncoder(buf)
-	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(msg); err != nil {
-		s.jsonBufPool.Put(buf)
+	st.buf.Grow(2048)
+	if err := st.enc.Encode(msg); err != nil {
+		s.wsMarshalPool.Put(st)
 		return nil, err
 	}
-	return buf, nil
+	return st, nil
 }
 
 func isTerminalStreamStatus(status types.StreamStatus) bool {
