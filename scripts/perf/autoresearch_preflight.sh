@@ -6,33 +6,42 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-die() { echo "autoresearch_preflight: $*" >&2; exit 1; }
-
-command -v go >/dev/null 2>&1 || die "go not on PATH"
-test -f test/perf/bench_packages.txt || die "missing test/perf/bench_packages.txt"
-test -f scripts/perf/run_benchmarks.sh || die "missing scripts/perf/run_benchmarks.sh"
+command -v go >/dev/null 2>&1 || {
+	echo "autoresearch_preflight: go not on PATH" >&2
+	exit 1
+}
+[[ -f test/perf/bench_packages.txt ]] || {
+	echo "autoresearch_preflight: missing test/perf/bench_packages.txt" >&2
+	exit 1
+}
+[[ -f scripts/perf/run_benchmarks.sh ]] || {
+	echo "autoresearch_preflight: missing scripts/perf/run_benchmarks.sh" >&2
+	exit 1
+}
 
 COUNTER="test/perf/autoresearch_counter.txt"
 N=1
 if [[ -f "$COUNTER" ]]; then
 	N="$(sed '/^[[:space:]]*$/d' "$COUNTER" | head -n1 | tr -d '[:space:]')"
 fi
-[[ "$N" =~ ^[1-9][0-9]*$ ]] || die "invalid next id in $COUNTER (expected positive integer): '$N'"
+[[ "$N" =~ ^[1-9][0-9]*$ ]] || {
+	echo "autoresearch_preflight: invalid next id in $COUNTER (expected positive integer): '$N'" >&2
+	exit 1
+}
 
 BRANCH="autoresearch/perf-$N"
 CURRENT="$(git branch --show-current 2>/dev/null || true)"
-if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
-	if [[ "$CURRENT" != "$BRANCH" ]]; then
-		die "local branch $BRANCH already exists — checkout it to resume, or delete it before starting fresh"
-	fi
+if git show-ref --verify --quiet "refs/heads/$BRANCH" && [[ "$CURRENT" != "$BRANCH" ]]; then
+	echo "autoresearch_preflight: local branch $BRANCH already exists — checkout it to resume, or delete it before starting fresh" >&2
+	exit 1
 fi
 
-if git remote get-url origin >/dev/null 2>&1; then
-	if out="$(git ls-remote --heads origin "$BRANCH" 2>/dev/null)" && [[ -n "$out" ]]; then
-		if [[ "$CURRENT" != "$BRANCH" ]]; then
-			die "origin already has $BRANCH — delete remote branch, merge, or bump counter after merge"
-		fi
-	fi
+if git remote get-url origin >/dev/null 2>&1 &&
+	out="$(git ls-remote --heads origin "$BRANCH" 2>/dev/null)" &&
+	[[ -n "$out" ]] &&
+	[[ "$CURRENT" != "$BRANCH" ]]; then
+	echo "autoresearch_preflight: origin already has $BRANCH — delete remote branch, merge, or bump counter after merge" >&2
+	exit 1
 fi
 
 PKG_LINES="$(grep -Ev '^[[:space:]]*#|^[[:space:]]*$' test/perf/bench_packages.txt | wc -l | awk '{print $1}')"

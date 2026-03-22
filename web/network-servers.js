@@ -8,7 +8,6 @@ import {
   TEST_CONFIG,
 } from "./state.js";
 import {
-  parseJSONOrThrow,
   isSameOriginURL,
   fetchWithTimeout,
   readErrorResponseMessage,

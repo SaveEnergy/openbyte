@@ -27,6 +27,7 @@ run_pkg() {
 	local pkg="$1"
 	# -run '^$' runs no tests; only benchmarks.
 	go test "$pkg" -run '^$' -bench . -benchmem -benchtime="$TIME" -count="$COUNT"
+	return 0
 }
 
 if [[ "${1:-}" == "--stdout" ]]; then
