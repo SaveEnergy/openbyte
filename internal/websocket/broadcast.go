@@ -61,9 +61,12 @@ func (s *Server) snapshotClients(streamID string) ([]*clientConn, bool) {
 		s.mu.RUnlock()
 		return nil, false
 	}
-	clientList := make([]*clientConn, 0, len(clients))
+	n := len(clients)
+	clientList := make([]*clientConn, n)
+	i := 0
 	for _, client := range clients {
-		clientList = append(clientList, client)
+		clientList[i] = client
+		i++
 	}
 	s.mu.RUnlock()
 	return clientList, true
