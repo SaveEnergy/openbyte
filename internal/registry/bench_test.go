@@ -12,11 +12,7 @@ import (
 // BenchmarkRegistryAuthenticateOK is constant-time bearer comparison + header parsing (mutations path).
 func BenchmarkRegistryAuthenticateOK(b *testing.B) {
 	const key = "registry-api-key-32bytes-long!!"
-	h := &Handler{
-		service: nil,
-		logger:  logging.GetLogger(),
-		apiKey:  key,
-	}
+	h := NewHandler(nil, logging.GetLogger(), key)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/registry/servers", nil)
 	req.Header.Set("Authorization", authBearerPrefix+key)
 
@@ -32,11 +28,7 @@ func BenchmarkRegistryAuthenticateOK(b *testing.B) {
 // BenchmarkRegistryAuthenticateWrongToken exercises the rejection path (still constant-time compare length).
 func BenchmarkRegistryAuthenticateWrongToken(b *testing.B) {
 	key := strings.Repeat("a", 48)
-	h := &Handler{
-		service: nil,
-		logger:  logging.GetLogger(),
-		apiKey:  key,
-	}
+	h := NewHandler(nil, logging.GetLogger(), key)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/registry/servers", nil)
 	req.Header.Set("Authorization", authBearerPrefix+strings.Repeat("b", 48))
 
