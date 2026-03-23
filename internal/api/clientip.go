@@ -38,13 +38,14 @@ func (r *ClientIPResolver) FromRequest(req *http.Request) string {
 		return ipString(remoteIP)
 	}
 
-	if clientIP := r.rightmostUntrustedIP(req.Header.Get("X-Forwarded-For")); clientIP != nil {
+	xff := req.Header.Get("X-Forwarded-For")
+	if clientIP := r.rightmostUntrustedIP(xff); clientIP != nil {
 		return ipString(clientIP)
 	}
 	// When XFF contains only trusted hops, do not fall back to X-Real-IP:
 	// a proxy may not strip it, allowing an attacker to spoof (trusted XFF + fake X-Real-IP).
 	// Fall back to the direct connection (remoteAddr).
-	if req.Header.Get("X-Forwarded-For") != "" {
+	if xff != "" {
 		return ipString(remoteIP)
 	}
 	if clientIP := parseHeaderIP(req.Header.Get("X-Real-IP")); clientIP != nil {
@@ -61,16 +62,23 @@ func (r *ClientIPResolver) rightmostUntrustedIP(xff string) net.IP {
 	if xff == "" {
 		return nil
 	}
-	parts := strings.Split(xff, ",")
-	for i := len(parts) - 1; i >= 0; i-- {
-		ip := parseHeaderIP(parts[i])
-		if ip == nil {
-			continue
+	// Parse from the right without strings.Split (avoids a slice alloc per request).
+	remainder := xff
+	for remainder != "" {
+		idx := strings.LastIndex(remainder, ",")
+		var part string
+		if idx == -1 {
+			part = remainder
+			remainder = ""
+		} else {
+			part = remainder[idx+1:]
+			remainder = remainder[:idx]
 		}
-		if r.isTrustedProxy(ip) {
-			continue
+		if ip := parseHeaderIP(part); ip != nil {
+			if !r.isTrustedProxy(ip) {
+				return ip
+			}
 		}
-		return ip
 	}
 	return nil
 }
