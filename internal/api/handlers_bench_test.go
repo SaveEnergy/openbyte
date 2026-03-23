@@ -80,6 +80,7 @@ func BenchmarkValidateMetricsPayload(b *testing.B) {
 	}
 }
 
+// BenchmarkNormalizeHost measures one pass over a fixed set of representative hosts per iteration.
 func BenchmarkNormalizeHost(b *testing.B) {
 	hosts := []string{
 		"",
@@ -97,6 +98,7 @@ func BenchmarkNormalizeHost(b *testing.B) {
 	}
 }
 
+// BenchmarkIsUnspecifiedBind measures one pass over typical bind addresses per iteration.
 func BenchmarkIsUnspecifiedBind(b *testing.B) {
 	addrs := []string{
 		"",

@@ -1,6 +1,10 @@
 # Packages included in perf-record / perf-bench (one import path per line).
-./test/unit/metrics
-./test/unit/websocket
-./test/unit/stream
+# Prefer internal/* benchmarks that call production hot paths (not synthetic loops in test/unit).
+./internal/metrics
+./internal/stream
+./internal/websocket
 ./internal/api
 ./internal/jsonbody
+./internal/results
+./internal/registry
+./pkg/types

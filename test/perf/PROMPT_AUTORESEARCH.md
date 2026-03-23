@@ -2,7 +2,50 @@
 
 Use this as a system or task prompt when an LLM should run **measured** perf experiments on openByte (microbenchmarks + `benchstat`), with **keep / discard / crash** logging to `results.tsv`.
 
-**Cursor:** tracked slash-command body: **`test/perf/AUTORESEARCH_CURSOR_COMMAND.md`** (copy/symlink to **`.cursor/commands/autoresearch.md`** — **`.cursor/`** is gitignored). Invoke **`/autoresearch`** so the agent reads this file and runs **`make autoresearch-preflight`** first.
+**Cursor:** tracked slash-command body: **`test/perf/AUTORESEARCH_CURSOR_COMMAND.md`** (copy/symlink to **`.cursor/commands/autoresearch.md`** — **`.cursor/`** is gitignored). Invoke **`/autoresearch`** so the agent reads this file and runs **`make autoresearch-preflight`** first. Use **`/autoresearch --loop`** for **outer loop**: merge + counter bump + next **`perf-N`** branch (see **Loop mode** below).
+
+---
+
+## Loop mode (`--loop`)
+
+Use when the human wants **continuous autoresearch iterations** without stopping after a single **`autoresearch/perf-N`** lifecycle.
+
+**Trigger:** **`/autoresearch --loop`**, or the human explicitly enables **loop mode** in the task.
+
+**When to advance an outer iteration**
+
+- Current branch is **`autoresearch/perf-N`**, working tree **clean**, **`test/perf/autoresearch_counter.txt`** still equals **`N`** (same invariant as **`scripts/perf/autoresearch_preflight.sh`**).
+- Feature branch is **ready to merge** into **`main`**: perf work committed, **`make ci-lint`** and **`go test ./... -short`** pass on that branch (same quality bar as a **keep** experiment).
+
+**Mechanical handoff (preferred)**
+
+```bash
+make autoresearch-loop-complete
+```
+
+This script (see **`scripts/perf/autoresearch_loop_complete.sh`**):
+
+1. Fast-forwards local **`main`** to **`origin/main`** when **`origin`** and **`origin/main`** exist (otherwise skips).
+2. Merges **`autoresearch/perf-N`** into **`main`** with a merge commit.
+3. Runs **`make ci-lint`** and **`go test ./... -short`** on the result (set **`AUTORESEARCH_LOOP_SKIP_TESTS=1`** only if the human explicitly allows skipping).
+4. Bumps **`test/perf/autoresearch_counter.txt`** to **`N+1`** and commits that change on **`main`**.
+5. Deletes **local** **`autoresearch/perf-N`**.
+6. Creates **`autoresearch/perf-(N+1)`** from the updated **`main`** tip.
+
+**After the script**
+
+- **Push:** `git push origin main` and, if the old branch was on the remote, `git push origin --delete autoresearch/perf-N` (aligns with **`AGENTS.md`** cleanup).
+- **Next inner loop:** run **`make autoresearch-preflight`** (optional but prints **`AUTORESEARCH_*`**), then follow **Setup** §3–6: **`make perf-record`** on the new branch tip, baseline / **`results.tsv`** policy, then resume the experiment loop.
+
+**Stop conditions**
+
+- Merge conflict, failed **`autoresearch-loop-complete`**, or failed tests after merge — fix with the human; do not bump counter or delete branches until resolved. If **`git merge`** succeeded but **lint/tests** failed, **`main`** may contain a merge commit without a counter bump — undo with care (e.g. **`git reset --hard HEAD~1`** on **`main`**) after confirming with the human.
+- **`main`** not fast-forward to **`origin/main`** — update **`main`** (or reconcile with the human), then retry.
+- Base branch not named **`main`:** set **`AUTORESEARCH_BASE_BRANCH=<name>`** in the environment when running the script (advanced).
+
+**PR-based workflows**
+
+If merges to **`main`** go through a **pull request**, the human merges the PR on the host; then locally (or in a fresh clone): **`git checkout main && git pull`**, **manually bump** **`autoresearch_counter.txt`** to **`N+1`**, commit, **`git branch -d autoresearch/perf-N`**, **`make autoresearch-preflight`**, **`git checkout -b autoresearch/perf-(next)`** — or run **`make autoresearch-loop-complete`** only when your local **`main`** already contains the merged PR and you still have **`autoresearch/perf-N`** locally (avoid double-merge; prefer the human’s agreed git flow).
 
 ---
 
@@ -175,7 +218,7 @@ Branch: **`autoresearch/perf-N`** where **`N`** is the id from **`test/perf/auto
 
 ## Optional: anchor benchmarks
 
-For simpler decisions, the human may name **1–3 anchor** benchmarks (e.g. `BenchmarkRespondJSON`, `BenchmarkEncodeMetricsMessage`). Optimize primarily for those; still **avoid** large regressions on the rest of the suite.
+For simpler decisions, the human may name **1–3 anchor** benchmarks (e.g. `BenchmarkManagerUpdateMetrics`, `BenchmarkManagerSendMetricsUpdates`, `BenchmarkStoreSave`, `BenchmarkUDPSendDownloadPacket`, `BenchmarkMarshalWebsocketMessage`, `BenchmarkReadUploadBody`). Optimize primarily for those; still **avoid** large regressions on the rest of the suite.
 
 ---
 
