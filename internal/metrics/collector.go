@@ -147,12 +147,11 @@ type LatencySnapshot struct {
 
 func (c *Collector) SnapshotLatencyStats(dst []uint32) LatencySnapshot {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
 	overflow := uint32(0)
 	if c.latencyHistogram != nil {
 		overflow = c.latencyHistogram.CopyTo(dst)
 	}
-	return LatencySnapshot{
+	snap := LatencySnapshot{
 		Overflow:    overflow,
 		Count:       c.latencyCount,
 		Min:         c.latencyMin,
@@ -161,4 +160,6 @@ func (c *Collector) SnapshotLatencyStats(dst []uint32) LatencySnapshot {
 		JitterSum:   c.jitterSum,
 		JitterCount: c.jitterCount,
 	}
+	c.mu.RUnlock()
+	return snap
 }

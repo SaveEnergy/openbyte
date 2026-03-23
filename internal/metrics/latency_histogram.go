@@ -49,11 +49,11 @@ func (h *LatencyHistogram) Record(sample time.Duration) {
 
 func (h *LatencyHistogram) Reset() {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	for i := range h.buckets {
 		h.buckets[i] = 0
 	}
 	h.overflow = 0
+	h.mu.Unlock()
 }
 
 func (h *LatencyHistogram) CopyTo(dst []uint32) uint32 {
