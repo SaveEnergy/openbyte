@@ -1,5 +1,6 @@
-// BenchmarkManagerCompleteStream and BenchmarkManagerFailStreamWithError include logging.Info
-// inside the timed region (production parity; noisy when run with large -count).
+// BenchmarkManagerCompleteStream and BenchmarkManagerFailStreamWithError hit production
+// logging on Complete/Fail; mute Info during these benches so perf-record does not write
+// unbounded log output to build/perf/bench.txt (go test captures stderr with stdout).
 package stream
 
 import (
@@ -7,8 +8,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/saveenergy/openbyte/internal/logging"
 	"github.com/saveenergy/openbyte/pkg/types"
 )
+
+func benchMuteStreamInfo(b *testing.B) {
+	logging.GetLogger().SetLevel(logging.LevelError)
+	b.Cleanup(func() { logging.GetLogger().SetLevel(logging.LevelInfo) })
+}
 
 func benchStreamConfig() types.StreamConfig {
 	return types.StreamConfig{
@@ -87,6 +94,7 @@ func BenchmarkManagerUpdateMetricsParallel(b *testing.B) {
 
 // BenchmarkManagerCancelStream times CancelStream only; setup is outside the timer (CreateStream logs once per iteration).
 func BenchmarkManagerCancelStream(b *testing.B) {
+	benchMuteStreamInfo(b)
 	cfg := benchStreamConfig()
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -110,6 +118,7 @@ func BenchmarkManagerCancelStream(b *testing.B) {
 
 // BenchmarkManagerCompleteStream times CompleteStream (emits one structured log per iteration inside the timed region).
 func BenchmarkManagerCompleteStream(b *testing.B) {
+	benchMuteStreamInfo(b)
 	cfg := benchStreamConfig()
 	metrics := benchMetricsTick()
 	b.ReportAllocs()
@@ -134,6 +143,7 @@ func BenchmarkManagerCompleteStream(b *testing.B) {
 
 // BenchmarkManagerFailStreamWithError times FailStreamWithError (emits one structured log per iteration).
 func BenchmarkManagerFailStreamWithError(b *testing.B) {
+	benchMuteStreamInfo(b)
 	cfg := benchStreamConfig()
 	metrics := benchMetricsTick()
 	cause := errors.New("bench failure")
