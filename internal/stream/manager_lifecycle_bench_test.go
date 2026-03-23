@@ -48,6 +48,7 @@ func benchMetricsTick() types.Metrics {
 
 // BenchmarkManagerUpdateMetrics is POST /stream/{id}/metrics (manager lock + StreamState.UpdateMetrics).
 func BenchmarkManagerUpdateMetrics(b *testing.B) {
+	benchMuteStreamInfo(b)
 	m := NewManager(512, 128)
 	st, err := m.CreateStream(benchStreamConfig())
 	if err != nil {
@@ -70,6 +71,7 @@ func BenchmarkManagerUpdateMetrics(b *testing.B) {
 
 // BenchmarkManagerUpdateMetricsParallel measures lock contention when many goroutines update the same stream.
 func BenchmarkManagerUpdateMetricsParallel(b *testing.B) {
+	benchMuteStreamInfo(b)
 	m := NewManager(512, 128)
 	st, err := m.CreateStream(benchStreamConfig())
 	if err != nil {

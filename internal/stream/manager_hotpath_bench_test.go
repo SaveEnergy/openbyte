@@ -9,6 +9,7 @@ import (
 
 // BenchmarkManagerGetStream is the hot read path for stream status polling.
 func BenchmarkManagerGetStream(b *testing.B) {
+	benchMuteStreamInfo(b)
 	m := NewManager(256, 64)
 	cfg := types.StreamConfig{
 		Protocol:   types.ProtocolTCP,
@@ -36,6 +37,7 @@ func BenchmarkManagerGetStream(b *testing.B) {
 
 // BenchmarkManagerSendMetricsUpdates scans active streams and enqueues metrics updates (broadcast tick body).
 func BenchmarkManagerSendMetricsUpdates(b *testing.B) {
+	benchMuteStreamInfo(b)
 	m := NewManager(256, 128)
 	const nStreams = 32
 	ids := make([]string, 0, nStreams)
