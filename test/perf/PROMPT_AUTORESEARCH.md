@@ -10,6 +10,8 @@ Use this as a system or task prompt when an LLM should run **measured** perf exp
 
 Use when the human wants **continuous autoresearch iterations** without stopping after a single **`autoresearch/perf-N`** lifecycle.
 
+**No hop-out:** **`--loop`** is **not** satisfied by running **`make autoresearch-loop-complete` once** and ending the session. That target is only **one outer step**. Unless a **Stop condition** applies, the agent **must** continue on the new **`autoresearch/perf-(N+1)`** branch: **`make autoresearch-preflight`**, then **Setup** §3–6 (baseline **`make perf-record`**, baseline / **`results.tsv`** policy), then the **experiment loop** — and when that branch is merge-ready, **`autoresearch-loop-complete`** again. **Repeat** until blocked.
+
 **Trigger:** **`/autoresearch --loop`**, or the human explicitly enables **loop mode** in the task.
 
 **When to advance an outer iteration**
@@ -35,7 +37,7 @@ This script (see **`scripts/perf/autoresearch_loop_complete.sh`**):
 **After the script**
 
 - **Push:** `git push origin main` and, if the old branch was on the remote, `git push origin --delete autoresearch/perf-N` (aligns with **`AGENTS.md`** cleanup).
-- **Next inner loop:** run **`make autoresearch-preflight`** (optional but prints **`AUTORESEARCH_*`**), then follow **Setup** §3–6: **`make perf-record`** on the new branch tip, baseline / **`results.tsv`** policy, then resume the experiment loop.
+- **Next inner loop (required for `--loop`):** run **`make autoresearch-preflight`**, then follow **Setup** §3–6: **`make perf-record`** on the new **`autoresearch/perf-(N+1)`** tip, baseline / **`results.tsv`** policy, then resume the experiment loop. **Do not** treat “merge + counter bump” as task completion.
 
 **Stop conditions**
 

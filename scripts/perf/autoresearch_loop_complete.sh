@@ -73,3 +73,4 @@ git checkout -b "autoresearch/perf-$NEXT"
 
 echo "autoresearch_loop_complete: OK — on autoresearch/perf-$NEXT (merged perf-$N into $BASE, counter=$NEXT)"
 echo "autoresearch_loop_complete: push when ready: git push origin $BASE && git push origin --delete autoresearch/perf-$N (if remote branch exists)"
+echo "autoresearch_loop_complete: /autoresearch --loop — do not stop here; run make autoresearch-preflight, then Setup §3–6 on autoresearch/perf-$NEXT (baseline perf-record, experiments); repeat until blocked (see test/perf/PROMPT_AUTORESEARCH.md)"

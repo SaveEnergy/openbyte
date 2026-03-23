@@ -1,10 +1,14 @@
 ---
-description: Measured perf autoresearch — benchmarks, benchstat, results.tsv; add --loop for merge + next perf-N iteration (openByte)
+description: Measured perf autoresearch — benchmarks, benchstat, results.tsv; --loop = multi-iteration (no hop-out after loop-complete)
 ---
 
 You are running **openByte perf autoresearch**: microbenchmark experiments, `benchstat` comparisons, and structured logging to `test/perf/results.tsv`.
 
-**Loop mode:** if the human invoked **`/autoresearch --loop`** (or **`--loop`** appears in the slash-command args), treat **outer iteration** as part of the task: when the current **`autoresearch/perf-N`** branch has merge-ready work (experiments done, **`make ci-lint`** + **`go test ./... -short`** green on that branch), run **`make autoresearch-loop-complete`** from a **clean** working tree, then **push** **`main`** and **delete remote** **`autoresearch/perf-N`** if it exists, then continue from **Setup** (baseline scan on the **new** branch — **`make perf-record`**, `results.tsv` / baseline policy). **Repeat** until blocked (merge conflict, script/test failure, ambiguous correctness, or human stop). **Do not** loop if every experiment regresses — widen diagnosis first (same as non-loop prompt).
+**Loop mode:** if the human invoked **`/autoresearch --loop`** (or **`--loop`** appears in the slash-command args), treat **outer + inner** iterations as one task. **Invalid:** run **`make autoresearch-loop-complete`** once and **stop** — that is a **hop-out** and does **not** honor **`--loop`**.
+
+**Valid cycle (repeat until blocked):** (1) On merge-ready **`autoresearch/perf-N`**, clean tree, counter **`N`**: **`make autoresearch-loop-complete`**. (2) **Push** **`main`**; delete remote **`autoresearch/perf-N`** if present. (3) **`make autoresearch-preflight`**. (4) On **`autoresearch/perf-(N+1)`**, **Setup** §3–6: baseline **`make perf-record`**, baseline / **`results.tsv`**, then **experiment loop** ( **`make perf-record`**, **`make perf-compare`**, commits, logging). (5) When the new branch is merge-ready, return to (1).
+
+**Stop** on merge conflict, failed script/tests, ambiguous correctness, or human stop. **Do not** blindly re-merge if every experiment regresses — widen diagnosis first (same as non-loop prompt).
 
 ## Bootstrap (run first; exit code is the contract)
 
