@@ -92,14 +92,16 @@ func BenchmarkManagerUpdateMetricsParallel(b *testing.B) {
 	})
 }
 
-// BenchmarkManagerCancelStream times CancelStream only; setup is outside the timer (CreateStream logs once per iteration).
+// BenchmarkManagerCancelStream measures new stream + StartStream + CancelStream per iteration.
+// Do not use StopTimer around NewManager/CreateStream/StartStream: the runtime scales b.N from the
+// timed slice only, so cheap CancelStream drives N into millions while untimed setup runs N times
+// and the bench appears hung.
 func BenchmarkManagerCancelStream(b *testing.B) {
 	benchMuteStreamInfo(b)
 	cfg := benchStreamConfig()
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		b.StopTimer()
 		m := NewManager(1024, 256)
 		st, err := m.CreateStream(cfg)
 		if err != nil {
@@ -109,14 +111,13 @@ func BenchmarkManagerCancelStream(b *testing.B) {
 		if err := m.StartStream(id); err != nil {
 			b.Fatal(err)
 		}
-		b.StartTimer()
 		if err := m.CancelStream(id); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-// BenchmarkManagerCompleteStream times CompleteStream (emits one structured log per iteration inside the timed region).
+// BenchmarkManagerCompleteStream measures full stream lifecycle through CompleteStream (see CancelStream re StopTimer).
 func BenchmarkManagerCompleteStream(b *testing.B) {
 	benchMuteStreamInfo(b)
 	cfg := benchStreamConfig()
@@ -124,7 +125,6 @@ func BenchmarkManagerCompleteStream(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		b.StopTimer()
 		m := NewManager(1024, 256)
 		st, err := m.CreateStream(cfg)
 		if err != nil {
@@ -134,14 +134,13 @@ func BenchmarkManagerCompleteStream(b *testing.B) {
 		if err := m.StartStream(id); err != nil {
 			b.Fatal(err)
 		}
-		b.StartTimer()
 		if err := m.CompleteStream(id, metrics); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-// BenchmarkManagerFailStreamWithError times FailStreamWithError (emits one structured log per iteration).
+// BenchmarkManagerFailStreamWithError measures full lifecycle through FailStreamWithError (see CancelStream re StopTimer).
 func BenchmarkManagerFailStreamWithError(b *testing.B) {
 	benchMuteStreamInfo(b)
 	cfg := benchStreamConfig()
@@ -150,7 +149,6 @@ func BenchmarkManagerFailStreamWithError(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		b.StopTimer()
 		m := NewManager(1024, 256)
 		st, err := m.CreateStream(cfg)
 		if err != nil {
@@ -160,7 +158,6 @@ func BenchmarkManagerFailStreamWithError(b *testing.B) {
 		if err := m.StartStream(id); err != nil {
 			b.Fatal(err)
 		}
-		b.StartTimer()
 		if err := m.FailStreamWithError(id, metrics, cause); err != nil {
 			b.Fatal(err)
 		}
