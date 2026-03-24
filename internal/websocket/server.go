@@ -3,6 +3,7 @@ package websocket
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -73,7 +74,23 @@ func NewServer() *Server {
 func (s *Server) SetAllowedOrigins(origins []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.allowedOrigins = origins
+	if len(origins) == 0 {
+		s.allowedOrigins = nil
+		return
+	}
+	out := make([]string, 0, len(origins))
+	for _, o := range origins {
+		t := strings.TrimSpace(o)
+		if t == "" {
+			continue
+		}
+		out = append(out, t)
+	}
+	if len(out) == 0 {
+		s.allowedOrigins = nil
+		return
+	}
+	s.allowedOrigins = out
 }
 
 func (s *Server) SetPingInterval(interval time.Duration) {

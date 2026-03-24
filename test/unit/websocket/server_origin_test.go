@@ -36,6 +36,20 @@ func TestServerAllowedOriginHostMatch(t *testing.T) {
 	}
 }
 
+func TestServerSetAllowedOriginsTrimsWhitespace(t *testing.T) {
+	server := obytewebsocket.NewServer()
+	server.SetAllowedOrigins([]string{"  https://foo.example.com  "})
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server.HandleStream(w, r, testStreamID)
+	}))
+	t.Cleanup(testServer.Close)
+
+	if err := dialWebSocket(t, testServer.URL, testOriginWildcard); err != nil {
+		t.Fatalf("expected trimmed origin to match: %v", err)
+	}
+}
+
 func TestWebSocketEmptyOriginWithConfiguredOrigins(t *testing.T) {
 	server := obytewebsocket.NewServer()
 	server.SetAllowedOrigins([]string{testOriginWildcard})
