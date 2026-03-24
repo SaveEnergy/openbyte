@@ -9,9 +9,10 @@ import (
 )
 
 type Handler struct {
-	service *Service
-	logger  *logging.Logger
-	apiKey  string
+	service     *Service
+	logger      *logging.Logger
+	apiKey      string
+	apiKeyBytes []byte // []byte(apiKey) for ConstantTimeCompare without per-request conversion
 }
 
 const (
@@ -41,9 +42,10 @@ type updateServerRequest struct {
 
 func NewHandler(service *Service, logger *logging.Logger, apiKey string) *Handler {
 	return &Handler{
-		service: service,
-		logger:  logger,
-		apiKey:  apiKey,
+		service:     service,
+		logger:      logger,
+		apiKey:      apiKey,
+		apiKeyBytes: []byte(apiKey),
 	}
 }
 
@@ -69,9 +71,9 @@ func (h *Handler) authenticate(r *http.Request) bool {
 	if !strings.HasPrefix(auth, authBearerPrefix) {
 		return false
 	}
-	token := strings.TrimPrefix(auth, authBearerPrefix)
+	token := auth[len(authBearerPrefix):]
 	if token == "" {
 		return false
 	}
-	return subtle.ConstantTimeCompare([]byte(token), []byte(h.apiKey)) == 1
+	return subtle.ConstantTimeCompare([]byte(token), h.apiKeyBytes) == 1
 }
