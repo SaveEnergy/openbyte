@@ -42,7 +42,7 @@ func (r *Router) isAllowedOrigin(origin string) bool {
 	}
 	originHostValue := types.OriginHost(origin)
 	for _, allowed := range r.allowedOrigins {
-		if matchesAllowedOrigin(strings.TrimSpace(allowed), origin, originHostValue) {
+		if matchesAllowedOrigin(allowed, origin, originHostValue) {
 			return true
 		}
 	}

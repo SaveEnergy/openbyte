@@ -52,6 +52,27 @@ func TestRouterAllowedOriginHostMatch(t *testing.T) {
 	}
 }
 
+func TestRouterAllowedOriginSetAllowedOriginsTrimsWhitespace(t *testing.T) {
+	router := &api.Router{}
+	router.SetAllowedOrigins([]string{"  https://foo.example.com  "})
+
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL, nil)
+	req.Header.Set("Origin", fooOrigin)
+	rec := httptest.NewRecorder()
+
+	handler := router.CORSMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf(statusWantFmt, rec.Code, http.StatusOK)
+	}
+	if got := rec.Header().Get(allowedOriginKey); got != fooOrigin {
+		t.Fatalf(routerAllowOriginFmt, got, fooOrigin)
+	}
+}
+
 func TestRouterRejectsWildcardBypassOrigin(t *testing.T) {
 	router := &api.Router{}
 	router.SetAllowedOrigins([]string{"*.example.com"})
