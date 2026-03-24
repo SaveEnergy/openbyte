@@ -9,8 +9,9 @@ import (
 
 func (s *Server) isAllowedOrigin(origin, host string) bool {
 	s.mu.RLock()
-	allowedOrigins := append([]string(nil), s.allowedOrigins...)
-	s.mu.RUnlock()
+	defer s.mu.RUnlock()
+
+	allowedOrigins := s.allowedOrigins
 
 	if origin == "" {
 		return allowEmptyOrigin(allowedOrigins)
@@ -22,7 +23,7 @@ func (s *Server) isAllowedOrigin(origin, host string) bool {
 
 	originHostValue := types.OriginHost(origin)
 	for _, allowed := range allowedOrigins {
-		if matchesAllowedOrigin(strings.TrimSpace(allowed), origin, originHostValue) {
+		if matchesAllowedOrigin(allowed, origin, originHostValue) {
 			return true
 		}
 	}
@@ -34,7 +35,7 @@ func allowEmptyOrigin(allowedOrigins []string) bool {
 		return true
 	}
 	for _, allowed := range allowedOrigins {
-		if strings.TrimSpace(allowed) == "*" {
+		if allowed == "*" {
 			return true
 		}
 	}
