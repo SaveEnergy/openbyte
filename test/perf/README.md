@@ -8,7 +8,6 @@ make perf-record             # → build/perf/bench.txt (stable; default count=5
 make perf-compare            # needs baseline + current bench.txt; benchstat or go run fallback
 make perf-check              # record + compare if baseline exists
 make autoresearch-preflight  # exit 0 + AUTORESEARCH_* lines before a new perf-N branch
-make autoresearch-loop-complete  # merge perf-N → main, bump counter, new perf-(N+1) branch (see PROMPT_AUTORESEARCH.md)
 ```
 
 Optional (faster repeats): `go install golang.org/x/perf/cmd/benchstat@latest` — not required; **`make perf-compare`** uses **`go run golang.org/x/perf/cmd/benchstat@latest`** when `benchstat` is missing.
