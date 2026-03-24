@@ -14,10 +14,14 @@ func TestShouldSkipRequestLog(t *testing.T) {
 		want bool
 	}{
 		{path: "/api/v1/ping", want: true},
+		{path: "/ping", want: true},
 		{path: "/api/v1/download", want: false},
 		{path: testPathAPIUpload, want: false},
 		{path: "/api/v1/stream/550e8400-e29b-41d4-a716-446655440000/stream", want: false},
 		{path: "/api/v1/results/abc12345", want: false},
+		{path: "/api/v1/ping/extra", want: false},
+		{path: "ping", want: false},
+		{path: "", want: false},
 	}
 
 	for _, tt := range tests {

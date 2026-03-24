@@ -37,7 +37,10 @@ func (rw *responseWriter) Flush() {
 }
 
 func shouldSkipRequestLog(path string) bool {
-	return strings.HasSuffix(path, "/ping")
+	const suf = "/ping"
+	lp := len(path)
+	ls := len(suf)
+	return lp >= ls && path[lp-ls:] == suf
 }
 
 func shouldLogRequest(path string, status int, duration time.Duration) bool {
