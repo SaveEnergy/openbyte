@@ -17,6 +17,7 @@ type Router struct {
 	limiter          *RateLimiter
 	wsServer         any
 	allowedOrigins   []string
+	corsAllowAll     bool // true when allowedOrigins contains "*"; set in SetAllowedOrigins
 	clientIPResolver *ClientIPResolver
 	webFS            http.FileSystem
 	runtimeMetrics   http.HandlerFunc
@@ -121,6 +122,13 @@ func (r *Router) HealthCheck(w http.ResponseWriter, req *http.Request) {
 
 func (r *Router) SetAllowedOrigins(origins []string) {
 	r.allowedOrigins = origins
+	r.corsAllowAll = false
+	for _, o := range origins {
+		if o == "*" {
+			r.corsAllowAll = true
+			break
+		}
+	}
 }
 
 // resolveWebFS returns the web file system to use for static assets.
