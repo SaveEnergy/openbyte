@@ -5,13 +5,28 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 const uploadRequestLogMinDuration = time.Second
+
+const (
+	apiPathPrefix       = "/api/"
+	apiPathPrefixLen    = len(apiPathPrefix)
+	uploadPathSuffix    = "/upload"
+	uploadPathSuffixLen = len(uploadPathSuffix)
+)
+
+func hasAPIPathPrefix(path string) bool {
+	return len(path) >= apiPathPrefixLen && path[:apiPathPrefixLen] == apiPathPrefix
+}
+
+func hasUploadPathSuffix(path string) bool {
+	lp := len(path)
+	return lp >= uploadPathSuffixLen && path[lp-uploadPathSuffixLen:] == uploadPathSuffix
+}
 
 type responseWriter struct {
 	http.ResponseWriter
@@ -44,10 +59,10 @@ func shouldSkipRequestLog(path string) bool {
 }
 
 func shouldLogRequest(path string, status int, duration time.Duration) bool {
-	if !strings.HasPrefix(path, "/api/") || shouldSkipRequestLog(path) {
+	if !hasAPIPathPrefix(path) || shouldSkipRequestLog(path) {
 		return false
 	}
-	if strings.HasSuffix(path, "/upload") {
+	if hasUploadPathSuffix(path) {
 		return status >= http.StatusBadRequest || duration >= uploadRequestLogMinDuration
 	}
 	return true
@@ -57,7 +72,7 @@ func (r *Router) LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		path := req.URL.Path
 
-		if strings.HasPrefix(path, "/api/") && !shouldSkipRequestLog(path) {
+		if hasAPIPathPrefix(path) && !shouldSkipRequestLog(path) {
 			start := time.Now()
 			rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 
