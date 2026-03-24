@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"slices"
 	"strings"
 
 	"github.com/saveenergy/openbyte/pkg/types"
@@ -66,5 +65,5 @@ func matchesAllowedOrigin(allowed, origin, originHostValue string) bool {
 }
 
 func (r *Router) isAllowAllOrigins() bool {
-	return slices.Contains(r.allowedOrigins, "*")
+	return r.corsAllowAll
 }
