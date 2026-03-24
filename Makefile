@@ -1,4 +1,4 @@
-.PHONY: build openbyte loadtest test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench perf-record perf-compare perf-check perf-leakcheck autoresearch-preflight autoresearch-loop-complete ci-test ci-lint lint-openapi
+.PHONY: build openbyte loadtest test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench perf-record perf-compare perf-check perf-leakcheck autoresearch-preflight ci-test ci-lint lint-openapi
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
@@ -74,9 +74,6 @@ perf-compare:
 
 autoresearch-preflight:
 	@bash "$(CURDIR)/scripts/perf/autoresearch_preflight.sh"
-
-autoresearch-loop-complete:
-	@bash "$(CURDIR)/scripts/perf/autoresearch_loop_complete.sh"
 
 perf-check: perf-record
 	@if [ -f test/perf/bench_baseline.txt ]; then $(MAKE) perf-compare; else echo "perf-check: wrote build/perf/bench.txt (add test/perf/bench_baseline.txt to enable compare)"; fi
@@ -164,8 +161,6 @@ help:
 	@echo "  perf-compare  - benchstat baseline vs build/perf/bench.txt (go run fallback)"
 	@echo "  perf-check    - perf-record + perf-compare if baseline exists"
 	@echo "  autoresearch-preflight - verify counter/branch + print AUTORESEARCH_* (perf agents)"
-	@echo "  autoresearch-loop-complete - one outer step: merge perf-N→main, bump counter, checkout perf-(N+1)"
-	@echo "    ( /autoresearch --loop: agents must then preflight + Setup §3–6 + experiments; see test/perf/PROMPT_AUTORESEARCH.md )"
 	@echo "  perf-smoke    - Run perf smoke with pprof capture"
 	@echo "  perf-leakcheck - Run goroutine leak profile smoke (Go 1.26 experiment)"
 	@echo "  run           - Run server (development, port 8080)"

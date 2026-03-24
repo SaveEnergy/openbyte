@@ -2,52 +2,21 @@
 
 Use this as a system or task prompt when an LLM should run **measured** perf experiments on openByte (microbenchmarks + `benchstat`), with **keep / discard / crash** logging to `results.tsv`.
 
-**Cursor:** tracked slash-command body: **`test/perf/AUTORESEARCH_CURSOR_COMMAND.md`** (copy/symlink to **`.cursor/commands/autoresearch.md`** — **`.cursor/`** is gitignored). Invoke **`/autoresearch`** so the agent reads this file and runs **`make autoresearch-preflight`** first. Use **`/autoresearch --loop`** for **outer loop**: merge + counter bump + next **`perf-N`** branch (see **Loop mode** below).
+**Cursor:** tracked slash-command body: **`test/perf/AUTORESEARCH_CURSOR_COMMAND.md`** (copy/symlink to **`.cursor/commands/autoresearch.md`** — **`.cursor/`** is gitignored). Invoke **`/autoresearch`** so the agent reads this file and runs **`make autoresearch-preflight`** first.
 
 ---
 
-## Loop mode (`--loop`)
+## After a perf branch merges (manual)
 
-Use when the human wants **continuous autoresearch iterations** without stopping after a single **`autoresearch/perf-N`** lifecycle.
+There is **no** automated merge script. When **`autoresearch/perf-N`** is ready for **`main`**:
 
-**No hop-out:** **`--loop`** is **not** satisfied by running **`make autoresearch-loop-complete` once** and ending the session. That target is only **one outer step**. Unless a **Stop condition** applies, the agent **must** continue on the new **`autoresearch/perf-(N+1)`** branch: **`make autoresearch-preflight`**, then **Setup** §3–6 (baseline **`make perf-record`**, baseline / **`results.tsv`** policy), then the **experiment loop** — and when that branch is merge-ready, **`autoresearch-loop-complete`** again. **Repeat** until blocked.
+1. Merge **`autoresearch/perf-N`** into **`main`** (merge commit or PR, per your git policy).
+2. On the result: **`make ci-lint`** and **`go test ./... -short`** — if either fails, fix with the human before bumping the counter (if **`git merge`** left **`main`** in a bad state, undo with care, e.g. **`git reset --hard HEAD~1`** on **`main`** after confirming).
+3. Set **`test/perf/autoresearch_counter.txt`** to **`N+1`**, commit on **`main`**.
+4. Delete **`autoresearch/perf-N`** locally (**`git branch -d`**); **`git push origin --delete autoresearch/perf-N`** if it existed on the remote.
+5. **`git checkout -b autoresearch/perf-(N+1)`** from the updated **`main`** tip (or **`make autoresearch-preflight`** first to confirm the counter and branch name).
 
-**Trigger:** **`/autoresearch --loop`**, or the human explicitly enables **loop mode** in the task.
-
-**When to advance an outer iteration**
-
-- Current branch is **`autoresearch/perf-N`**, working tree **clean**, **`test/perf/autoresearch_counter.txt`** still equals **`N`** (same invariant as **`scripts/perf/autoresearch_preflight.sh`**).
-- Feature branch is **ready to merge** into **`main`**: perf work committed, **`make ci-lint`** and **`go test ./... -short`** pass on that branch (same quality bar as a **keep** experiment).
-
-**Mechanical handoff (preferred)**
-
-```bash
-make autoresearch-loop-complete
-```
-
-This script (see **`scripts/perf/autoresearch_loop_complete.sh`**):
-
-1. Fast-forwards local **`main`** to **`origin/main`** when **`origin`** and **`origin/main`** exist (otherwise skips).
-2. Merges **`autoresearch/perf-N`** into **`main`** with a merge commit.
-3. Runs **`make ci-lint`** and **`go test ./... -short`** on the result (set **`AUTORESEARCH_LOOP_SKIP_TESTS=1`** only if the human explicitly allows skipping).
-4. Bumps **`test/perf/autoresearch_counter.txt`** to **`N+1`** and commits that change on **`main`**.
-5. Deletes **local** **`autoresearch/perf-N`**.
-6. Creates **`autoresearch/perf-(N+1)`** from the updated **`main`** tip.
-
-**After the script**
-
-- **Push:** `git push origin main` and, if the old branch was on the remote, `git push origin --delete autoresearch/perf-N` (aligns with **`AGENTS.md`** cleanup).
-- **Next inner loop (required for `--loop`):** run **`make autoresearch-preflight`**, then follow **Setup** §3–6: **`make perf-record`** on the new **`autoresearch/perf-(N+1)`** tip, baseline / **`results.tsv`** policy, then resume the experiment loop. **Do not** treat “merge + counter bump” as task completion.
-
-**Stop conditions**
-
-- Merge conflict, failed **`autoresearch-loop-complete`**, or failed tests after merge — fix with the human; do not bump counter or delete branches until resolved. If **`git merge`** succeeded but **lint/tests** failed, **`main`** may contain a merge commit without a counter bump — undo with care (e.g. **`git reset --hard HEAD~1`** on **`main`**) after confirming with the human.
-- **`main`** not fast-forward to **`origin/main`** — update **`main`** (or reconcile with the human), then retry.
-- Base branch not named **`main`:** set **`AUTORESEARCH_BASE_BRANCH=<name>`** in the environment when running the script (advanced).
-
-**PR-based workflows**
-
-If merges to **`main`** go through a **pull request**, the human merges the PR on the host; then locally (or in a fresh clone): **`git checkout main && git pull`**, **manually bump** **`autoresearch_counter.txt`** to **`N+1`**, commit, **`git branch -d autoresearch/perf-N`**, **`make autoresearch-preflight`**, **`git checkout -b autoresearch/perf-(next)`** — or run **`make autoresearch-loop-complete`** only when your local **`main`** already contains the merged PR and you still have **`autoresearch/perf-N`** locally (avoid double-merge; prefer the human’s agreed git flow).
+**PR-based workflows:** merge the PR on the host, then **`git checkout main && git pull`**, bump the counter, commit, delete the local feature branch, **`make autoresearch-preflight`**, **`git checkout -b autoresearch/perf-(next)`**.
 
 ---
 
@@ -213,8 +182,8 @@ Branch: **`autoresearch/perf-N`** where **`N`** is the id from **`test/perf/auto
 
 **Autonomy vs. safety**
 
-- The original prompt says “never stop” — in practice, **token/session limits** apply. If interrupted, the human can resume from branch + `results.tsv`.
-- Do **not** loop blindly if **every** idea regresses: widen diagnosis (read `benchstat.log`, pprof / `perf-smoke` only if human allows extra scope).
+- **Token/session limits** apply. If interrupted, the human can resume from branch + `results.tsv`.
+- Do **not** chase micro-opts blindly if **every** idea regresses: widen diagnosis (read `benchstat.log`, pprof / `perf-smoke` only if human allows extra scope).
 
 ---
 
