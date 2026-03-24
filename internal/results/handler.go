@@ -1,6 +1,7 @@
 package results
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/saveenergy/openbyte/internal/jsonbody"
 	"github.com/saveenergy/openbyte/internal/logging"
@@ -43,21 +45,38 @@ type saveResponse struct {
 	URL string `json:"url"`
 }
 
+var resultsJSONBufPool = sync.Pool{
+	New: func() any { return &bytes.Buffer{} },
+}
+
 func respondJSONError(w http.ResponseWriter, msg string, code int) {
 	writeJSON(w, code, map[string]string{"error": msg})
 }
 
 func writeJSON(w http.ResponseWriter, code int, payload any) {
-	body, err := json.Marshal(payload)
-	if err != nil {
+	buf, ok := resultsJSONBufPool.Get().(*bytes.Buffer)
+	if !ok {
+		buf = &bytes.Buffer{}
+	}
+	defer func() {
+		buf.Reset()
+		resultsJSONBufPool.Put(buf)
+	}()
+	buf.Grow(256)
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(payload); err != nil {
 		logging.Warn("results: marshal response failed", logging.Field{Key: "error", Value: err})
 		code = http.StatusInternalServerError
-		body = []byte(`{"error":"internal error"}` + "\n")
+		buf.Reset()
+		buf.WriteString(`{"error":"internal error"}`)
+	} else if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] == '\n' {
+		buf.Truncate(buf.Len() - 1) // match json.Marshal output (no trailing newline)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(code)
-	if _, err := w.Write(body); err != nil {
+	if _, err := w.Write(buf.Bytes()); err != nil {
 		logging.Warn("results: write response failed", logging.Field{Key: "error", Value: err})
 	}
 }

@@ -1,6 +1,7 @@
 package results
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 	"time"
@@ -36,10 +37,24 @@ func BenchmarkMarshalResult(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		_, err := json.Marshal(r)
-		if err != nil {
+		buf, ok := resultsJSONBufPool.Get().(*bytes.Buffer)
+		if !ok {
+			buf = &bytes.Buffer{}
+		}
+		buf.Reset()
+		buf.Grow(256)
+		enc := json.NewEncoder(buf)
+		enc.SetEscapeHTML(false)
+		if err := enc.Encode(r); err != nil {
+			resultsJSONBufPool.Put(buf)
 			b.Fatal(err)
 		}
+		if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] == '\n' {
+			buf.Truncate(buf.Len() - 1)
+		}
+		_ = buf.Len()
+		buf.Reset()
+		resultsJSONBufPool.Put(buf)
 	}
 }
 
