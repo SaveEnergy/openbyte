@@ -136,8 +136,8 @@ func StripHostPort(host string) string {
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		return h
 	}
-	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
-		return strings.TrimPrefix(strings.TrimSuffix(host, "]"), "[")
+	if n := len(host); n >= 2 && host[0] == '[' && host[n-1] == ']' {
+		return host[1 : n-1]
 	}
 	return host
 }
