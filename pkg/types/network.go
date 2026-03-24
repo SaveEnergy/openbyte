@@ -144,6 +144,21 @@ func StripHostPort(host string) string {
 
 // OriginHost extracts the hostname from an origin URL string.
 func OriginHost(origin string) string {
+	// Fast path: typical browser origins are absolute URLs with no userinfo.
+	// Avoid url.Parse allocation when we can slice scheme://authority[/...] safely.
+	if idx := strings.Index(origin, "://"); idx >= 0 {
+		rest := origin[idx+3:]
+		end := strings.IndexByte(rest, '/')
+		var authority string
+		if end < 0 {
+			authority = rest
+		} else {
+			authority = rest[:end]
+		}
+		if authority != "" && !strings.Contains(authority, "@") {
+			return StripHostPort(authority)
+		}
+	}
 	parsed, err := url.Parse(origin)
 	if err == nil && parsed.Host != "" {
 		return StripHostPort(parsed.Host)

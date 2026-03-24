@@ -57,6 +57,7 @@ func TestOriginHost(t *testing.T) {
 	}{
 		{httpExampleURL, exampleHost},
 		{httpsExamplePorted, exampleHost},
+		{"https://user@" + exampleHost + "/p", exampleHost},
 		{"http://" + localhostHost + ":3000", localhostHost},
 		{"http://[" + loopbackIPv6Host + "]:8080", loopbackIPv6Host},
 		{exampleHost, exampleHost},
