@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/logging"
@@ -121,14 +122,27 @@ func (r *Router) HealthCheck(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Router) SetAllowedOrigins(origins []string) {
-	r.allowedOrigins = origins
 	r.corsAllowAll = false
+	if len(origins) == 0 {
+		r.allowedOrigins = nil
+		return
+	}
+	out := make([]string, 0, len(origins))
 	for _, o := range origins {
-		if o == "*" {
+		t := strings.TrimSpace(o)
+		if t == "" {
+			continue
+		}
+		out = append(out, t)
+		if t == "*" {
 			r.corsAllowAll = true
-			break
 		}
 	}
+	if len(out) == 0 {
+		r.allowedOrigins = nil
+		return
+	}
+	r.allowedOrigins = out
 }
 
 // resolveWebFS returns the web file system to use for static assets.
