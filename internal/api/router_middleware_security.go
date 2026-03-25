@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -13,7 +12,7 @@ func isHTTPS(r *http.Request) bool {
 	if r.TLS != nil {
 		return true
 	}
-	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+	return forwardedProtoIsHTTPS(r.Header.Get("X-Forwarded-Proto"))
 }
 
 func SecurityHeadersMiddleware(next http.Handler) http.Handler {

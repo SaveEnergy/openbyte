@@ -80,7 +80,7 @@ func requestScheme(r *http.Request, cfg *config.Config) string {
 	}
 	if cfg != nil && cfg.TrustProxyHeaders {
 		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
-			if strings.EqualFold(proto, "https") {
+			if forwardedProtoIsHTTPS(proto) {
 				return "https"
 			}
 		}
