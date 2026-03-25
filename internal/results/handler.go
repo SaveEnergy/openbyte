@@ -7,7 +7,6 @@ import (
 	"io"
 	"math"
 	"net/http"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -15,9 +14,25 @@ import (
 	"github.com/saveenergy/openbyte/internal/logging"
 )
 
-var validID = regexp.MustCompile(`^[0-9a-zA-Z]{8}$`)
-
 const maxResultBodyBytes = 4096
+
+// validResultID reports whether id is exactly eight ASCII letters or digits.
+func validResultID(id string) bool {
+	if len(id) != 8 {
+		return false
+	}
+	for i := 0; i < 8; i++ {
+		c := id[i]
+		switch {
+		case c >= '0' && c <= '9':
+		case c >= 'a' && c <= 'z':
+		case c >= 'A' && c <= 'Z':
+		default:
+			return false
+		}
+	}
+	return true
+}
 
 type Handler struct {
 	store *Store
@@ -152,7 +167,7 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if !validID.MatchString(id) {
+	if !validResultID(id) {
 		respondJSONError(w, "invalid result ID", http.StatusBadRequest)
 		return
 	}

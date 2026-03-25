@@ -65,7 +65,7 @@ func BenchmarkValidResultIDMatch(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if !validID.MatchString(id) {
+		if !validResultID(id) {
 			b.Fatal("expected match")
 		}
 	}
@@ -78,7 +78,7 @@ func BenchmarkValidResultIDReject(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if validID.MatchString(id) {
+		if validResultID(id) {
 			b.Fatal("expected reject")
 		}
 	}
