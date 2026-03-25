@@ -2,12 +2,11 @@ package api
 
 import (
 	"net/http"
-	"strings"
 )
 
 func registryRateLimitMiddleware(limiter *RateLimiter, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, apiV1RegistryPrefix) {
+		if !hasRegistryAPIPrefix(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -40,4 +39,12 @@ func applyRateLimit(limiter *RateLimiter, next http.HandlerFunc) http.HandlerFun
 		}
 		next(w, r)
 	}
+}
+
+func hasRegistryAPIPrefix(p string) bool {
+	pre := apiV1RegistryPrefix
+	if len(p) < len(pre) {
+		return false
+	}
+	return p[:len(pre)] == pre
 }
