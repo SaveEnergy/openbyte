@@ -53,7 +53,7 @@ func matchesAllowedOrigin(allowed, origin, originHostValue string) bool {
 	if allowed == "" {
 		return false
 	}
-	if allowed == "*" || strings.EqualFold(allowed, origin) {
+	if allowed == "*" || allowed == origin || strings.EqualFold(allowed, origin) {
 		return true
 	}
 	if after, ok := strings.CutPrefix(allowed, "*."); ok {
@@ -61,7 +61,8 @@ func matchesAllowedOrigin(allowed, origin, originHostValue string) bool {
 			(originHostValue == after || strings.HasSuffix(originHostValue, "."+after))
 	}
 	allowedHost := types.OriginHost(allowed)
-	return allowedHost != "" && originHostValue != "" && strings.EqualFold(allowedHost, originHostValue)
+	return allowedHost != "" && originHostValue != "" &&
+		(allowedHost == originHostValue || strings.EqualFold(allowedHost, originHostValue))
 }
 
 func (r *Router) isAllowAllOrigins() bool {
