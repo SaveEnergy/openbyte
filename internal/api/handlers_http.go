@@ -7,7 +7,6 @@ import (
 	"io"
 	"math"
 	"net/http"
-	"strings"
 	"sync"
 
 	"github.com/saveenergy/openbyte/internal/logging"
@@ -19,9 +18,14 @@ var jsonBufPool = sync.Pool{
 	New: func() any { return &bytes.Buffer{} },
 }
 
+const (
+	jsonContentTypePrefix    = "application/json"
+	jsonContentTypePrefixLen = len(jsonContentTypePrefix)
+)
+
 func isJSONContentType(r *http.Request) bool {
 	ct := r.Header.Get("Content-Type")
-	return strings.HasPrefix(ct, "application/json")
+	return len(ct) >= jsonContentTypePrefixLen && ct[:jsonContentTypePrefixLen] == jsonContentTypePrefix
 }
 
 func validateMetricsPayload(m types.Metrics) error {
