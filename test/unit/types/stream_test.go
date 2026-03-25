@@ -1,6 +1,7 @@
 package types_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -46,6 +47,36 @@ func TestStripHostPort(t *testing.T) {
 		got := types.StripHostPort(tc.input)
 		if got != tc.want {
 			t.Errorf(stripHostPortFmt, tc.input, got, tc.want)
+		}
+	}
+}
+
+func TestDotBoundarySuffix(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		host, suffix string
+		want         bool
+	}{
+		{"foo.example.com", "example.com", true},
+		{"static.assets.cdn.example.org", "cdn.example.org", true},
+		{"example.com", "example.com", false},
+		{"example.com", "ample.com", false},
+		{"foo", "", false},
+		{"foo.", "", true},
+	}
+	for _, tc := range cases {
+		got := types.DotBoundarySuffix(tc.host, tc.suffix)
+		if got != tc.want {
+			t.Errorf("DotBoundarySuffix(%q, %q) = %v, want %v", tc.host, tc.suffix, got, tc.want)
+		}
+	}
+	// Parity with strings.HasSuffix(host, "."+suffix) for non-empty suffix.
+	for _, suf := range []string{"a", "bc", "example.com"} {
+		for _, host := range []string{"x.y.z", "a.b.c.d", "foo.example.com"} {
+			want := strings.HasSuffix(host, "."+suf)
+			if got := types.DotBoundarySuffix(host, suf); got != want {
+				t.Errorf("DotBoundarySuffix(%q, %q) = %v, want %v (HasSuffix parity)", host, suf, got, want)
+			}
 		}
 	}
 }

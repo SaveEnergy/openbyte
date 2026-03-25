@@ -142,6 +142,21 @@ func StripHostPort(host string) string {
 	return host
 }
 
+// DotBoundarySuffix reports whether host ends with "."+suffix (dot-separated
+// suffix). For empty suffix, it reports whether host ends with '.'.
+func DotBoundarySuffix(host, suffix string) bool {
+	if suffix == "" {
+		return len(host) > 0 && host[len(host)-1] == '.'
+	}
+	if len(host) <= len(suffix) {
+		return false
+	}
+	if host[len(host)-len(suffix)-1] != '.' {
+		return false
+	}
+	return host[len(host)-len(suffix):] == suffix
+}
+
 // OriginHost extracts the hostname from an origin URL string.
 func OriginHost(origin string) string {
 	// Fast path: typical browser origins are absolute URLs with no userinfo.

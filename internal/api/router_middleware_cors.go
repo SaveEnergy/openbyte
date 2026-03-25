@@ -58,7 +58,7 @@ func matchesAllowedOrigin(allowed, origin, originHostValue string) bool {
 	}
 	if after, ok := strings.CutPrefix(allowed, "*."); ok {
 		return originHostValue != "" &&
-			(originHostValue == after || strings.HasSuffix(originHostValue, "."+after))
+			(originHostValue == after || types.DotBoundarySuffix(originHostValue, after))
 	}
 	allowedHost := types.OriginHost(allowed)
 	return allowedHost != "" && originHostValue != "" &&
