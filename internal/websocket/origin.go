@@ -46,7 +46,7 @@ func matchesAllowedOrigin(allowed, origin, originHostValue string) bool {
 	if allowed == "" {
 		return false
 	}
-	if allowed == "*" || strings.EqualFold(allowed, origin) {
+	if allowed == "*" || allowed == origin || strings.EqualFold(allowed, origin) {
 		return true
 	}
 	if after, ok := strings.CutPrefix(allowed, "*."); ok {
