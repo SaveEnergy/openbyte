@@ -77,14 +77,31 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 	})
 }
 
+const (
+	staticFontsDirPrefix    = "fonts/"
+	staticFontsDirPrefixLen = len(staticFontsDirPrefix)
+	staticWoff2Suffix       = ".woff2"
+	staticWoff2SuffixLen    = len(staticWoff2Suffix)
+	staticWoffSuffix        = ".woff"
+	staticWoffSuffixLen     = len(staticWoffSuffix)
+)
+
 func isAllowedStaticAsset(name string, allowed map[string]bool) bool {
 	if allowed[name] {
 		return true
 	}
-	if strings.HasPrefix(name, "fonts/") {
-		return strings.HasSuffix(name, ".woff2") || strings.HasSuffix(name, ".woff")
+	if len(name) >= staticFontsDirPrefixLen && name[:staticFontsDirPrefixLen] == staticFontsDirPrefix {
+		return staticFontAssetSuffixOK(name)
 	}
 	return false
+}
+
+func staticFontAssetSuffixOK(name string) bool {
+	n := len(name)
+	if n >= staticWoff2SuffixLen && name[n-staticWoff2SuffixLen:] == staticWoff2Suffix {
+		return true
+	}
+	return n >= staticWoffSuffixLen && name[n-staticWoffSuffixLen:] == staticWoffSuffix
 }
 
 func staticCacheMiddleware(next http.Handler) http.Handler {
