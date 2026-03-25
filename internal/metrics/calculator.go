@@ -97,11 +97,11 @@ func CalculateJitter(samples []time.Duration) float64 {
 
 	var sum float64
 	for i := 1; i < len(samples); i++ {
-		diff := float64(samples[i] - samples[i-1])
-		if diff < 0 {
-			diff = -diff
+		d := samples[i] - samples[i-1]
+		if d < 0 {
+			d = -d
 		}
-		sum += diff
+		sum += float64(d)
 	}
 
 	return sum / float64(len(samples)-1) / float64(time.Millisecond)
