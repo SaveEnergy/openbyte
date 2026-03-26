@@ -88,7 +88,7 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 func (h *SpeedTestHandler) Ping(w http.ResponseWriter, r *http.Request) {
 	drainRequestBody(r)
 	clientIP := h.resolveClientIP(r)
-	isIPv6 := strings.Contains(clientIP, ":")
+	isIPv6 := strings.IndexByte(clientIP, ':') >= 0
 
 	w.Header().Set(headerContentType, contentTypeJSON)
 	w.Header().Set(headerCacheControl, valueNoStore)
