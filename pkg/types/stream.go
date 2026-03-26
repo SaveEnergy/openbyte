@@ -83,9 +83,14 @@ func (ss *StreamState) UpdateMetrics(m Metrics) {
 	ss.Metrics = m
 	elapsed := time.Since(ss.StartTime)
 	if !ss.StartTime.IsZero() && ss.Config.Duration > 0 {
-		ss.Progress = float64(elapsed) / float64(ss.Config.Duration) * 100
-		if ss.Progress > 100 {
-			ss.Progress = 100
+		el := elapsed.Nanoseconds()
+		den := ss.Config.Duration.Nanoseconds()
+		if den > 0 {
+			p := float64(el) / float64(den) * 100
+			if p > 100 {
+				p = 100
+			}
+			ss.Progress = p
 		}
 	}
 }
