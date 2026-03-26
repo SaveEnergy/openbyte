@@ -84,8 +84,8 @@ func (m *MultiStreamAggregator) GetAggregatedMetrics() types.Metrics {
 
 	throughputMbps := float64(0)
 	throughputAvgMbps := float64(0)
-	if elapsed.Seconds() > 0 {
-		throughputMbps = float64(totalBytes*8) / elapsed.Seconds() / 1_000_000
+	if ns := elapsed.Nanoseconds(); ns > 0 {
+		throughputMbps = float64(totalBytes*8) * 1e9 / float64(ns) / 1_000_000
 		throughputAvgMbps = throughputMbps
 	}
 
