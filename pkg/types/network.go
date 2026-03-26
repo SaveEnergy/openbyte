@@ -204,7 +204,7 @@ func OriginHost(origin string) string {
 		} else {
 			authority = rest[:end]
 		}
-		if authority != "" && !strings.Contains(authority, "@") {
+		if authority != "" && strings.IndexByte(authority, '@') < 0 {
 			return StripHostPort(authority)
 		}
 	}
