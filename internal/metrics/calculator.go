@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"math"
 	"slices"
 	"time"
 
@@ -51,9 +50,9 @@ func CalculateLatencyFromHistogram(bucketCounts []uint32, overflow uint32, bucke
 	avgMs := float64(sum) / float64(count) / float64(time.Millisecond)
 
 	bucketWidthMs := float64(bucketWidth / time.Millisecond)
-	p50 := percentileFromHistogram(bucketCounts, overflow, count, 0.50, maxMs, bucketWidthMs)
-	p95 := percentileFromHistogram(bucketCounts, overflow, count, 0.95, maxMs, bucketWidthMs)
-	p99 := percentileFromHistogram(bucketCounts, overflow, count, 0.99, maxMs, bucketWidthMs)
+	p50 := percentileFromHistogram(bucketCounts, overflow, count, 1, 2, maxMs, bucketWidthMs)
+	p95 := percentileFromHistogram(bucketCounts, overflow, count, 95, 100, maxMs, bucketWidthMs)
+	p99 := percentileFromHistogram(bucketCounts, overflow, count, 99, 100, maxMs, bucketWidthMs)
 
 	return types.LatencyMetrics{
 		MinMs: minMs,
@@ -66,12 +65,16 @@ func CalculateLatencyFromHistogram(bucketCounts []uint32, overflow uint32, bucke
 	}
 }
 
-func percentileFromHistogram(bucketCounts []uint32, overflow uint32, count int64, ratio float64, maxMs float64, bucketWidthMs float64) float64 {
+func percentileFromHistogram(bucketCounts []uint32, overflow uint32, count int64, num, denom int64, maxMs float64, bucketWidthMs float64) float64 {
 	if count <= 0 {
 		return 0
 	}
+	if num <= 0 || denom <= 0 {
+		return 0
+	}
 
-	target := max(int64(math.Ceil(float64(count)*ratio)), 1)
+	// Integer ceil(count * num / denom), matching legacy math.Ceil(float64(count)*ratio).
+	target := max((count*num+denom-1)/denom, 1)
 
 	var seen int64
 	for i, c := range bucketCounts {
