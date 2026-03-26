@@ -174,3 +174,44 @@
 - Public hosted test fleet (infra/cost).
 - Additional SDKs from OpenAPI (TypeScript/Python).
 - Packaging polish (Homebrew/apt).
+
+## Cursor Cloud specific instructions
+
+### Prerequisites
+
+- **Go 1.26.1** (pre-installed in the VM).
+- **Node.js 22** + **bun** (install via `npm install -g bun` if missing).
+- JS dev deps: `bun install` in repo root (Playwright + Redocly CLI).
+- Playwright browser: `bunx playwright install chromium --with-deps`.
+
+### Running the server (development)
+
+```bash
+make build && WEB_ROOT=./web ./bin/openbyte server
+```
+
+- `WEB_ROOT=./web` serves static files from disk instead of the embedded copy, enabling live edits without rebuilding.
+- Server listens on **:8080** (HTTP API + UI), **:8081** (TCP), **:8082** (UDP).
+- Web UI: `http://localhost:8080`.
+
+### Common commands
+
+| Task | Command |
+|---|---|
+| Build | `make build` |
+| Run server (dev) | `make run` (or `WEB_ROOT=./web ./bin/openbyte server`) |
+| Lint (Go) | `make ci-lint` |
+| Lint (OpenAPI) | `bun run lint:openapi` |
+| Unit tests | `go test ./... -short` |
+| E2E tests (Go) | `go test ./test/e2e -short` |
+| UI E2E (Playwright) | `make test-ui` (requires running server) |
+| Race detector | `make test-race` |
+| Benchmarks | `make perf-bench` |
+
+### Gotchas
+
+- The server must be running before Playwright UI tests (`make test-ui`).
+- No CGO required; SQLite uses `modernc.org/sqlite` (pure Go).
+- No external databases or services needed to run locally.
+- New `web/*.js` or `web/*.css` files must be added to `internal/api/router_static.go` allowlist or the server returns 404.
+- CLI client needs full URL scheme: `./bin/openbyte client http://localhost:8080`, not just `localhost`.
