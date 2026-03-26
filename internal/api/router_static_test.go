@@ -1,6 +1,19 @@
 package api
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+func TestStaticPathIsRootOrHTML_matchesHasSuffix(t *testing.T) {
+	t.Parallel()
+	for _, p := range []string{"/", "/index.html", "/foo.html", "/foo", "/foo.htm", "", "/a.html", "/path/x.html"} {
+		want := p == "/" || strings.HasSuffix(p, ".html")
+		if got := staticPathIsRootOrHTML(p); got != want {
+			t.Fatalf("%q: got %v want %v", p, got, want)
+		}
+	}
+}
 
 func TestIsAllowedStaticAsset_fonts(t *testing.T) {
 	t.Parallel()

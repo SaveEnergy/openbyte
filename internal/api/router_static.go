@@ -104,10 +104,18 @@ func staticFontAssetSuffixOK(name string) bool {
 	return n >= staticWoffSuffixLen && name[n-staticWoffSuffixLen:] == staticWoffSuffix
 }
 
+func staticPathIsRootOrHTML(path string) bool {
+	if path == "/" {
+		return true
+	}
+	n := len(path)
+	return n >= 5 && path[n-5:] == ".html"
+}
+
 func staticCacheMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet || r.Method == http.MethodHead {
-			if r.URL.Path == "/" || strings.HasSuffix(r.URL.Path, ".html") {
+			if staticPathIsRootOrHTML(r.URL.Path) {
 				w.Header().Set(headerCacheControl, valueNoStore)
 			}
 		}
