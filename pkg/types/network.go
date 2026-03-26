@@ -25,7 +25,7 @@ func NewNetworkInfo() *NetworkInfo {
 
 func (n *NetworkInfo) SetClientIP(ip string) {
 	n.ClientIP = sanitizeIP(ip)
-	n.IPv6 = strings.Contains(n.ClientIP, ":")
+	n.IPv6 = strings.IndexByte(n.ClientIP, ':') >= 0
 }
 
 func (n *NetworkInfo) SetServerIP(ip string) {
