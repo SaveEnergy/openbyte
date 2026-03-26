@@ -14,16 +14,16 @@ func CalculateLatency(samples []time.Duration) types.LatencyMetrics {
 	}
 
 	sorted := make([]time.Duration, len(samples))
-	copy(sorted, samples)
+	var sum time.Duration
+	for i := range samples {
+		sorted[i] = samples[i]
+		sum += samples[i]
+	}
 	slices.Sort(sorted)
 
 	min := float64(sorted[0]) / float64(time.Millisecond)
 	max := float64(sorted[len(sorted)-1]) / float64(time.Millisecond)
 
-	sum := time.Duration(0)
-	for _, s := range sorted {
-		sum += s
-	}
 	avg := float64(sum) / float64(len(sorted)) / float64(time.Millisecond)
 
 	p50 := float64(sorted[len(sorted)*50/100]) / float64(time.Millisecond)
