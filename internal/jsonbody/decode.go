@@ -12,6 +12,10 @@ import (
 // additional non-EOF data (more than one top-level JSON value).
 var ErrTrailingJSON = stdErrors.New("request body must contain a single JSON object")
 
+// trailingJSONProbe avoids allocating a new empty struct on every
+// DecodeSingleObject call when probing for trailing JSON after the primary decode.
+var trailingJSONProbe struct{}
+
 // DecodeSingleObject reads r.Body into dst using json.Decoder with
 // DisallowUnknownFields. When limit > 0, the body is wrapped with
 // http.MaxBytesReader using w for the error response path.
@@ -28,7 +32,7 @@ func DecodeSingleObject(w http.ResponseWriter, r *http.Request, dst any, limit i
 		_, _ = io.Copy(io.Discard, r.Body)
 		return err
 	}
-	if err := dec.Decode(&struct{}{}); !stdErrors.Is(err, io.EOF) {
+	if err := dec.Decode(&trailingJSONProbe); !stdErrors.Is(err, io.EOF) {
 		_, _ = io.Copy(io.Discard, r.Body)
 		return ErrTrailingJSON
 	}
