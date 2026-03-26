@@ -21,17 +21,12 @@ func validResultID(id string) bool {
 	if len(id) != 8 {
 		return false
 	}
-	for i := 0; i < 8; i++ {
-		c := id[i]
-		switch {
-		case c >= '0' && c <= '9':
-		case c >= 'a' && c <= 'z':
-		case c >= 'A' && c <= 'Z':
-		default:
-			return false
-		}
-	}
-	return true
+	return isAlnumByte(id[0]) && isAlnumByte(id[1]) && isAlnumByte(id[2]) && isAlnumByte(id[3]) &&
+		isAlnumByte(id[4]) && isAlnumByte(id[5]) && isAlnumByte(id[6]) && isAlnumByte(id[7])
+}
+
+func isAlnumByte(c byte) bool {
+	return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
 }
 
 type Handler struct {
