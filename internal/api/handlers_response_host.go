@@ -15,7 +15,7 @@ func normalizeHost(host string) string {
 		return loopbackIPv4
 	}
 	// No port — avoid net.SplitHostPort when the input cannot be host:port.
-	if !strings.Contains(host, ":") {
+	if strings.IndexByte(host, ':') < 0 {
 		if host == "localhost" {
 			return loopbackIPv4
 		}
@@ -31,7 +31,7 @@ func normalizeHost(host string) string {
 	}
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		trimmed = h
-		if strings.Contains(h, ":") && strings.Contains(host, "[") {
+		if strings.IndexByte(h, ':') >= 0 && strings.IndexByte(host, '[') >= 0 {
 			trimmed = "[" + h + "]"
 		}
 	}
@@ -49,7 +49,7 @@ func isUnspecifiedBind(addr string) bool {
 		return true
 	}
 	// No port — only literal 0.0.0.0 is unspecified among bind strings without ':'.
-	if !strings.Contains(host, ":") {
+	if strings.IndexByte(host, ':') < 0 {
 		return host == "0.0.0.0"
 	}
 	// Bracketed [::] with a trailing port: slice compare only (no SplitHostPort / "["+h+"]" alloc).
