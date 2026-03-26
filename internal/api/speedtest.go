@@ -14,7 +14,7 @@ type SpeedTestHandler struct {
 	activeDownloads    int64
 	activeUploads      int64
 	maxConcurrent      int64
-	maxConcurrentPerIP int
+	maxConcurrentPerIP atomic.Int64
 	maxDurationSec     int
 	clientIPResolver   *ClientIPResolver
 	randomData         []byte
@@ -75,9 +75,7 @@ func (h *SpeedTestHandler) SetMaxConcurrentPerIP(limit int) {
 	if limit < 0 {
 		limit = 0
 	}
-	h.ipMu.Lock()
-	h.maxConcurrentPerIP = limit
-	h.ipMu.Unlock()
+	h.maxConcurrentPerIP.Store(int64(limit))
 }
 
 func (h *SpeedTestHandler) resolveClientIP(r *http.Request) string {
@@ -116,9 +114,13 @@ func (h *SpeedTestHandler) tryAcquirePerIP(clientIP string, isDownload bool) boo
 	if clientIP == "" {
 		return true
 	}
+	if h.maxConcurrentPerIP.Load() <= 0 {
+		return true
+	}
 	h.ipMu.Lock()
 	defer h.ipMu.Unlock()
-	if h.maxConcurrentPerIP <= 0 {
+	limit := int(h.maxConcurrentPerIP.Load())
+	if limit <= 0 {
 		return true
 	}
 	counts := h.activeByIP[clientIP]
@@ -129,7 +131,7 @@ func (h *SpeedTestHandler) tryAcquirePerIP(clientIP string, isDownload bool) boo
 	if isDownload {
 		current = counts.downloads
 	}
-	if current >= h.maxConcurrentPerIP {
+	if current >= limit {
 		return false
 	}
 	if h.activeByIP[clientIP] == nil {
