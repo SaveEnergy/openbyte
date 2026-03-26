@@ -41,13 +41,14 @@ func NewMultiStreamAggregator(streamCount int) *MultiStreamAggregator {
 }
 
 func (m *MultiStreamAggregator) GetAggregatedMetrics() types.Metrics {
-	m.mu.RLock()
-	collectors := append([]*Collector(nil), m.collectors...)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	collectors := m.collectors
 	startTime := m.startTime
-	bucketLen := len(m.bucketCounts)
-	bucketScratchLen := len(m.bucketScratch)
 	bucketWidth := m.bucketWidth
-	m.mu.RUnlock()
+	bucketCounts := m.bucketCounts
+	bucketScratch := m.bucketScratch
 
 	if len(collectors) == 0 {
 		return types.Metrics{
@@ -61,8 +62,9 @@ func (m *MultiStreamAggregator) GetAggregatedMetrics() types.Metrics {
 	var totalPacketsSent int64
 	var totalPacketsRecv int64
 	totals := latencyMergeTotals{}
-	bucketCounts := make([]uint32, bucketLen)
-	bucketScratch := make([]uint32, bucketScratchLen)
+	if len(bucketCounts) > 0 {
+		clear(bucketCounts)
+	}
 
 	for _, collector := range collectors {
 		totalBytesSent += atomic.LoadInt64(&collector.bytesSent)
