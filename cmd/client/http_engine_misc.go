@@ -47,6 +47,9 @@ func (e *HTTPTestEngine) handleNonOKResponse(ctx context.Context, direction stri
 }
 
 func (e *HTTPTestEngine) addBytes(n int64, elapsed time.Duration) {
+	if elapsed >= e.config.Duration {
+		return
+	}
 	if elapsed < e.config.GraceTime {
 		atomic.AddInt64(&e.graceBytes, n)
 		return

@@ -14,7 +14,7 @@ import (
 )
 
 func (e *HTTPTestEngine) runDownload(ctx context.Context) error {
-	reqURL := e.buildDownloadURL()
+	deadline := time.Now().Add(e.config.Duration)
 	var wg sync.WaitGroup
 	errCh := make(chan error, e.config.Streams)
 
@@ -22,7 +22,7 @@ func (e *HTTPTestEngine) runDownload(ctx context.Context) error {
 		wg.Add(1)
 		go func(delay time.Duration) {
 			defer wg.Done()
-			if err := e.runDownloadStream(ctx, reqURL, delay); err != nil {
+			if err := e.runDownloadStream(ctx, deadline, delay); err != nil {
 				errCh <- err
 			}
 		}(time.Duration(i) * e.config.StreamDelay)
@@ -33,10 +33,19 @@ func (e *HTTPTestEngine) runDownload(ctx context.Context) error {
 	return joinStreamErrors("download", errCh)
 }
 
-func (e *HTTPTestEngine) runDownloadStream(ctx context.Context, reqURL string, delay time.Duration) error {
-	time.Sleep(delay)
+func (e *HTTPTestEngine) runDownloadStream(ctx context.Context, deadline time.Time, delay time.Duration) error {
+	streamCtx, cancel := context.WithDeadline(ctx, deadline)
+	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if !waitForStreamDelay(streamCtx, delay) {
+		return nil
+	}
+	remaining := time.Until(deadline)
+	if remaining <= 0 {
+		return nil
+	}
+
+	req, err := http.NewRequestWithContext(streamCtx, http.MethodGet, e.buildDownloadURL(remaining), nil)
 	if err != nil {
 		return err
 	}
@@ -69,7 +78,7 @@ func (e *HTTPTestEngine) runDownloadStream(ctx context.Context, reqURL string, d
 			e.addBytes(int64(n), e.elapsedSinceStart())
 		}
 		if readErr != nil {
-			if errors.Is(readErr, io.EOF) || ctx.Err() != nil {
+			if errors.Is(readErr, io.EOF) || streamCtx.Err() != nil {
 				return nil
 			}
 			return readErr
@@ -77,15 +86,40 @@ func (e *HTTPTestEngine) runDownloadStream(ctx context.Context, reqURL string, d
 	}
 }
 
-func (e *HTTPTestEngine) buildDownloadURL() string {
+func waitForStreamDelay(ctx context.Context, delay time.Duration) bool {
+	if delay <= 0 {
+		return true
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+func (e *HTTPTestEngine) buildDownloadURL(duration time.Duration) string {
 	base := strings.TrimRight(e.config.ServerURL, "/")
 	u, err := url.Parse(base + "/api/v1/download")
 	if err != nil {
 		return base + "/api/v1/download"
 	}
 	q := u.Query()
-	q.Set("duration", fmt.Sprintf("%d", int(e.config.Duration.Seconds())))
+	q.Set("duration", fmt.Sprintf("%d", ceilDurationSeconds(duration)))
 	q.Set("chunk", fmt.Sprintf("%d", e.config.ChunkSize))
 	u.RawQuery = q.Encode()
 	return u.String()
+}
+
+func ceilDurationSeconds(duration time.Duration) int {
+	if duration <= 0 {
+		return 1
+	}
+	seconds := int(duration / time.Second)
+	if duration%time.Second != 0 {
+		seconds++
+	}
+	return max(seconds, 1)
 }

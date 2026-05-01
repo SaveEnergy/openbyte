@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -64,6 +65,60 @@ func TestHTTPTestEngineDownload(t *testing.T) {
 	}
 	if metrics.BytesReceived == 0 {
 		t.Fatalf("expected bytes received > 0")
+	}
+}
+
+func TestHTTPTestEngineDownloadUsesGlobalDuration(t *testing.T) {
+	handler := api.NewSpeedTestHandler(10, 300)
+	mux := http.NewServeMux()
+	mux.HandleFunc(downloadPath, handler.Download)
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+
+	cfg := &HTTPTestConfig{
+		ServerURL:      server.URL,
+		Duration:       engineDuration,
+		Streams:        8,
+		ChunkSize:      downloadChunkSize,
+		Direction:      downloadDirection,
+		GraceTime:      0,
+		StreamDelay:    200 * time.Millisecond,
+		OverheadFactor: 1.0,
+		Timeout:        engineTimeout,
+	}
+
+	engine, err := NewHTTPTestEngine(cfg)
+	if err != nil {
+		t.Fatalf("new http test engine: %v", err)
+	}
+	defer engine.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+
+	start := time.Now()
+	if err := engine.Run(ctx); err != nil {
+		t.Fatalf("run download: %v", err)
+	}
+	elapsed := time.Since(start)
+	if elapsed > engineDuration+700*time.Millisecond {
+		t.Fatalf("download exceeded global duration: elapsed=%s duration=%s", elapsed, engineDuration)
+	}
+	if metrics := engine.GetMetrics(); metrics.BytesTransferred == 0 {
+		t.Fatalf("expected bytes transferred > 0")
+	}
+}
+
+func TestHTTPAddBytesStopsAtConfiguredDuration(t *testing.T) {
+	engine := &HTTPTestEngine{config: &HTTPTestConfig{Duration: engineDuration}}
+
+	engine.addBytes(100, engineDuration)
+	if total := atomic.LoadInt64(&engine.totalBytes); total != 0 {
+		t.Fatalf("total bytes after duration = %d, want 0", total)
+	}
+
+	engine.addBytes(100, engineDuration-time.Millisecond)
+	if total := atomic.LoadInt64(&engine.totalBytes); total != 100 {
+		t.Fatalf("total bytes before duration = %d, want 100", total)
 	}
 }
 
