@@ -47,11 +47,13 @@ Workflow lives at `.github/workflows/ci.yml`:
 - `SSH_PORT` — optional (default 22)
 - `REMOTE_DIR` — path containing `docker/docker-compose.ghcr.yaml` (e.g., `/opt/openbyte`)
 - `GHCR_USERNAME` — GHCR username (e.g., `SaveEnergy`)
+- `SERVER_NAME` — optional display name used by CI/release deploys (e.g., `Frankfurt 10G`)
 
 Notes:
 
 - CI/release workflows derive `GHCR_OWNER` from the repository owner.
 - CI deploy sets `IMAGE_TAG` to the commit SHA; release deploy sets `IMAGE_TAG` to the semver tag.
+- If `SERVER_NAME` is set as a repository variable, it overrides the remote `.env` value for CI/release deploys.
 - CI/release deploys fail closed if the scanned SSH host key fingerprint does not match `SSH_HOST_FINGERPRINT`.
 
 Record the fingerprint out-of-band before enabling deploys:
@@ -81,6 +83,7 @@ Copy both `docker/docker-compose.ghcr.yaml` and `docker/docker-compose.ghcr.trae
 
 ```bash
 PUBLIC_HOST="speedtest.example.com"
+SERVER_NAME="Frankfurt 10G"
 ALLOWED_ORIGINS="https://speedtest.example.com"
 TRUST_PROXY_HEADERS=true
 TRUSTED_PROXY_CIDRS="10.0.0.0/8,192.168.0.0/16"
@@ -236,9 +239,11 @@ Each server needs its own public host:
 ```bash
 # Server 1 (NYC)
 PUBLIC_HOST=nyc.speedtest.example.com
+SERVER_NAME="New York 10G"
 
 # Server 2 (AMS)
 PUBLIC_HOST=ams.speedtest.example.com
+SERVER_NAME="Amsterdam 10G"
 ```
 
 ### Client Usage

@@ -1,13 +1,44 @@
 /** Server health and network info (barrel). */
 
-import { getApiBase, elements } from "./state.js";
+import { getApiBase, elements, state } from "./state.js";
 import { detectNetworkInfo, updateNetworkDisplay } from "./network-probes.js";
 import { isHealthyServerCandidate } from "./network-health.js";
 
 export { detectNetworkInfo, updateNetworkDisplay };
 
+const fallbackServerName = "openByte Server";
+
 export function resolveServerName() {
-  return "Current Server";
+  return normalizeServerName(state.serverName);
+}
+
+export async function loadServerInfo() {
+  try {
+    const response = await fetch(`${getApiBase()}/version`, {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      await response.text().catch(() => {});
+      throw new Error(`version endpoint returned ${response.status}`);
+    }
+    const data = await response.json();
+    setServerName(data?.server_name);
+  } catch (e) {
+    console.debug("Server info load failed:", e);
+    setServerName(state.serverName);
+  }
+}
+
+function setServerName(name) {
+  state.serverName = normalizeServerName(name);
+  if (elements.serverName) {
+    elements.serverName.textContent = state.serverName;
+  }
+}
+
+function normalizeServerName(name) {
+  const value = typeof name === "string" ? name.trim() : "";
+  return value || fallbackServerName;
 }
 
 function setServerOnlineUI() {

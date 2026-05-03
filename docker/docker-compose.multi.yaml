@@ -18,6 +18,7 @@ services:
       - "8082:8082/udp"
     environment:
       - PUBLIC_HOST=${US_EAST_HOST:-}
+      - SERVER_NAME=${US_EAST_NAME:-US East}
       - CAPACITY_GBPS=25
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
@@ -52,6 +53,7 @@ services:
       - "8182:8082/udp"
     environment:
       - PUBLIC_HOST=${EU_WEST_HOST:-}
+      - SERVER_NAME=${EU_WEST_NAME:-EU West}
       - CAPACITY_GBPS=25
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
@@ -86,6 +88,7 @@ services:
       - "8282:8082/udp"
     environment:
       - PUBLIC_HOST=${AP_SOUTH_HOST:-}
+      - SERVER_NAME=${AP_SOUTH_NAME:-AP South}
       - CAPACITY_GBPS=25
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}

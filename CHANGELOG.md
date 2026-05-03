@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-05-03
+
+### Added
+
+- **Server display name**: `SERVER_NAME` / `--server-name` now drives the Web UI server subtitle
+  and the `server_name` saved with shared results; CI/release deploys can source it from the
+  `SERVER_NAME` GitHub repository variable.
+
 ## [0.9.0] - 2026-05-03
 
 ### Removed
@@ -94,6 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **golang.org/x/term** v0.41.0, **modernc.org/sqlite** v1.47.0, **github.com/mark3labs/mcp-go** v0.45.0 (and transitive updates).
 - Routine **GitHub Actions** version bumps via Dependabot.
 
-[Unreleased]: https://github.com/SaveEnergy/openbyte/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/SaveEnergy/openbyte/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/SaveEnergy/openbyte/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/SaveEnergy/openbyte/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/SaveEnergy/openbyte/compare/v0.7.0...v0.8.0

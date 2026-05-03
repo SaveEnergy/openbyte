@@ -24,6 +24,7 @@ export const state = {
     ipv4: null,
     ipv6: null,
   },
+  serverName: "openByte Server",
   resultId: null,
   shareSavePromise: null,
   lastAriaProgressUpdateMs: 0,

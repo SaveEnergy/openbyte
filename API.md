@@ -348,7 +348,8 @@ Build/version information.
 **Response:**
 ```json
 {
-  "version": "v1.2.3"
+  "version": "v1.2.3",
+  "server_name": "Frankfurt 10G"
 }
 ```
 

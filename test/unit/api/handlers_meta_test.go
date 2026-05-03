@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/saveenergy/openbyte/internal/api"
+	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/stream"
 )
 
@@ -16,6 +17,9 @@ func TestGetVersion(t *testing.T) {
 	mgr := stream.NewManager(10, 10)
 	handler := api.NewHandler(mgr)
 	handler.SetVersion("1.2.3")
+	cfg := config.DefaultConfig()
+	cfg.ServerName = "Frankfurt 10G"
+	handler.SetConfig(cfg)
 
 	req := httptest.NewRequest(http.MethodGet, versionEndpoint, nil)
 	rec := httptest.NewRecorder()
@@ -31,6 +35,9 @@ func TestGetVersion(t *testing.T) {
 	}
 	if resp.Version != "1.2.3" {
 		t.Errorf("version = %q, want 1.2.3", resp.Version)
+	}
+	if resp.ServerName != "Frankfurt 10G" {
+		t.Errorf("server name = %q, want Frankfurt 10G", resp.ServerName)
 	}
 }
 
@@ -48,6 +55,9 @@ func TestGetVersionDefault(t *testing.T) {
 	}
 	if resp.Version != "dev" {
 		t.Errorf("default version = %q, want dev", resp.Version)
+	}
+	if resp.ServerName != config.DefaultServerName {
+		t.Errorf("default server name = %q, want %q", resp.ServerName, config.DefaultServerName)
 	}
 }
 

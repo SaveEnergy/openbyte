@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -47,6 +48,9 @@ func (c *Config) loadCoreEnvPortsAndBind() error {
 func (c *Config) loadCoreEnvPublicHost() error {
 	if host := os.Getenv("PUBLIC_HOST"); host != "" {
 		c.PublicHost = host
+	}
+	if name := strings.TrimSpace(os.Getenv("SERVER_NAME")); name != "" {
+		c.ServerName = name
 	}
 	return nil
 }

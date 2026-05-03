@@ -509,6 +509,9 @@ components:
       properties:
         version:
           type: string
+        server_name:
+          type: string
+          description: Display name configured for this server.
 
     StartStreamRequest:
       type: object

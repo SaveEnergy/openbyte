@@ -85,28 +85,29 @@ Uses BEREC-compliant measurement practices:
 
 ### Server Environment Variables
 
-| Variable               | Default          | Description                                                        |
-| ---------------------- | ---------------- | ------------------------------------------------------------------ |
-| `PORT`                 | 8080             | HTTP API port                                                      |
-| `TCP_TEST_PORT`        | 8081             | TCP test data port                                                 |
-| `UDP_TEST_PORT`        | 8082             | UDP test data port                                                 |
-| `PUBLIC_HOST`          | —                | Public hostname/IP                                                 |
-| `CAPACITY_GBPS`        | 25               | Server link capacity; HTTP concurrency limits auto-scale from this |
-| `RATE_LIMIT_PER_IP`    | 100              | Rate limit per IP per minute                                       |
-| `GLOBAL_RATE_LIMIT`    | 1000             | Global rate limit per minute                                       |
-| `TRUST_PROXY_HEADERS`  | false            | Trust proxy headers for client IP                                  |
-| `TRUSTED_PROXY_CIDRS`  | —                | Comma-separated trusted proxy CIDRs                                |
-| `ALLOWED_ORIGINS`      | `*`              | Comma-separated CORS/WS allowed origins                            |
-| `WEB_ROOT`             | _(embedded)_     | Override path to static web assets (for development)               |
-| `MAX_CONCURRENT_TESTS` | 10               | Maximum simultaneous tests                                         |
-| `MAX_STREAMS`          | 32               | Maximum parallel streams per test (1-64)                           |
-| `MAX_TEST_DURATION`    | `300s`           | Maximum test duration (Go duration format)                         |
-| `DATA_DIR`             | `./data`         | Path to SQLite database directory                                  |
-| `MAX_STORED_RESULTS`   | 10000            | Maximum stored test results (older results auto-purged)            |
-| `BIND_ADDRESS`         | `0.0.0.0`        | Address to bind listeners                                          |
-| `PPROF_ENABLED`        | false            | Enable pprof profiling server                                      |
-| `PPROF_ADDR`           | `127.0.0.1:6060` | pprof server listen address                                        |
-| `PERF_STATS_INTERVAL`  | —                | Log runtime stats at this interval (e.g. `10s`)                    |
+| Variable               | Default           | Description                                                        |
+| ---------------------- | ----------------- | ------------------------------------------------------------------ |
+| `PORT`                 | 8080              | HTTP API port                                                      |
+| `TCP_TEST_PORT`        | 8081              | TCP test data port                                                 |
+| `UDP_TEST_PORT`        | 8082              | UDP test data port                                                 |
+| `SERVER_NAME`          | `openByte Server` | Display name shown in the Web UI and saved results                 |
+| `PUBLIC_HOST`          | —                 | Public hostname/IP                                                 |
+| `CAPACITY_GBPS`        | 25                | Server link capacity; HTTP concurrency limits auto-scale from this |
+| `RATE_LIMIT_PER_IP`    | 100               | Rate limit per IP per minute                                       |
+| `GLOBAL_RATE_LIMIT`    | 1000              | Global rate limit per minute                                       |
+| `TRUST_PROXY_HEADERS`  | false             | Trust proxy headers for client IP                                  |
+| `TRUSTED_PROXY_CIDRS`  | —                 | Comma-separated trusted proxy CIDRs                                |
+| `ALLOWED_ORIGINS`      | `*`               | Comma-separated CORS/WS allowed origins                            |
+| `WEB_ROOT`             | _(embedded)_      | Override path to static web assets (for development)               |
+| `MAX_CONCURRENT_TESTS` | 10                | Maximum simultaneous tests                                         |
+| `MAX_STREAMS`          | 32                | Maximum parallel streams per test (1-64)                           |
+| `MAX_TEST_DURATION`    | `300s`            | Maximum test duration (Go duration format)                         |
+| `DATA_DIR`             | `./data`          | Path to SQLite database directory                                  |
+| `MAX_STORED_RESULTS`   | 10000             | Maximum stored test results (older results auto-purged)            |
+| `BIND_ADDRESS`         | `0.0.0.0`         | Address to bind listeners                                          |
+| `PPROF_ENABLED`        | false             | Enable pprof profiling server                                      |
+| `PPROF_ADDR`           | `127.0.0.1:6060`  | pprof server listen address                                        |
+| `PERF_STATS_INTERVAL`  | —                 | Log runtime stats at this interval (e.g. `10s`)                    |
 
 Notes:
 

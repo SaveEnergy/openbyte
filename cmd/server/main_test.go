@@ -29,6 +29,7 @@ func TestApplyServerFlagOverrides(t *testing.T) {
 	fs, fv := buildServerFlagSet(cfg)
 	if err := fs.Parse([]string{
 		"--public-host=" + flagPublicHost,
+		"--server-name=Frankfurt 10G",
 		"--max-test-duration=" + duration120s,
 		"--allowed-origins=" + allowedOriginsValue,
 	}); err != nil {
@@ -41,6 +42,9 @@ func TestApplyServerFlagOverrides(t *testing.T) {
 
 	if cfg.PublicHost != flagPublicHost {
 		t.Fatalf("public host = %q, want %q", cfg.PublicHost, flagPublicHost)
+	}
+	if cfg.ServerName != "Frankfurt 10G" {
+		t.Fatalf("server name = %q, want Frankfurt 10G", cfg.ServerName)
 	}
 	if cfg.MaxTestDuration.String() != maxDuration2m {
 		t.Fatalf("max test duration = %s, want %s", cfg.MaxTestDuration, maxDuration2m)

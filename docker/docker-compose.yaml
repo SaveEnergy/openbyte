@@ -8,12 +8,13 @@ services:
     image: openbyte:latest
     container_name: openbyte
     ports:
-      - "8080:8080"   # API + Web UI
-      - "8081:8081"   # TCP test port
-      - "8082:8082"   # UDP test port
+      - "8080:8080" # API + Web UI
+      - "8081:8081" # TCP test port
+      - "8082:8082" # UDP test port
       - "8082:8082/udp"
     environment:
       - PUBLIC_HOST=${PUBLIC_HOST:-}
+      - SERVER_NAME=${SERVER_NAME:-openByte Server}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
       - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}

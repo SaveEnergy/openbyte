@@ -168,6 +168,7 @@ jobs:
       SSH_PORT: ${{ vars.SSH_PORT }}
       REMOTE_DIR: ${{ vars.REMOTE_DIR }}
       GHCR_USERNAME: ${{ vars.GHCR_USERNAME }}
+      SERVER_NAME: ${{ vars.SERVER_NAME }}
       SSH_KEY: ${{ secrets.SSH_KEY }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
     steps:

@@ -5,9 +5,12 @@ import (
 	"time"
 )
 
+const DefaultServerName = "openByte Server"
+
 type Config struct {
 	Port        string
 	BindAddress string
+	ServerName  string
 
 	TCPTestPort int
 	UDPTestPort int
@@ -57,6 +60,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Port:                  "8080",
 		BindAddress:           "0.0.0.0",
+		ServerName:            DefaultServerName,
 		TCPTestPort:           8081,
 		UDPTestPort:           8082,
 		PublicHost:            "",

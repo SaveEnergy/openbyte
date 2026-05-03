@@ -50,6 +50,19 @@ func TestConfigLoadGlobalRateLimitEnv(t *testing.T) {
 	}
 }
 
+func TestConfigLoadServerNameEnv(t *testing.T) {
+	t.Setenv("SERVER_NAME", "Frankfurt 10G")
+
+	cfg := config.DefaultConfig()
+	if err := cfg.LoadFromEnv(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if cfg.ServerName != "Frankfurt 10G" {
+		t.Fatalf("server name = %q, want Frankfurt 10G", cfg.ServerName)
+	}
+}
+
 func TestConfigLoadGlobalRateLimitEnvInvalid(t *testing.T) {
 	t.Setenv("GLOBAL_RATE_LIMIT", "not-a-number")
 
@@ -257,5 +270,19 @@ func TestValidateMaxConcurrentPerIPWithinBounds(t *testing.T) {
 	cfg.MaxConcurrentPerIP = 5
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("bounded max concurrent per IP should pass: %v", err)
+	}
+}
+
+func TestValidateServerName(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.ServerName = ""
+	if cfg.Validate() == nil {
+		t.Fatal("empty server name should fail validation")
+	}
+
+	cfg = config.DefaultConfig()
+	cfg.ServerName = string(make([]byte, 201))
+	if cfg.Validate() == nil {
+		t.Fatal("overlong server name should fail validation")
 	}
 }

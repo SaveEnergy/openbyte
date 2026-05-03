@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func (c *Config) validatePorts() error {
@@ -45,6 +46,12 @@ func validatePortCollisions(httpPortRaw string, httpPort, tcpPort, udpPort int) 
 }
 
 func (c *Config) validateLimits() error {
+	if strings.TrimSpace(c.ServerName) == "" {
+		return fmt.Errorf("server name cannot be empty")
+	}
+	if len(c.ServerName) > 200 {
+		return fmt.Errorf("server name must be <= 200 bytes")
+	}
 	if c.MaxConcurrentTests <= 0 {
 		return fmt.Errorf("max concurrent tests must be > 0")
 	}

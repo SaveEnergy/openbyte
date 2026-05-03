@@ -2,6 +2,7 @@
 # Pull image DEPLOY_TAG on remote host and recreate openbyte container. Run from repo root.
 # Required env: SSH_HOST, SSH_HOST_FINGERPRINT, SSH_USER, SSH_PORT, REMOTE_DIR, SSH_KEY,
 # GHCR_USERNAME, GHCR_TOKEN, DEPLOY_TAG, GITHUB_REPOSITORY_OWNER
+# Optional env: SERVER_NAME (overrides remote .env for this deploy)
 set -euo pipefail
 [[ -n "${REMOTE_DIR:-}" ]] || { echo "REMOTE_DIR not set"; exit 1; }
 [[ -n "${DEPLOY_TAG:-}" ]] || { echo "DEPLOY_TAG not set"; exit 1; }
@@ -30,15 +31,21 @@ GHCR_USERNAME_Q="$(printf '%q' "$GHCR_USERNAME")"
 GHCR_TOKEN_Q="$(printf '%q' "$GHCR_TOKEN")"
 OWNER_LC_Q="$(printf '%q' "$OWNER_LC")"
 DEPLOY_TAG_Q="$(printf '%q' "$DEPLOY_TAG")"
+SERVER_NAME_Q="$(printf '%q' "${SERVER_NAME:-}")"
 
 ssh -i "$SSH_TMP_DIR/id_rsa" \
   -o UserKnownHostsFile="$SSH_TMP_DIR/known_hosts" \
   -o IdentitiesOnly=yes \
   -p "${SSH_PORT:-22}" \
   "${SSH_USER}@${SSH_HOST}" \
-  "REMOTE_DIR=$REMOTE_DIR_Q GHCR_USERNAME=$GHCR_USERNAME_Q GHCR_TOKEN=$GHCR_TOKEN_Q OWNER_LC=$OWNER_LC_Q DEPLOY_TAG=$DEPLOY_TAG_Q sh -seu" <<'EOF'
+  "REMOTE_DIR=$REMOTE_DIR_Q GHCR_USERNAME=$GHCR_USERNAME_Q GHCR_TOKEN=$GHCR_TOKEN_Q OWNER_LC=$OWNER_LC_Q DEPLOY_TAG=$DEPLOY_TAG_Q SERVER_NAME=$SERVER_NAME_Q sh -seu" <<'EOF'
 [ -n "$REMOTE_DIR" ] || { echo "REMOTE_DIR not set"; exit 1; }
 test -f "$REMOTE_DIR/.env" || { echo "Missing .env at $REMOTE_DIR/.env"; exit 1; }
+if [ -n "${SERVER_NAME:-}" ]; then
+  export SERVER_NAME
+else
+  unset SERVER_NAME
+fi
 echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
 cd "$REMOTE_DIR"

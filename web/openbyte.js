@@ -6,12 +6,13 @@ import {
   resetToIdle,
   handleShare,
 } from "./speedtest-orchestrator.js";
-import { checkServer, detectNetworkInfo } from "./network.js";
+import { checkServer, detectNetworkInfo, loadServerInfo } from "./network.js";
 import { bindEvents, loadSettings } from "./settings.js";
 
 function init() {
   initElements();
   loadSettings();
+  loadServerInfo();
   checkServer();
   bindEvents({
     startTest,

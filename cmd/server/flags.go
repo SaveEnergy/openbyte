@@ -20,6 +20,7 @@ const (
 type serverFlagValues struct {
 	port               *string
 	bindAddress        *string
+	serverName         *string
 	tcpTestPort        *int
 	udpTestPort        *int
 	publicHost         *string
@@ -56,6 +57,7 @@ func buildServerFlagSet(cfg *config.Config) (*flag.FlagSet, *serverFlagValues) {
 	fv := &serverFlagValues{
 		port:               fs.String("port", cfg.Port, "HTTP API port (env: PORT)"),
 		bindAddress:        fs.String("bind-address", cfg.BindAddress, "Bind address (env: BIND_ADDRESS)"),
+		serverName:         fs.String("server-name", cfg.ServerName, "Display name for this server (env: SERVER_NAME)"),
 		tcpTestPort:        fs.Int("tcp-test-port", cfg.TCPTestPort, "TCP test port (env: TCP_TEST_PORT)"),
 		udpTestPort:        fs.Int("udp-test-port", cfg.UDPTestPort, "UDP test port (env: UDP_TEST_PORT)"),
 		publicHost:         fs.String("public-host", cfg.PublicHost, "Public host for URLs (env: PUBLIC_HOST)"),
@@ -125,6 +127,7 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 	overrides := map[string]func() error{
 		"port":                  func() error { cfg.Port = *fv.port; return nil },
 		"bind-address":          func() error { cfg.BindAddress = *fv.bindAddress; return nil },
+		"server-name":           func() error { cfg.ServerName = strings.TrimSpace(*fv.serverName); return nil },
 		"tcp-test-port":         func() error { cfg.TCPTestPort = *fv.tcpTestPort; return nil },
 		"udp-test-port":         func() error { cfg.UDPTestPort = *fv.udpTestPort; return nil },
 		"public-host":           func() error { cfg.PublicHost = *fv.publicHost; return nil },
