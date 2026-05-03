@@ -1,18 +1,8 @@
 /** DOM updates: progress, speed display, state views, toast. */
 
-import {
-  state,
-  elements,
-  RING_CIRCUMFERENCE,
-  RING_END_OFFSET,
-  TEST_CONFIG,
-  toast,
-} from "./state.js";
+import { state, elements, TEST_CONFIG, toast } from "./state.js";
 import { computeBufferbloatGrade, formatSpeed } from "./utils.js";
 import { updateNetworkDisplay } from "./network.js";
-
-let visualProgress = 0;
-let progressAnimationFrame = 0;
 
 function focusStateAction(stateName) {
   if (elements.settingsModal?.open) return;
@@ -59,11 +49,31 @@ function formatLatencyMs(val) {
   return "-";
 }
 
+function setInstrumentActivity(speed, direction) {
+  if (!elements.testingState) return;
+
+  const normalized =
+    direction === "latency"
+      ? Math.max(0.1, Math.min(1, 1 - speed / 180))
+      : Math.max(0.08, Math.min(1, Math.log10(speed + 1) / 3));
+
+  const glowSize = 18 + normalized * 34;
+  elements.testingState.style.setProperty(
+    "--instrument-glow-size",
+    `${glowSize.toFixed(0)}px`,
+  );
+  elements.testingState.style.setProperty(
+    "--instrument-opacity",
+    (0.32 + normalized * 0.3).toFixed(2),
+  );
+}
+
 export function updateSpeed(speed, direction) {
   if (typeof speed !== "number" || !Number.isFinite(speed) || speed < 0)
     speed = 0;
   if (!elements.speedNumber || !elements.speedUnit) return;
   state.currentSpeed = speed;
+  setInstrumentActivity(speed, direction);
 
   let displaySpeed, unit;
 
@@ -90,73 +100,24 @@ export function updateSpeed(speed, direction) {
 }
 
 export function updateProgress(progress) {
-  if (!elements.progressRing) return;
   const clamped = Math.min(100, Math.max(0, progress));
   state.progress = clamped;
-  if (!progressAnimationFrame) {
-    progressAnimationFrame = requestAnimationFrame(animateProgressRing);
-  }
-  if (clamped >= 99.5 && clamped > visualProgress) {
-    visualProgress = clamped;
-  }
-  if (visualProgress > state.progress) {
-    visualProgress = state.progress;
-  }
-  if (elements.progressMeter) {
-    const roundedProgress = Math.round(clamped);
-    const nowMs = performance.now();
-    const isBoundary = roundedProgress <= 0 || roundedProgress >= 100;
-    const valueChanged = roundedProgress !== state.lastAriaProgressValue;
-    const largeStep =
-      Math.abs(roundedProgress - state.lastAriaProgressValue) >= 10;
-    const pastThrottleWindow =
-      nowMs - state.lastAriaProgressUpdateMs >=
-      TEST_CONFIG.ARIA_PROGRESS_UPDATE_MS;
-    if (valueChanged && (isBoundary || largeStep || pastThrottleWindow)) {
-      if (typeof elements.progressMeter.value === "number") {
-        elements.progressMeter.value = roundedProgress;
-      }
-      state.lastAriaProgressValue = roundedProgress;
-      state.lastAriaProgressUpdateMs = nowMs;
-    }
-  }
-}
 
-function animateProgressRing() {
-  progressAnimationFrame = 0;
-  const targetProgress = state.progress;
-  if (!Number.isFinite(targetProgress)) return;
-  const diff = targetProgress - visualProgress;
-  if (Math.abs(diff) > 0.1) {
-    visualProgress += diff * 0.3;
-  } else {
-    visualProgress = targetProgress;
-  }
-  let offset = RING_CIRCUMFERENCE - (visualProgress / 100) * RING_CIRCUMFERENCE;
-  if (visualProgress >= 99.5) {
-    offset = -RING_END_OFFSET;
-  }
-  elements.progressRing.style.strokeDashoffset = offset;
-  if (Math.abs(targetProgress - visualProgress) > 0.1) {
-    progressAnimationFrame = requestAnimationFrame(animateProgressRing);
+  if (elements.progressMeter) {
+    elements.progressMeter.removeAttribute("value");
   }
 }
 
 export function resetProgress() {
-  if (!elements.progressRing || !elements.speedNumber) return;
+  if (!elements.speedNumber) return;
   state.progress = 0;
-  visualProgress = 0;
-  if (progressAnimationFrame) {
-    cancelAnimationFrame(progressAnimationFrame);
-    progressAnimationFrame = 0;
-  }
-  state.lastAriaProgressUpdateMs = 0;
-  state.lastAriaProgressValue = 0;
-  elements.progressRing.style.strokeDashoffset = RING_CIRCUMFERENCE;
   if (elements.progressMeter) {
-    if (typeof elements.progressMeter.value === "number") {
-      elements.progressMeter.value = 0;
-    }
+    elements.progressMeter.removeAttribute("value");
+    elements.progressMeter.textContent = "Measuring network";
+  }
+  if (elements.testingState) {
+    elements.testingState.style.removeProperty("--instrument-glow-size");
+    elements.testingState.style.removeProperty("--instrument-opacity");
   }
   elements.speedNumber.textContent = "0";
 }
@@ -165,9 +126,20 @@ export function updateTestType(text, className) {
   if (!elements.testType || !elements.progressRing || !elements.speedNumber)
     return;
   elements.testType.textContent = text;
+  elements.speedNumber.textContent = "0";
+  if (elements.speedUnit) {
+    elements.speedUnit.textContent = className === "measuring" ? "ms" : "Mbps";
+  }
+  if (elements.progressMeter) {
+    elements.progressMeter.setAttribute("aria-label", `${text} in progress`);
+    elements.progressMeter.textContent = text;
+  }
+  if (elements.testingState) {
+    elements.testingState.dataset.phase = className;
+  }
   elements.progressRing.setAttribute(
     "class",
-    "progress-ring-fill " + className,
+    "instrument-ring-arc " + className,
   );
   elements.speedNumber.className = "speed-number " + className;
 }

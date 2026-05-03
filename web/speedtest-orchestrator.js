@@ -8,6 +8,7 @@ import {
   showError,
   hideError,
   resetProgress,
+  updateTestType,
 } from "./ui.js";
 import { measureLatency, runDirectionPhase } from "./speedtest.js";
 import { resolveServerName } from "./network.js";
@@ -24,6 +25,8 @@ export async function startTest() {
 
   try {
     state.phase = "latency";
+    resetProgress();
+    updateTestType("↔ Ping", "measuring");
     showState("testing");
     state.latencyResult = await measureLatency(signal);
 

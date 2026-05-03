@@ -96,7 +96,7 @@
 
 .speed-display {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -121,6 +121,10 @@
   color: var(--upload-color);
 }
 
+.speed-number.measuring {
+  color: var(--accent-primary);
+}
+
 .speed-unit {
   font-family: var(--font-display);
   font-size: 1.25rem;
@@ -130,49 +134,150 @@
 }
 
 .test-type {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--bg-hover);
+  border-radius: 999px;
+  background: var(--bg-secondary);
   font-size: 0.875rem;
   color: var(--text-secondary);
   margin-top: var(--space-sm);
-  opacity: 0.8;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition:
+    border-color var(--motion-duration-medium) ease,
+    color var(--motion-duration-medium) ease;
 }
 
-.progress-ring-container {
+.test-type::before {
+  content: "";
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--instrument-color, var(--accent-primary));
+  box-shadow: 0 0 14px var(--instrument-color, var(--accent-primary));
+  animation: instrumentStatusPulse 1.4s ease-in-out infinite;
+}
+
+#testingState {
+  --instrument-color: var(--accent-primary);
+  --instrument-soft-color: rgba(0, 212, 170, 0.2);
+  --instrument-glow-size: 28px;
+  --instrument-opacity: 0.44;
+  --instrument-orbit-duration: 2s;
+}
+
+#testingState[data-phase="downloading"] {
+  --instrument-color: var(--download-color);
+  --instrument-soft-color: rgba(0, 212, 170, 0.24);
+  --instrument-orbit-duration: 1.45s;
+}
+
+#testingState[data-phase="uploading"] {
+  --instrument-color: var(--upload-color);
+  --instrument-soft-color: rgba(102, 126, 234, 0.25);
+  --instrument-orbit-duration: 1.7s;
+}
+
+#testingState[data-phase="measuring"] {
+  --instrument-orbit-duration: 2.25s;
+}
+
+#testingState[data-phase="downloading"] .test-type,
+#testingState[data-phase="uploading"] .test-type,
+#testingState[data-phase="measuring"] .test-type {
+  border-color: var(--instrument-color);
+  color: var(--text-primary);
+}
+
+.instrument-ring-container {
   position: absolute;
   width: 280px;
   height: 280px;
   pointer-events: none;
+  z-index: 1;
 }
 
-.progress-ring {
+.instrument-ring-container::before {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--instrument-soft-color) 0%,
+    transparent 68%
+  );
+  filter: blur(22px);
+  opacity: var(--instrument-opacity);
+  animation: instrumentBreath 2.8s ease-in-out infinite;
+}
+
+.instrument-ring {
+  position: relative;
   width: 100%;
   height: 100%;
-  transform: rotate(-90deg);
+  overflow: visible;
 }
 
-.progress-ring-bg {
+.instrument-ring-bg,
+.instrument-ring-grid,
+.instrument-ring-pulse,
+.instrument-ring-spark,
+.instrument-ring-arc {
   fill: none;
+}
+
+.instrument-ring-bg {
   stroke: var(--bg-card);
   stroke-width: 4;
 }
 
-.progress-ring-fill {
-  fill: none;
-  stroke: var(--accent-primary);
-  stroke-width: 4;
+.instrument-ring-grid {
+  stroke: var(--bg-hover);
+  stroke-width: 1;
+  stroke-dasharray: 2 14;
+  opacity: 0.9;
+  transform-origin: 100px 100px;
+  animation: instrumentGridDrift 8s linear infinite;
+}
+
+.instrument-ring-pulse {
+  stroke: var(--instrument-color);
+  stroke-width: 18;
+  opacity: 0.08;
+  transform-origin: 100px 100px;
+  animation: instrumentPulse 2s ease-in-out infinite;
+}
+
+.instrument-ring-spark {
+  stroke: var(--instrument-color);
+  stroke-width: 2;
   stroke-linecap: round;
-  stroke-dasharray: 565.48;
-  stroke-dashoffset: 565.48;
+  stroke-dasharray: 18 497;
+  opacity: 0.55;
+  transform-origin: 100px 100px;
+  animation: instrumentOrbit 3.2s linear infinite reverse;
+}
+
+.instrument-ring-arc {
+  stroke: var(--instrument-color);
+  stroke-width: 4.5;
+  stroke-linecap: round;
+  stroke-dasharray: 96 470;
+  stroke-dashoffset: 0;
+  transform-origin: 100px 100px;
+  filter: drop-shadow(0 0 var(--instrument-glow-size) var(--instrument-color));
   transition:
-    stroke-dashoffset var(--motion-duration-fast) linear,
-    stroke var(--motion-duration-medium) ease;
-}
-
-.progress-ring-fill.downloading {
-  stroke: var(--download-color);
-}
-
-.progress-ring-fill.uploading {
-  stroke: var(--upload-color);
+    stroke var(--motion-duration-medium) ease,
+    filter var(--motion-duration-medium) ease;
+  animation:
+    instrumentOrbit var(--instrument-orbit-duration) linear infinite,
+    instrumentArcBreathe 1.6s ease-in-out infinite;
 }
 
 .results-main {
@@ -457,7 +562,7 @@
     max-width: 300px;
   }
 
-  .progress-ring-container {
+  .instrument-ring-container {
     width: 220px;
     height: 220px;
   }

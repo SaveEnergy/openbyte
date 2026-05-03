@@ -27,8 +27,6 @@ export const state = {
   serverName: "openByte Server",
   resultId: null,
   shareSavePromise: null,
-  lastAriaProgressUpdateMs: 0,
-  lastAriaProgressValue: -1,
   /** Internal diagnostics (peak/sustained/volatility, stop_reason) — not shown in default UI */
   diagnostics: null,
 };
@@ -72,9 +70,6 @@ export function initElements() {
   elements.shareBtn = document.getElementById("shareBtn");
 }
 
-export const RING_CIRCUMFERENCE = 2 * Math.PI * 90;
-export const RING_END_OFFSET = 2;
-
 export const TEST_CONFIG = {
   HTTP_TIMEOUT_BUFFER_MS: 10000,
   HEALTH_CHECK_TIMEOUT_MS: 5000,
@@ -98,7 +93,6 @@ export const TEST_CONFIG = {
   WARMUP_MAX_GRACE_MS: 5000,
   TOAST_ERROR_MS: 5000,
   TOAST_SUCCESS_MS: 2000,
-  ARIA_PROGRESS_UPDATE_MS: 1000,
 };
 
 export const modal = { lastTrigger: null };

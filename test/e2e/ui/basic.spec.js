@@ -194,6 +194,13 @@ test.describe("openByte UI", () => {
 
     await page.locator("#startBtn").click();
     await expect(page.locator("#testingState")).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("#progressMeter")).not.toHaveAttribute(
+      "value",
+      /.+/,
+    );
+    await expect(page.locator("#testType")).toContainText(
+      /Ping|Download|Upload/,
+    );
     await expect(page.locator("#cancelBtn")).toBeFocused();
 
     await page.locator("#cancelBtn").click();

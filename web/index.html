@@ -71,25 +71,28 @@
             <div class="speed-number" id="speedNumber">0</div>
             <div class="speed-unit" id="speedUnit">Mbps</div>
           </div>
-          <div class="test-type" id="testType">↓ Download</div>
-          <div class="progress-ring-container">
+          <div class="test-type" id="testType" aria-live="polite">↔ Ping</div>
+          <div class="instrument-ring-container">
             <progress
               class="visually-hidden"
               id="progressMeter"
               max="100"
-              value="0"
+              aria-label="Network measurement in progress"
             >
-              0%
+              Measuring network
             </progress>
             <svg
-              class="progress-ring"
+              class="instrument-ring"
               id="progressRingSvg"
               viewBox="0 0 200 200"
               aria-hidden="true"
             >
-              <circle class="progress-ring-bg" cx="100" cy="100" r="90" />
+              <circle class="instrument-ring-bg" cx="100" cy="100" r="90" />
+              <circle class="instrument-ring-grid" cx="100" cy="100" r="73" />
+              <circle class="instrument-ring-pulse" cx="100" cy="100" r="90" />
+              <circle class="instrument-ring-spark" cx="100" cy="100" r="82" />
               <circle
-                class="progress-ring-fill"
+                class="instrument-ring-arc"
                 id="progressRing"
                 cx="100"
                 cy="100"

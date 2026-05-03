@@ -41,6 +41,62 @@
   }
 }
 
+@keyframes instrumentOrbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes instrumentGridDrift {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes instrumentPulse {
+  0%,
+  100% {
+    opacity: 0.05;
+    stroke-width: 14;
+  }
+  50% {
+    opacity: 0.14;
+    stroke-width: 22;
+  }
+}
+
+@keyframes instrumentBreath {
+  0%,
+  100% {
+    transform: scale(0.96);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+@keyframes instrumentArcBreathe {
+  0%,
+  100% {
+    opacity: 0.64;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes instrumentStatusPulse {
+  0%,
+  100% {
+    transform: scale(0.86);
+    opacity: 0.65;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -48,6 +104,19 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .instrument-ring-container::before,
+  .instrument-ring-grid,
+  .instrument-ring-pulse,
+  .instrument-ring-spark,
+  .instrument-ring-arc,
+  .test-type::before {
+    animation: none !important;
+  }
+
+  .instrument-ring-arc {
+    opacity: 0.9;
   }
 }
 
