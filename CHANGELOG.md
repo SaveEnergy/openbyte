@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-03
+
 ### Removed
 
 - **MCP server**: removed the pre-1.0 `openbyte mcp` stdio server, its command wiring,
@@ -18,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `API.md` and `api/openapi.yaml` are the canonical integration surface.
 - **Server selection**: removed the single-option web server selector, `/api/v1/servers`,
   server identity config, and related metadata tests/docs after the registry cut.
+- **CLI server selection aliases**: removed `openbyte client --servers`, `--auto` / `-a`,
+  `--server`, bare config aliases, legacy `obyte` config fallback, and API-key request
+  plumbing from CLI / `check` / Go SDK. Client targeting is now explicit URL-only.
 - **Perf autoresearch outer loop**: **`make autoresearch-loop-complete`**, **`scripts/perf/autoresearch_loop_complete.sh`**, and **`/autoresearch --loop`** / loop-mode docs — merge **`perf-N`** → **`main`**, counter bump, and next branch are **manual** (see **`test/perf/PROMPT_AUTORESEARCH.md`**).
 
 ### Changed
@@ -44,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Static analysis cleanup**: staticcheck now passes cleanly after removing unused
+  locks/helpers and switching hot-path `sync.Pool` buffers to pointer-backed values.
 - **Web / server**: **`internal/api/router_static.go`** allowlists **`speedtest-http-{download,shared,upload}.js`** (split modules were **404**); regression test **`TestRouterStaticServesSpeedtestHTTPModules`**. **`README.md`** Configuration notes: **`PUBLIC_HOST`** for stable advertised hosts.
 - **SonarQube** (targets **2026-03-20** OPEN list): **`[[`** conditionals in **`scripts/deploy/*.sh`**; **`TestDecodeSingleObject*`** names in **`internal/jsonbody/decode_test.go`**; **`go:S1192`** via shared format / path constants in tests; **`playwright.config.js`** **`resolvePlaywrightWorkers()`** (no nested ternary); **`execContexter`** in **`internal/results/store_migrate.go`**; **`test/e2e/ui/basic.spec.js`** fetch mock: **`init?.signal`** / **`signal?.`** for **`javascript:S6582`**; success toast **`<output>`** in **`web/index.html`** + assertion update. **AGENTS.md** Sonar snapshot updated.
 - **CI**: `build-push` / `deploy` no longer skipped on docs-only `main` pushes (removed `paths-filter` `docker` gate from image job; `changes` still used for PR Playwright gating).
@@ -87,5 +94,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **golang.org/x/term** v0.41.0, **modernc.org/sqlite** v1.47.0, **github.com/mark3labs/mcp-go** v0.45.0 (and transitive updates).
 - Routine **GitHub Actions** version bumps via Dependabot.
 
-[Unreleased]: https://github.com/SaveEnergy/openbyte/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/SaveEnergy/openbyte/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/SaveEnergy/openbyte/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/SaveEnergy/openbyte/compare/v0.7.0...v0.8.0
