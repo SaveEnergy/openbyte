@@ -52,7 +52,6 @@ POST   /api/v1/stream/{id}/cancel     # Cancel test
 POST   /api/v1/stream/{id}/metrics    # Client reports metrics
 POST   /api/v1/stream/{id}/complete   # Client reports completion
 WS     /api/v1/stream/{id}/stream     # Real-time metrics
-GET    /api/v1/servers                # List servers
 GET    /api/v1/version                # Build version
 GET    /api/v1/download               # HTTP streaming download
 POST   /api/v1/upload                 # HTTP streaming upload
@@ -204,7 +203,7 @@ CLI Client                              Server
 - Goroutine per stream
 - Atomic counters for hot-path metrics (bytes, packets)
 - `sync.RWMutex` for histogram (writers exclusive, readers concurrent)
-- `sync.Once` for idempotent Stop() on manager/registry
+- `sync.Once` for idempotent Stop() on manager/server shutdown paths
 - `sync.WaitGroup` for graceful shutdown of background goroutines
 - Context-based cancellation throughout
 
@@ -214,7 +213,6 @@ CLI Client                              Server
 
 - Load balancer distributes tests
 - Each server handles subset of tests
-- Optional registry service for automatic discovery
 
 ### Vertical
 

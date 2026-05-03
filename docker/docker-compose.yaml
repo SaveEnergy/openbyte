@@ -13,10 +13,6 @@ services:
       - "8082:8082"   # UDP test port
       - "8082:8082/udp"
     environment:
-      - SERVER_ID=${SERVER_ID:-openbyte-1}
-      - SERVER_NAME=${SERVER_NAME:-OpenByte Server}
-      - SERVER_LOCATION=${SERVER_LOCATION:-Unknown}
-      - SERVER_REGION=${SERVER_REGION:-}
       - PUBLIC_HOST=${PUBLIC_HOST:-}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}

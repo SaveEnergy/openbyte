@@ -124,11 +124,4 @@ export function bindEvents(extraHandlers) {
   initSettingsModal();
   elements.duration.addEventListener("change", saveSettings);
   elements.streams.addEventListener("change", saveSettings);
-
-  if (elements.serverSelect) {
-    elements.serverSelect.addEventListener(
-      "change",
-      extraHandlers.onServerChange,
-    );
-  }
 }

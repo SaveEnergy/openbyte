@@ -48,15 +48,11 @@ VOLUME /app/data
 # Expose ports: API (8080), TCP test (8081), UDP test (8082)
 EXPOSE 8080 8081 8082/tcp 8082/udp
 
-# Environment variables for server identity
+# Environment variables for server runtime
 ENV PORT=8080 \
     BIND_ADDRESS=0.0.0.0 \
     TCP_TEST_PORT=8081 \
     UDP_TEST_PORT=8082 \
-    SERVER_ID="" \
-    SERVER_NAME="OpenByte Server" \
-    SERVER_LOCATION="Unknown" \
-    SERVER_REGION="" \
     PUBLIC_HOST="" \
     CAPACITY_GBPS=25 \
     RATE_LIMIT_PER_IP=100 \

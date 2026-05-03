@@ -5,7 +5,6 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"strings"
 )
 
 func (c *Config) validatePorts() error {
@@ -95,16 +94,6 @@ func (c *Config) validateProxyAndStorage() error {
 	}
 	if c.TrustProxyHeaders && len(c.TrustedProxyCIDRs) == 0 {
 		return fmt.Errorf("trusted proxy CIDRs required when trust proxy headers is enabled")
-	}
-	return nil
-}
-
-func (c *Config) validateRegistry() error {
-	if c.RegistryEnabled && c.RegistryInterval <= 0 {
-		return fmt.Errorf("registry interval must be > 0 when registry is enabled")
-	}
-	if c.RegistryEnabled && strings.TrimSpace(c.RegistryURL) == "" {
-		return fmt.Errorf("registry URL required when registry is enabled")
 	}
 	return nil
 }

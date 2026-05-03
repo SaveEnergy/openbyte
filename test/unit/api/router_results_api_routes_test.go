@@ -86,31 +86,6 @@ func TestUnknownAPIRouteReturnsJSONNotFound(t *testing.T) {
 	}
 }
 
-func TestRegistryRoutesRateLimited(t *testing.T) {
-	manager := stream.NewManager(10, 10)
-	handler := api.NewHandler(manager)
-	cfg := config.DefaultConfig()
-	cfg.GlobalRateLimit = 1
-	cfg.RateLimitPerIP = 1
-	router := api.NewRouter(handler, cfg)
-	router.SetRateLimiter(cfg)
-	h := router.SetupRoutes(testRegistryRegistrar{})
-
-	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+registryHealthAPI, nil)
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf(routerFirstRegistryReq+statusWantFmt, rec.Code, http.StatusOK)
-	}
-
-	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+registryHealthAPI, nil)
-	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusTooManyRequests {
-		t.Fatalf(routerSecondRegistryReq+statusWantFmt, rec.Code, http.StatusTooManyRequests)
-	}
-}
-
 func TestResultsPageRouteRateLimited(t *testing.T) {
 	manager := stream.NewManager(10, 10)
 	handler := api.NewHandler(manager)

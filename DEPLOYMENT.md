@@ -80,9 +80,6 @@ cd /opt/openbyte
 Copy both `docker/docker-compose.ghcr.yaml` and `docker/docker-compose.ghcr.traefik.yaml`, then create a `.env` with runtime values:
 
 ```bash
-SERVER_ID=openbyte-1
-SERVER_NAME="OpenByte Server"
-SERVER_LOCATION="EU"
 PUBLIC_HOST="speedtest.example.com"
 ALLOWED_ORIGINS="https://speedtest.example.com"
 TRUST_PROXY_HEADERS=true
@@ -149,9 +146,6 @@ ExecStart=/opt/openbyte/openbyte server
 Restart=always
 RestartSec=5
 
-Environment="SERVER_ID=prod-1"
-Environment="SERVER_NAME=Production Server"
-Environment="SERVER_LOCATION=US-East"
 Environment="PUBLIC_HOST=speedtest.example.com"
 Environment="PORT=8080"
 Environment="TCP_TEST_PORT=8081"
@@ -237,19 +231,13 @@ curl http://localhost:8080/health
 
 ### Server Configuration
 
-Each server needs unique identity:
+Each server needs its own public host:
 
 ```bash
 # Server 1 (NYC)
-SERVER_ID=nyc-1
-SERVER_NAME="New York"
-SERVER_LOCATION="US-East"
 PUBLIC_HOST=nyc.speedtest.example.com
 
 # Server 2 (AMS)
-SERVER_ID=ams-1
-SERVER_NAME="Amsterdam"
-SERVER_LOCATION="EU-West"
 PUBLIC_HOST=ams.speedtest.example.com
 ```
 

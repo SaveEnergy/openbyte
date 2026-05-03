@@ -12,13 +12,11 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 		"index.html":                 true,
 		"download.html":              true,
 		resultsHTML:                  true,
-		"skill.html":                 true,
 		"openbyte.js":                true,
 		"state.js":                   true,
 		"utils.js":                   true,
 		"network.js":                 true,
 		"network-probes.js":          true,
-		"network-servers.js":         true,
 		"network-helpers.js":         true,
 		"network-health.js":          true,
 		"speedtest-orchestrator.js":  true,
@@ -36,12 +34,10 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 		"download-platform.js":       true,
 		"download-github.js":         true,
 		"results.js":                 true,
-		"skill.js":                   true,
 		"base.css":                   true,
 		"download.css":               true,
 		"speed.css":                  true,
 		"modal.css":                  true,
-		"skill.css":                  true,
 		"motion.css":                 true,
 		"favicon.svg":                true,
 	}
@@ -55,7 +51,7 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 			name = "index.html"
 		}
 		switch name {
-		case "download", "results", "skill":
+		case "download", "results":
 			name += ".html"
 		}
 		if strings.Contains(name, "..") || !isAllowedStaticAsset(name, allowed) {

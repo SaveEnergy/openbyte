@@ -23,7 +23,6 @@ func (r *Router) registerCoreV1Routes(v1 func(method, route string, handler http
 	v1("POST", "/stream/{id}/cancel", r.HandleWithID(r.handler.CancelStream))
 	v1("POST", "/stream/{id}/metrics", r.HandleWithID(r.handler.ReportMetrics))
 	v1("POST", "/stream/{id}/complete", r.HandleWithID(r.handler.CompleteStream))
-	v1("GET", "/servers", r.handler.GetServers)
 	v1("GET", "/version", r.handler.GetVersion)
 	v1("GET", "/download", r.speedtest.Download)
 	v1("POST", "/upload", r.speedtest.Upload)
@@ -101,9 +100,6 @@ func (r *Router) registerResultsPageRoute(mux *http.ServeMux, webFS http.FileSys
 }
 
 func (r *Router) wrapMiddlewares(handler http.Handler) http.Handler {
-	if r.limiter != nil {
-		handler = registryRateLimitMiddleware(r.limiter, handler)
-	}
 	handler = DeadlineMiddleware(handler)
 	handler = r.CORSMiddleware(handler)
 	handler = SecurityHeadersMiddleware(handler)

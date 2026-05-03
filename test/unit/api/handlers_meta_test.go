@@ -7,16 +7,10 @@ import (
 	"testing"
 
 	"github.com/saveenergy/openbyte/internal/api"
-	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/stream"
 )
 
-const (
-	versionEndpoint     = "/api/v1/version"
-	serversEndpoint     = "/api/v1/servers"
-	decodeServersErrFmt = "decode servers response: %v"
-	serversLenErrFmt    = "servers = %d, want 1"
-)
+const versionEndpoint = "/api/v1/version"
 
 func TestGetVersion(t *testing.T) {
 	mgr := stream.NewManager(10, 10)
@@ -69,146 +63,6 @@ func TestGetVersionDrainsUnexpectedBody(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
-	}
-	assertTrackingBodyDrained(t, tb)
-}
-
-func TestGetServers(t *testing.T) {
-	mgr := stream.NewManager(10, 10)
-	handler := api.NewHandler(mgr)
-	cfg := config.DefaultConfig()
-	cfg.ServerName = "Test Server"
-	handler.SetConfig(cfg)
-
-	req := httptest.NewRequest(http.MethodGet, serversEndpoint, nil)
-	req.Host = "testhost:8080"
-	rec := httptest.NewRecorder()
-	handler.GetServers(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
-	}
-
-	var resp api.ServersResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf(decodeServersErrFmt, err)
-	}
-	if len(resp.Servers) != 1 {
-		t.Fatalf(serversLenErrFmt, len(resp.Servers))
-	}
-	if resp.Servers[0].Name != "Test Server" {
-		t.Errorf("server name = %q, want Test Server", resp.Servers[0].Name)
-	}
-	if resp.Servers[0].Health != "healthy" {
-		t.Errorf("health = %q, want healthy", resp.Servers[0].Health)
-	}
-}
-
-func TestGetServersUsesRequestHostWhenBindAllInterfaces(t *testing.T) {
-	mgr := stream.NewManager(10, 10)
-	handler := api.NewHandler(mgr)
-	cfg := config.DefaultConfig()
-	cfg.BindAddress = "0.0.0.0"
-	cfg.Port = "8080"
-	cfg.TrustProxyHeaders = false
-	handler.SetConfig(cfg)
-
-	req := httptest.NewRequest(http.MethodGet, serversEndpoint, nil)
-	req.Host = "localhost:8080"
-	rec := httptest.NewRecorder()
-	handler.GetServers(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
-	}
-
-	var resp api.ServersResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf(decodeServersErrFmt, err)
-	}
-	if len(resp.Servers) != 1 {
-		t.Fatalf(serversLenErrFmt, len(resp.Servers))
-	}
-	want := "http://localhost:8080"
-	if resp.Servers[0].APIEndpoint != want {
-		t.Fatalf("api endpoint = %q, want %q", resp.Servers[0].APIEndpoint, want)
-	}
-}
-
-func TestGetServersIgnoresRequestHostWhenProxyUntrusted(t *testing.T) {
-	mgr := stream.NewManager(10, 10)
-	handler := api.NewHandler(mgr)
-	cfg := config.DefaultConfig()
-	cfg.BindAddress = "127.0.0.1"
-	cfg.Port = "8080"
-	cfg.TrustProxyHeaders = false
-	handler.SetConfig(cfg)
-
-	req := httptest.NewRequest(http.MethodGet, serversEndpoint, nil)
-	req.Host = "evil.example:9999"
-	req.Header.Set("X-Forwarded-Proto", "https")
-	rec := httptest.NewRecorder()
-	handler.GetServers(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
-	}
-
-	var resp api.ServersResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf(decodeServersErrFmt, err)
-	}
-	if len(resp.Servers) != 1 {
-		t.Fatalf(serversLenErrFmt, len(resp.Servers))
-	}
-	if resp.Servers[0].APIEndpoint != "http://127.0.0.1:8080" {
-		t.Fatalf("api endpoint = %q, want %q", resp.Servers[0].APIEndpoint, "http://127.0.0.1:8080")
-	}
-}
-
-func TestGetServersPreservesProxyPort(t *testing.T) {
-	mgr := stream.NewManager(10, 10)
-	handler := api.NewHandler(mgr)
-	cfg := config.DefaultConfig()
-	cfg.TrustProxyHeaders = true
-	handler.SetConfig(cfg)
-
-	req := httptest.NewRequest(http.MethodGet, serversEndpoint, nil)
-	req.Host = "proxy.example.com:8443"
-	req.Header.Set("X-Forwarded-Proto", "https")
-	rec := httptest.NewRecorder()
-	handler.GetServers(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
-	}
-
-	var resp api.ServersResponse
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf(decodeServersErrFmt, err)
-	}
-	if len(resp.Servers) != 1 {
-		t.Fatalf(serversLenErrFmt, len(resp.Servers))
-	}
-	want := "https://proxy.example.com:8443"
-	if resp.Servers[0].APIEndpoint != want {
-		t.Errorf("api_endpoint = %q, want %q", resp.Servers[0].APIEndpoint, want)
-	}
-}
-
-func TestGetServersRejectsWrongMethodDrainsBody(t *testing.T) {
-	mgr := stream.NewManager(10, 10)
-	handler := api.NewHandler(mgr)
-
-	tb := &trackingBody{data: []byte(`{"unexpected":"payload"}`)}
-	req := httptest.NewRequest(http.MethodPost, serversEndpoint, nil)
-	req.Body = tb
-	rec := httptest.NewRecorder()
-
-	handler.GetServers(rec, req)
-
-	if rec.Code != http.StatusMethodNotAllowed {
-		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusMethodNotAllowed)
 	}
 	assertTrackingBodyDrained(t, tb)
 }

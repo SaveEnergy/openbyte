@@ -63,28 +63,6 @@ func (c *Config) loadStorageEnv() error {
 	return nil
 }
 
-func (c *Config) loadRegistryEnv() error {
-	c.RegistryEnabled = c.RegistryEnabled || envBool("REGISTRY_ENABLED")
-	if u := os.Getenv("REGISTRY_URL"); u != "" {
-		c.RegistryURL = u
-	}
-	if key := os.Getenv("REGISTRY_API_KEY"); key != "" {
-		c.RegistryAPIKey = key
-	}
-	if d, ok, err := parseDurationEnv("REGISTRY_INTERVAL"); err != nil {
-		return fmt.Errorf("%w (e.g. 30s)", err)
-	} else if ok {
-		c.RegistryInterval = d
-	}
-	c.RegistryMode = c.RegistryMode || envBool("REGISTRY_MODE")
-	if d, ok, err := parseDurationEnv("REGISTRY_SERVER_TTL"); err != nil {
-		return fmt.Errorf("%w (e.g. 60s)", err)
-	} else if ok {
-		c.RegistryServerTTL = d
-	}
-	return nil
-}
-
 func (c *Config) loadTLSEnv() {
 	if cert := os.Getenv("TLS_CERT_FILE"); cert != "" {
 		c.TLSCertFile = cert

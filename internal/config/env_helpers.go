@@ -60,11 +60,3 @@ func parseDurationEnv(name string) (time.Duration, bool, error) {
 	}
 	return d, true, nil
 }
-
-func defaultServerID() string {
-	hostname, err := os.Hostname()
-	if err != nil || strings.TrimSpace(hostname) == "" {
-		return "openbyte-server"
-	}
-	return hostname
-}

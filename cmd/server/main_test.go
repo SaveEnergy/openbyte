@@ -11,11 +11,11 @@ import (
 )
 
 const (
-	envServerName       = "Env Name"
-	flagServerName      = "Flag Name"
+	envPublicHost       = "env.example.com"
+	flagPublicHost      = "flag.example.com"
 	duration120s        = "120s"
 	allowedOriginsValue = "https://a.example.com, https://b.example.com"
-	registryInterval5s  = "5s"
+	perfStatsInterval5s = "5s"
 	loopbackClientIP    = "127.0.0.1"
 	maxDuration2m       = "2m0s"
 	parseFlagsFmt       = "parse flags: %v"
@@ -23,15 +23,14 @@ const (
 
 func TestApplyServerFlagOverrides(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfg.ServerName = envServerName
+	cfg.PublicHost = envPublicHost
 	cfg.MaxTestDuration = 5 * time.Minute
 
 	fs, fv := buildServerFlagSet(cfg)
 	if err := fs.Parse([]string{
-		"--server-name=" + flagServerName,
+		"--public-host=" + flagPublicHost,
 		"--max-test-duration=" + duration120s,
 		"--allowed-origins=" + allowedOriginsValue,
-		"--registry-enabled=true",
 	}); err != nil {
 		t.Fatalf(parseFlagsFmt, err)
 	}
@@ -40,17 +39,14 @@ func TestApplyServerFlagOverrides(t *testing.T) {
 		t.Fatalf("apply overrides: %v", err)
 	}
 
-	if cfg.ServerName != flagServerName {
-		t.Fatalf("server name = %q, want %q", cfg.ServerName, flagServerName)
+	if cfg.PublicHost != flagPublicHost {
+		t.Fatalf("public host = %q, want %q", cfg.PublicHost, flagPublicHost)
 	}
 	if cfg.MaxTestDuration.String() != maxDuration2m {
 		t.Fatalf("max test duration = %s, want %s", cfg.MaxTestDuration, maxDuration2m)
 	}
 	if len(cfg.AllowedOrigins) != 2 || cfg.AllowedOrigins[0] != "https://a.example.com" || cfg.AllowedOrigins[1] != "https://b.example.com" {
 		t.Fatalf("allowed origins = %#v, want two trimmed entries", cfg.AllowedOrigins)
-	}
-	if !cfg.RegistryEnabled {
-		t.Fatal("registry enabled should be true")
 	}
 }
 
@@ -68,12 +64,12 @@ func TestApplyServerFlagOverridesInvalidDuration(t *testing.T) {
 
 func TestApplyServerFlagOverridesFailsFastOnInvalidDuration(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfg.RegistryInterval = 30 * time.Second
+	cfg.PerfStatsInterval = 30 * time.Second
 
 	fs, fv := buildServerFlagSet(cfg)
 	if err := fs.Parse([]string{
 		"--max-test-duration=not-a-duration",
-		"--registry-interval=" + registryInterval5s,
+		"--perf-stats-interval=" + perfStatsInterval5s,
 	}); err != nil {
 		t.Fatalf(parseFlagsFmt, err)
 	}
@@ -81,8 +77,8 @@ func TestApplyServerFlagOverridesFailsFastOnInvalidDuration(t *testing.T) {
 	if applyServerFlagOverrides(cfg, fs, fv) == nil {
 		t.Fatal("expected error for invalid duration")
 	}
-	if cfg.RegistryInterval != 30*time.Second {
-		t.Fatalf("registry interval changed despite earlier duration parse error: got %s", cfg.RegistryInterval)
+	if cfg.PerfStatsInterval != 30*time.Second {
+		t.Fatalf("perf stats interval changed despite earlier duration parse error: got %s", cfg.PerfStatsInterval)
 	}
 }
 

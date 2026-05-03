@@ -6,21 +6,17 @@ import {
   resetToIdle,
   handleShare,
 } from "./speedtest-orchestrator.js";
-import { loadServers, detectNetworkInfo, onServerChange } from "./network.js";
+import { checkServer, detectNetworkInfo } from "./network.js";
 import { bindEvents, loadSettings } from "./settings.js";
-import { showError } from "./ui.js";
 
 function init() {
   initElements();
   loadSettings();
-  loadServers().catch((err) => {
-    showError(err?.message || "Failed to load servers");
-  });
+  checkServer();
   bindEvents({
     startTest,
     resetToIdle,
     handleShare,
-    onServerChange,
   });
   detectNetworkInfo();
 }

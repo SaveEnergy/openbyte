@@ -1,7 +1,5 @@
 package api_test
 
-import "net/http"
-
 const (
 	statusWantFmt             = "status = %d, want %d"
 	exampleBaseURL            = "http://example.com"
@@ -14,7 +12,6 @@ const (
 	resultsNewErrFmt          = "results.New: %v"
 	resultsPagePath           = "/results/abc12345"
 	apiUnknownPath            = "/api/v1/nonexistent"
-	registryHealthAPI         = "/api/v1/registry/health"
 	versionAPIPath            = "/api/v1/version"
 	pingAPIPath               = "/api/v1/ping"
 	downloadAPIPath           = "/api/v1/download"
@@ -30,8 +27,6 @@ const (
 	routerCacheRootFmt        = "cache-control for / = %q, want %q"
 	routerCacheHTMLFmt        = "cache-control for html = %q, want %q"
 	routerFirstVersionReq     = "first version request "
-	routerFirstRegistryReq    = "first registry request "
-	routerSecondRegistryReq   = "second registry request "
 	routerFirstResultsReq     = "first results page "
 	routerSecondResultsReq    = "second results page "
 	routerEvilBypassFmt       = "evilexample.com should be rejected, got Allow-Origin = %q"
@@ -53,14 +48,4 @@ const (
 	routerWriteFontFmt        = "write font: %v"
 	routerFontServedFmt       = "font should be served, got %d"
 	routerEmbedDeniedFmt      = "embed.go should be denied by allowlist, got %d"
-	routerSkillServedFmt      = "skill.html should be served, got %d"
 )
-
-type testRegistryRegistrar struct{}
-
-func (testRegistryRegistrar) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/registry/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
-	})
-}

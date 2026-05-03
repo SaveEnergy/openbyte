@@ -11,7 +11,7 @@ func (c *Config) loadCoreEnv() error {
 	if err := c.loadCoreEnvPortsAndBind(); err != nil {
 		return err
 	}
-	if err := c.loadCoreEnvServerMeta(); err != nil {
+	if err := c.loadCoreEnvPublicHost(); err != nil {
 		return err
 	}
 	return c.loadCoreEnvCapacityAndLimits()
@@ -44,19 +44,7 @@ func (c *Config) loadCoreEnvPortsAndBind() error {
 	return nil
 }
 
-func (c *Config) loadCoreEnvServerMeta() error {
-	if id := os.Getenv("SERVER_ID"); id != "" {
-		c.ServerID = id
-	}
-	if name := os.Getenv("SERVER_NAME"); name != "" {
-		c.ServerName = name
-	}
-	if loc := os.Getenv("SERVER_LOCATION"); loc != "" {
-		c.ServerLocation = loc
-	}
-	if region := os.Getenv("SERVER_REGION"); region != "" {
-		c.ServerRegion = region
-	}
+func (c *Config) loadCoreEnvPublicHost() error {
 	if host := os.Getenv("PUBLIC_HOST"); host != "" {
 		c.PublicHost = host
 	}

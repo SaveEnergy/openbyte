@@ -97,22 +97,3 @@ func BenchmarkNormalizeHost(b *testing.B) {
 		}
 	}
 }
-
-// BenchmarkIsUnspecifiedBind measures one pass over typical bind addresses per iteration.
-func BenchmarkIsUnspecifiedBind(b *testing.B) {
-	addrs := []string{
-		"",
-		"0.0.0.0",
-		"0.0.0.0:8080",
-		"[::]:8080",
-		"[::1]:443",
-		"127.0.0.1:9090",
-	}
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		for _, a := range addrs {
-			_ = isUnspecifiedBind(a)
-		}
-	}
-}

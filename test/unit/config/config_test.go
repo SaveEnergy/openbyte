@@ -187,21 +187,6 @@ func TestValidateTrustedProxyCIDRsRejectsInvalidCIDR(t *testing.T) {
 	}
 }
 
-func TestValidateRegistryIntervalWhenRegistryEnabled(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.RegistryEnabled = true
-	cfg.RegistryURL = "https://registry.example.com"
-	cfg.RegistryInterval = 0
-	if cfg.Validate() == nil {
-		t.Fatal("registry interval <= 0 should fail when registry enabled")
-	}
-
-	cfg.RegistryInterval = 5 * time.Second
-	if err := cfg.Validate(); err != nil {
-		t.Fatalf("valid registry interval should pass: %v", err)
-	}
-}
-
 func TestValidateTrustProxyHeadersRequiresTrustedCIDRs(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.TrustProxyHeaders = true
@@ -213,16 +198,6 @@ func TestValidateTrustProxyHeadersRequiresTrustedCIDRs(t *testing.T) {
 	cfg.TrustedProxyCIDRs = []string{"10.0.0.0/8"}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("expected trusted CIDR to satisfy validation: %v", err)
-	}
-}
-
-func TestConfigValidateRegistryURLRequired(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.RegistryEnabled = true
-	cfg.RegistryInterval = 5 * time.Second
-	cfg.RegistryURL = ""
-	if cfg.Validate() == nil {
-		t.Fatal("expected error when registry enabled without URL")
 	}
 }
 

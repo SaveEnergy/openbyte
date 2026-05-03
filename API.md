@@ -8,7 +8,7 @@ http://localhost:8080/api/v1
 
 ## Authentication
 
-Public API by default (no auth required). Registry endpoints (`/api/v1/registry/*`) require a Bearer token when `REGISTRY_API_KEY` is set.
+Public API; no authentication required.
 
 ## Endpoints
 
@@ -247,52 +247,7 @@ Client reports test completion with final metrics (client mode only).
 - `200 OK`: Completion recorded
 - `404 Not Found`: Test not found
 
-### 7. List Servers
-
-**GET** `/servers`
-
-Get available test servers with full metadata.
-
-**Response:**
-```json
-{
-  "servers": [
-    {
-      "id": "nyc-1",
-      "name": "New York",
-      "location": "US-East",
-      "region": "us-east-1",
-      "host": "speedtest-nyc.example.com",
-      "tcp_port": 8081,
-      "udp_port": 8082,
-      "api_endpoint": "https://speedtest-nyc.example.com:8080",
-      "health": "healthy",
-      "capacity_gbps": 25,
-      "active_tests": 3,
-      "max_tests": 10
-    }
-  ]
-}
-```
-
-**Fields:**
-- `id`: Unique server identifier
-- `name`: Human-readable server name
-- `location`: Geographic location
-- `region`: Cloud region (optional)
-- `host`: Server hostname/IP
-- `tcp_port`: TCP test port (default: 8081)
-- `udp_port`: UDP test port (default: 8082)
-- `api_endpoint`: Full API endpoint URL
-- `health`: Server health status ("healthy", "degraded", "offline")
-- `capacity_gbps`: Maximum capacity in Gbps
-- `active_tests`: Current running tests
-- `max_tests`: Maximum concurrent tests
-
-**Status Codes:**
-- `200 OK`: Servers listed
-
-### 8. Health Check
+### 7. Health Check
 
 **GET** `/health` *(root path, not under `/api/v1`)*
 
@@ -308,7 +263,7 @@ Server health status.
 **Status Codes:**
 - `200 OK`: Server healthy
 
-### 9. Download Test
+### 8. Download Test
 
 **GET** `/download`
 
@@ -327,7 +282,7 @@ Stream random data to client for download speed measurement.
 curl -o /dev/null http://localhost:8080/api/v1/download?duration=5
 ```
 
-### 10. Upload Test
+### 9. Upload Test
 
 **POST** `/upload`
 
@@ -350,7 +305,7 @@ Receive data from client for upload speed measurement.
 - `200 OK`: Upload received
 - `503 Service Unavailable`: Too many concurrent uploads
 
-### 11. Ping
+### 10. Ping
 
 **GET** `/ping`
 
@@ -384,7 +339,7 @@ The web UI uses this endpoint in two ways:
 
 See [Deployment Guide](DEPLOYMENT.md#ipv4ipv6-detection) for DNS setup.
 
-### 12. Version
+### 11. Version
 
 **GET** `/version`
 
@@ -400,7 +355,7 @@ Build/version information.
 **Status Codes:**
 - `200 OK`: Version returned
 
-### 13. WebSocket Stream
+### 12. WebSocket Stream
 
 **WS** `/stream/{stream_id}/stream`
 
@@ -604,111 +559,6 @@ Returns 404 if the result is not found or has expired (90-day retention).
 
 `GET /results/{id}` serves a standalone HTML page that fetches and renders the saved result.
 
-## Registry API (Optional)
-
-Server registry for multi-server deployments. Enable with `REGISTRY_MODE=true`. Protected endpoints require `Authorization: Bearer <REGISTRY_API_KEY>` when `REGISTRY_API_KEY` is set.
-
-### List Servers
-
-**GET** `/api/v1/registry/servers`
-
-**Query Parameters:**
-- `healthy` (optional): `"true"` to return only healthy servers
-
-**Response (200):**
-```json
-{
-  "servers": [
-    {
-      "id": "nyc-1",
-      "name": "New York",
-      "location": "US-East",
-      "host": "speedtest-nyc.example.com",
-      "tcp_port": 8081,
-      "udp_port": 8082,
-      "api_endpoint": "https://speedtest-nyc.example.com:8080",
-      "health": "healthy",
-      "capacity_gbps": 25,
-      "active_tests": 3,
-      "max_tests": 10,
-      "last_heartbeat": "2026-02-07T12:00:00Z"
-    }
-  ],
-  "count": 1
-}
-```
-
-### Register Server
-
-**POST** `/api/v1/registry/servers` *(auth required)*
-
-**Request Body:**
-```json
-{
-  "id": "nyc-1",
-  "name": "New York",
-  "location": "US-East",
-  "host": "speedtest-nyc.example.com",
-  "tcp_port": 8081,
-  "udp_port": 8082,
-  "capacity_gbps": 25
-}
-```
-
-**Response (201):**
-```json
-{
-  "status": "registered",
-  "server_id": "nyc-1"
-}
-```
-
-### Get Server
-
-**GET** `/api/v1/registry/servers/{id}`
-
-**Response (200):** Same as individual entry from list endpoint.
-
-**Status Codes:** `200` OK, `404` Not Found.
-
-### Update Server (Heartbeat)
-
-**PUT** `/api/v1/registry/servers/{id}` *(auth required)*
-
-Same body as register. Used for periodic heartbeats with updated `active_tests`.
-
-**Response (200):**
-```json
-{
-  "status": "updated",
-  "server_id": "nyc-1"
-}
-```
-
-### Deregister Server
-
-**DELETE** `/api/v1/registry/servers/{id}` *(auth required)*
-
-**Response (200):**
-```json
-{
-  "status": "deregistered",
-  "server_id": "nyc-1"
-}
-```
-
-### Registry Health
-
-**GET** `/api/v1/registry/health`
-
-**Response (200):**
-```json
-{
-  "status": "healthy",
-  "servers": 5
-}
-```
-
 ## Rate Limiting
 
 **Limits:**
@@ -730,4 +580,3 @@ Same body as register. Used for periodic heartbeats with updated `active_tests`.
   "error": "Human-readable error message"
 }
 ```
-

@@ -131,57 +131,6 @@ test.describe("openByte UI", () => {
     expect(pageErrors).toEqual([]);
   });
 
-  test("server list JSON errors surface to users", async ({ page }) => {
-    await page.route("**/api/v1/servers", async (route) => {
-      await route.fulfill({
-        status: 503,
-        contentType: "application/json",
-        body: JSON.stringify({ error: "registry temporarily unavailable" }),
-      });
-    });
-
-    await page.goto("/");
-    await expect(page.locator("#errorToast")).toBeVisible();
-    await expect(page.locator("#errorToast")).toContainText(
-      /registry temporarily unavailable/i,
-    );
-  });
-
-  test("server list timeout surfaces user message", async ({ page }) => {
-    const pageErrors = [];
-    page.on("pageerror", (err) => pageErrors.push(err.message));
-    await page.addInitScript(() => {
-      const originalFetch = globalThis.fetch.bind(globalThis);
-      globalThis.fetch = (input, init) => {
-        const url = typeof input === "string" ? input : input.url;
-        if (url.includes("/api/v1/servers")) {
-          return new Promise((resolve, reject) => {
-            const signal = init?.signal;
-            const abort = () => {
-              signal?.removeEventListener("abort", abort);
-              reject(new DOMException("Aborted", "AbortError"));
-            };
-            if (signal?.aborted) {
-              abort();
-              return;
-            }
-            signal?.addEventListener("abort", abort, { once: true });
-          });
-        }
-        return originalFetch(input, init);
-      };
-    });
-
-    await page.goto("/");
-    await expect(page.locator("#errorToast")).toContainText(
-      /timed out while loading servers/i,
-      {
-        timeout: 10_000,
-      },
-    );
-    expect(pageErrors).toEqual([]);
-  });
-
   test("settings saved uses polite toast region", async ({ page }) => {
     await page.goto("/");
     await page.locator("#showSettings").click();
@@ -343,26 +292,6 @@ test.describe("openByte UI", () => {
     const downloadMbps = Number.parseFloat(downloadText || "0");
     expect(Number.isFinite(downloadMbps)).toBeTruthy();
     expect(downloadMbps).toBeGreaterThanOrEqual(0);
-  });
-
-  test("skill page uses external scripts only", async ({ page }) => {
-    await page.goto("/skill.html");
-
-    await expect(page.locator("h1")).toHaveText(/Agent Skill/i);
-    await expect(page.locator("#copySkillBtn")).toBeVisible();
-
-    const scripts = await page.locator("script").evaluateAll((nodes) =>
-      nodes.map((n) => ({
-        src: n.getAttribute("src"),
-        inline: (n.textContent || "").trim().length > 0,
-      })),
-    );
-
-    expect(scripts.length).toBeGreaterThan(0);
-    for (const script of scripts) {
-      expect(script.src).toBeTruthy();
-      expect(script.inline).toBeFalsy();
-    }
   });
 
   test("renders shared result page from saved result", async ({

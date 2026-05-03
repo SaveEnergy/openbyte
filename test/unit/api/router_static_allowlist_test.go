@@ -24,7 +24,6 @@ func TestRouterStaticServesSpeedtestHTTPModules(t *testing.T) {
 		"speedtest-http-shared.js",
 		"speedtest-http-upload.js",
 		"network-probes.js",
-		"network-servers.js",
 		"speedtest-orchestrator.js",
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -49,13 +48,6 @@ func TestRouterStaticFileServerAllowlist(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf(routerEmbedDeniedFmt, rec.Code)
-	}
-
-	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+"/skill.html", nil)
-	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf(routerSkillServedFmt, rec.Code)
 	}
 }
 

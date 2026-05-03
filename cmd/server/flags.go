@@ -15,8 +15,6 @@ import (
 const (
 	flagMaxTestDuration   = "max-test-duration"
 	flagPerfStatsInterval = "perf-stats-interval"
-	flagRegistryInterval  = "registry-interval"
-	flagRegistryServerTTL = "registry-server-ttl"
 )
 
 type serverFlagValues struct {
@@ -24,10 +22,6 @@ type serverFlagValues struct {
 	bindAddress        *string
 	tcpTestPort        *int
 	udpTestPort        *int
-	serverID           *string
-	serverName         *string
-	serverLocation     *string
-	serverRegion       *string
 	publicHost         *string
 	capacityGbps       *int
 	maxConcurrentTests *int
@@ -46,11 +40,6 @@ type serverFlagValues struct {
 	pprofAddress       *string
 	perfStatsInterval  *string
 	runtimeMetrics     *bool
-	registryEnabled    *bool
-	registryMode       *bool
-	registryURL        *string
-	registryInterval   *string
-	registryServerTTL  *string
 }
 
 func buildServerFlagSet(cfg *config.Config) (*flag.FlagSet, *serverFlagValues) {
@@ -69,10 +58,6 @@ func buildServerFlagSet(cfg *config.Config) (*flag.FlagSet, *serverFlagValues) {
 		bindAddress:        fs.String("bind-address", cfg.BindAddress, "Bind address (env: BIND_ADDRESS)"),
 		tcpTestPort:        fs.Int("tcp-test-port", cfg.TCPTestPort, "TCP test port (env: TCP_TEST_PORT)"),
 		udpTestPort:        fs.Int("udp-test-port", cfg.UDPTestPort, "UDP test port (env: UDP_TEST_PORT)"),
-		serverID:           fs.String("server-id", cfg.ServerID, "Server ID (env: SERVER_ID)"),
-		serverName:         fs.String("server-name", cfg.ServerName, "Server display name (env: SERVER_NAME)"),
-		serverLocation:     fs.String("server-location", cfg.ServerLocation, "Server location (env: SERVER_LOCATION)"),
-		serverRegion:       fs.String("server-region", cfg.ServerRegion, "Server region (env: SERVER_REGION)"),
 		publicHost:         fs.String("public-host", cfg.PublicHost, "Public host for URLs (env: PUBLIC_HOST)"),
 		capacityGbps:       fs.Int("capacity-gbps", cfg.CapacityGbps, "Capacity in Gbps (env: CAPACITY_GBPS)"),
 		maxConcurrentTests: fs.Int("max-concurrent-tests", cfg.MaxConcurrentTests, "Max concurrent tests (env: MAX_CONCURRENT_TESTS)"),
@@ -91,11 +76,6 @@ func buildServerFlagSet(cfg *config.Config) (*flag.FlagSet, *serverFlagValues) {
 		pprofAddress:       fs.String("pprof-addr", cfg.PprofAddress, "Pprof address (env: PPROF_ADDR)"),
 		perfStatsInterval:  fs.String(flagPerfStatsInterval, cfg.PerfStatsInterval.String(), "Runtime stats interval, e.g. 10s (env: PERF_STATS_INTERVAL)"),
 		runtimeMetrics:     fs.Bool("runtime-metrics", cfg.RuntimeMetrics, "Enable runtime metrics endpoint /debug/runtime-metrics (env: RUNTIME_METRICS_ENABLED)"),
-		registryEnabled:    fs.Bool("registry-enabled", cfg.RegistryEnabled, "Enable registry client mode (env: REGISTRY_ENABLED)"),
-		registryMode:       fs.Bool("registry-mode", cfg.RegistryMode, "Enable registry server mode (env: REGISTRY_MODE)"),
-		registryURL:        fs.String("registry-url", cfg.RegistryURL, "Registry URL (env: REGISTRY_URL)"),
-		registryInterval:   fs.String(flagRegistryInterval, cfg.RegistryInterval.String(), "Registry heartbeat interval, e.g. 30s (env: REGISTRY_INTERVAL)"),
-		registryServerTTL:  fs.String(flagRegistryServerTTL, cfg.RegistryServerTTL.String(), "Registry server TTL, e.g. 60s (env: REGISTRY_SERVER_TTL)"),
 	}
 	return fs, fv
 }
@@ -147,10 +127,6 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 		"bind-address":          func() error { cfg.BindAddress = *fv.bindAddress; return nil },
 		"tcp-test-port":         func() error { cfg.TCPTestPort = *fv.tcpTestPort; return nil },
 		"udp-test-port":         func() error { cfg.UDPTestPort = *fv.udpTestPort; return nil },
-		"server-id":             func() error { cfg.ServerID = *fv.serverID; return nil },
-		"server-name":           func() error { cfg.ServerName = *fv.serverName; return nil },
-		"server-location":       func() error { cfg.ServerLocation = *fv.serverLocation; return nil },
-		"server-region":         func() error { cfg.ServerRegion = *fv.serverRegion; return nil },
 		"public-host":           func() error { cfg.PublicHost = *fv.publicHost; return nil },
 		"capacity-gbps":         func() error { cfg.CapacityGbps = *fv.capacityGbps; return nil },
 		"max-concurrent-tests":  func() error { cfg.MaxConcurrentTests = *fv.maxConcurrentTests; return nil },
@@ -170,16 +146,7 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 		flagPerfStatsInterval: func() error {
 			return setFlagDuration(flagPerfStatsInterval, *fv.perfStatsInterval, &cfg.PerfStatsInterval)
 		},
-		"runtime-metrics":  func() error { cfg.RuntimeMetrics = *fv.runtimeMetrics; return nil },
-		"registry-enabled": func() error { cfg.RegistryEnabled = *fv.registryEnabled; return nil },
-		"registry-mode":    func() error { cfg.RegistryMode = *fv.registryMode; return nil },
-		"registry-url":     func() error { cfg.RegistryURL = *fv.registryURL; return nil },
-		flagRegistryInterval: func() error {
-			return setFlagDuration(flagRegistryInterval, *fv.registryInterval, &cfg.RegistryInterval)
-		},
-		flagRegistryServerTTL: func() error {
-			return setFlagDuration(flagRegistryServerTTL, *fv.registryServerTTL, &cfg.RegistryServerTTL)
-		},
+		"runtime-metrics": func() error { cfg.RuntimeMetrics = *fv.runtimeMetrics; return nil },
 	}
 
 	var applyErr error

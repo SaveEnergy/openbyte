@@ -11,7 +11,6 @@ import (
 	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/logging"
-	"github.com/saveenergy/openbyte/internal/registry"
 	"github.com/saveenergy/openbyte/internal/results"
 	"github.com/saveenergy/openbyte/internal/stream"
 	"github.com/saveenergy/openbyte/internal/websocket"
@@ -19,19 +18,15 @@ import (
 )
 
 type serverResources struct {
-	streamServer    *stream.Server
-	manager         *stream.Manager
-	resultsStore    *results.Store
-	wsServer        *websocket.Server
-	registryService *registry.Service
-	registryClient  *registry.Client
-	broadcastWg     sync.WaitGroup
+	streamServer *stream.Server
+	manager      *stream.Manager
+	resultsStore *results.Store
+	wsServer     *websocket.Server
+	broadcastWg  sync.WaitGroup
 }
 
 func (r *serverResources) stopAll(pprofServer *http.Server, stopStats func()) {
 	stopServerDependencies(
-		r.registryClient,
-		r.registryService,
 		r.resultsStore,
 		r.manager,
 		&r.broadcastWg,
@@ -90,29 +85,11 @@ func setupRuntimeResources(cfg *config.Config, version string, resources *server
 		router.SetRuntimeMetricsHandler(runtimeMetricsHandler())
 	}
 
-	var registrars []api.RouteRegisterer
-	if cfg.RegistryMode {
-		logging.Info("Starting in registry mode")
-		resources.registryService = registry.NewService(cfg.RegistryServerTTL, 30*time.Second)
-		resources.registryService.Start()
-
-		registryLogger := logging.NewLogger("registry")
-		registryHandler := registry.NewHandler(resources.registryService, registryLogger, cfg.RegistryAPIKey)
-		registrars = append(registrars, registryHandler)
-	}
-
-	muxRouter := router.SetupRoutes(registrars...)
+	muxRouter := router.SetupRoutes()
 	resources.broadcastWg.Go(func() {
 		broadcastMetrics(resources.manager, resources.wsServer)
 	})
 
-	if cfg.RegistryEnabled && !cfg.RegistryMode {
-		logger := logging.NewLogger("registry-client")
-		resources.registryClient = registry.NewClient(cfg, logger)
-		if err := resources.registryClient.Start(resources.manager.ActiveCount); err != nil {
-			logging.Warn("Registry client failed to start", logging.Field{Key: "error", Value: err})
-		}
-	}
 	return muxRouter, nil
 }
 
@@ -156,20 +133,12 @@ func shutdownHTTPServer(srv *http.Server, timeout time.Duration) {
 }
 
 func stopServerDependencies(
-	registryClient *registry.Client,
-	registryService *registry.Service,
 	resultsStore *results.Store,
 	manager *stream.Manager,
 	broadcastWg *sync.WaitGroup,
 	wsServer *websocket.Server,
 	streamServer *stream.Server,
 ) {
-	if registryClient != nil {
-		registryClient.Stop()
-	}
-	if registryService != nil {
-		registryService.Stop()
-	}
 	if resultsStore != nil {
 		resultsStore.Close()
 	}

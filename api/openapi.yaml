@@ -122,19 +122,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/VersionResponse"
 
-  /api/v1/servers:
-    get:
-      summary: List available servers
-      operationId: getServers
-      tags: [Server]
-      responses:
-        "200":
-          description: Server list
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ServersResponse"
-
   /api/v1/stream/start:
     post:
       summary: Start a new test stream
@@ -406,172 +393,7 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
-  /api/v1/registry/servers:
-    get:
-      summary: List registered servers
-      operationId: listRegistryServers
-      tags: [Registry]
-      parameters:
-        - name: healthy
-          in: query
-          schema:
-            type: string
-            enum: ["true", "false"]
-          description: Filter to healthy servers only
-      responses:
-        "200":
-          description: Server list
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  servers:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/RegisteredServer"
-                  count:
-                    type: integer
-        "429":
-          $ref: "#/components/responses/RateLimited"
-    post:
-      summary: Register a server
-      operationId: registerServer
-      tags: [Registry]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ServerInfo"
-        description: Max 64KB. Content-Type must be application/json.
-      responses:
-        "201":
-          description: Server registered
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: registered
-                  server_id:
-                    type: string
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "413":
-          $ref: "#/components/responses/RequestEntityTooLarge"
-        "415":
-          $ref: "#/components/responses/UnsupportedMediaType"
-        "429":
-          $ref: "#/components/responses/RateLimited"
-
-  /api/v1/registry/servers/{id}:
-    get:
-      summary: Get registered server
-      operationId: getRegistryServer
-      tags: [Registry]
-      parameters:
-        - $ref: "#/components/parameters/ServerID"
-      responses:
-        "200":
-          description: Server details
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/RegisteredServer"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "429":
-          $ref: "#/components/responses/RateLimited"
-    put:
-      summary: Update registered server
-      operationId: updateRegistryServer
-      tags: [Registry]
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/ServerID"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ServerInfo"
-        description: Max 64KB. Content-Type must be application/json.
-      responses:
-        "200":
-          description: Server updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: updated
-                  server_id:
-                    type: string
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "413":
-          $ref: "#/components/responses/RequestEntityTooLarge"
-        "415":
-          $ref: "#/components/responses/UnsupportedMediaType"
-        "429":
-          $ref: "#/components/responses/RateLimited"
-    delete:
-      summary: Deregister a server
-      operationId: deregisterServer
-      tags: [Registry]
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/ServerID"
-      responses:
-        "200":
-          description: Server deregistered
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "429":
-          $ref: "#/components/responses/RateLimited"
-
-  /api/v1/registry/health:
-    get:
-      summary: Registry health check
-      operationId: registryHealth
-      tags: [Registry]
-      responses:
-        "200":
-          description: Registry health
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: healthy
-                  servers:
-                    type: integer
-
 components:
-  securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-
   parameters:
     StreamID:
       name: id
@@ -581,14 +403,6 @@ components:
         type: string
         format: uuid
       description: Stream UUID
-    ServerID:
-      name: id
-      in: path
-      required: true
-      schema:
-        type: string
-      description: Server ID
-
   responses:
     BadRequest:
       description: Bad request
@@ -654,13 +468,6 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-    Unauthorized:
-      description: Authentication required
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorResponse"
-
   schemas:
     ErrorResponse:
       type: object
@@ -702,55 +509,6 @@ components:
       properties:
         version:
           type: string
-
-    ServerInfo:
-      type: object
-      required: [id]
-      properties:
-        id:
-          type: string
-        name:
-          type: string
-        location:
-          type: string
-        region:
-          type: string
-        host:
-          type: string
-        tcp_port:
-          type: integer
-        udp_port:
-          type: integer
-        api_endpoint:
-          type: string
-        health:
-          type: string
-        capacity_gbps:
-          type: integer
-        active_tests:
-          type: integer
-        max_tests:
-          type: integer
-
-    ServersResponse:
-      type: object
-      properties:
-        servers:
-          type: array
-          items:
-            $ref: "#/components/schemas/ServerInfo"
-
-    RegisteredServer:
-      allOf:
-        - $ref: "#/components/schemas/ServerInfo"
-        - type: object
-          properties:
-            last_seen:
-              type: string
-              format: date-time
-            expires_at:
-              type: string
-              format: date-time
 
     StartStreamRequest:
       type: object

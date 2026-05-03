@@ -12,12 +12,8 @@ type Config struct {
 	TCPTestPort int
 	UDPTestPort int
 
-	ServerID       string
-	ServerName     string
-	ServerLocation string
-	ServerRegion   string
-	PublicHost     string
-	CapacityGbps   int
+	PublicHost   string
+	CapacityGbps int
 
 	MaxConcurrentTests int
 	MaxTestDuration    time.Duration
@@ -52,30 +48,17 @@ type Config struct {
 	DataDir          string
 	MaxStoredResults int
 
-	RegistryEnabled  bool
-	RegistryURL      string
-	RegistryAPIKey   string
-	RegistryInterval time.Duration
-
-	RegistryMode      bool
-	RegistryServerTTL time.Duration
-
 	TLSCertFile string
 	TLSKeyFile  string
 	TLSAutoGen  bool // Auto-generate self-signed cert for dev
 }
 
 func DefaultConfig() *Config {
-	hostname := defaultServerID()
 	return &Config{
 		Port:                  "8080",
 		BindAddress:           "0.0.0.0",
 		TCPTestPort:           8081,
 		UDPTestPort:           8082,
-		ServerID:              hostname,
-		ServerName:            "OpenByte Server",
-		ServerLocation:        "Unknown",
-		ServerRegion:          "",
 		PublicHost:            "",
 		CapacityGbps:          25,
 		MaxConcurrentTests:    10,
@@ -103,12 +86,6 @@ func DefaultConfig() *Config {
 		WebRoot:               "",
 		DataDir:               "./data",
 		MaxStoredResults:      10000,
-		RegistryEnabled:       false,
-		RegistryURL:           "",
-		RegistryAPIKey:        "",
-		RegistryInterval:      30 * time.Second,
-		RegistryMode:          false,
-		RegistryServerTTL:     60 * time.Second,
 		TLSCertFile:           "",
 		TLSKeyFile:            "",
 		TLSAutoGen:            true, // Auto-generate for dev by default
@@ -128,9 +105,6 @@ func (c *Config) LoadFromEnv() error {
 	if err := c.loadStorageEnv(); err != nil {
 		return err
 	}
-	if err := c.loadRegistryEnv(); err != nil {
-		return err
-	}
 	c.loadTLSEnv()
 	return nil
 }
@@ -143,9 +117,6 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := c.validateProxyAndStorage(); err != nil {
-		return err
-	}
-	if err := c.validateRegistry(); err != nil {
 		return err
 	}
 	if err := c.validateTLS(); err != nil {

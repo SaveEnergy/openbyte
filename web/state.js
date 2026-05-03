@@ -1,9 +1,7 @@
 /** Shared state, DOM element refs, and config constants. */
 
-let _apiBase = "/api/v1";
-
 export function getApiBase() {
-  return _apiBase;
+  return "/api/v1";
 }
 
 export const state = {
@@ -18,8 +16,6 @@ export const state = {
   currentSpeed: 0,
   progress: 0,
   abortController: null,
-  servers: [],
-  selectedServer: null,
   settings: {
     duration: 30,
     streams: 4,
@@ -68,9 +64,6 @@ export function initElements() {
   elements.settingsModal = document.getElementById("settingsModal");
   elements.duration = document.getElementById("duration");
   elements.streams = document.getElementById("streams");
-  elements.serverSelectGroup = document.getElementById("serverSelectGroup");
-  elements.serverSelect = document.getElementById("serverSelect");
-  elements.serverStatus = document.getElementById("serverStatus");
   elements.errorToast = document.getElementById("errorToast");
   elements.errorMessage = document.getElementById("errorMessage");
   elements.successToast = document.getElementById("successToast");
@@ -106,10 +99,6 @@ export const TEST_CONFIG = {
   TOAST_SUCCESS_MS: 2000,
   ARIA_PROGRESS_UPDATE_MS: 1000,
 };
-
-export function setApiBase(base) {
-  _apiBase = base;
-}
 
 export const modal = { lastTrigger: null };
 export const toast = { timer: null };

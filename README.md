@@ -30,11 +30,8 @@ High-performance network speed test server capable of 25 Gbit/s sustained throug
 make build
 ./bin/openbyte server
 
-# With server identity
-SERVER_ID=nyc-1 SERVER_NAME="New York" ./bin/openbyte server
-
 # With server flags (flags override env values when set)
-./bin/openbyte server --server-name "New York" --public-host speedtest.example.com
+./bin/openbyte server --public-host speedtest.example.com
 ```
 
 ### CLI Client
@@ -43,7 +40,7 @@ SERVER_ID=nyc-1 SERVER_NAME="New York" ./bin/openbyte server
 ./bin/openbyte client -d download -t 30        # 30-second download test
 ./bin/openbyte client -S nyc                   # Use configured server
 ./bin/openbyte client speedtest.example.com    # Use remote server
-./bin/openbyte client --servers                # List servers
+./bin/openbyte client --servers                # List configured CLI servers
 ./bin/openbyte client -p http -d download      # HTTP streaming download
 ```
 
@@ -94,10 +91,6 @@ Uses BEREC-compliant measurement practices:
 | `PORT` | 8080 | HTTP API port |
 | `TCP_TEST_PORT` | 8081 | TCP test data port |
 | `UDP_TEST_PORT` | 8082 | UDP test data port |
-| `SERVER_ID` | hostname | Unique server identifier |
-| `SERVER_NAME` | OpenByte Server | Human-readable name |
-| `SERVER_LOCATION` | — | Geographic location |
-| `SERVER_REGION` | — | Cloud region (optional) |
 | `PUBLIC_HOST` | — | Public hostname/IP |
 | `CAPACITY_GBPS` | 25 | Server link capacity; HTTP concurrency limits auto-scale from this |
 | `RATE_LIMIT_PER_IP` | 100 | Rate limit per IP per minute |
@@ -117,7 +110,7 @@ Uses BEREC-compliant measurement practices:
 | `PERF_STATS_INTERVAL` | — | Log runtime stats at this interval (e.g. `10s`) |
 
 Notes:
-- With default `BIND_ADDRESS=0.0.0.0`, `GET /api/v1/servers` builds `api_endpoint` from the HTTP request `Host` so the web UI stays same-origin (e.g. open `http://localhost:8080` → endpoint uses `localhost`, not `0.0.0.0`). If you bind `127.0.0.1` only, open the UI at `http://127.0.0.1:PORT`, or set `PUBLIC_HOST` for a stable advertised host.
+- If you bind `127.0.0.1` only, open the UI at `http://127.0.0.1:PORT`, or set `PUBLIC_HOST` for a stable advertised host in client-mode stream responses.
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
 - Default CORS allows all origins; set `ALLOWED_ORIGINS` to restrict (supports `*` and `*.example.com`).
 - If running behind a reverse proxy, increase max request body size (e.g. 35MB) and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.
@@ -129,10 +122,10 @@ Notes:
 # docker run
 docker run --rm -p 8080:8080 -p 8081:8081 -p 8082:8082 -p 8082:8082/udp \
   ghcr.io/saveenergy/openbyte:latest \
-  server --server-name "My Box" --public-host speed.example.com
+  server --public-host speed.example.com
 
 # docker compose service command override
-# command: ["server", "--server-name=My Box", "--public-host=speed.example.com"]
+# command: ["server", "--public-host=speed.example.com"]
 ```
 
 ### IPv4/IPv6 Detection
@@ -172,26 +165,6 @@ bunx playwright test
 make test-ui
 ```
 
-## Multi-Server Deployment
-
-### Registry Service (Optional)
-
-Run a central registry for automatic server discovery:
-
-```bash
-# Start registry service
-REGISTRY_MODE=true ./bin/openbyte server
-
-# Servers register with registry
-REGISTRY_ENABLED=true REGISTRY_URL=http://registry:8080 ./bin/openbyte server
-```
-
-Registry API:
-- `GET /api/v1/registry/servers` — List all servers
-- `GET /api/v1/registry/servers?healthy=true` — List healthy servers
-- `POST /api/v1/registry/servers` — Register server
-- `DELETE /api/v1/registry/servers/{id}` — Deregister
-
 ## Documentation
 
 - [Architecture](ARCHITECTURE.md) — System design and components
@@ -211,7 +184,6 @@ internal/
   api/        # REST API + HTTP speed test handlers
   config/     # Configuration
   metrics/    # Metrics collection + latency histogram
-  registry/   # Server registry
   results/    # SQLite results store
   stream/     # TCP/UDP test engine
   websocket/  # Real-time metrics streaming
