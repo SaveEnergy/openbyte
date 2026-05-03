@@ -57,8 +57,6 @@ type Config struct {
 	PacketSize int
 	ChunkSize  int
 	ServerURL  string
-	Server     string
-	APIKey     string
 	Timeout    int
 	JSON       bool
 	NDJSON     bool
@@ -68,7 +66,6 @@ type Config struct {
 	NoColor    bool
 	NoProgress bool
 	WarmUp     int
-	Auto       bool
 }
 
 type StreamResponse struct {

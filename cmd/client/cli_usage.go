@@ -6,24 +6,18 @@ import (
 )
 
 func printUsage() {
-	fmt.Fprintf(os.Stdout, `Usage: openbyte client [flags] [server]
+	fmt.Fprintf(os.Stdout, `Usage: openbyte client [flags] [server-url]
 
 Run network speed test (client-side measurement).
 
-Server Selection:
-  openbyte client <alias>           Use server alias from config
+Server:
   openbyte client <url>             Use server URL directly
   openbyte client -S <url>          Use server URL directly
-  openbyte client -a, --auto        Auto-select fastest server
-  openbyte client --servers         List configured servers
 
 Flags:
   -h, --help              Show help
   --version               Print version
-  -a, --auto              Auto-select fastest server (lowest latency)
   -S string               Server URL (short)
-  --server string         Server alias
-  --servers               List configured servers
   -p, --protocol string   Protocol: tcp, udp, http (default: tcp)
   -d, --direction string  Direction: download, upload, bidirectional (default: download)
   -t, --duration int      Test duration in seconds (1-300) (default: 30)
@@ -50,9 +44,9 @@ Environment:
 
 Examples:
   openbyte client                          # Default test
-  openbyte client -a                       # Auto-select fastest server
+  openbyte client https://speed.example.com
   openbyte client -d upload -t 60          # Upload test, 60s
   openbyte client -p udp -d bidirectional -s 8
-  openbyte client --json server.example.com
+  openbyte client --json https://speed.example.com
 `)
 }

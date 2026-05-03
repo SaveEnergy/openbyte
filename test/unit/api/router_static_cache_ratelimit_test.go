@@ -46,7 +46,7 @@ func TestStaticJSDoesNotForceNoStore(t *testing.T) {
 	h.ServeHTTP(rec, req)
 
 	if rec.Header().Get(cacheControlKey) == noStoreHeader {
-		t.Fatalf(routerJSNoStoreErr)
+		t.Fatal(routerJSNoStoreErr)
 	}
 }
 
@@ -65,7 +65,7 @@ func TestSecurityHeadersMiddlewareSetsCSP(t *testing.T) {
 
 	csp := rec.Header().Get("Content-Security-Policy")
 	if csp == "" {
-		t.Fatalf(routerCSPHeaderMissingErr)
+		t.Fatal(routerCSPHeaderMissingErr)
 	}
 	if !strings.Contains(csp, "script-src 'self'") {
 		t.Fatalf(routerCSPScriptSrcFmt, csp)
@@ -102,14 +102,14 @@ func TestRateLimitSkipPathsAndStreamPathBehavior(t *testing.T) {
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code == http.StatusTooManyRequests {
-		t.Fatalf(routerPingBypassErr)
+		t.Fatal(routerPingBypassErr)
 	}
 
 	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+downloadAPIPath, nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code == http.StatusTooManyRequests {
-		t.Fatalf(routerDownloadBypassErr)
+		t.Fatal(routerDownloadBypassErr)
 	}
 
 	req = httptest.NewRequest(http.MethodPost, exampleBaseURL+uploadAPIPath, strings.NewReader("x"))
@@ -117,7 +117,7 @@ func TestRateLimitSkipPathsAndStreamPathBehavior(t *testing.T) {
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code == http.StatusTooManyRequests {
-		t.Fatalf(routerUploadBypassErr)
+		t.Fatal(routerUploadBypassErr)
 	}
 
 	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+streamWSAPIPath, nil)

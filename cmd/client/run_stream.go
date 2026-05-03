@@ -32,13 +32,6 @@ func runStream(ctx context.Context, config *Config, formatter OutputFormatter, s
 	return nil
 }
 
-// EngineRunner interface for TCP/UDP engines
-type EngineRunner interface {
-	Run(ctx context.Context) error
-	GetMetrics() EngineMetrics
-	IsRunning() bool
-}
-
 func runClientSideTest(ctx context.Context, config *Config, formatter OutputFormatter, streamResp *StreamResponse) error {
 	testAddr := streamResp.TestServerTCP
 	if config.Protocol == protocolUDP {

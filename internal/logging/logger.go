@@ -43,21 +43,10 @@ func GetLogger() *Logger {
 	return defaultLogger
 }
 
-func NewLogger(name string) *Logger {
-	return &Logger{
-		level:  GetLogger().level,
-		logger: log.New(os.Stderr, "["+name+"] ", log.LstdFlags|log.Lmicroseconds),
-	}
-}
-
 func (l *Logger) SetLevel(level Level) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.level = level
-}
-
-func (l *Logger) Debug(msg string, fields ...Field) {
-	l.log(LevelDebug, msg, fields...)
 }
 
 func (l *Logger) Info(msg string, fields ...Field) {
@@ -190,10 +179,6 @@ func formatUint64(v uint64) string {
 
 func formatFloat(v float64) string {
 	return fmt.Sprintf("%.2f", v)
-}
-
-func Debug(msg string, fields ...Field) {
-	GetLogger().Debug(msg, fields...)
 }
 
 func Info(msg string, fields ...Field) {

@@ -4,18 +4,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/saveenergy/openbyte/pkg/types"
 )
-
-type CollectorInterface interface {
-	RecordBytes(bytes int64, direction string)
-	RecordLatency(latency time.Duration)
-	RecordPacket(sent bool)
-	GetMetrics() types.Metrics
-	Reset()
-	Close()
-}
 
 type Collector struct {
 	bytesSent        int64
@@ -47,10 +36,15 @@ func NewCollector() *Collector {
 		startTime:        time.Now(),
 		bucketPool: sync.Pool{
 			New: func() any {
-				return make([]uint32, latencyBucketCount)
+				return newLatencyBucketBuffer(latencyBucketCount)
 			},
 		},
 	}
+}
+
+func newLatencyBucketBuffer(size int) *[]uint32 {
+	buckets := make([]uint32, size)
+	return &buckets
 }
 
 func (c *Collector) RecordBytes(bytes int64, direction string) {
@@ -124,14 +118,6 @@ func (c *Collector) Reset() {
 	c.lastLatency = 0
 	c.hasLastLatency = false
 	c.startTime = time.Now()
-}
-
-func (c *Collector) Close() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	// Do not set c.latencyHistogram = nil to avoid data races with RecordLatency
-	// which reads it outside the lock to minimize contention.
-	c.bucketPool = sync.Pool{}
 }
 
 // LatencySnapshot holds a point-in-time copy of latency statistics.

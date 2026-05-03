@@ -23,7 +23,6 @@ const (
 	pathPing          = "/api/v1/ping"
 	pathDownload      = "/api/v1/download"
 	pathUpload        = "/api/v1/upload"
-	authBearerPrefix  = "Bearer "
 )
 
 var (
@@ -37,16 +36,10 @@ var (
 type Client struct {
 	serverURL  string
 	httpClient *http.Client
-	apiKey     string
 }
 
 // Option configures the Client.
 type Option func(*Client)
-
-// WithAPIKey sets the API key for authenticated requests.
-func WithAPIKey(key string) Option {
-	return func(c *Client) { c.apiKey = key }
-}
 
 // WithHTTPClient overrides the default http.Client.
 func WithHTTPClient(hc *http.Client) Option {

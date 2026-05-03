@@ -21,7 +21,6 @@ type Server struct {
 	activeUDPSenders int64
 	maxUDPSenders    int64
 	maxConnDur       time.Duration
-	mu               sync.RWMutex
 	wg               sync.WaitGroup
 	stopCh           chan struct{}
 	randomData       []byte
@@ -54,7 +53,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		randomData:    make([]byte, randomDataSize),
 		recvPool: sync.Pool{
 			New: func() any {
-				return make([]byte, recvBufferSize)
+				return newRecvBuffer()
 			},
 		},
 	}
@@ -98,12 +97,17 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	return s, nil
 }
 
-func (s *Server) getRecvBuffer() []byte {
-	buf, ok := s.recvPool.Get().([]byte)
-	if !ok || len(buf) != recvBufferSize {
-		return make([]byte, recvBufferSize)
+func newRecvBuffer() *[]byte {
+	buf := make([]byte, recvBufferSize)
+	return &buf
+}
+
+func (s *Server) getRecvBuffer() *[]byte {
+	bufPtr, ok := s.recvPool.Get().(*[]byte)
+	if !ok || bufPtr == nil || len(*bufPtr) != recvBufferSize {
+		return newRecvBuffer()
 	}
-	return buf
+	return bufPtr
 }
 
 func (s *Server) isStopping() bool {

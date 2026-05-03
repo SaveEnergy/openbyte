@@ -16,7 +16,6 @@ const (
 	apiPathStreamStart = "/api/v1/stream/start"
 	apiPathStreamBase  = "/api/v1/stream/"
 	contentTypeJSON    = "application/json"
-	authBearerPrefix   = "Bearer "
 	pathCancel         = "/cancel"
 	pathComplete       = "/complete"
 	statusCompleted    = "completed"
@@ -45,9 +44,6 @@ func startStream(ctx context.Context, config *Config) (*StreamResponse, error) {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	if config.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+config.APIKey)
-	}
 
 	timeout := time.Duration(config.Timeout) * time.Second
 	if timeout <= 0 {
@@ -81,7 +77,7 @@ func startStream(ctx context.Context, config *Config) (*StreamResponse, error) {
 	return &streamResp, nil
 }
 
-func CancelStream(ctx context.Context, serverURL, streamID, apiKey string) error {
+func CancelStream(ctx context.Context, serverURL, streamID string) error {
 	parent := ctx
 	if parent == nil {
 		parent = context.Background()
@@ -94,9 +90,6 @@ func CancelStream(ctx context.Context, serverURL, streamID, apiKey string) error
 	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, apiURL, nil)
 	if err != nil {
 		return err
-	}
-	if apiKey != "" {
-		req.Header.Set("Authorization", authBearerPrefix+apiKey)
 	}
 
 	client := newHTTPClient(5 * time.Second)
@@ -152,9 +145,6 @@ func completeStream(ctx context.Context, config *Config, streamID string, metric
 		return fmt.Errorf("complete stream request: %w", err)
 	}
 	req.Header.Set("Content-Type", contentTypeJSON)
-	if config.APIKey != "" {
-		req.Header.Set("Authorization", authBearerPrefix+config.APIKey)
-	}
 
 	client := newHTTPClient(5 * time.Second)
 	defer client.CloseIdleConnections()

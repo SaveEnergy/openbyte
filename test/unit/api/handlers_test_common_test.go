@@ -97,10 +97,10 @@ func (tb *trackingBody) Close() error {
 func assertTrackingBodyDrained(t *testing.T, tb *trackingBody) {
 	t.Helper()
 	if tb.reads == 0 {
-		t.Fatalf(handlersExpectedBodyDrainedErr)
+		t.Fatal(handlersExpectedBodyDrainedErr)
 	}
 	if !tb.closed {
-		t.Fatalf(handlersExpectedBodyClosedErr)
+		t.Fatal(handlersExpectedBodyClosedErr)
 	}
 }
 

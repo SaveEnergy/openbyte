@@ -50,9 +50,6 @@ func (e *HTTPTestEngine) runDownloadStream(ctx context.Context, deadline time.Ti
 		return err
 	}
 	req.Header.Set("Accept-Encoding", "identity")
-	if e.config.APIKey != "" {
-		req.Header.Set("Authorization", "Bearer "+e.config.APIKey)
-	}
 
 	resp, err := e.client.Do(req)
 	if err != nil {
@@ -65,11 +62,12 @@ func (e *HTTPTestEngine) runDownloadStream(ctx context.Context, deadline time.Ti
 		return e.handleNonOKResponse(ctx, "download", resp)
 	}
 
-	buf, ok := e.bufferPool.Get().([]byte)
-	if !ok {
-		buf = make([]byte, 64*1024)
+	bufPtr, ok := e.bufferPool.Get().(*[]byte)
+	if !ok || bufPtr == nil || len(*bufPtr) < clientBufferSize {
+		bufPtr = newClientBuffer()
 	}
-	defer e.bufferPool.Put(buf)
+	buf := *bufPtr
+	defer e.bufferPool.Put(bufPtr)
 
 	for {
 		n, readErr := resp.Body.Read(buf)

@@ -47,7 +47,7 @@ func BenchmarkReadUploadBody(b *testing.B) {
 	data := make([]byte, bodySize)
 	pool := &sync.Pool{
 		New: func() any {
-			return make([]byte, uploadReadBufferSize)
+			return newUploadBuffer()
 		},
 	}
 	ctx := context.Background()

@@ -104,20 +104,20 @@ func TestStoreTrimToMaxDeterministicWithEqualCreatedAt(t *testing.T) {
 		t.Fatalf("Get trimmed id: %v", err)
 	}
 	if trimmed != nil {
-		t.Fatalf("expected AAAA0001 trimmed under deterministic tie-break")
+		t.Fatal("expected AAAA0001 trimmed under deterministic tie-break")
 	}
 	keptA, err := store2.Get("BBBB0001")
 	if err != nil {
 		t.Fatalf("Get kept id BBBB0001: %v", err)
 	}
 	if keptA == nil {
-		t.Fatalf(storeKeptBBBBMsg)
+		t.Fatal(storeKeptBBBBMsg)
 	}
 	keptB, err := store2.Get("CCCC0001")
 	if err != nil {
 		t.Fatalf("Get kept id CCCC0001: %v", err)
 	}
 	if keptB == nil {
-		t.Fatalf(storeKeptCCCCMsg)
+		t.Fatal(storeKeptCCCCMsg)
 	}
 }

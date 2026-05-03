@@ -55,11 +55,12 @@ func (e *TestEngine) runBidirectionalReadLoop(ctx context.Context, conn net.Conn
 }
 
 func (e *TestEngine) runBidiReadLoop(ctx context.Context, conn net.Conn, onRead func(n int, d time.Duration)) error {
-	buf, ok := e.bufferPool.Get().([]byte)
-	if !ok {
-		buf = make([]byte, 64*1024)
+	bufPtr, ok := e.bufferPool.Get().(*[]byte)
+	if !ok || bufPtr == nil || len(*bufPtr) < clientBufferSize {
+		bufPtr = newClientBuffer()
 	}
-	defer e.bufferPool.Put(buf)
+	buf := *bufPtr
+	defer e.bufferPool.Put(bufPtr)
 	lastRTTSample := time.Now()
 	for {
 		if err := ctx.Err(); err != nil {
@@ -87,11 +88,12 @@ func (e *TestEngine) runBidiReadLoop(ctx context.Context, conn net.Conn, onRead 
 }
 
 func (e *TestEngine) runBidirectionalWriteLoop(ctx context.Context, conn net.Conn) error {
-	buf, ok := e.bufferPool.Get().([]byte)
-	if !ok {
-		buf = make([]byte, 64*1024)
+	bufPtr, ok := e.bufferPool.Get().(*[]byte)
+	if !ok || bufPtr == nil || len(*bufPtr) < clientBufferSize {
+		bufPtr = newClientBuffer()
 	}
-	defer e.bufferPool.Put(buf)
+	buf := *bufPtr
+	defer e.bufferPool.Put(bufPtr)
 	for {
 		if err := ctx.Err(); err != nil {
 			return err

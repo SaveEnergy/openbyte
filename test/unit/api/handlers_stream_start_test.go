@@ -117,10 +117,10 @@ func TestStartStreamRejectsWrongContentTypeDrainsBody(t *testing.T) {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusUnsupportedMediaType)
 	}
 	if tb.reads == 0 {
-		t.Fatalf(handlersExpectedBodyDrainedErr)
+		t.Fatal(handlersExpectedBodyDrainedErr)
 	}
 	if !tb.closed {
-		t.Fatalf(handlersExpectedBodyClosedErr)
+		t.Fatal(handlersExpectedBodyClosedErr)
 	}
 }
 

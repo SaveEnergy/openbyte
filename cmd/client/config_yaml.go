@@ -11,18 +11,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type ServerConfig struct {
-	URL    string `yaml:"url"`
-	Name   string `yaml:"name"`
-	APIKey string `yaml:"api_key,omitempty"`
-}
-
 type ConfigFile struct {
-	DefaultServer string                  `yaml:"default_server,omitempty"`
-	Servers       map[string]ServerConfig `yaml:"servers,omitempty"`
-
 	ServerURL  string `yaml:"server_url,omitempty"`
-	APIKey     string `yaml:"api_key,omitempty"`
 	Protocol   string `yaml:"protocol,omitempty"`
 	Direction  string `yaml:"direction,omitempty"`
 	Duration   int    `yaml:"duration,omitempty"`
@@ -46,14 +36,6 @@ func getConfigPath() string {
 	return filepath.Join(configDir, "openbyte", "config.yaml")
 }
 
-func getLegacyConfigPath() string {
-	configDir := resolvedConfigDir()
-	if configDir == "" {
-		return ""
-	}
-	return filepath.Join(configDir, "obyte", "config.yaml")
-}
-
 func resolvedConfigDir() string {
 	configDir := os.Getenv("XDG_CONFIG_HOME")
 	if configDir != "" {
@@ -73,15 +55,7 @@ func loadConfigFile() (*ConfigFile, error) {
 	}
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		legacyPath := getLegacyConfigPath()
-		if legacyPath == "" {
-			return nil, nil
-		}
-		if _, legacyErr := os.Stat(legacyPath); os.IsNotExist(legacyErr) {
-			return nil, nil
-		}
-		configPath = legacyPath
-		fmt.Fprintf(os.Stderr, "openbyte client: note: using legacy config path %s\n", legacyPath)
+		return nil, nil
 	}
 
 	data, err := os.ReadFile(configPath)
@@ -101,24 +75,6 @@ func loadConfigFile() (*ConfigFile, error) {
 	return &config, nil
 }
 
-func resolveServerURL(configFile *ConfigFile, serverAlias string) (string, string) {
-	if configFile == nil {
-		return "", ""
-	}
-
-	if serverAlias == "" {
-		serverAlias = configFile.DefaultServer
-	}
-
-	if serverAlias != "" && configFile.Servers != nil {
-		if server, ok := configFile.Servers[serverAlias]; ok {
-			return server.URL, server.APIKey
-		}
-	}
-
-	return configFile.ServerURL, configFile.APIKey
-}
-
 func validateConfigFile(config *ConfigFile) error {
 	if err := validateServerURLs(config); err != nil {
 		return err
@@ -133,14 +89,6 @@ func validateServerURLs(config *ConfigFile) error {
 	if config.ServerURL != "" {
 		if _, err := normalizeAndValidateServerURL(config.ServerURL); err != nil {
 			return fmt.Errorf("invalid server_url: %w", err)
-		}
-	}
-	for alias, server := range config.Servers {
-		if strings.TrimSpace(server.URL) == "" {
-			return fmt.Errorf("invalid server %q url: empty", alias)
-		}
-		if _, err := normalizeAndValidateServerURL(server.URL); err != nil {
-			return fmt.Errorf("invalid server %q url: %w", alias, err)
 		}
 	}
 	return nil

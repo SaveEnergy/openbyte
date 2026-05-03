@@ -12,9 +12,6 @@ func (c *Client) healthCheck(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("server unreachable: %w", err)
 	}
-	if c.apiKey != "" {
-		req.Header.Set("Authorization", authBearerPrefix+c.apiKey)
-	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("server unreachable: %w", err)

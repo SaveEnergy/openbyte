@@ -28,10 +28,6 @@ var validResultID = regexp.MustCompile(`^[0-9a-zA-Z]{8}$`)
 
 const internalWSClientIPHeader = "X-OpenByte-Client-IP"
 
-func (r *Router) GetLimiter() *RateLimiter {
-	return r.limiter
-}
-
 func NewRouter(handler *Handler, cfg *config.Config) *Router {
 	maxDur := 300
 	if cfg.MaxTestDuration > 0 {

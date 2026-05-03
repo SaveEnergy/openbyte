@@ -12,13 +12,14 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
+const clientBufferSize = 64 * 1024
+
 type TestEngine struct {
 	config       *TestEngineConfig
 	connections  []net.Conn
 	metrics      *LocalMetrics
 	networkInfo  *types.NetworkInfo
 	rttCollector *types.RTTCollector
-	mu           sync.RWMutex
 	running      int32
 	startTime    time.Time
 	measureStart time.Time // set after warm-up; throughput computed from here
@@ -68,10 +69,15 @@ func NewTestEngine(cfg *TestEngineConfig) *TestEngine {
 		},
 		bufferPool: sync.Pool{
 			New: func() any {
-				return make([]byte, 64*1024)
+				return newClientBuffer()
 			},
 		},
 	}
+}
+
+func newClientBuffer() *[]byte {
+	buf := make([]byte, clientBufferSize)
+	return &buf
 }
 
 func (e *TestEngine) Run(ctx context.Context) error {
@@ -210,10 +216,6 @@ func (e *TestEngine) GetMetrics() EngineMetrics {
 		Elapsed:          measureElapsed,
 		Running:          atomic.LoadInt32(&e.running) == 1,
 	}
-}
-
-func (e *TestEngine) IsRunning() bool {
-	return atomic.LoadInt32(&e.running) == 1
 }
 
 type EngineMetrics struct {

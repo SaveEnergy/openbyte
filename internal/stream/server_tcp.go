@@ -158,8 +158,9 @@ func (s *Server) handleUpload(conn *net.TCPConn) {
 }
 
 func (s *Server) readDiscardLoop(conn *net.TCPConn, deadline time.Duration) {
-	buf := s.getRecvBuffer()
-	defer s.recvPool.Put(buf)
+	bufPtr := s.getRecvBuffer()
+	buf := *bufPtr
+	defer s.recvPool.Put(bufPtr)
 	readsSinceDeadline := 0
 	conn.SetReadDeadline(time.Now().Add(deadline))
 
@@ -202,8 +203,9 @@ func (s *Server) handleBidirectional(conn *net.TCPConn) {
 }
 
 func (s *Server) handleEcho(conn *net.TCPConn) {
-	buf := s.getRecvBuffer()
-	defer s.recvPool.Put(buf)
+	bufPtr := s.getRecvBuffer()
+	buf := *bufPtr
+	defer s.recvPool.Put(bufPtr)
 	bytesSinceRefresh := 0
 	deadline := time.Now().Add(tcpEchoReadDeadline)
 	for {

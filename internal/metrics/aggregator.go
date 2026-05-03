@@ -18,8 +18,6 @@ type MultiStreamAggregator struct {
 	rr            uint32
 }
 
-var _ CollectorInterface = (*MultiStreamAggregator)(nil)
-
 func NewMultiStreamAggregator(streamCount int) *MultiStreamAggregator {
 	collectors := make([]*Collector, streamCount)
 	for i := range streamCount {
@@ -119,16 +117,6 @@ func (m *MultiStreamAggregator) GetAggregatedMetrics() types.Metrics {
 	}
 }
 
-func (m *MultiStreamAggregator) Reset() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for _, collector := range m.collectors {
-		collector.Reset()
-	}
-	m.startTime = time.Now()
-}
-
 func (m *MultiStreamAggregator) RecordBytes(bytes int64, direction string) {
 	collector := m.nextCollector()
 	if collector == nil {
@@ -151,20 +139,6 @@ func (m *MultiStreamAggregator) RecordPacket(sent bool) {
 		return
 	}
 	collector.RecordPacket(sent)
-}
-
-func (m *MultiStreamAggregator) GetMetrics() types.Metrics {
-	return m.GetAggregatedMetrics()
-}
-
-func (m *MultiStreamAggregator) Close() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for _, collector := range m.collectors {
-		collector.Close()
-	}
-	m.collectors = nil
 }
 
 func (m *MultiStreamAggregator) nextCollector() *Collector {

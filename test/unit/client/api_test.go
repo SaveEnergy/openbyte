@@ -28,7 +28,7 @@ func TestCancelStreamUsesDetachedContextWhenParentCanceled(t *testing.T) {
 	cancel()
 
 	start := time.Now()
-	err := client.CancelStream(ctx, server.URL, testStreamID, "")
+	err := client.CancelStream(ctx, server.URL, testStreamID)
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -55,7 +55,7 @@ func TestCancelStreamSuccess(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), cancelTimeout)
 	defer cancel()
 
-	if err := client.CancelStream(ctx, server.URL, testStreamID, ""); err != nil {
+	if err := client.CancelStream(ctx, server.URL, testStreamID); err != nil {
 		t.Fatalf("CancelStream: %v", err)
 	}
 }
@@ -68,7 +68,7 @@ func TestCancelStreamServerError(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), cancelTimeout)
 	defer cancel()
-	if client.CancelStream(ctx, server.URL, testStreamID, "") == nil {
+	if client.CancelStream(ctx, server.URL, testStreamID) == nil {
 		t.Fatal("expected error on non-2xx cancel response")
 	}
 }

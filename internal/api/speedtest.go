@@ -53,10 +53,10 @@ func NewSpeedTestHandler(maxConcurrent, maxDurationSec int) *SpeedTestHandler {
 		randomData:     make([]byte, speedtestRandomSize),
 		activeByIP:     make(map[string]*speedtestIPCounts),
 		uploadBufPool: sync.Pool{
-			New: func() any { return make([]byte, uploadReadBufferSize) },
+			New: func() any { return newUploadBuffer() },
 		},
 		fallbackRandomPool: sync.Pool{
-			New: func() any { return make([]byte, fallbackRandomSize) },
+			New: func() any { return newSpeedtestBuffer(fallbackRandomSize) },
 		},
 	}
 	if _, err := rand.Read(handler.randomData); err != nil {
@@ -65,6 +65,15 @@ func NewSpeedTestHandler(maxConcurrent, maxDurationSec int) *SpeedTestHandler {
 		handler.randomData = nil
 	}
 	return handler
+}
+
+func newUploadBuffer() *[]byte {
+	return newSpeedtestBuffer(uploadReadBufferSize)
+}
+
+func newSpeedtestBuffer(size int) *[]byte {
+	buf := make([]byte, size)
+	return &buf
 }
 
 func (h *SpeedTestHandler) SetClientIPResolver(resolver *ClientIPResolver) {

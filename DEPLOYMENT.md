@@ -224,7 +224,7 @@ sudo systemctl status openbyte
 curl http://localhost:8080/health
 
 # Test from client
-./bin/openbyte client -S production -d download -t 10
+./bin/openbyte client https://speedtest.example.com -d download -t 10
 ```
 
 ## Multi-Server Deployment
@@ -241,19 +241,13 @@ PUBLIC_HOST=nyc.speedtest.example.com
 PUBLIC_HOST=ams.speedtest.example.com
 ```
 
-### Client Configuration
+### Client Usage
 
-Update `~/.config/openbyte/config.yaml`:
+Point the client at the server you want to test:
 
-```yaml
-default_server: nyc
-servers:
-  nyc:
-    url: https://nyc.speedtest.example.com
-    name: "New York"
-  ams:
-    url: https://ams.speedtest.example.com
-    name: "Amsterdam"
+```bash
+openbyte client https://nyc.speedtest.example.com -d download
+openbyte client https://ams.speedtest.example.com -d download
 ```
 
 ## Reverse Proxy (Nginx)

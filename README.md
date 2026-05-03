@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="web/openbyte-wordmark-dark.svg">
-    <img src="web/openbyte-wordmark-light.svg" alt="openByte" width="460">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openbyte-wordmark-dark.svg">
+    <img src="docs/assets/openbyte-wordmark-light.svg" alt="openByte" width="460">
   </picture>
 </p>
 
@@ -38,9 +38,8 @@ make build
 
 ```bash
 ./bin/openbyte client -d download -t 30        # 30-second download test
-./bin/openbyte client -S nyc                   # Use configured server
-./bin/openbyte client speedtest.example.com    # Use remote server
-./bin/openbyte client --servers                # List configured CLI servers
+./bin/openbyte client -S https://speed.example.com
+./bin/openbyte client https://speed.example.com
 ./bin/openbyte client -p http -d download      # HTTP streaming download
 ```
 
@@ -86,30 +85,31 @@ Uses BEREC-compliant measurement practices:
 
 ### Server Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | 8080 | HTTP API port |
-| `TCP_TEST_PORT` | 8081 | TCP test data port |
-| `UDP_TEST_PORT` | 8082 | UDP test data port |
-| `PUBLIC_HOST` | — | Public hostname/IP |
-| `CAPACITY_GBPS` | 25 | Server link capacity; HTTP concurrency limits auto-scale from this |
-| `RATE_LIMIT_PER_IP` | 100 | Rate limit per IP per minute |
-| `GLOBAL_RATE_LIMIT` | 1000 | Global rate limit per minute |
-| `TRUST_PROXY_HEADERS` | false | Trust proxy headers for client IP |
-| `TRUSTED_PROXY_CIDRS` | — | Comma-separated trusted proxy CIDRs |
-| `ALLOWED_ORIGINS` | `*` | Comma-separated CORS/WS allowed origins |
-| `WEB_ROOT` | *(embedded)* | Override path to static web assets (for development) |
-| `MAX_CONCURRENT_TESTS` | 10 | Maximum simultaneous tests |
-| `MAX_STREAMS` | 32 | Maximum parallel streams per test (1-64) |
-| `MAX_TEST_DURATION` | `300s` | Maximum test duration (Go duration format) |
-| `DATA_DIR` | `./data` | Path to SQLite database directory |
-| `MAX_STORED_RESULTS` | 10000 | Maximum stored test results (older results auto-purged) |
-| `BIND_ADDRESS` | `0.0.0.0` | Address to bind listeners |
-| `PPROF_ENABLED` | false | Enable pprof profiling server |
-| `PPROF_ADDR` | `127.0.0.1:6060` | pprof server listen address |
-| `PERF_STATS_INTERVAL` | — | Log runtime stats at this interval (e.g. `10s`) |
+| Variable               | Default          | Description                                                        |
+| ---------------------- | ---------------- | ------------------------------------------------------------------ |
+| `PORT`                 | 8080             | HTTP API port                                                      |
+| `TCP_TEST_PORT`        | 8081             | TCP test data port                                                 |
+| `UDP_TEST_PORT`        | 8082             | UDP test data port                                                 |
+| `PUBLIC_HOST`          | —                | Public hostname/IP                                                 |
+| `CAPACITY_GBPS`        | 25               | Server link capacity; HTTP concurrency limits auto-scale from this |
+| `RATE_LIMIT_PER_IP`    | 100              | Rate limit per IP per minute                                       |
+| `GLOBAL_RATE_LIMIT`    | 1000             | Global rate limit per minute                                       |
+| `TRUST_PROXY_HEADERS`  | false            | Trust proxy headers for client IP                                  |
+| `TRUSTED_PROXY_CIDRS`  | —                | Comma-separated trusted proxy CIDRs                                |
+| `ALLOWED_ORIGINS`      | `*`              | Comma-separated CORS/WS allowed origins                            |
+| `WEB_ROOT`             | _(embedded)_     | Override path to static web assets (for development)               |
+| `MAX_CONCURRENT_TESTS` | 10               | Maximum simultaneous tests                                         |
+| `MAX_STREAMS`          | 32               | Maximum parallel streams per test (1-64)                           |
+| `MAX_TEST_DURATION`    | `300s`           | Maximum test duration (Go duration format)                         |
+| `DATA_DIR`             | `./data`         | Path to SQLite database directory                                  |
+| `MAX_STORED_RESULTS`   | 10000            | Maximum stored test results (older results auto-purged)            |
+| `BIND_ADDRESS`         | `0.0.0.0`        | Address to bind listeners                                          |
+| `PPROF_ENABLED`        | false            | Enable pprof profiling server                                      |
+| `PPROF_ADDR`           | `127.0.0.1:6060` | pprof server listen address                                        |
+| `PERF_STATS_INTERVAL`  | —                | Log runtime stats at this interval (e.g. `10s`)                    |
 
 Notes:
+
 - If you bind `127.0.0.1` only, open the UI at `http://127.0.0.1:PORT`, or set `PUBLIC_HOST` for a stable advertised host in client-mode stream responses.
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
 - Default CORS allows all origins; set `ALLOWED_ORIGINS` to restrict (supports `*` and `*.example.com`).
@@ -143,14 +143,7 @@ See [Deployment Guide](DEPLOYMENT.md#ipv4ipv6-detection) for details.
 `~/.config/openbyte/config.yaml`:
 
 ```yaml
-default_server: nyc
-servers:
-  nyc:
-    url: https://speedtest-nyc.example.com
-    name: "New York"
-  ams:
-    url: https://speedtest-ams.example.com
-    name: "Amsterdam"
+server_url: https://speedtest.example.com
 protocol: http
 chunk_size: 1048576
 ```

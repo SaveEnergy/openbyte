@@ -110,7 +110,7 @@ func TestRouterRejectsInvalidStreamID(t *testing.T) {
 		t.Fatalf(statusWantFmt, rec.Code, http.StatusBadRequest)
 	}
 	if called {
-		t.Fatalf(routerInvalidIDCalledErr)
+		t.Fatal(routerInvalidIDCalledErr)
 	}
 }
 
@@ -133,7 +133,7 @@ func TestWebSocketRouteRejectsInvalidStreamID(t *testing.T) {
 		t.Fatalf(statusWantFmt, rec.Code, http.StatusBadRequest)
 	}
 	if called {
-		t.Fatalf(routerInvalidIDCalledErr)
+		t.Fatal(routerInvalidIDCalledErr)
 	}
 }
 

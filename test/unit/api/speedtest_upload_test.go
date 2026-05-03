@@ -210,10 +210,10 @@ func TestUploadAtCapacityDrainsBodyBefore503(t *testing.T) {
 		t.Fatalf(speedtestStatusFmt, rec.Code, statusServiceUnavailable)
 	}
 	if tb.reads == 0 {
-		t.Fatalf(speedtestExpectReqBodyDrained503)
+		t.Fatal(speedtestExpectReqBodyDrained503)
 	}
 	if !tb.closed {
-		t.Fatalf(speedtestExpectReqBodyClosed)
+		t.Fatal(speedtestExpectReqBodyClosed)
 	}
 }
 

@@ -53,13 +53,6 @@ func (m *Manager) cleanup() {
 	}
 }
 
-func (m *Manager) releaseActiveStream(streamID string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.releaseActiveStreamLocked(streamID)
-}
-
 func (m *Manager) releaseActiveStreamLocked(streamID string) {
 	clientIP, exists := m.activeStreams[streamID]
 	if !exists {

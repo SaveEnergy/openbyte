@@ -28,9 +28,6 @@ func (c *Client) collectLatencySamples(ctx context.Context, samples int) []time.
 		if err != nil {
 			continue
 		}
-		if c.apiKey != "" {
-			req.Header.Set("Authorization", authBearerPrefix+c.apiKey)
-		}
 		latency, sampleOK := c.latencySample(req, time.Now())
 		if sampleOK {
 			latencies = append(latencies, latency)

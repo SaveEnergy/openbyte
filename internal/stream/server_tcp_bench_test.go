@@ -61,7 +61,7 @@ func BenchmarkStreamRecvBufferPool(b *testing.B) {
 		stopCh: make(chan struct{}),
 		recvPool: sync.Pool{
 			New: func() any {
-				return make([]byte, recvBufferSize)
+				return newRecvBuffer()
 			},
 		},
 	}

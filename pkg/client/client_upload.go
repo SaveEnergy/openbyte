@@ -41,9 +41,6 @@ func (c *Client) uploadLoop(ctx context.Context, durationSec int) (totalBytes in
 			return totalBytes, 0
 		}
 		req.Header.Set("Content-Type", "application/octet-stream")
-		if c.apiKey != "" {
-			req.Header.Set("Authorization", authBearerPrefix+c.apiKey)
-		}
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			return totalBytes, 0

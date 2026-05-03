@@ -14,22 +14,19 @@ func (h *SpeedTestHandler) resolveRandomSource() ([]byte, func(), error) {
 			// Intentionally empty: shared randomData has no per-request cleanup.
 		}, nil
 	}
-	pooled, _ := h.fallbackRandomPool.Get().([]byte)
 	const fallbackSize = 64 * 1024
-	if len(pooled) < fallbackSize {
-		pooled = make([]byte, fallbackSize)
+	pooledPtr, ok := h.fallbackRandomPool.Get().(*[]byte)
+	if !ok || pooledPtr == nil || cap(*pooledPtr) < fallbackSize {
+		pooledPtr = newSpeedtestBuffer(fallbackSize)
 	}
+	pooled := (*pooledPtr)[:fallbackSize]
 	randomSource := pooled[:fallbackSize]
 	if _, err := rand.Read(randomSource); err != nil {
-		if cap(pooled) >= fallbackSize {
-			h.fallbackRandomPool.Put(pooled)
-		}
+		h.fallbackRandomPool.Put(pooledPtr)
 		return nil, nil, err
 	}
 	return randomSource, func() {
-		if cap(pooled) >= fallbackSize {
-			h.fallbackRandomPool.Put(pooled)
-		}
+		h.fallbackRandomPool.Put(pooledPtr)
 	}, nil
 }
 

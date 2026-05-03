@@ -5,7 +5,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 const (
@@ -47,16 +46,4 @@ func parsePositiveIntEnv(name string) (int, bool, error) {
 		return 0, true, fmt.Errorf("invalid %s %q: must be a positive integer", name, raw)
 	}
 	return v, true, nil
-}
-
-func parseDurationEnv(name string) (time.Duration, bool, error) {
-	raw := os.Getenv(name)
-	if raw == "" {
-		return 0, false, nil
-	}
-	d, err := time.ParseDuration(raw)
-	if err != nil || d <= 0 {
-		return 0, true, fmt.Errorf("invalid %s %q: must be a positive duration", name, raw)
-	}
-	return d, true, nil
 }

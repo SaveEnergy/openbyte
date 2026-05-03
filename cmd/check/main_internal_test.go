@@ -29,7 +29,7 @@ func TestCheckDurationMsMatchesSDKMeasurement(t *testing.T) {
 	origRunCheck := runCheckFn
 	defer func() { runCheckFn = origRunCheck }()
 
-	runCheckFn = func(_ context.Context, serverURL, _ string) (*CheckResult, error) {
+	runCheckFn = func(_ context.Context, serverURL string) (*CheckResult, error) {
 		return &CheckResult{
 			SchemaVersion: "1.0",
 			Status:        "ok",

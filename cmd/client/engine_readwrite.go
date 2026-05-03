@@ -26,11 +26,12 @@ func (e *TestEngine) runDownload(ctx context.Context, conn net.Conn) error {
 }
 
 func (e *TestEngine) runReadLoop(ctx context.Context, conn net.Conn, timeout time.Duration, onRead func(n int, readDuration time.Duration)) error {
-	buf, ok := e.bufferPool.Get().([]byte)
-	if !ok {
-		buf = make([]byte, 64*1024)
+	bufPtr, ok := e.bufferPool.Get().(*[]byte)
+	if !ok || bufPtr == nil || len(*bufPtr) < clientBufferSize {
+		bufPtr = newClientBuffer()
 	}
-	defer e.bufferPool.Put(buf)
+	buf := *bufPtr
+	defer e.bufferPool.Put(bufPtr)
 	lastRTTSample := time.Now()
 	rttSampleInterval := 500 * time.Millisecond
 	for {
@@ -105,11 +106,12 @@ func (e *TestEngine) runUpload(ctx context.Context, conn net.Conn) error {
 }
 
 func (e *TestEngine) runWriteLoop(ctx context.Context, conn net.Conn, timeout time.Duration, onWrite func(n int, writeDuration time.Duration)) error {
-	buf, ok := e.bufferPool.Get().([]byte)
-	if !ok {
-		buf = make([]byte, 64*1024)
+	bufPtr, ok := e.bufferPool.Get().(*[]byte)
+	if !ok || bufPtr == nil || len(*bufPtr) < clientBufferSize {
+		bufPtr = newClientBuffer()
 	}
-	defer e.bufferPool.Put(buf)
+	buf := *bufPtr
+	defer e.bufferPool.Put(bufPtr)
 	lastRTTSample := time.Now()
 	rttSampleInterval := 500 * time.Millisecond
 	for {

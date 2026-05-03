@@ -26,9 +26,10 @@ func readUploadBody(
 	deadline time.Time,
 	pool *sync.Pool,
 ) (totalBytes int64, readFailed bool) {
-	buf := getUploadBuf(pool)
+	bufPtr := getUploadBuf(pool)
+	buf := *bufPtr
 	if pool != nil {
-		defer pool.Put(buf)
+		defer pool.Put(bufPtr)
 	}
 	for {
 		select {
@@ -48,18 +49,20 @@ func readUploadBody(
 	}
 }
 
-func getUploadBuf(pool *sync.Pool) []byte {
+func getUploadBuf(pool *sync.Pool) *[]byte {
 	if pool == nil {
-		return make([]byte, uploadReadBufferSize)
+		return newUploadBuffer()
 	}
 	pooled := pool.Get()
 	if pooled == nil {
-		return make([]byte, uploadReadBufferSize)
+		return newUploadBuffer()
 	}
-	if cast, ok := pooled.([]byte); ok && len(cast) >= uploadReadBufferSize {
-		return cast[:uploadReadBufferSize]
+	if cast, ok := pooled.(*[]byte); ok && cast != nil && cap(*cast) >= uploadReadBufferSize {
+		buf := (*cast)[:uploadReadBufferSize]
+		*cast = buf
+		return cast
 	}
-	return make([]byte, uploadReadBufferSize)
+	return newUploadBuffer()
 }
 
 func writeUploadResponse(w http.ResponseWriter, controller *http.ResponseController, totalBytes int64, startTime time.Time) {

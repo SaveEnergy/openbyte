@@ -20,7 +20,6 @@ type HTTPTestConfig struct {
 	GraceTime      time.Duration
 	StreamDelay    time.Duration
 	OverheadFactor float64
-	APIKey         string
 	Timeout        time.Duration
 }
 
@@ -66,7 +65,7 @@ func NewHTTPTestEngine(cfg *HTTPTestConfig) (*HTTPTestEngine, error) {
 		uploadPayload: payload,
 		bufferPool: sync.Pool{
 			New: func() any {
-				return make([]byte, 64*1024)
+				return newClientBuffer()
 			},
 		},
 	}, nil
@@ -116,8 +115,4 @@ func (e *HTTPTestEngine) elapsedSinceStart() time.Duration {
 
 func (e *HTTPTestEngine) Close() {
 	e.client.CloseIdleConnections()
-}
-
-func (e *HTTPTestEngine) IsRunning() bool {
-	return atomic.LoadInt32(&e.running) == 1
 }

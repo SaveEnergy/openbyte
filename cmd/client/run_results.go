@@ -41,7 +41,7 @@ func handleClientTestCompletion(
 }
 
 func cancelStreamWithCleanup(ctx context.Context, config *Config, streamID string, rootErr error) error {
-	cancelErr := CancelStream(ctx, config.ServerURL, streamID, config.APIKey)
+	cancelErr := CancelStream(ctx, config.ServerURL, streamID)
 	if cancelErr != nil {
 		return fmt.Errorf("%w (and cancel cleanup failed: %v)", rootErr, cancelErr)
 	}

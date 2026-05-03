@@ -24,9 +24,6 @@ func (c *Client) downloadMeasured(ctx context.Context, durationSec int) (mbps fl
 		return 0, 0, false
 	}
 	req.Header.Set("Accept-Encoding", "identity")
-	if c.apiKey != "" {
-		req.Header.Set("Authorization", authBearerPrefix+c.apiKey)
-	}
 
 	start := time.Now()
 	resp, err := c.httpClient.Do(req)

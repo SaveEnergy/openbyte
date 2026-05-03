@@ -34,13 +34,14 @@ func (c *Collector) GetMetrics() types.Metrics {
 	jitterCount = c.jitterCount
 	c.mu.RUnlock()
 	if c.latencyHistogram != nil && latencyCount > 0 {
-		buckets, ok := c.bucketPool.Get().([]uint32)
-		if !ok || len(buckets) != c.latencyHistogram.BucketCount() {
-			buckets = make([]uint32, c.latencyHistogram.BucketCount())
+		bucketPtr, ok := c.bucketPool.Get().(*[]uint32)
+		if !ok || bucketPtr == nil || len(*bucketPtr) != c.latencyHistogram.BucketCount() {
+			bucketPtr = newLatencyBucketBuffer(c.latencyHistogram.BucketCount())
 		}
+		buckets := *bucketPtr
 		overflow := c.latencyHistogram.CopyTo(buckets)
 		latencyMetrics = CalculateLatencyFromHistogram(buckets, overflow, c.latencyHistogram.BucketWidth(), latencyCount, latencyMin, latencyMax, latencySum)
-		c.bucketPool.Put(buckets)
+		c.bucketPool.Put(bucketPtr)
 	}
 	if jitterCount > 0 {
 		jitterMs = float64(jitterSum) / float64(jitterCount) / float64(time.Millisecond)

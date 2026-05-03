@@ -161,7 +161,7 @@ func TestStoreCleanupRetriesOnBusyError(t *testing.T) {
 	defer store2.Close()
 	<-released
 	if time.Since(reopenStart) < storeMinLockWait {
-		t.Fatalf("expected cleanup to block on lock and retry")
+		t.Fatal("expected cleanup to block on lock and retry")
 	}
 
 	trimmed, err := store2.Get(id)
@@ -169,6 +169,6 @@ func TestStoreCleanupRetriesOnBusyError(t *testing.T) {
 		t.Fatalf("get trimmed result: %v", err)
 	}
 	if trimmed != nil {
-		t.Fatalf(storeExpectedCleanupDeleteMsg)
+		t.Fatal(storeExpectedCleanupDeleteMsg)
 	}
 }

@@ -2,29 +2,25 @@ package client
 
 import (
 	"os"
-	"strings"
 )
-
-const clientAPIKeyEnv = "OPENBYTE_API_KEY"
 
 func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string]bool) *Config {
 	result := &Config{}
 
 	applyDefaults(result)
-	applyConfigFileDefaults(result, configFile, flagConfig.Server)
+	applyConfigFileDefaults(result, configFile)
 
 	if os.Getenv("NO_COLOR") != "" {
 		result.NoColor = true
 	}
 
-	applyFlagOverrides(result, flagConfig, configFile, flagsSet)
+	applyFlagOverrides(result, flagConfig, flagsSet)
 
 	return result
 }
 
 func applyDefaults(result *Config) {
 	result.ServerURL = defaultServerURL
-	result.APIKey = strings.TrimSpace(os.Getenv(clientAPIKeyEnv))
 	result.Protocol = defaultProtocol
 	result.Direction = defaultDirection
 	result.Duration = defaultDuration
@@ -35,20 +31,12 @@ func applyDefaults(result *Config) {
 	result.WarmUp = defaultWarmUp
 }
 
-func applyConfigFileDefaults(result *Config, configFile *ConfigFile, flagServer string) {
+func applyConfigFileDefaults(result *Config, configFile *ConfigFile) {
 	if configFile == nil {
 		return
 	}
-	serverURL, apiKey := resolveServerURL(configFile, flagServer)
-	if serverURL != "" {
-		result.ServerURL = serverURL
-	} else if configFile.ServerURL != "" {
+	if configFile.ServerURL != "" {
 		result.ServerURL = configFile.ServerURL
-	}
-	if apiKey != "" {
-		result.APIKey = apiKey
-	} else if configFile.APIKey != "" {
-		result.APIKey = configFile.APIKey
 	}
 	if configFile.Protocol != "" {
 		result.Protocol = configFile.Protocol
@@ -79,10 +67,7 @@ func applyConfigFileDefaults(result *Config, configFile *ConfigFile, flagServer 
 	result.NoProgress = configFile.NoProgress
 }
 
-func applyFlagOverrides(result, flagConfig *Config, configFile *ConfigFile, flagsSet map[string]bool) {
-	if flagsSet["server"] && flagConfig.Server != "" {
-		applyServerFlagOverride(result, flagConfig, configFile)
-	}
+func applyFlagOverrides(result, flagConfig *Config, flagsSet map[string]bool) {
 	applyStringOverride(flagsSet, "server-url", flagConfig.ServerURL, func(v string) { result.ServerURL = v })
 	applyStringOverride(flagsSet, "protocol", flagConfig.Protocol, func(v string) { result.Protocol = v })
 	applyStringOverride(flagsSet, "direction", flagConfig.Direction, func(v string) { result.Direction = v })
@@ -98,7 +83,6 @@ func applyFlagOverrides(result, flagConfig *Config, configFile *ConfigFile, flag
 	applyBoolOverride(flagsSet, "no-color", flagConfig.NoColor, func(v bool) { result.NoColor = v })
 	applyBoolOverride(flagsSet, "no-progress", flagConfig.NoProgress, func(v bool) { result.NoProgress = v })
 	applyIntOverride(flagsSet, "warmup", flagConfig.WarmUp, func(v int) { result.WarmUp = v })
-	applyBoolOverride(flagsSet, "auto", flagConfig.Auto, func(v bool) { result.Auto = v })
 }
 
 func applyStringOverride(flagsSet map[string]bool, key string, value string, apply func(string)) {
@@ -127,20 +111,4 @@ func applyIntOverride(flagsSet map[string]bool, key string, value int, apply fun
 		return
 	}
 	apply(value)
-}
-
-func applyServerFlagOverride(result, flagConfig *Config, configFile *ConfigFile) {
-	if configFile == nil || configFile.Servers == nil {
-		result.ServerURL = flagConfig.Server
-		return
-	}
-	server, ok := configFile.Servers[flagConfig.Server]
-	if !ok {
-		result.ServerURL = flagConfig.Server
-		return
-	}
-	result.ServerURL = server.URL
-	if server.APIKey != "" {
-		result.APIKey = server.APIKey
-	}
 }

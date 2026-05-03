@@ -30,10 +30,10 @@ func TestSpeedTestDownloadWritesData(t *testing.T) {
 		t.Fatalf("content-type = %q, want %q", got, octetStreamType)
 	}
 	if rec.Header().Get(speedtestCacheControlKey) == "" {
-		t.Fatalf("cache-control header missing")
+		t.Fatal("cache-control header missing")
 	}
 	if rec.Body.Len() == 0 {
-		t.Fatalf("expected non-zero download body")
+		t.Fatal("expected non-zero download body")
 	}
 }
 
@@ -111,10 +111,10 @@ func TestDownloadAtCapacityDrainsBodyBefore503(t *testing.T) {
 		t.Fatalf(speedtestStatusFmt, rec.Code, statusServiceUnavailable)
 	}
 	if tb.reads == 0 {
-		t.Fatalf(speedtestExpectReqBodyDrained503)
+		t.Fatal(speedtestExpectReqBodyDrained503)
 	}
 	if !tb.closed {
-		t.Fatalf(speedtestExpectReqBodyClosed)
+		t.Fatal(speedtestExpectReqBodyClosed)
 	}
 }
 

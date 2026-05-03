@@ -41,9 +41,6 @@ func (e *HTTPTestEngine) runUploadStream(ctx context.Context, reqURL string, dea
 			return err
 		}
 		req.Header.Set("Content-Type", "application/octet-stream")
-		if e.config.APIKey != "" {
-			req.Header.Set("Authorization", "Bearer "+e.config.APIKey)
-		}
 
 		resp, err := e.client.Do(req)
 		if err != nil {

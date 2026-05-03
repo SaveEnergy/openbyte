@@ -38,19 +38,15 @@ func parseFlags(args []string, version string) (*Config, map[string]bool, int, e
 	flagSet.BoolVar(&config.Quiet, "q", false, "Quiet mode (errors only) (short)")
 	flagSet.BoolVar(&config.NoColor, "no-color", false, "Disable color output")
 	flagSet.BoolVar(&config.NoProgress, "no-progress", false, "Disable progress indicators")
-	flagSet.StringVar(&config.Server, "server", "", "Server alias")
 	flagSet.StringVar(&config.ServerURL, "S", "", "Server URL (short)")
 	flagSet.StringVar(&config.ServerURL, flagServerURL, "", "Server URL (override)")
 	flagSet.IntVar(&config.Timeout, "timeout", 0, "Request timeout in seconds")
 
 	flagSet.IntVar(&config.WarmUp, "warmup", 2, "Warm-up seconds before measurement")
-	flagSet.BoolVar(&config.Auto, "auto", false, "Auto-select fastest server")
-	flagSet.BoolVar(&config.Auto, "a", false, "Auto-select fastest server (short)")
 
 	versionFlag := flagSet.Bool("version", false, "Print version")
 	help := flagSet.Bool("help", false, "Show help")
 	flagSet.BoolVar(help, "h", false, "Show help (short)")
-	servers := flagSet.Bool("servers", false, "List configured servers")
 
 	if err := flagSet.Parse(args); err != nil {
 		return nil, nil, exitUsage, err
@@ -60,11 +56,6 @@ func parseFlags(args []string, version string) (*Config, map[string]bool, int, e
 		flagsSet[f.Name] = true
 		applyFlagAlias(flagsSet, f.Name)
 	})
-
-	if *servers {
-		listServers()
-		return nil, nil, exitSuccess, nil
-	}
 
 	if *versionFlag {
 		fmt.Printf("openbyte %s\n", version)
@@ -104,8 +95,6 @@ func applyFlagAlias(flagsSet map[string]bool, name string) {
 		flagsSet["quiet"] = true
 	case "h":
 		flagsSet["help"] = true
-	case "a":
-		flagsSet["auto"] = true
 	}
 }
 
@@ -126,7 +115,8 @@ func applyPositionalServerArg(config *Config, flagsSet map[string]bool, rest []s
 		flagsSet[flagServerURL] = true
 		return nil
 	}
-	config.Server = server
-	flagsSet["server"] = true
-	return nil
+	if strings.TrimSpace(server) == "" {
+		return fmt.Errorf("server URL is required")
+	}
+	return fmt.Errorf("invalid server URL %q: include http:// or https://", server)
 }

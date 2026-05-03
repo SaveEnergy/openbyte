@@ -177,24 +177,6 @@ func TestSDKSpeedTestUnreachableServer(t *testing.T) {
 	}
 }
 
-// --- WithAPIKey ---
-
-func TestSDKWithAPIKey(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set(headerContentType, jsonContentType)
-		w.Write([]byte(statusOKBody))
-	}))
-	t.Cleanup(srv.Close)
-
-	c := pkgclient.New(srv.URL, pkgclient.WithAPIKey("test-key-123"))
-	if err := c.Healthy(context.Background()); err != nil {
-		t.Fatalf("Healthy failed: %v", err)
-	}
-	if c == nil {
-		t.Error("client should not be nil")
-	}
-}
-
 // --- Check ---
 
 func TestSDKCheckHasInterpretation(t *testing.T) {

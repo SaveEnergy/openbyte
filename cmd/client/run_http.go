@@ -31,7 +31,6 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 		GraceTime:      graceTime,
 		StreamDelay:    200 * time.Millisecond,
 		OverheadFactor: 1.0,
-		APIKey:         config.APIKey,
 		Timeout:        time.Duration(config.Timeout) * time.Second,
 	}
 	minTimeout := httpCfg.Duration + 10*time.Second
