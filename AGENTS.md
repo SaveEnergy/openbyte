@@ -2,7 +2,7 @@
 
 ### Core Runtime
 
-- Single `openbyte` binary with `server` / `client` / `check` / `mcp` subcommands.
+- Single `openbyte` binary with `server` / `client` / `check` subcommands.
 - Routing uses stdlib `net/http.ServeMux` (`METHOD /path/{param}` + `r.PathValue`).
 - Web assets are embedded (`//go:embed`) with optional `WEB_ROOT` override for development.
 - Stream lifecycle and counters are atomic-first on hot paths; mutexes reserved for coordination paths.
@@ -49,7 +49,7 @@
 
 ### Agent & API Surface
 
-- MCP server available via `openbyte mcp` (stdio transport).
+- Agent integrations use the HTTP API / OpenAPI contract and Go SDK; the former `openbyte mcp` stdio server was removed pre-1.0.
 - Go SDK (`pkg/client`): `Check`, `SpeedTest`, `Diagnose`, `Healthy`; implementation split across `client.go` + `client_{check,speedtest,diagnose,health,latency,download,upload}.go` (same exported API).
 - OpenAPI spec lives at `api/openapi.yaml`; CI/release lint it.
 - JSON output supports schema versioning and structured error contracts.
@@ -160,8 +160,8 @@
 
 ### Verification baseline
 
-- `go test ./cmd/check ./cmd/mcp ./cmd/server ./cmd/client`
-- `go test ./test/unit/api ./test/unit/client ./test/unit/mcp ./test/unit/results ./test/unit/websocket`
+- `go test ./cmd/check ./cmd/server ./cmd/client`
+- `go test ./test/unit/api ./test/unit/client ./test/unit/results ./test/unit/websocket`
 - `go test ./internal/results`
 
 ### Test layout

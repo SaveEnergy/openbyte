@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **MCP server**: removed the pre-1.0 `openbyte mcp` stdio server, its command wiring,
+  tests, docs, and `github.com/mark3labs/mcp-go` dependency. Agent integrations should
+  use the HTTP API / OpenAPI contract or Go SDK.
 - **Perf autoresearch outer loop**: **`make autoresearch-loop-complete`**, **`scripts/perf/autoresearch_loop_complete.sh`**, and **`/autoresearch --loop`** / loop-mode docs — merge **`perf-N`** → **`main`**, counter bump, and next branch are **manual** (see **`test/perf/PROMPT_AUTORESEARCH.md`**).
 
 ### Changed

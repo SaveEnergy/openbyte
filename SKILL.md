@@ -40,47 +40,6 @@ All errors return JSON:
 {"error": "description"}
 ```
 
-## MCP Server (for AI Agents)
-
-Start the MCP server over stdio:
-
-```bash
-openbyte mcp
-```
-
-### Tools
-
-| Tool | Duration | Description |
-|------|----------|-------------|
-| `connectivity_check` | ~3-5s | Quick latency + burst download/upload. Returns grade A-F. |
-| `speed_test` | configurable | Full speed test. Params: `server_url`, `direction`, `duration`. |
-| `diagnose` | ~15-20s | Comprehensive: 10 latency samples, 5s download, 5s upload, full interpretation. |
-
-All tools accept an optional `server_url` parameter (default: `http://localhost:8080`).
-
-### MCP Response Format
-
-Every tool returns JSON with an `interpretation` object:
-
-```json
-{
-  "status": "ok",
-  "latency_ms": 12.5,
-  "download_mbps": 450.2,
-  "upload_mbps": 95.1,
-  "jitter_ms": 1.3,
-  "interpretation": {
-    "grade": "A",
-    "summary": "Excellent connection: 450 Mbps down, 95 Mbps up, 13ms latency",
-    "latency_rating": "excellent",
-    "speed_rating": "fast",
-    "stability_rating": "stable",
-    "suitable_for": ["web_browsing", "video_conferencing", "streaming_4k", "gaming", "large_transfers"],
-    "concerns": []
-  }
-}
-```
-
 ## Go SDK
 
 Import `github.com/saveenergy/openbyte/pkg/client`:

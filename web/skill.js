@@ -60,7 +60,6 @@ function setupCopy(btnId) {
 }
 
 setupCopy("copySkillBtn");
-setupCopy("copyMcpBtn");
 setupCopy("copySdkBtn");
 setupCopy("copyCurlBtn");
 setupCopy("copyGoInstallBtn");
