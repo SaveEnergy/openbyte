@@ -16,10 +16,6 @@ export const state = {
   currentSpeed: 0,
   progress: 0,
   abortController: null,
-  settings: {
-    duration: 30,
-    streams: 4,
-  },
   networkInfo: {
     ipv4: null,
     ipv6: null,
@@ -58,11 +54,6 @@ export function initElements() {
   elements.serverInfo = document.getElementById("serverInfo");
   elements.serverDot = document.querySelector(".server-dot");
   elements.serverText = document.querySelector(".server-text");
-  elements.showSettings = document.getElementById("showSettings");
-  elements.closeSettings = document.getElementById("closeSettings");
-  elements.settingsModal = document.getElementById("settingsModal");
-  elements.duration = document.getElementById("duration");
-  elements.streams = document.getElementById("streams");
   elements.errorToast = document.getElementById("errorToast");
   elements.errorMessage = document.getElementById("errorMessage");
   elements.successToast = document.getElementById("successToast");
@@ -75,7 +66,17 @@ export const TEST_CONFIG = {
   HEALTH_CHECK_TIMEOUT_MS: 5000,
   RETRY_AFTER_DEFAULT_MS: 1000,
   RETRY_AFTER_MAX_MS: 120000,
-  STREAM_DELAY_MS: 200,
+  ADAPTIVE_MIN_STREAMS: 1,
+  ADAPTIVE_MAX_STREAMS: 64,
+  ADAPTIVE_RAMP_SECONDS: 1,
+  ADAPTIVE_MAX_RAMP_SECONDS: 5,
+  ADAPTIVE_MEASURE_SECONDS: 5,
+  ADAPTIVE_GBPS_MEASURE_SECONDS: 4,
+  ADAPTIVE_FAST_MEASURE_SECONDS: 3,
+  ADAPTIVE_MAX_MEASURE_SECONDS: 30,
+  ADAPTIVE_GAIN_THRESHOLD: 0.08,
+  ADAPTIVE_STREAM_DELAY_MS: 20,
+  ADAPTIVE_MAX_STREAM_SPREAD_MS: 250,
   MAX_NETWORK_RETRIES: 2,
   NETWORK_RETRY_DELAY_MS: 250,
   UPLOAD_RANDOM_CHUNK_BYTES: 65536,
@@ -95,5 +96,4 @@ export const TEST_CONFIG = {
   TOAST_SUCCESS_MS: 2000,
 };
 
-export const modal = { lastTrigger: null };
 export const toast = { timer: null };

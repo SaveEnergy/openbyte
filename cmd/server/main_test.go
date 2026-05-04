@@ -5,9 +5,6 @@ import (
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/config"
-	"github.com/saveenergy/openbyte/internal/stream"
-	"github.com/saveenergy/openbyte/internal/websocket"
-	"github.com/saveenergy/openbyte/pkg/types"
 )
 
 const (
@@ -16,7 +13,6 @@ const (
 	duration120s        = "120s"
 	allowedOriginsValue = "https://a.example.com, https://b.example.com"
 	perfStatsInterval5s = "5s"
-	loopbackClientIP    = "127.0.0.1"
 	maxDuration2m       = "2m0s"
 	parseFlagsFmt       = "parse flags: %v"
 )
@@ -83,44 +79,6 @@ func TestApplyServerFlagOverridesFailsFastOnInvalidDuration(t *testing.T) {
 	}
 	if cfg.PerfStatsInterval != 30*time.Second {
 		t.Fatalf("perf stats interval changed despite earlier duration parse error: got %s", cfg.PerfStatsInterval)
-	}
-}
-
-func TestRunShutdownBroadcastDrain(t *testing.T) {
-	manager := stream.NewManager(10, 10)
-	manager.Start()
-	wsServer := websocket.NewServer()
-
-	done := make(chan struct{})
-	go func() {
-		broadcastMetrics(manager, wsServer)
-		close(done)
-	}()
-
-	state, err := manager.CreateStream(types.StreamConfig{
-		Protocol:   types.ProtocolTCP,
-		Direction:  types.DirectionDownload,
-		Duration:   2 * time.Second,
-		Streams:    1,
-		PacketSize: 1400,
-		StartTime:  time.Now(),
-		ClientIP:   loopbackClientIP,
-	})
-	if err != nil {
-		t.Fatalf("create stream: %v", err)
-	}
-	if err := manager.StartStream(state.Config.ID); err != nil {
-		t.Fatalf("start stream: %v", err)
-	}
-	if err := manager.UpdateMetrics(state.Config.ID, types.Metrics{ThroughputMbps: 42}); err != nil {
-		t.Fatalf("update metrics: %v", err)
-	}
-
-	manager.Stop()
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("broadcastMetrics goroutine did not drain after manager.Stop")
 	}
 }
 

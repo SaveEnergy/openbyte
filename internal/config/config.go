@@ -1,9 +1,6 @@
 package config
 
-import (
-	"fmt"
-	"time"
-)
+import "time"
 
 const DefaultServerName = "openByte Server"
 
@@ -12,18 +9,10 @@ type Config struct {
 	BindAddress string
 	ServerName  string
 
-	TCPTestPort int
-	UDPTestPort int
-
 	PublicHost   string
 	CapacityGbps int
 
-	MaxConcurrentTests int
-	MaxTestDuration    time.Duration
-	MaxStreams         int
-
-	TCPBufferSize int
-	UDPBufferSize int
+	MaxTestDuration time.Duration
 
 	ReadTimeout       time.Duration
 	ReadHeaderTimeout time.Duration
@@ -43,10 +32,6 @@ type Config struct {
 	TrustedProxyCIDRs []string
 	AllowedOrigins    []string
 
-	TestRetentionPeriod   time.Duration
-	WebSocketPingInterval time.Duration
-	MetricsUpdateInterval time.Duration
-
 	WebRoot          string
 	DataDir          string
 	MaxStoredResults int
@@ -58,41 +43,32 @@ type Config struct {
 
 func DefaultConfig() *Config {
 	return &Config{
-		Port:                  "8080",
-		BindAddress:           "0.0.0.0",
-		ServerName:            DefaultServerName,
-		TCPTestPort:           8081,
-		UDPTestPort:           8082,
-		PublicHost:            "",
-		CapacityGbps:          25,
-		MaxConcurrentTests:    10,
-		MaxTestDuration:       300 * time.Second,
-		MaxStreams:            32,
-		TCPBufferSize:         64 * 1024,
-		UDPBufferSize:         1400,
-		ReadTimeout:           0,                // disabled; upload handlers manage own body deadline
-		ReadHeaderTimeout:     15 * time.Second, // protects against slowloris
-		WriteTimeout:          0,                // disabled; streaming endpoints manage own duration
-		IdleTimeout:           60 * time.Second,
-		PprofEnabled:          false,
-		PprofAddress:          "127.0.0.1:6060",
-		PerfStatsInterval:     0,
-		RuntimeMetrics:        false,
-		RateLimitPerIP:        100,
-		MaxConcurrentPerIP:    10,
-		GlobalRateLimit:       1000,
-		TrustProxyHeaders:     false,
-		TrustedProxyCIDRs:     nil,
-		AllowedOrigins:        []string{"*"},
-		TestRetentionPeriod:   1 * time.Hour,
-		WebSocketPingInterval: 30 * time.Second,
-		MetricsUpdateInterval: 1 * time.Second,
-		WebRoot:               "",
-		DataDir:               "./data",
-		MaxStoredResults:      10000,
-		TLSCertFile:           "",
-		TLSKeyFile:            "",
-		TLSAutoGen:            true, // Auto-generate for dev by default
+		Port:               "8080",
+		BindAddress:        "0.0.0.0",
+		ServerName:         DefaultServerName,
+		PublicHost:         "",
+		CapacityGbps:       25,
+		MaxTestDuration:    300 * time.Second,
+		ReadTimeout:        0,                // disabled; upload handlers manage own body deadline
+		ReadHeaderTimeout:  15 * time.Second, // protects against slowloris
+		WriteTimeout:       0,                // disabled; streaming endpoints manage own duration
+		IdleTimeout:        60 * time.Second,
+		PprofEnabled:       false,
+		PprofAddress:       "127.0.0.1:6060",
+		PerfStatsInterval:  0,
+		RuntimeMetrics:     false,
+		RateLimitPerIP:     100,
+		MaxConcurrentPerIP: 10,
+		GlobalRateLimit:    1000,
+		TrustProxyHeaders:  false,
+		TrustedProxyCIDRs:  nil,
+		AllowedOrigins:     []string{"*"},
+		WebRoot:            "",
+		DataDir:            "./data",
+		MaxStoredResults:   10000,
+		TLSCertFile:        "",
+		TLSKeyFile:         "",
+		TLSAutoGen:         true, // Auto-generate for dev by default
 	}
 }
 
@@ -136,12 +112,4 @@ func (c *Config) Validate() error {
 func (c *Config) MaxConcurrentHTTP() int {
 	limit := max(c.CapacityGbps*8, 50)
 	return limit
-}
-
-func (c *Config) GetTCPTestAddress() string {
-	return fmt.Sprintf("%s:%d", c.BindAddress, c.TCPTestPort)
-}
-
-func (c *Config) GetUDPTestAddress() string {
-	return fmt.Sprintf("%s:%d", c.BindAddress, c.UDPTestPort)
 }

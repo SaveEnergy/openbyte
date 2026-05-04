@@ -284,7 +284,7 @@ func TestNDJSONFormatterCapturesWriteError(t *testing.T) {
 // --- SchemaVersion constant ---
 
 func TestSchemaVersionFormat(t *testing.T) {
-	if client.SchemaVersion != "1.0" {
-		t.Errorf("expected SchemaVersion 1.0, got %s", client.SchemaVersion)
+	if client.SchemaVersion != "2.0" {
+		t.Errorf("expected SchemaVersion 2.0, got %s", client.SchemaVersion)
 	}
 }

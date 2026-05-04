@@ -9,12 +9,10 @@ import (
 
 	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/internal/config"
-	"github.com/saveenergy/openbyte/internal/stream"
 )
 
 func TestRouterStaticServesSpeedtestHTTPModules(t *testing.T) {
-	manager := stream.NewManager(10, 10)
-	handler := api.NewHandler(manager)
+	handler := api.NewHandler()
 	router := api.NewRouter(handler, config.DefaultConfig())
 	h := router.SetupRoutes()
 
@@ -24,7 +22,13 @@ func TestRouterStaticServesSpeedtestHTTPModules(t *testing.T) {
 		"speedtest-http-shared.js",
 		"speedtest-http-upload.js",
 		"network-probes.js",
+		"speedtest-adaptive.js",
+		"speedtest-worker.js",
 		"speedtest-orchestrator.js",
+		"events.js",
+		"toast.css",
+		"api.html",
+		"api.css",
 	} {
 		t.Run(name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/"+name, nil)
@@ -38,8 +42,7 @@ func TestRouterStaticServesSpeedtestHTTPModules(t *testing.T) {
 }
 
 func TestRouterStaticFileServerAllowlist(t *testing.T) {
-	manager := stream.NewManager(10, 10)
-	handler := api.NewHandler(manager)
+	handler := api.NewHandler()
 	router := api.NewRouter(handler, config.DefaultConfig())
 	h := router.SetupRoutes()
 
@@ -52,8 +55,7 @@ func TestRouterStaticFileServerAllowlist(t *testing.T) {
 }
 
 func TestRouterStaticFileServerAllowlistServesFontsFromWebRoot(t *testing.T) {
-	manager := stream.NewManager(10, 10)
-	handler := api.NewHandler(manager)
+	handler := api.NewHandler()
 	router := api.NewRouter(handler, config.DefaultConfig())
 
 	webRoot := t.TempDir()
@@ -79,8 +81,7 @@ func TestRouterStaticFileServerAllowlistServesFontsFromWebRoot(t *testing.T) {
 }
 
 func TestCriticalRoutesRespondOK(t *testing.T) {
-	manager := stream.NewManager(10, 10)
-	handler := api.NewHandler(manager)
+	handler := api.NewHandler()
 	router := api.NewRouter(handler, config.DefaultConfig())
 	h := router.SetupRoutes()
 

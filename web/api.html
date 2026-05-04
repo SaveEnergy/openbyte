@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="openByte HTTP API quick reference for agents and automation."
+    />
+    <meta property="og:title" content="openByte — API" />
+    <meta
+      property="og:description"
+      content="HTTP API quick reference for running openByte speed tests from agents and automation."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/favicon.svg" />
+    <meta name="theme-color" content="#0a0a0f" />
+    <title>openByte API</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      rel="preload"
+      href="/fonts/dm-sans-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="/fonts/jetbrains-mono-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="api.css" />
+    <link rel="stylesheet" href="motion.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#mainContent">Skip to main content</a>
+    <div class="app docs-app">
+      <header class="header">
+        <div class="brand">
+          <a href="/" class="link-plain"
+            ><div class="logo">
+              open<span class="logo-accent">Byte</span>
+            </div></a
+          >
+          <div class="server-name">API</div>
+        </div>
+        <a class="footer-link" href="/">Speed Test</a>
+      </header>
+
+      <main class="api-main" id="mainContent">
+        <section class="api-hero">
+          <p class="api-kicker">HTTP API · no client install</p>
+          <h1 class="api-title">Agent quick reference</h1>
+          <p class="api-subtitle">
+            Use these same-origin endpoints to probe latency, measure download
+            and upload throughput, and optionally save a shareable result.
+          </p>
+          <div class="api-base-card" aria-label="API base URL">
+            <span class="api-label">Base URL</span>
+            <code>window.location.origin</code>
+          </div>
+        </section>
+
+        <section class="api-section" aria-labelledby="workflowTitle">
+          <h2 class="api-section-title" id="workflowTitle">Recommended flow</h2>
+          <ol class="api-steps">
+            <li>
+              <strong>Identify server</strong>
+              <code>GET /api/v1/version</code>
+            </li>
+            <li>
+              <strong>Sample idle latency</strong>
+              <code>GET /api/v1/ping</code> 10–20 times.
+            </li>
+            <li>
+              <strong>Measure download</strong>
+              stream <code>GET /api/v1/download?duration=5</code> and count
+              bytes client-side.
+            </li>
+            <li>
+              <strong>Measure upload</strong>
+              send <code>application/octet-stream</code> bodies to
+              <code>POST /api/v1/upload</code> until your target duration ends.
+            </li>
+            <li>
+              <strong>Optional share</strong>
+              persist a summary with <code>POST /api/v1/results</code>.
+            </li>
+          </ol>
+        </section>
+
+        <section class="api-section" aria-labelledby="endpointTitle">
+          <h2 class="api-section-title" id="endpointTitle">Endpoints</h2>
+          <div class="api-grid">
+            <article class="api-card">
+              <div class="api-method get">GET</div>
+              <h3><code>/health</code></h3>
+              <p>
+                Simple liveness check. Returns <code>{"status":"ok"}</code>.
+              </p>
+            </article>
+            <article class="api-card">
+              <div class="api-method get">GET</div>
+              <h3><code>/api/v1/version</code></h3>
+              <p>Server version and display name.</p>
+            </article>
+            <article class="api-card">
+              <div class="api-method get">GET</div>
+              <h3><code>/api/v1/ping</code></h3>
+              <p>Latency probe plus observed client IP and IPv6 flag.</p>
+            </article>
+            <article class="api-card">
+              <div class="api-method get">GET</div>
+              <h3><code>/api/v1/download</code></h3>
+              <p>
+                Binary stream. Query: <code>duration=1..300</code>,
+                <code>chunk=65536..4194304</code>.
+              </p>
+            </article>
+            <article class="api-card">
+              <div class="api-method post">POST</div>
+              <h3><code>/api/v1/upload</code></h3>
+              <p>
+                Reads an octet-stream body and returns bytes, duration, and
+                throughput.
+              </p>
+            </article>
+            <article class="api-card">
+              <div class="api-method post">POST</div>
+              <h3><code>/api/v1/results</code></h3>
+              <p>Save a result summary. Returns an 8-character result ID.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="api-section" aria-labelledby="snippetTitle">
+          <h2 class="api-section-title" id="snippetTitle">Browser snippet</h2>
+          <pre
+            class="api-code"
+          ><code>async function ping(base = location.origin) {
+  const start = performance.now();
+  const res = await fetch(`${base}/api/v1/ping`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`ping failed: ${res.status}`);
+  return { latencyMs: performance.now() - start, ...(await res.json()) };
+}
+
+async function downloadMbps(seconds = 5, base = location.origin) {
+  const start = performance.now();
+  const res = await fetch(
+    `${base}/api/v1/download?duration=${seconds}&chunk=1048576`,
+    { cache: "no-store" },
+  );
+  if (!res.ok || !res.body) throw new Error(`download failed: ${res.status}`);
+  const reader = res.body.getReader();
+  let bytes = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+  }
+  const elapsed = (performance.now() - start) / 1000;
+  return (bytes * 8) / elapsed / 1_000_000;
+}
+
+async function uploadOnce(size = 1048576, base = location.origin) {
+  const payload = new Uint8Array(size);
+  crypto.getRandomValues(payload);
+  const res = await fetch(`${base}/api/v1/upload`, {
+    method: "POST",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: payload,
+  });
+  if (!res.ok) throw new Error(`upload failed: ${res.status}`);
+  return res.json();
+}</code></pre>
+        </section>
+
+        <section class="api-section api-note" aria-labelledby="notesTitle">
+          <h2 class="api-section-title" id="notesTitle">Agent notes</h2>
+          <ul>
+            <li>No authentication is required by default.</li>
+            <li>
+              Rate limits and server capacity return JSON errors; respect
+              <code>Retry-After</code> when present.
+            </li>
+            <li>
+              The canonical OpenAPI spec lives in
+              <a
+                class="api-link"
+                href="https://github.com/saveenergy/openbyte/blob/main/api/openapi.yaml"
+                target="_blank"
+                rel="noopener noreferrer"
+                >api/openapi.yaml</a
+              >.
+            </li>
+          </ul>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-links">
+          <a class="footer-link" href="/">Speed Test</a>
+          <span class="footer-divider">&middot;</span>
+          <a class="footer-link" href="/api.html">API</a>
+          <span class="footer-divider">&middot;</span>
+          <a
+            class="footer-link"
+            href="https://github.com/saveenergy/openbyte"
+            target="_blank"
+            rel="noopener noreferrer"
+            >GitHub</a
+          >
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>

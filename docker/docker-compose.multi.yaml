@@ -13,9 +13,6 @@ services:
     container_name: openbyte-us-east
     ports:
       - "8080:8080"
-      - "8081:8081"
-      - "8082:8082"
-      - "8082:8082/udp"
     environment:
       - PUBLIC_HOST=${US_EAST_HOST:-}
       - SERVER_NAME=${US_EAST_NAME:-US East}
@@ -48,9 +45,6 @@ services:
     container_name: openbyte-eu-west
     ports:
       - "8180:8080"
-      - "8181:8081"
-      - "8182:8082"
-      - "8182:8082/udp"
     environment:
       - PUBLIC_HOST=${EU_WEST_HOST:-}
       - SERVER_NAME=${EU_WEST_NAME:-EU West}
@@ -83,9 +77,6 @@ services:
     container_name: openbyte-ap-south
     ports:
       - "8280:8080"
-      - "8281:8081"
-      - "8282:8082"
-      - "8282:8082/udp"
     environment:
       - PUBLIC_HOST=${AP_SOUTH_HOST:-}
       - SERVER_NAME=${AP_SOUTH_NAME:-AP South}

@@ -33,7 +33,7 @@
     />
     <link rel="stylesheet" href="base.css" />
     <link rel="stylesheet" href="speed.css" />
-    <link rel="stylesheet" href="modal.css" />
+    <link rel="stylesheet" href="toast.css" />
     <link rel="stylesheet" href="motion.css" />
   </head>
   <body>
@@ -164,9 +164,7 @@
         <div class="footer-links">
           <a class="footer-link" href="/">Speed Test</a>
           <span class="footer-divider">·</span>
-          <button class="footer-link" id="showSettings">Settings</button>
-          <span class="footer-divider">·</span>
-          <a class="footer-link" href="/download.html">Download</a>
+          <a class="footer-link" href="/api.html">API</a>
           <span class="footer-divider">·</span>
           <a
             class="footer-link"
@@ -177,53 +175,6 @@
           >
         </div>
       </footer>
-
-      <!-- Settings Modal (hidden by default, opened via showModal()) -->
-      <dialog class="modal" id="settingsModal" aria-labelledby="settingsTitle">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h2 id="settingsTitle">Settings</h2>
-            <button
-              class="modal-close"
-              id="closeSettings"
-              type="button"
-              aria-label="Close settings"
-            >
-              ×
-            </button>
-          </div>
-          <div class="modal-body">
-            <div class="setting-group">
-              <label class="setting-label" for="duration">Test Duration</label>
-              <select class="setting-input" id="duration">
-                <option value="5">5 seconds (quick)</option>
-                <option value="10">10 seconds</option>
-                <option value="20">20 seconds</option>
-                <option value="30" selected>30 seconds</option>
-              </select>
-            </div>
-            <div class="setting-group">
-              <label class="setting-label" for="streams">
-                <span>Parallel Connections</span>
-                <span class="setting-hint" id="streamsHint"
-                  >(more = higher max speed)</span
-                >
-              </label>
-              <select
-                class="setting-input"
-                id="streams"
-                aria-describedby="streamsHint"
-              >
-                <option value="1">1 stream (~150 Mbps)</option>
-                <option value="4" selected>4 streams (~600 Mbps)</option>
-                <option value="8">8 streams (~1 Gbps)</option>
-                <option value="16">16 streams (~2 Gbps+)</option>
-                <option value="32">32 streams (~5 Gbps+)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </dialog>
 
       <!-- Error Toast -->
       <div

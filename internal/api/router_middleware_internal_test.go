@@ -17,7 +17,6 @@ func TestShouldSkipRequestLog(t *testing.T) {
 		{path: "/ping", want: true},
 		{path: "/api/v1/download", want: false},
 		{path: testPathAPIUpload, want: false},
-		{path: "/api/v1/stream/550e8400-e29b-41d4-a716-446655440000/stream", want: false},
 		{path: "/api/v1/results/abc12345", want: false},
 		{path: "/api/v1/ping/extra", want: false},
 		{path: "ping", want: false},
@@ -46,7 +45,6 @@ func TestShouldLogRequest(t *testing.T) {
 		{name: "upload success stays quiet", path: testPathAPIUpload, status: http.StatusOK, duration: 10 * time.Millisecond, want: false},
 		{name: "upload failure logs", path: testPathAPIUpload, status: http.StatusServiceUnavailable, duration: 10 * time.Millisecond, want: true},
 		{name: "slow upload logs", path: testPathAPIUpload, status: http.StatusOK, duration: uploadRequestLogMinDuration + time.Millisecond, want: true},
-		{name: "stream websocket logs", path: "/api/v1/stream/550e8400-e29b-41d4-a716-446655440000/stream", status: http.StatusSwitchingProtocols, duration: 5 * time.Second, want: true},
 	}
 
 	for _, tt := range tests {

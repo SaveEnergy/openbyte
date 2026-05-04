@@ -6,13 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/results"
-	"github.com/saveenergy/openbyte/internal/stream"
-	"github.com/saveenergy/openbyte/pkg/types"
 )
 
 const (
@@ -44,80 +41,8 @@ func mustStringField(t *testing.T, m map[string]any, key string) string {
 	return s
 }
 
-func TestAPIStartStream(t *testing.T) {
-	manager := stream.NewManager(10, 2)
-	manager.Start()
-	defer manager.Stop()
-
-	handler := api.NewHandler(manager)
-
-	reqBody := map[string]any{
-		"protocol":  "tcp",
-		"direction": "download",
-		"duration":  10,
-		"streams":   4,
-	}
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		t.Fatalf("marshal request body: %v", err)
-	}
-
-	req := httptest.NewRequest(integrationPostMethod, "/api/v1/stream/start", bytes.NewReader(body))
-	req.Header.Set("Content-Type", integrationJSONType)
-	w := httptest.NewRecorder()
-
-	handler.StartStream(w, req)
-
-	if w.Code != http.StatusCreated {
-		t.Logf("Response body: %s", w.Body.String())
-		t.Errorf(integrationStatusFmt, w.Code, http.StatusCreated)
-		return
-	}
-
-	var resp map[string]any
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("Failed to parse response: %v", err)
-	}
-
-	_ = mustStringField(t, resp, "stream_id")
-	_ = mustStringField(t, resp, "websocket_url")
-}
-
-func TestAPIGetStreamStatus(t *testing.T) {
-	manager := stream.NewManager(10, 2)
-	manager.Start()
-	defer manager.Stop()
-
-	handler := api.NewHandler(manager)
-
-	config := types.StreamConfig{
-		Protocol:  types.ProtocolTCP,
-		Direction: types.DirectionDownload,
-		Duration:  10 * time.Second,
-		Streams:   4,
-	}
-	state, err := manager.CreateStream(config)
-	if err != nil {
-		t.Fatalf("Failed to create stream: %v", err)
-	}
-
-	req := httptest.NewRequest(integrationGetMethod, "/api/v1/stream/"+state.Config.ID+"/status", nil)
-	w := httptest.NewRecorder()
-
-	router := api.NewRouter(handler, testConfig())
-	router.SetupRoutes().ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf(integrationStatusFmt, w.Code, http.StatusOK)
-	}
-}
-
 func TestCORSAllowedOrigin(t *testing.T) {
-	manager := stream.NewManager(10, 2)
-	manager.Start()
-	defer manager.Stop()
-
-	handler := api.NewHandler(manager)
+	handler := api.NewHandler()
 	router := api.NewRouter(handler, testConfig())
 	router.SetAllowedOrigins([]string{integrationOrigin})
 
@@ -133,11 +58,7 @@ func TestCORSAllowedOrigin(t *testing.T) {
 }
 
 func TestCORSBlockedOrigin(t *testing.T) {
-	manager := stream.NewManager(10, 2)
-	manager.Start()
-	defer manager.Stop()
-
-	handler := api.NewHandler(manager)
+	handler := api.NewHandler()
 	router := api.NewRouter(handler, testConfig())
 	router.SetAllowedOrigins([]string{integrationOrigin})
 
@@ -153,11 +74,7 @@ func TestCORSBlockedOrigin(t *testing.T) {
 }
 
 func TestAPIResultsSaveAndGet(t *testing.T) {
-	manager := stream.NewManager(10, 2)
-	manager.Start()
-	defer manager.Stop()
-
-	handler := api.NewHandler(manager)
+	handler := api.NewHandler()
 	router := api.NewRouter(handler, testConfig())
 
 	store, err := results.New(t.TempDir()+resultsDBSuffix, 100)

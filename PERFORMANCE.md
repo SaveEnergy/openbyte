@@ -1,67 +1,50 @@
-## Performance Profiling Guide
+# Performance Guide
 
-### Enable pprof
+openByte is now HTTP-only. Performance work should focus on the browser/HTTP data path, JSON/result APIs, and runtime behavior around `/api/v1/download`, `/api/v1/upload`, and `/api/v1/ping`.
 
-Set env vars and run server:
+## Benchmarks
 
-```
-PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6060 go run ./cmd/openbyte server
-```
-
-Endpoints:
-
-- `http://127.0.0.1:6060/debug/pprof/`
-- `http://127.0.0.1:6060/debug/pprof/profile?seconds=30`
-- `http://127.0.0.1:8080/debug/runtime-metrics` (when `RUNTIME_METRICS_ENABLED=true`)
-
-### Go 1.26 goroutine leak profile (experimental)
-
-Go 1.26 adds an experimental goroutine leak profile (`goroutineleak`) behind a build-time experiment flag.
-
-Quick local smoke:
-
-```
-make perf-leakcheck
+```bash
+make perf-bench   # quick stdout pass
+make perf-record  # writes build/perf/bench.txt
+make perf-compare # benchstat baseline vs current
 ```
 
-Manual build/run:
+The benchmark package list lives in `test/perf/bench_packages.txt`.
 
-```
-GOEXPERIMENT=goroutineleakprofile go build -o bin/openbyte-leak ./cmd/openbyte
-PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6061 ./bin/openbyte-leak server
-curl "http://127.0.0.1:6061/debug/pprof/goroutineleak?debug=1"
-```
+## Local smoke profiling
 
-Nightly CI can run this smoke path by setting repository variable `LEAK_PROFILE_SMOKE=true`.
-
-### Runtime stats logging
-
-```
-PERF_STATS_INTERVAL=5s go run ./cmd/openbyte server
+```bash
+make build
+PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6060 ./bin/openbyte server
+curl -sf http://127.0.0.1:8080/api/v1/ping
+curl -s "http://127.0.0.1:6060/debug/pprof/profile?seconds=10" -o /tmp/openbyte-cpu.pprof
+go tool pprof /tmp/openbyte-cpu.pprof
 ```
 
-Logs include goroutines, heap usage, GC count, and pause totals.
+For upload/download smoke, use the Web UI or simple HTTP clients against:
 
-### Local load generator
-
-Build:
-
-```
-go build -o bin/openbyte-load ./cmd/loadtest
-```
-
-Examples:
-
-```
-./bin/openbyte-load --mode tcp-download --host 127.0.0.1 --tcp-port 8081 --duration 15s --concurrency 8
-./bin/openbyte-load --mode tcp-upload --host 127.0.0.1 --tcp-port 8081 --duration 15s --concurrency 8
-./bin/openbyte-load --mode udp-download --host 127.0.0.1 --udp-port 8082 --duration 10s --concurrency 4 --packet-size 1200
-./bin/openbyte-load --mode udp-upload --host 127.0.0.1 --udp-port 8082 --duration 10s --concurrency 4 --packet-size 1200
+```bash
+curl -o /dev/null "http://127.0.0.1:8080/api/v1/download?duration=5"
+head -c 33554432 /dev/zero | curl -X POST --data-binary @- \
+  -H 'Content-Type: application/octet-stream' \
+  http://127.0.0.1:8080/api/v1/upload
 ```
 
-### Suggested perf scenarios
+## Hot paths
 
-- TCP download: `duration=30s`, `concurrency=8`, MTU-sized chunks
-- TCP upload: `duration=30s`, `concurrency=8`
-- UDP download/upload: `duration=20s`, `concurrency=4`, `packet-size=1200`
-- WebSocket fanout: use `--mode ws --ws-url ws://host/api/v1/stream/<id>/stream` with `concurrency=100+`
+- `internal/api/speedtest_download.go`
+- `internal/api/speedtest_upload.go`
+- `internal/api/speedtest_handlers.go`
+- `internal/jsonbody/decode.go`
+- `internal/results/*`
+- `web/speedtest-worker.js`
+- `web/speedtest-adaptive.js`
+- `web/speedtest-http-*.js`
+
+## Rules of thumb
+
+- Correctness first; profile before optimizing.
+- Do not add user-visible telemetry by default; keep detail opt-in.
+- Avoid benchmark-only complexity unless the win is large and easy to explain.
+- Keep the default product path simple: browser HTTP speed test + result sharing.

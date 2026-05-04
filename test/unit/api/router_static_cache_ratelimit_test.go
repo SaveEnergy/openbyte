@@ -8,12 +8,10 @@ import (
 
 	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/internal/config"
-	"github.com/saveenergy/openbyte/internal/stream"
 )
 
 func TestStaticHTMLUsesNoStoreCacheControl(t *testing.T) {
-	manager := stream.NewManager(10, 10)
-	handler := api.NewHandler(manager)
+	handler := api.NewHandler()
 	router := api.NewRouter(handler, config.DefaultConfig())
 
 	h := router.SetupRoutes()
@@ -26,7 +24,7 @@ func TestStaticHTMLUsesNoStoreCacheControl(t *testing.T) {
 		t.Fatalf(routerCacheRootFmt, got, noStoreHeader)
 	}
 
-	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+"/download.html", nil)
+	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+"/api.html", nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -36,8 +34,7 @@ func TestStaticHTMLUsesNoStoreCacheControl(t *testing.T) {
 }
 
 func TestStaticJSDoesNotForceNoStore(t *testing.T) {
-	manager := stream.NewManager(10, 10)
-	handler := api.NewHandler(manager)
+	handler := api.NewHandler()
 	router := api.NewRouter(handler, config.DefaultConfig())
 
 	h := router.SetupRoutes()
@@ -70,7 +67,10 @@ func TestSecurityHeadersMiddlewareSetsCSP(t *testing.T) {
 	if !strings.Contains(csp, "script-src 'self'") {
 		t.Fatalf(routerCSPScriptSrcFmt, csp)
 	}
-	if !strings.Contains(csp, "connect-src 'self' https: http: ws: wss:") {
+	if !strings.Contains(csp, "worker-src 'self'") {
+		t.Fatalf("csp missing worker-src self: %q", csp)
+	}
+	if !strings.Contains(csp, "connect-src 'self' https: http:") {
 		t.Fatalf(routerCSPConnectSrcFmt, csp)
 	}
 	if strings.Contains(csp, "connect-src *") {
@@ -78,17 +78,13 @@ func TestSecurityHeadersMiddlewareSetsCSP(t *testing.T) {
 	}
 }
 
-func TestRateLimitSkipPathsAndStreamPathBehavior(t *testing.T) {
-	manager := stream.NewManager(10, 10)
-	handler := api.NewHandler(manager)
+func TestRateLimitSkipPaths(t *testing.T) {
+	handler := api.NewHandler()
 	cfg := config.DefaultConfig()
 	cfg.GlobalRateLimit = 1
 	cfg.RateLimitPerIP = 1
 	router := api.NewRouter(handler, cfg)
 	router.SetRateLimiter(cfg)
-	router.SetWebSocketHandler(func(w http.ResponseWriter, r *http.Request, streamID string) {
-		w.WriteHeader(http.StatusOK)
-	})
 	h := router.SetupRoutes()
 
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+versionAPIPath, nil)
@@ -120,10 +116,4 @@ func TestRateLimitSkipPathsAndStreamPathBehavior(t *testing.T) {
 		t.Fatal(routerUploadBypassErr)
 	}
 
-	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+streamWSAPIPath, nil)
-	rec = httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusTooManyRequests {
-		t.Fatalf(routerStreamRateLimitFmt, rec.Code)
-	}
 }

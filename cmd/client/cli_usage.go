@@ -18,11 +18,9 @@ Flags:
   -h, --help              Show help
   --version               Print version
   -S string               Server URL (short)
-  -p, --protocol string   Protocol: tcp, udp, http (default: tcp)
-  -d, --direction string  Direction: download, upload, bidirectional (default: download)
+  -d, --direction string  Direction: download or upload (default: download)
   -t, --duration int      Test duration in seconds (1-300) (default: 30)
   -s, --streams int       Parallel streams (1-64) (default: 4)
-  --packet-size int       Packet size in bytes (64-9000) (default: 1400)
   --chunk-size int        HTTP chunk size in bytes (65536-4194304) (default: 1048576)
   --json                  Output results as JSON
   --ndjson                Streaming newline-delimited JSON (progress + result)
@@ -46,7 +44,6 @@ Examples:
   openbyte client                          # Default test
   openbyte client https://speed.example.com
   openbyte client -d upload -t 60          # Upload test, 60s
-  openbyte client -p udp -d bidirectional -s 8
   openbyte client --json https://speed.example.com
 `)
 }

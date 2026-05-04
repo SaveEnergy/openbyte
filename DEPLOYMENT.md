@@ -7,7 +7,7 @@ Production deployment guide for openByte speed test server.
 - Go 1.25.0+ installed
 - SSH access to production server
 - Root or sudo access for port binding (<1024)
-- Firewall rules configured (ports 8080, 8081, 8082)
+- Firewall rules configured (port 8080)
 
 ## Quick Deploy
 
@@ -151,8 +151,6 @@ RestartSec=5
 
 Environment="PUBLIC_HOST=speedtest.example.com"
 Environment="PORT=8080"
-Environment="TCP_TEST_PORT=8081"
-Environment="UDP_TEST_PORT=8082"
 Environment="CAPACITY_GBPS=25"
 Environment="RATE_LIMIT_PER_IP=100"
 Environment="GLOBAL_RATE_LIMIT=1000"
@@ -160,7 +158,6 @@ Environment="TRUST_PROXY_HEADERS=true"
 Environment="TRUSTED_PROXY_CIDRS=10.0.0.0/8,192.168.0.0/16"
 Environment="ALLOWED_ORIGINS=https://speedtest.example.com"
 Environment="DATA_DIR=/opt/openbyte/data"
-Environment="MAX_CONCURRENT_TESTS=10"
 Environment="MAX_TEST_DURATION=300s"
 
 [Install]
@@ -199,15 +196,9 @@ ssh user@server "cd /opt/openbyte && sudo tar xzf /tmp/openbyte.tar.gz && sudo c
 ```bash
 # UFW
 sudo ufw allow 8080/tcp
-sudo ufw allow 8081/tcp
-sudo ufw allow 8082/tcp
-sudo ufw allow 8082/udp
 
 # firewalld
 sudo firewall-cmd --permanent --add-port=8080/tcp
-sudo firewall-cmd --permanent --add-port=8081/tcp
-sudo firewall-cmd --permanent --add-port=8082/tcp
-sudo firewall-cmd --permanent --add-port=8082/udp
 sudo firewall-cmd --reload
 ```
 
@@ -289,7 +280,7 @@ When running behind a proxy, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_C
 
 ## Reverse Proxy (Traefik)
 
-Traefik integration via Docker labels. TCP/UDP test ports must stay exposed directly.
+Traefik integration via Docker labels. openByte only needs HTTP(S) proxying to container port 8080.
 
 ```bash
 # Create traefik network first
@@ -325,10 +316,7 @@ The provided Traefik compose files include a dedicated upload router with a 35MB
 | `TRAEFIK_NETWORK`      | `traefik`             | External network name   |
 | `TRAEFIK_CERTRESOLVER` | `letsencrypt`         | TLS cert resolver       |
 
-**Important:** TCP (8081) and UDP (8082) ports cannot be proxied through HTTP. They must be:
-
-- Exposed directly on the host, or
-- Configured as Traefik TCP/UDP routers (advanced)
+**Important:** openByte is HTTP-only; expose or proxy only port 8080.
 
 ## IPv4/IPv6 Detection
 

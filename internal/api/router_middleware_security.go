@@ -25,8 +25,9 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 				"font-src 'self'; "+
 				"style-src 'self'; "+
 				"script-src 'self'; "+
+				"worker-src 'self'; "+
 				"img-src 'self' data:; "+
-				"connect-src 'self' https: http: ws: wss:")
+				"connect-src 'self' https: http:")
 		if isHTTPS(r) {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}

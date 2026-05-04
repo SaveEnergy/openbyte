@@ -8,14 +8,12 @@ import (
 
 	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/internal/config"
-	"github.com/saveenergy/openbyte/internal/stream"
 )
 
 const versionEndpoint = "/api/v1/version"
 
 func TestGetVersion(t *testing.T) {
-	mgr := stream.NewManager(10, 10)
-	handler := api.NewHandler(mgr)
+	handler := api.NewHandler()
 	handler.SetVersion("1.2.3")
 	cfg := config.DefaultConfig()
 	cfg.ServerName = "Frankfurt 10G"
@@ -42,8 +40,7 @@ func TestGetVersion(t *testing.T) {
 }
 
 func TestGetVersionDefault(t *testing.T) {
-	mgr := stream.NewManager(10, 10)
-	handler := api.NewHandler(mgr)
+	handler := api.NewHandler()
 
 	req := httptest.NewRequest(http.MethodGet, versionEndpoint, nil)
 	rec := httptest.NewRecorder()
@@ -62,8 +59,7 @@ func TestGetVersionDefault(t *testing.T) {
 }
 
 func TestGetVersionDrainsUnexpectedBody(t *testing.T) {
-	mgr := stream.NewManager(10, 10)
-	handler := api.NewHandler(mgr)
+	handler := api.NewHandler()
 	tb := &trackingBody{data: []byte(`{"unexpected":"payload"}`)}
 
 	req := httptest.NewRequest(http.MethodGet, versionEndpoint, nil)

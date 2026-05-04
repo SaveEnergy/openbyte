@@ -1,14 +1,5 @@
 /** Shared helpers for HTTP speed tests (download + upload). */
 
-import { state } from "./state.js";
-
-export function resolveStreamsInner() {
-  if (!state.settings.streams || Number.isNaN(state.settings.streams)) {
-    return 4;
-  }
-  return state.settings.streams;
-}
-
 export function resolveChunkSize() {
   return 1024 * 1024;
 }
@@ -42,6 +33,14 @@ export function resolveStopReason(signal, endTimeRef, nominalEndTime) {
   return "duration";
 }
 
+export function attachAdaptiveDiagnostics(diag, adaptive, streams) {
+  const out = { ...diag, streams };
+  if (adaptive) {
+    out.adaptive = adaptive;
+  }
+  return out;
+}
+
 /**
  * Shared warmup + measure accounting + progress callback for HTTP upload/download.
  * `metricsState` must have `allBytes`, `totalBytes`, `measureStartTime`.
@@ -51,7 +50,6 @@ export function applyHttpMeasureTick(
   warmUp,
   byteCount,
   now,
-  startTime,
   onProgress,
   extra,
 ) {
@@ -72,14 +70,8 @@ export function applyHttpMeasureTick(
   if (extra?.earlyStop && measuring && extra.earlyStop.record(byteCount, now)) {
     extra.endTimeRef.value = now;
   }
-  const elapsedSec = (now - startTime) / 1000;
-  const phaseDurationMs = Math.max(1, extra.endTimeRef.value - startTime);
-  const phaseProgress = Math.min(
-    100,
-    Math.max(0, ((now - startTime) / phaseDurationMs) * 100),
-  );
   const displayBytes = measuring
     ? metricsState.totalBytes
     : metricsState.allBytes;
-  onProgress(displayBytes, elapsedSec, phaseProgress);
+  onProgress(displayBytes);
 }

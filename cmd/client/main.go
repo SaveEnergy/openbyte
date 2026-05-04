@@ -21,31 +21,23 @@ var (
 )
 
 const (
-	defaultServerURL  = "http://localhost:8080"
-	defaultProtocol   = "tcp"
-	defaultDirection  = "download"
-	defaultDuration   = 30
-	defaultStreams    = 4
-	defaultPacketSize = 1400
-	defaultChunkSize  = 1024 * 1024
-	defaultTimeout    = 60
-	defaultWarmUp     = 2
+	defaultServerURL = "http://localhost:8080"
+	defaultDirection = "download"
+	defaultDuration  = 30
+	defaultStreams   = 4
+	defaultChunkSize = 1024 * 1024
+	defaultTimeout   = 60
+	defaultWarmUp    = 2
 )
 
 // Protocol/direction literals for validation and branching (S1192).
 const (
-	protocolTCP            = "tcp"
-	protocolUDP            = "udp"
-	protocolHTTP           = "http"
-	directionDownload      = "download"
-	directionUpload        = "upload"
-	directionBidirectional = "bidirectional"
-	modeClient             = "client"
-	schemeHTTP             = "http"
-	schemeHTTPS            = "https"
-	cmdDownload            = "D"
-	cmdUpload              = "U"
-	cmdBidirectional       = "B"
+	protocolHTTP      = "http"
+	directionDownload = "download"
+	directionUpload   = "upload"
+	statusCompleted   = "completed"
+	schemeHTTP        = "http"
+	schemeHTTPS       = "https"
 )
 
 func Run(args []string, version string) int {
@@ -79,20 +71,16 @@ func Run(args []string, version string) int {
 	ctx, cancel := context.WithTimeout(context.Background(), totalTimeout)
 	defer cancel()
 
-	var streamID atomic.Value
 	var interrupted atomic.Bool
 
-	stopInterruptWatcher := startInterruptWatcher(ctx, cancel, config, &streamID, &interrupted)
+	stopInterruptWatcher := startInterruptWatcher(cancel, &interrupted)
 	defer stopInterruptWatcher()
 
-	return executeStreamRun(ctx, config, formatter, &streamID, &interrupted)
+	return executeClientRun(ctx, config, formatter, &interrupted)
 }
 
 func startInterruptWatcher(
-	ctx context.Context,
 	cancel context.CancelFunc,
-	config *Config,
-	streamID *atomic.Value,
 	interrupted *atomic.Bool,
 ) func() {
 	sigCh := make(chan os.Signal, 1)
@@ -104,11 +92,6 @@ func startInterruptWatcher(
 			return
 		case <-sigCh:
 			interrupted.Store(true)
-			if id, ok := streamID.Load().(string); ok && id != "" {
-				if err := CancelStream(ctx, config.ServerURL, id); err != nil {
-					fmt.Fprintf(os.Stderr, "openbyte client: warning: failed to cancel stream %s: %v\n", id, err)
-				}
-			}
 			cancel()
 		}
 	}()
@@ -118,14 +101,13 @@ func startInterruptWatcher(
 	}
 }
 
-func executeStreamRun(
+func executeClientRun(
 	ctx context.Context,
 	config *Config,
 	formatter OutputFormatter,
-	streamID *atomic.Value,
 	interrupted *atomic.Bool,
 ) int {
-	if err := runStream(ctx, config, formatter, streamID); err != nil {
+	if err := runStream(ctx, config, formatter); err != nil {
 		if interrupted.Load() && errors.Is(err, context.Canceled) {
 			return exitInterrupt
 		}

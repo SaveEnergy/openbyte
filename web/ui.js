@@ -5,7 +5,6 @@ import { computeBufferbloatGrade, formatSpeed } from "./utils.js";
 import { updateNetworkDisplay } from "./network.js";
 
 function focusStateAction(stateName) {
-  if (elements.settingsModal?.open) return;
   const targets = {
     idle: elements.startBtn,
     testing: elements.cancelBtn,
@@ -230,10 +229,4 @@ export function hideError() {
   clearToastTimer();
   elements.errorToast?.classList.add("hidden");
   elements.successToast?.classList.add("hidden");
-}
-
-export function notifySettingsSaved() {
-  if (elements.settingsModal?.open) {
-    showError("Settings saved", false);
-  }
 }

@@ -1,17 +1,13 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"slices"
-	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -66,10 +62,9 @@ func TestComputePingMetricsPopulated(t *testing.T) {
 
 func TestBuildResultsDirectionThroughput(t *testing.T) {
 	cfg := &Config{
-		Protocol:   "tcp",
-		Duration:   10,
-		Streams:    2,
-		PacketSize: 1400,
+		Duration:  10,
+		Streams:   2,
+		ChunkSize: 1024 * 1024,
 	}
 	metrics := EngineMetrics{
 		ThroughputMbps:   120,
@@ -83,7 +78,6 @@ func TestBuildResultsDirectionThroughput(t *testing.T) {
 	}{
 		{name: "download", direction: "download", wantDown: 120},
 		{name: "upload", direction: "upload", wantDown: 0},
-		{name: "bidirectional", direction: "bidirectional", wantDown: 60},
 	}
 
 	for _, tc := range cases {
@@ -98,6 +92,12 @@ func TestBuildResultsDirectionThroughput(t *testing.T) {
 			}
 			if got.Config.Direction != tc.direction {
 				t.Fatalf("direction = %q, want %q", got.Config.Direction, tc.direction)
+			}
+			if got.Config.Protocol != protocolHTTP {
+				t.Fatalf("protocol = %q, want %q", got.Config.Protocol, protocolHTTP)
+			}
+			if got.Config.ChunkSize != cfg.ChunkSize {
+				t.Fatalf("chunk size = %d, want %d", got.Config.ChunkSize, cfg.ChunkSize)
 			}
 			got4k := contains(got.Interpretation.SuitableFor, "streaming_4k")
 			want4k := tc.wantDown >= 25
@@ -202,110 +202,6 @@ func TestFormatterLastError(t *testing.T) {
 	}
 }
 
-func TestRunCancelStreamError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/stream/start":
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"stream_id":"s1","websocket_url":"ws://127.0.0.1:1","status":"running","mode":"proxy"}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/stream/s1/cancel":
-			w.WriteHeader(http.StatusInternalServerError)
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer server.Close()
-
-	cfg := &Config{
-		Protocol:  "tcp",
-		Direction: "download",
-		Duration:  1,
-		Streams:   1,
-		ServerURL: server.URL,
-		Timeout:   2,
-	}
-
-	var streamID atomic.Value
-	err := runStream(context.Background(), cfg, noopOutputFormatter{}, &streamID)
-	if err == nil {
-		t.Fatal("expected runStream error")
-	}
-	if !strings.Contains(err.Error(), "cancel cleanup failed") {
-		t.Fatalf("error = %q, want cancel cleanup context", err.Error())
-	}
-}
-
-func TestRunClientSideTestCancelsStreamOnFormatterError(t *testing.T) {
-	cancelCalled := make(chan struct{}, 1)
-	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/api/v1/stream/s1/cancel" {
-			select {
-			case cancelCalled <- struct{}{}:
-			default:
-			}
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer apiServer.Close()
-
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen test server: %v", err)
-	}
-	defer listener.Close()
-
-	go func() {
-		conn, acceptErr := listener.Accept()
-		if acceptErr != nil {
-			return
-		}
-		defer conn.Close()
-		cmd := make([]byte, 1)
-		if _, readErr := io.ReadFull(conn, cmd); readErr != nil {
-			return
-		}
-		payload := bytes.Repeat([]byte("x"), 1024)
-		for {
-			if _, writeErr := conn.Write(payload); writeErr != nil {
-				return
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
-	}()
-
-	cfg := &Config{
-		Protocol:  "tcp",
-		Direction: "download",
-		Duration:  5,
-		Streams:   1,
-		ServerURL: apiServer.URL,
-		Timeout:   2,
-	}
-	streamResp := &StreamResponse{
-		StreamID:      "s1",
-		TestServerTCP: listener.Addr().String(),
-	}
-	formatter := &formatterWithErr{err: errors.New("stdout closed")}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err = runClientSideTest(ctx, cfg, formatter, streamResp)
-	if err == nil {
-		t.Fatal("expected formatter error")
-	}
-	if !strings.Contains(err.Error(), "formatter output failed") {
-		t.Fatalf("error = %q, want formatter output failed", err.Error())
-	}
-	select {
-	case <-cancelCalled:
-	case <-time.After(2 * time.Second):
-		t.Fatal("expected cancel cleanup request after formatter error")
-	}
-}
-
 func TestHTTPTimeoutAtLeastDuration(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 	mux := http.NewServeMux()
@@ -316,7 +212,6 @@ func TestHTTPTimeoutAtLeastDuration(t *testing.T) {
 
 	cfg := &Config{
 		ServerURL:  server.URL,
-		Protocol:   "http",
 		Direction:  "download",
 		Duration:   2,
 		Streams:    1,

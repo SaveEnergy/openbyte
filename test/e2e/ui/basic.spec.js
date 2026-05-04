@@ -26,72 +26,33 @@ test.describe("openByte UI", () => {
     await expect(page.locator("#serverName")).toHaveText("Frankfurt 10G");
   });
 
-  test("download page recommends darwin arm64 on Apple Silicon", async ({
-    page,
-  }) => {
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, "userAgentData", {
-        configurable: true,
-        value: {
-          platform: "macOS",
-          architecture: "arm64",
-        },
-      });
-    });
+  test("API page gives agents HTTP endpoints", async ({ page }) => {
+    await page.goto("/api.html");
 
-    await page.route(
-      "https://api.github.com/repos/saveenergy/openbyte/releases/latest",
-      async (route) => {
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            tag_name: "v9.9.9",
-            assets: [
-              {
-                name: "openbyte_darwin_amd64.tar.gz",
-                browser_download_url:
-                  "https://example.invalid/openbyte_darwin_amd64.tar.gz",
-                size: 11_000_000,
-              },
-              {
-                name: "openbyte_darwin_arm64.tar.gz",
-                browser_download_url:
-                  "https://example.invalid/openbyte_darwin_arm64.tar.gz",
-                size: 10_000_000,
-              },
-            ],
-          }),
-        });
-      },
-    );
-
-    await page.goto("/download.html");
-
-    await expect(page.locator("#recommendedPlatform")).toContainText(
-      /macOS · Apple Silicon/i,
-    );
-    await expect(page.locator("#recommendedLabel")).toContainText(
-      /Download v9\.9\.9/i,
-    );
-    await expect(page.locator("#recommendedBtn")).toHaveAttribute(
-      "href",
-      "https://example.invalid/openbyte_darwin_arm64.tar.gz",
-    );
-    await expect(page.locator("#recommendedBtn")).toHaveAttribute(
-      "aria-disabled",
-      "false",
-    );
+    await expect(page.locator("h1")).toHaveText(/Agent quick reference/i);
+    await expect(page.locator("body")).toContainText("/api/v1/ping");
+    await expect(page.locator("body")).toContainText("/api/v1/download");
+    await expect(page.locator("body")).toContainText("/api/v1/upload");
+    await expect(page.locator("body")).toContainText("/api/v1/results");
   });
 
-  test("runs a short test flow", async ({ page }) => {
-    await page.goto("/");
+  test("runs a short adaptive test flow", async ({ page }) => {
+    await page.addInitScript(() => {
+      const OriginalWorker = globalThis.Worker;
+      globalThis.__openbyteWorkerUrls = [];
+      globalThis.Worker = class OpenByteTestWorker extends OriginalWorker {
+        constructor(url, options) {
+          globalThis.__openbyteWorkerUrls.push(String(url));
+          super(url, options);
+        }
+      };
+    });
 
-    await page.locator("#showSettings").click();
-    await expect(page.locator("#settingsModal")).toBeVisible();
-    await page.selectOption("#duration", "5");
-    await page.selectOption("#streams", "1");
-    await page.locator("#closeSettings").click();
+    await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
+
+    await expect(page.locator("#showSettings")).toHaveCount(0);
+    await expect(page.locator("#duration")).toHaveCount(0);
+    await expect(page.locator("#streams")).toHaveCount(0);
 
     await page.locator("#startBtn").click();
     await expect(page.locator("#resultsState")).toBeVisible({
@@ -101,63 +62,17 @@ test.describe("openByte UI", () => {
     const downloadMbps = Number.parseFloat(downloadText || "0");
     expect(Number.isFinite(downloadMbps)).toBeTruthy();
     expect(downloadMbps).toBeGreaterThanOrEqual(0);
-  });
-
-  test("settings save tolerates localStorage write failures", async ({
-    page,
-  }) => {
-    const pageErrors = [];
-    page.on("pageerror", (err) => pageErrors.push(err.message));
-    await page.addInitScript(() => {
-      const originalSetItem = Storage.prototype.setItem;
-      Storage.prototype.setItem = function (key, value) {
-        if (key === "obyte-settings") {
-          throw new DOMException("quota", "QuotaExceededError");
-        }
-        return originalSetItem.call(this, key, value);
-      };
-    });
-
-    await page.goto("/");
-    await page.locator("#showSettings").click();
-    await expect(page.locator("#settingsModal")).toBeVisible();
-    await page.selectOption("#duration", "5");
-    await expect(page.locator("#duration")).toHaveValue("5");
-    await expect(page.locator("#successToast")).toBeHidden();
-    expect(pageErrors).toEqual([]);
-  });
-
-  test("settings load tolerates localStorage read failures", async ({
-    page,
-  }) => {
-    const pageErrors = [];
-    page.on("pageerror", (err) => pageErrors.push(err.message));
-    await page.addInitScript(() => {
-      const originalGetItem = Storage.prototype.getItem;
-      Storage.prototype.getItem = function (key) {
-        if (key === "obyte-settings") {
-          throw new DOMException("blocked", "SecurityError");
-        }
-        return originalGetItem.call(this, key);
-      };
-    });
-
-    await page.goto("/");
-    await expect(page.locator("#idleState")).toBeVisible();
-    await expect(page.locator("#duration")).toHaveValue("30");
-    expect(pageErrors).toEqual([]);
-  });
-
-  test("settings saved uses polite toast region", async ({ page }) => {
-    await page.goto("/");
-    await page.locator("#showSettings").click();
-    await expect(page.locator("#settingsModal")).toBeVisible();
-    await page.selectOption("#duration", "5");
-
-    await expect(page.locator("#successToast")).toBeVisible();
-    await expect(page.locator("#successToast")).toContainText(
-      /settings saved/i,
+    const workerUrls = await page.evaluate(
+      () => globalThis.__openbyteWorkerUrls,
     );
+    expect(
+      workerUrls.some((url) => url.includes("speedtest-worker.js")),
+    ).toBeTruthy();
+  });
+
+  test("toast regions keep accessible roles", async ({ page }) => {
+    await page.goto("/");
+
     await expect(page.locator("#successToast")).toHaveJSProperty(
       "tagName",
       "OUTPUT",
@@ -174,23 +89,14 @@ test.describe("openByte UI", () => {
     await expect(page.locator("#errorToast")).toBeHidden();
   });
 
-  test("settings modal reopen is idempotent and focus follows state", async ({
-    page,
-  }) => {
+  test("adaptive test focus follows state", async ({ page }) => {
     const pageErrors = [];
     page.on("pageerror", (err) => pageErrors.push(err.message));
 
-    await page.goto("/");
-    await page.locator("#showSettings").click();
-    await expect(page.locator("#settingsModal")).toBeVisible();
-    await page.evaluate(() => document.getElementById("showSettings").click());
-    await expect(page.locator("#settingsModal")).toBeVisible();
-    await expect(page.locator("#duration")).toBeFocused();
+    await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
+    await expect(page.locator("#idleState")).toBeVisible();
+    await expect(page.locator("#startBtn")).toBeVisible();
     expect(pageErrors).toEqual([]);
-
-    await page.selectOption("#duration", "5");
-    await page.selectOption("#streams", "1");
-    await page.locator("#closeSettings").click();
 
     await page.locator("#startBtn").click();
     await expect(page.locator("#testingState")).toBeVisible({ timeout: 10000 });
@@ -199,7 +105,7 @@ test.describe("openByte UI", () => {
       /.+/,
     );
     await expect(page.locator("#testType")).toContainText(
-      /Ping|Download|Upload/,
+      /Ping|Saturating|Measuring/,
     );
     await expect(page.locator("#cancelBtn")).toBeFocused();
 
@@ -245,12 +151,7 @@ test.describe("openByte UI", () => {
       };
     });
 
-    await page.goto("/");
-    await page.locator("#showSettings").click();
-    await expect(page.locator("#settingsModal")).toBeVisible();
-    await page.selectOption("#duration", "5");
-    await page.selectOption("#streams", "1");
-    await page.locator("#closeSettings").click();
+    await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
 
     await page.locator("#startBtn").click();
     await expect(page.locator("#resultsState")).toBeVisible({
@@ -273,12 +174,7 @@ test.describe("openByte UI", () => {
       });
     });
 
-    await page.goto("/");
-    await page.locator("#showSettings").click();
-    await expect(page.locator("#settingsModal")).toBeVisible();
-    await page.selectOption("#duration", "5");
-    await page.selectOption("#streams", "1");
-    await page.locator("#closeSettings").click();
+    await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
 
     await page.locator("#startBtn").click();
     await expect(page.locator("#resultsState")).toBeVisible({
@@ -292,13 +188,7 @@ test.describe("openByte UI", () => {
   });
 
   test("handles cancel then restart cleanly", async ({ page }) => {
-    await page.goto("/");
-
-    await page.locator("#showSettings").click();
-    await expect(page.locator("#settingsModal")).toBeVisible();
-    await page.selectOption("#duration", "5");
-    await page.selectOption("#streams", "1");
-    await page.locator("#closeSettings").click();
+    await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
 
     await page.locator("#startBtn").click();
     await expect(page.locator("#testingState")).toBeVisible({ timeout: 10000 });

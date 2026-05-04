@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-05-04
+
+### Added
+
+- **Adaptive Web UI speed test**: the browser now ramps HTTP stream concurrency automatically,
+  then measures with the stream count that saturated the path; HTTP transfer loops now run
+  in a browser Web Worker so the UI thread stays responsive during high-throughput tests.
+- **Web API quick reference**: added `/api.html` with agent-friendly HTTP endpoint notes
+  and browser snippets for ping, download, upload, and result sharing.
+
+### Removed
+
+- **Manual Web UI speed settings**: removed visible stream-count and duration controls; the
+  default browser test now uses the same adaptive strategy for slow and high-capacity links.
+- **TCP/UDP CLI testing**: removed the CLI TCP/UDP client data plane, stream-start/websocket
+  client plumbing, `--protocol`/`-p`, `--packet-size`, and bidirectional CLI mode. The CLI
+  is HTTP-only now; CLI JSON schema version is now `2.0` and reports `chunk_size`.
+- **Downloads page**: removed the browser downloads page and GitHub release/platform detection
+  scripts; the web app now points agents and users to the API page instead.
+- **Server-side TCP/UDP stream stack**: removed raw TCP/UDP listeners, `/api/v1/stream/*`,
+  websocket metrics fanout, `cmd/loadtest`, stream result/state types, direct test-port config,
+  and the `gorilla/websocket` plus custom stream-error dependencies. Docker now
+  exposes only port `8080`.
+
 ## [0.9.1] - 2026-05-03
 
 ### Added
@@ -102,7 +126,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **golang.org/x/term** v0.41.0, **modernc.org/sqlite** v1.47.0, **github.com/mark3labs/mcp-go** v0.45.0 (and transitive updates).
 - Routine **GitHub Actions** version bumps via Dependabot.
 
-[Unreleased]: https://github.com/SaveEnergy/openbyte/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/SaveEnergy/openbyte/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/SaveEnergy/openbyte/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/SaveEnergy/openbyte/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/SaveEnergy/openbyte/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/SaveEnergy/openbyte/compare/v0.7.0...v0.8.0

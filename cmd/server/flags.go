@@ -21,13 +21,9 @@ type serverFlagValues struct {
 	port               *string
 	bindAddress        *string
 	serverName         *string
-	tcpTestPort        *int
-	udpTestPort        *int
 	publicHost         *string
 	capacityGbps       *int
-	maxConcurrentTests *int
 	maxConcurrentPerIP *int
-	maxStreams         *int
 	maxTestDuration    *string
 	rateLimitPerIP     *int
 	globalRateLimit    *int
@@ -58,13 +54,9 @@ func buildServerFlagSet(cfg *config.Config) (*flag.FlagSet, *serverFlagValues) {
 		port:               fs.String("port", cfg.Port, "HTTP API port (env: PORT)"),
 		bindAddress:        fs.String("bind-address", cfg.BindAddress, "Bind address (env: BIND_ADDRESS)"),
 		serverName:         fs.String("server-name", cfg.ServerName, "Display name for this server (env: SERVER_NAME)"),
-		tcpTestPort:        fs.Int("tcp-test-port", cfg.TCPTestPort, "TCP test port (env: TCP_TEST_PORT)"),
-		udpTestPort:        fs.Int("udp-test-port", cfg.UDPTestPort, "UDP test port (env: UDP_TEST_PORT)"),
 		publicHost:         fs.String("public-host", cfg.PublicHost, "Public host for URLs (env: PUBLIC_HOST)"),
 		capacityGbps:       fs.Int("capacity-gbps", cfg.CapacityGbps, "Capacity in Gbps (env: CAPACITY_GBPS)"),
-		maxConcurrentTests: fs.Int("max-concurrent-tests", cfg.MaxConcurrentTests, "Max concurrent tests (env: MAX_CONCURRENT_TESTS)"),
 		maxConcurrentPerIP: fs.Int("max-concurrent-per-ip", cfg.MaxConcurrentPerIP, "Max concurrent tests per IP (env: MAX_CONCURRENT_PER_IP)"),
-		maxStreams:         fs.Int("max-streams", cfg.MaxStreams, "Max streams per test, 1-64 (env: MAX_STREAMS)"),
 		maxTestDuration:    fs.String(flagMaxTestDuration, cfg.MaxTestDuration.String(), "Max test duration, e.g. 300s (env: MAX_TEST_DURATION)"),
 		rateLimitPerIP:     fs.Int("rate-limit-per-ip", cfg.RateLimitPerIP, "Per-IP rate limit per minute (env: RATE_LIMIT_PER_IP)"),
 		globalRateLimit:    fs.Int("global-rate-limit", cfg.GlobalRateLimit, "Global rate limit per minute (env: GLOBAL_RATE_LIMIT)"),
@@ -128,13 +120,9 @@ func applyServerFlagOverrides(cfg *config.Config, fs *flag.FlagSet, fv *serverFl
 		"port":                  func() error { cfg.Port = *fv.port; return nil },
 		"bind-address":          func() error { cfg.BindAddress = *fv.bindAddress; return nil },
 		"server-name":           func() error { cfg.ServerName = strings.TrimSpace(*fv.serverName); return nil },
-		"tcp-test-port":         func() error { cfg.TCPTestPort = *fv.tcpTestPort; return nil },
-		"udp-test-port":         func() error { cfg.UDPTestPort = *fv.udpTestPort; return nil },
 		"public-host":           func() error { cfg.PublicHost = *fv.publicHost; return nil },
 		"capacity-gbps":         func() error { cfg.CapacityGbps = *fv.capacityGbps; return nil },
-		"max-concurrent-tests":  func() error { cfg.MaxConcurrentTests = *fv.maxConcurrentTests; return nil },
 		"max-concurrent-per-ip": func() error { cfg.MaxConcurrentPerIP = *fv.maxConcurrentPerIP; return nil },
-		"max-streams":           func() error { cfg.MaxStreams = *fv.maxStreams; return nil },
 		flagMaxTestDuration:     func() error { return setFlagDuration(flagMaxTestDuration, *fv.maxTestDuration, &cfg.MaxTestDuration) },
 		"rate-limit-per-ip":     func() error { cfg.RateLimitPerIP = *fv.rateLimitPerIP; return nil },
 		"global-rate-limit":     func() error { cfg.GlobalRateLimit = *fv.globalRateLimit; return nil },

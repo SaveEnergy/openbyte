@@ -1,29 +1,15 @@
 package api
 
-import (
-	"github.com/saveenergy/openbyte/internal/config"
-	"github.com/saveenergy/openbyte/internal/stream"
-)
+import "github.com/saveenergy/openbyte/internal/config"
 
 type Handler struct {
-	manager          *stream.Manager
 	config           *config.Config
 	clientIPResolver *ClientIPResolver
 	version          string
 }
 
-const (
-	maxJSONBodyBytes         = 1 << 20
-	defaultStreamDurationSec = 30
-	defaultStreamCount       = 4
-	methodNotAllowedErr      = "method not allowed"
-	contentTypeJSONErr       = "Content-Type must be application/json"
-)
-
-func NewHandler(manager *stream.Manager) *Handler {
-	return &Handler{
-		manager: manager,
-	}
+func NewHandler() *Handler {
+	return &Handler{}
 }
 
 func (h *Handler) SetConfig(cfg *config.Config) {

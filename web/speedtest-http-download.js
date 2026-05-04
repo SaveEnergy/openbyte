@@ -2,6 +2,10 @@
 
 import { getApiBase, state, TEST_CONFIG } from "./state.js";
 import {
+  runAdaptiveHTTPTest,
+  streamDelayForIndex,
+} from "./speedtest-adaptive.js";
+import {
   sleep,
   retryAfterMs,
   isNetworkError,
@@ -10,12 +14,12 @@ import {
 import { createWarmUpDetector, createEarlyStopDetector } from "./warmup.js";
 import { createDiagnosticsCollector } from "./diagnostics.js";
 import {
-  resolveStreamsInner,
   resolveChunkSize,
   detectOverheadFactor,
   throwIfZeroBytes,
   resolveStopReason,
   applyHttpMeasureTick,
+  attachAdaptiveDiagnostics,
 } from "./speedtest-http-shared.js";
 
 function buildDownloadChunkAttempts(chunkSize) {
@@ -128,7 +132,6 @@ function processDownloadChunk(value, now, ctx) {
     ctx.warmUp,
     value.length,
     now,
-    ctx.startTime,
     ctx.onProgress,
     {
       diagnostics: ctx.diagnostics,
@@ -138,11 +141,18 @@ function processDownloadChunk(value, now, ctx) {
   );
 }
 
-export async function runDownloadTest(duration, onProgress, signal) {
+async function runDownloadWindow(options) {
+  const {
+    duration,
+    streams,
+    onProgress,
+    signal,
+    collectDiagnostics = true,
+    adaptive,
+  } = options;
   const startTime = performance.now();
-  const numStreams = resolveStreamsInner();
+  const numStreams = streams;
   const chunkSize = resolveChunkSize();
-  const streamDelay = TEST_CONFIG.STREAM_DELAY_MS;
   const maxNetworkRetries = TEST_CONFIG.MAX_NETWORK_RETRIES;
   const retryDelayMs = TEST_CONFIG.NETWORK_RETRY_DELAY_MS;
   const nominalEndTime = startTime + duration * 1000;
@@ -155,7 +165,9 @@ export async function runDownloadTest(duration, onProgress, signal) {
 
   const warmUp = createWarmUpDetector(duration * 1000);
   const earlyStop = createEarlyStopDetector(() => warmUp.settled());
-  const diagnostics = createDiagnosticsCollector(TEST_CONFIG.WARMUP_WINDOW_MS);
+  const diagnostics = collectDiagnostics
+    ? createDiagnosticsCollector(TEST_CONFIG.WARMUP_WINDOW_MS)
+    : null;
   const readState = { totalBytes: 0, measureStartTime: 0, allBytes: 0 };
 
   const downloadStream = async (chunk) => {
@@ -185,7 +197,6 @@ export async function runDownloadTest(duration, onProgress, signal) {
     const readCtx = {
       warmUp,
       readState,
-      startTime,
       endTimeRef,
       earlyStop,
       diagnostics,
@@ -211,7 +222,7 @@ export async function runDownloadTest(duration, onProgress, signal) {
 
   const streamPromises = [];
   for (let i = 0; i < numStreams; i++) {
-    const delay = i * streamDelay;
+    const delay = streamDelayForIndex(i);
     const streamPromise = (async () => {
       await new Promise((r) => setTimeout(r, delay));
       const attempts = buildDownloadChunkAttempts(chunkSize);
@@ -246,11 +257,36 @@ export async function runDownloadTest(duration, onProgress, signal) {
     overload: "Server overloaded. Try again in a moment or change server.",
     noStreams: "Download failed. No stream completed successfully.",
   });
+  if (!collectDiagnostics && streamState.sawOverload) {
+    throw new Error("Server overloaded during adaptive download ramp");
+  }
 
   const stopReason = resolveStopReason(signal, endTimeRef, nominalEndTime);
-  const diag = diagnostics.finish(stopReason);
-  state.diagnostics = state.diagnostics || {};
-  state.diagnostics.download = diag;
+  if (diagnostics) {
+    const diag = diagnostics.finish(stopReason);
+    state.diagnostics = state.diagnostics || {};
+    state.diagnostics.download = attachAdaptiveDiagnostics(
+      diag,
+      adaptive,
+      numStreams,
+    );
+  }
 
   return Math.max(avgSpeed, 0);
+}
+
+export async function runDownloadTest(onProgress, signal, options = {}) {
+  return runAdaptiveHTTPTest({
+    direction: "download",
+    signal,
+    config: options.config,
+    onPhase: options.onPhase,
+    onMeasureStart: options.onMeasureStart,
+    runWindow: (windowOptions) =>
+      runDownloadWindow({
+        ...windowOptions,
+        onProgress,
+        signal,
+      }),
+  });
 }

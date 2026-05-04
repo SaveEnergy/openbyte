@@ -19,7 +19,7 @@ func BenchmarkShouldSkipRequestLog(b *testing.B) {
 }
 
 func BenchmarkShouldLogRequestAPIOK(b *testing.B) {
-	path := "/api/v1/streams/550e8400-e29b-41d4-a716-446655440000"
+	path := "/api/v1/results/abc12345"
 	duration := 50 * time.Millisecond
 
 	b.ReportAllocs()

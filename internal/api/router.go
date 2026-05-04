@@ -16,7 +16,6 @@ type Router struct {
 	speedtest        *SpeedTestHandler
 	resultsHandler   *results.Handler
 	limiter          *RateLimiter
-	wsServer         any
 	allowedOrigins   []string
 	corsAllowAll     bool // true when allowedOrigins contains "*"; set in SetAllowedOrigins
 	clientIPResolver *ClientIPResolver
@@ -25,8 +24,6 @@ type Router struct {
 }
 
 var validResultID = regexp.MustCompile(`^[0-9a-zA-Z]{8}$`)
-
-const internalWSClientIPHeader = "X-OpenByte-Client-IP"
 
 func NewRouter(handler *Handler, cfg *config.Config) *Router {
 	maxDur := 300
@@ -50,10 +47,6 @@ func (r *Router) SetClientIPResolver(resolver *ClientIPResolver) {
 	if r.speedtest != nil {
 		r.speedtest.SetClientIPResolver(resolver)
 	}
-}
-
-func (r *Router) SetWebSocketHandler(handler func(http.ResponseWriter, *http.Request, string)) {
-	r.wsServer = handler
 }
 
 func (r *Router) SetResultsHandler(h *results.Handler) {
@@ -80,7 +73,6 @@ func (r *Router) SetupRoutes() http.Handler {
 
 	r.registerCoreV1Routes(v1)
 	r.registerResultsAPIRoutes(v1)
-	r.registerWebSocketStreamRoute(v1)
 
 	mux.HandleFunc("GET /health", r.HealthCheck)
 	if r.runtimeMetrics != nil {

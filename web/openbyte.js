@@ -1,4 +1,4 @@
-/** Main entry: wiring, settings, share/init. */
+/** Main entry: wiring, network detection, share/init. */
 
 import { initElements } from "./state.js";
 import {
@@ -7,11 +7,10 @@ import {
   handleShare,
 } from "./speedtest-orchestrator.js";
 import { checkServer, detectNetworkInfo, loadServerInfo } from "./network.js";
-import { bindEvents, loadSettings } from "./settings.js";
+import { bindEvents } from "./events.js";
 
 function init() {
   initElements();
-  loadSettings();
   loadServerInfo();
   checkServer();
   bindEvents({

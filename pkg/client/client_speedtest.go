@@ -11,7 +11,7 @@ import (
 // SpeedTestOptions configures a full speed test.
 type SpeedTestOptions struct {
 	Direction string // "download" or "upload" (default: "download")
-	Duration  int    // seconds, 1-300 (default: 10)
+	Duration  int    // seconds, 1-300; values below 1 are clamped to 1
 }
 
 // SpeedTestResult is the output of a full speed test.
@@ -85,7 +85,7 @@ func normalizeSpeedTestOptions(opts SpeedTestOptions) (SpeedTestOptions, error) 
 		opts.Direction = directionDownload
 	}
 	if opts.Duration < 1 {
-		opts.Duration = 10
+		opts.Duration = 1
 	}
 	if opts.Duration > 300 {
 		opts.Duration = 300

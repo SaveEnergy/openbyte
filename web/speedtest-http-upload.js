@@ -2,6 +2,10 @@
 
 import { getApiBase, state, TEST_CONFIG } from "./state.js";
 import {
+  runAdaptiveHTTPTest,
+  streamDelayForIndex,
+} from "./speedtest-adaptive.js";
+import {
   sleep,
   retryAfterMs,
   isNetworkError,
@@ -10,12 +14,12 @@ import {
 import { createWarmUpDetector, createEarlyStopDetector } from "./warmup.js";
 import { createDiagnosticsCollector } from "./diagnostics.js";
 import {
-  resolveStreamsInner,
   resolveChunkSize,
   detectOverheadFactor,
   throwIfZeroBytes,
   resolveStopReason,
   applyHttpMeasureTick,
+  attachAdaptiveDiagnostics,
 } from "./speedtest-http-shared.js";
 
 async function sendUploadRequest(blob, duration, signal) {
@@ -38,20 +42,11 @@ function recordUploadProgress(
   warmUp,
   blobSize,
   now,
-  startTime,
   onProgress,
   extra,
 ) {
   metricsState.successfulStreams += 1;
-  applyHttpMeasureTick(
-    metricsState,
-    warmUp,
-    blobSize,
-    now,
-    startTime,
-    onProgress,
-    extra,
-  );
+  applyHttpMeasureTick(metricsState, warmUp, blobSize, now, onProgress, extra);
 }
 
 function handleUploadNonOkResponse(res, metricsState, retryAfterFn) {
@@ -78,15 +73,8 @@ function handleUploadCatchError(
 }
 
 async function processUploadResponse(res, options) {
-  const {
-    blob,
-    metricsState,
-    retryAfterFn,
-    warmUp,
-    startTime,
-    onProgress,
-    extra,
-  } = options;
+  const { blob, metricsState, retryAfterFn, warmUp, onProgress, extra } =
+    options;
   if (res.ok) {
     await res.text().catch(() => {});
     const now = performance.now();
@@ -95,7 +83,6 @@ async function processUploadResponse(res, options) {
       warmUp,
       blob.size,
       now,
-      startTime,
       onProgress,
       extra,
     );
@@ -166,7 +153,6 @@ async function runSingleUploadStream(options) {
     retryDelayMs,
     warmUp,
     metricsState,
-    startTime,
     onProgress,
     extra,
   } = options;
@@ -183,7 +169,6 @@ async function runSingleUploadStream(options) {
           metricsState,
           retryAfterFn: retryAfterMs,
           warmUp,
-          startTime,
           onProgress,
           extra,
         },
@@ -211,11 +196,18 @@ async function runSingleUploadStream(options) {
   }
 }
 
-export async function runUploadTest(duration, onProgress, signal) {
+async function runUploadWindow(options) {
+  const {
+    duration,
+    streams,
+    onProgress,
+    signal,
+    collectDiagnostics = true,
+    adaptive,
+  } = options;
   const startTime = performance.now();
-  const numStreams = resolveStreamsInner();
+  const numStreams = streams;
   const chunkSize = resolveChunkSize();
-  const streamDelay = TEST_CONFIG.STREAM_DELAY_MS;
   const blobSize = chunkSize;
   const maxNetworkRetries = TEST_CONFIG.MAX_NETWORK_RETRIES;
   const retryDelayMs = TEST_CONFIG.NETWORK_RETRY_DELAY_MS;
@@ -230,7 +222,9 @@ export async function runUploadTest(duration, onProgress, signal) {
 
   const warmUp = createWarmUpDetector(duration * 1000);
   const earlyStop = createEarlyStopDetector(() => warmUp.settled());
-  const diagnostics = createDiagnosticsCollector(TEST_CONFIG.WARMUP_WINDOW_MS);
+  const diagnostics = collectDiagnostics
+    ? createDiagnosticsCollector(TEST_CONFIG.WARMUP_WINDOW_MS)
+    : null;
   const nominalEndTime = startTime + duration * 1000;
   const endTimeRef = { value: nominalEndTime };
   const extra = { earlyStop, diagnostics, endTimeRef };
@@ -245,11 +239,11 @@ export async function runUploadTest(duration, onProgress, signal) {
   }
   const blob = new Blob(chunks);
 
-  const streams = [];
+  const streamPromises = [];
   for (let i = 0; i < numStreams; i++) {
-    streams.push(
+    streamPromises.push(
       runSingleUploadStream({
-        delay: i * streamDelay,
+        delay: streamDelayForIndex(i),
         blob,
         endTimeRef,
         duration,
@@ -258,13 +252,12 @@ export async function runUploadTest(duration, onProgress, signal) {
         retryDelayMs,
         warmUp,
         metricsState,
-        startTime,
         onProgress,
         extra,
       }),
     );
   }
-  await Promise.all(streams);
+  await Promise.all(streamPromises);
 
   const overheadFactor = detectOverheadFactor();
   const endNow = Math.min(performance.now(), endTimeRef.value);
@@ -284,11 +277,36 @@ export async function runUploadTest(duration, onProgress, signal) {
     overload: "Server overloaded. Try again in a moment or change server.",
     noStreams: "Upload failed. No stream completed successfully.",
   });
+  if (!collectDiagnostics && metricsState.sawOverload) {
+    throw new Error("Server overloaded during adaptive upload ramp");
+  }
 
   const stopReason = resolveStopReason(signal, endTimeRef, nominalEndTime);
-  const diag = diagnostics.finish(stopReason);
-  state.diagnostics = state.diagnostics || {};
-  state.diagnostics.upload = diag;
+  if (diagnostics) {
+    const diag = diagnostics.finish(stopReason);
+    state.diagnostics = state.diagnostics || {};
+    state.diagnostics.upload = attachAdaptiveDiagnostics(
+      diag,
+      adaptive,
+      numStreams,
+    );
+  }
 
   return Math.max(avgSpeed, 0);
+}
+
+export async function runUploadTest(onProgress, signal, options = {}) {
+  return runAdaptiveHTTPTest({
+    direction: "upload",
+    signal,
+    config: options.config,
+    onPhase: options.onPhase,
+    onMeasureStart: options.onMeasureStart,
+    runWindow: (windowOptions) =>
+      runUploadWindow({
+        ...windowOptions,
+        onProgress,
+        signal,
+      }),
+  });
 }

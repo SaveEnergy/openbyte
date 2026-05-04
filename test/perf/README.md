@@ -1,6 +1,6 @@
 # Performance benchmarks
 
-Package list: **`bench_packages.txt`** (defaults include **`internal/{metrics,stream,websocket,api,jsonbody,results}`** and **`pkg/types`**). Runner: **`scripts/perf/run_benchmarks.sh`**.
+Package list: **`bench_packages.txt`** (defaults include **`internal/{metrics,api,jsonbody,results}`** and **`pkg/types`**). Runner: **`scripts/perf/run_benchmarks.sh`**.
 
 ```bash
 make perf-bench              # quick, stdout

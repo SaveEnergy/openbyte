@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"net"
 	"net/http"
 	"testing"
-	"time"
 )
 
 func TestHealthEndpoint(t *testing.T) {
@@ -61,71 +59,6 @@ func TestPingEndpoint(t *testing.T) {
 	if _, ok := data["timestamp"].(float64); !ok {
 		t.Fatalf("timestamp missing or invalid type: %T", data["timestamp"])
 	}
-}
-
-func TestStreamServerTCPDownload(t *testing.T) {
-	skipIfShort(t)
-	ts := NewTestServer(t)
-	defer ts.Close()
-
-	tcpAddr, _ := getStreamTestAddrs(t, ts)
-	conn, err := net.DialTimeout("tcp", tcpAddr, 2*time.Second)
-	if err != nil {
-		t.Fatalf("dial tcp: %v", err)
-	}
-	defer conn.Close()
-
-	if _, err := conn.Write([]byte{'D'}); err != nil {
-		t.Fatalf("write tcp command: %v", err)
-	}
-
-	buf := make([]byte, 2048)
-	if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
-		t.Fatalf("set read deadline: %v", err)
-	}
-	n, err := conn.Read(buf)
-	if err != nil {
-		t.Fatalf("read tcp payload: %v", err)
-	}
-	if n <= 0 {
-		t.Fatalf("read bytes = %d, want > 0", n)
-	}
-}
-
-func TestStreamServerUDPDownload(t *testing.T) {
-	skipIfShort(t)
-	ts := NewTestServer(t)
-	defer ts.Close()
-
-	_, udpAddr := getStreamTestAddrs(t, ts)
-	serverAddr, err := net.ResolveUDPAddr("udp", udpAddr)
-	if err != nil {
-		t.Fatalf("resolve udp addr: %v", err)
-	}
-
-	conn, err := net.DialUDP("udp", nil, serverAddr)
-	if err != nil {
-		t.Fatalf("dial udp: %v", err)
-	}
-	defer conn.Close()
-
-	if _, err := conn.Write([]byte{'D'}); err != nil {
-		t.Fatalf("write udp command: %v", err)
-	}
-
-	buf := make([]byte, 2048)
-	if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
-		t.Fatalf("set udp read deadline: %v", err)
-	}
-	n, _, err := conn.ReadFromUDP(buf)
-	if err != nil {
-		t.Fatalf("read udp payload: %v", err)
-	}
-	if n <= 0 {
-		t.Fatalf("read udp bytes = %d, want > 0", n)
-	}
-
-	_, _ = conn.Write([]byte{'S'})
 }
 
 func TestResultsSaveAndGet(t *testing.T) {

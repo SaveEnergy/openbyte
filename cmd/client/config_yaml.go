@@ -79,7 +79,10 @@ func validateConfigFile(config *ConfigFile) error {
 	if err := validateServerURLs(config); err != nil {
 		return err
 	}
-	if err := validateProtocolAndDirection(config); err != nil {
+	if err := validateConfigFileRemovedTransport(config); err != nil {
+		return err
+	}
+	if err := validateConfigFileDirection(config); err != nil {
 		return err
 	}
 	return validateNumericRanges(config)
@@ -94,15 +97,19 @@ func validateServerURLs(config *ConfigFile) error {
 	return nil
 }
 
-func validateProtocolAndDirection(config *ConfigFile) error {
-	if config.Protocol != "" && config.Protocol != protocolTCP && config.Protocol != protocolUDP && config.Protocol != protocolHTTP {
-		return fmt.Errorf("invalid protocol: %s (must be tcp, udp, or http)", config.Protocol)
+func validateConfigFileRemovedTransport(config *ConfigFile) error {
+	if config.Protocol != "" && config.Protocol != protocolHTTP {
+		return fmt.Errorf("invalid protocol: %s (CLI is HTTP-only; remove protocol or set http)", config.Protocol)
 	}
-	if config.Direction != "" && config.Direction != directionDownload && config.Direction != directionUpload && config.Direction != directionBidirectional {
-		return fmt.Errorf("invalid direction: %s (must be download, upload, or bidirectional)", config.Direction)
+	if config.PacketSize != 0 {
+		return fmt.Errorf("packet_size is no longer used by the HTTP-only CLI; use chunk_size")
 	}
-	if config.Protocol == protocolHTTP && config.Direction == directionBidirectional {
-		return fmt.Errorf("invalid direction for http: %s (must be download or upload)", config.Direction)
+	return nil
+}
+
+func validateConfigFileDirection(config *ConfigFile) error {
+	if config.Direction != "" && config.Direction != directionDownload && config.Direction != directionUpload {
+		return fmt.Errorf("invalid direction: %s (must be download or upload)", config.Direction)
 	}
 	return nil
 }
@@ -113,9 +120,6 @@ func validateNumericRanges(config *ConfigFile) error {
 	}
 	if config.Streams != 0 && (config.Streams < 1 || config.Streams > 64) {
 		return fmt.Errorf("invalid streams: %d (must be 1-64)", config.Streams)
-	}
-	if config.PacketSize < 0 || (config.PacketSize > 0 && (config.PacketSize < 64 || config.PacketSize > 9000)) {
-		return fmt.Errorf("invalid packet size: %d (must be 64-9000 bytes)", config.PacketSize)
 	}
 	if config.ChunkSize < 0 || (config.ChunkSize > 0 && (config.ChunkSize < 65536 || config.ChunkSize > 4194304)) {
 		return fmt.Errorf("invalid chunk size: %d (must be 65536-4194304 bytes)", config.ChunkSize)

@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+const clientBufferSize = 64 * 1024
+
 type HTTPTestConfig struct {
 	ServerURL      string
 	Duration       time.Duration
@@ -21,6 +23,11 @@ type HTTPTestConfig struct {
 	StreamDelay    time.Duration
 	OverheadFactor float64
 	Timeout        time.Duration
+}
+
+func newClientBuffer() *[]byte {
+	buf := make([]byte, clientBufferSize)
+	return &buf
 }
 
 type HTTPTestEngine struct {

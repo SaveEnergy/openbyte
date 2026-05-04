@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"time"
 
@@ -11,41 +10,11 @@ import (
 	"github.com/saveenergy/openbyte/pkg/types"
 )
 
-func handleClientTestCompletion(
-	ctx context.Context,
-	config *Config,
-	formatter OutputFormatter,
-	streamID string,
-	startTime time.Time,
-	metrics EngineMetrics,
-	runErr error,
-) error {
-	results := buildResults(streamID, config, metrics, startTime)
-	formatter.FormatComplete(results)
-	if ferr := formatterLastError(formatter); ferr != nil {
-		return fmt.Errorf(formatterOutputFailedFmt, ferr)
+func computePingMetrics(samples []time.Duration) (LatencyStats, float64) {
+	if len(samples) == 0 {
+		return LatencyStats{}, 0
 	}
-
-	completeErr := completeStream(ctx, config, streamID, metrics)
-	if completeErr != nil {
-		if shouldReturnRunError(runErr) {
-			return fmt.Errorf("%w (and completion report failed: %v)", runErr, completeErr)
-		}
-		return fmt.Errorf("failed to report completion: %w", completeErr)
-	}
-
-	if shouldReturnRunError(runErr) {
-		return runErr
-	}
-	return nil
-}
-
-func cancelStreamWithCleanup(ctx context.Context, config *Config, streamID string, rootErr error) error {
-	cancelErr := CancelStream(ctx, config.ServerURL, streamID)
-	if cancelErr != nil {
-		return fmt.Errorf("%w (and cancel cleanup failed: %v)", rootErr, cancelErr)
-	}
-	return rootErr
+	return calculateClientLatency(samples), calculateClientJitter(samples)
 }
 
 func shouldReturnRunError(err error) bool {
@@ -53,13 +22,6 @@ func shouldReturnRunError(err error) bool {
 		return false
 	}
 	return !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled)
-}
-
-func computePingMetrics(samples []time.Duration) (LatencyStats, float64) {
-	if len(samples) == 0 {
-		return LatencyStats{}, 0
-	}
-	return calculateClientLatency(samples), calculateClientJitter(samples)
 }
 
 func buildResults(streamID string, config *Config, metrics EngineMetrics, startTime time.Time) *StreamResults {
@@ -72,9 +34,6 @@ func buildResults(streamID string, config *Config, metrics EngineMetrics, startT
 		downMbps = throughput
 	case directionUpload:
 		upMbps = throughput
-	case directionBidirectional:
-		downMbps = throughput / 2
-		upMbps = throughput / 2
 	}
 
 	interp := diagnostic.Interpret(diagnostic.Params{
@@ -90,11 +49,11 @@ func buildResults(streamID string, config *Config, metrics EngineMetrics, startT
 		StreamID:      streamID,
 		Status:        statusCompleted,
 		Config: &StreamConfig{
-			Protocol:   config.Protocol,
-			Direction:  config.Direction,
-			Duration:   config.Duration,
-			Streams:    config.Streams,
-			PacketSize: config.PacketSize,
+			Protocol:  protocolHTTP,
+			Direction: config.Direction,
+			Duration:  config.Duration,
+			Streams:   config.Streams,
+			ChunkSize: config.ChunkSize,
 		},
 		Results: &ResultMetrics{
 			ThroughputMbps:    metrics.ThroughputMbps,

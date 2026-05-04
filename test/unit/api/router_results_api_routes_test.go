@@ -9,12 +9,10 @@ import (
 	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/results"
-	"github.com/saveenergy/openbyte/internal/stream"
 )
 
 func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
-	manager := stream.NewManager(10, 10)
-	handler := api.NewHandler(manager)
+	handler := api.NewHandler()
 	router := api.NewRouter(handler, config.DefaultConfig())
 
 	store, err := results.New(t.TempDir()+resultsDBPath, 10)
@@ -43,8 +41,7 @@ func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
 }
 
 func TestResultsPageRouteRejectsInvalidID(t *testing.T) {
-	manager := stream.NewManager(10, 10)
-	handler := api.NewHandler(manager)
+	handler := api.NewHandler()
 	router := api.NewRouter(handler, config.DefaultConfig())
 
 	store, err := results.New(t.TempDir()+resultsDBPath, 10)
@@ -65,8 +62,7 @@ func TestResultsPageRouteRejectsInvalidID(t *testing.T) {
 }
 
 func TestUnknownAPIRouteReturnsJSONNotFound(t *testing.T) {
-	manager := stream.NewManager(10, 10)
-	handler := api.NewHandler(manager)
+	handler := api.NewHandler()
 	router := api.NewRouter(handler, config.DefaultConfig())
 	h := router.SetupRoutes()
 
@@ -87,8 +83,7 @@ func TestUnknownAPIRouteReturnsJSONNotFound(t *testing.T) {
 }
 
 func TestResultsPageRouteRateLimited(t *testing.T) {
-	manager := stream.NewManager(10, 10)
-	handler := api.NewHandler(manager)
+	handler := api.NewHandler()
 	cfg := config.DefaultConfig()
 	cfg.GlobalRateLimit = 1
 	cfg.RateLimitPerIP = 1

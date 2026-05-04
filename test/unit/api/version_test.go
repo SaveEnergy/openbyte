@@ -11,7 +11,7 @@ import (
 )
 
 func TestVersionEndpoint(t *testing.T) {
-	handler := api.NewHandler(nil)
+	handler := api.NewHandler()
 	handler.SetVersion("1.2.3")
 	cfg := config.DefaultConfig()
 	cfg.ServerName = "Amsterdam 10G"

@@ -1,16 +1,9 @@
 package client
 
 import (
-	"errors"
-	"net"
 	"slices"
 	"time"
 )
-
-func isTimeoutError(err error) bool {
-	var netErr net.Error
-	return errors.As(err, &netErr) && netErr.Timeout()
-}
 
 func calculateClientLatency(samples []time.Duration) LatencyStats {
 	if len(samples) == 0 {

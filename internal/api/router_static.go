@@ -10,7 +10,7 @@ import (
 func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 	allowed := map[string]bool{
 		"index.html":                 true,
-		"download.html":              true,
+		"api.html":                   true,
 		resultsHTML:                  true,
 		"openbyte.js":                true,
 		"state.js":                   true,
@@ -20,6 +20,8 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 		"network-helpers.js":         true,
 		"network-health.js":          true,
 		"speedtest-orchestrator.js":  true,
+		"speedtest-adaptive.js":      true,
+		"speedtest-worker.js":        true,
 		"speedtest.js":               true,
 		"speedtest-http.js":          true,
 		"speedtest-http-download.js": true,
@@ -28,16 +30,13 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 		"speedtest-latency.js":       true,
 		"warmup.js":                  true,
 		"diagnostics.js":             true,
-		"settings.js":                true,
+		"events.js":                  true,
 		"ui.js":                      true,
-		"download.js":                true,
-		"download-platform.js":       true,
-		"download-github.js":         true,
 		"results.js":                 true,
+		"api.css":                    true,
 		"base.css":                   true,
-		"download.css":               true,
 		"speed.css":                  true,
-		"modal.css":                  true,
+		"toast.css":                  true,
 		"motion.css":                 true,
 		"favicon.svg":                true,
 	}
@@ -51,7 +50,7 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 			name = "index.html"
 		}
 		switch name {
-		case "download", "results":
+		case "api", "results":
 			name += ".html"
 		}
 		if strings.Contains(name, "..") || !isAllowedStaticAsset(name, allowed) {

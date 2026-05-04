@@ -50,11 +50,7 @@ services:
       target: server
     image: openbyte:latest
     container_name: openbyte
-    # Remove HTTP port - Traefik handles it
-    ports:
-      - "8081:8081" # TCP test - direct
-      - "8082:8082" # UDP test - direct
-      - "8082:8082/udp"
+    # Traefik reaches openByte on the internal Docker network.
     environment:
       - PUBLIC_HOST=${PUBLIC_HOST:-}
       - SERVER_NAME=${SERVER_NAME:-openByte Server}

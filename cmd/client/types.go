@@ -3,6 +3,7 @@ package client
 import (
 	"io"
 	"sync"
+	"time"
 
 	"github.com/saveenergy/openbyte/pkg/diagnostic"
 	"github.com/saveenergy/openbyte/pkg/types"
@@ -50,11 +51,9 @@ type NDJSONFormatter struct {
 }
 
 type Config struct {
-	Protocol   string
 	Direction  string
 	Duration   int
 	Streams    int
-	PacketSize int
 	ChunkSize  int
 	ServerURL  string
 	Timeout    int
@@ -68,39 +67,9 @@ type Config struct {
 	WarmUp     int
 }
 
-type StreamResponse struct {
-	StreamID      string `json:"stream_id"`
-	WebSocketURL  string `json:"websocket_url"`
-	TestServerTCP string `json:"test_server_tcp,omitempty"`
-	TestServerUDP string `json:"test_server_udp,omitempty"`
-	Status        string `json:"status"`
-	Mode          string `json:"mode"`
-}
-
-type StartStreamRequest struct {
-	Protocol   string `json:"protocol"`
-	Direction  string `json:"direction"`
-	Duration   int    `json:"duration"`
-	Streams    int    `json:"streams"`
-	PacketSize int    `json:"packet_size"`
-	Mode       string `json:"mode"`
-}
-
-type WebSocketMessage struct {
-	Type             string         `json:"type"`
-	Progress         float64        `json:"progress,omitempty"`
-	ElapsedSeconds   float64        `json:"elapsed_seconds,omitempty"`
-	RemainingSeconds float64        `json:"remaining_seconds,omitempty"`
-	Timestamp        string         `json:"timestamp,omitempty"`
-	Metrics          *types.Metrics `json:"metrics,omitempty"`
-	Results          *StreamResults `json:"results,omitempty"`
-	Error            string         `json:"error,omitempty"`
-	Message          string         `json:"message,omitempty"`
-}
-
 // SchemaVersion is the semantic version of the JSON output schema.
 // Bump major on breaking changes; minor on additive changes.
-const SchemaVersion = "1.0"
+const SchemaVersion = "2.0"
 
 type StreamResults struct {
 	SchemaVersion   string                     `json:"schema_version"`
@@ -115,12 +84,12 @@ type StreamResults struct {
 }
 
 type StreamConfig struct {
-	Protocol   string `json:"protocol"`
-	Direction  string `json:"direction"`
-	Duration   int    `json:"duration"`
-	Streams    int    `json:"streams"`
-	PacketSize int    `json:"packet_size"`
-	Server     string `json:"server,omitempty"`
+	Protocol  string `json:"protocol"`
+	Direction string `json:"direction"`
+	Duration  int    `json:"duration"`
+	Streams   int    `json:"streams"`
+	ChunkSize int    `json:"chunk_size"`
+	Server    string `json:"server,omitempty"`
 }
 
 // JSONErrorResponse is the structured error emitted when --json is active.
@@ -142,4 +111,27 @@ type ResultMetrics struct {
 	PacketsSent       int64                `json:"packets_sent"`
 	PacketsReceived   int64                `json:"packets_received"`
 	Network           *types.NetworkInfo   `json:"network,omitempty"`
+}
+
+type EngineMetrics struct {
+	ThroughputMbps   float64
+	BytesTransferred int64
+	BytesSent        int64
+	BytesReceived    int64
+	Latency          LatencyStats
+	RTT              types.RTTMetrics
+	Network          *types.NetworkInfo
+	JitterMs         float64
+	Elapsed          time.Duration
+	Running          bool
+}
+
+type LatencyStats struct {
+	MinMs float64
+	MaxMs float64
+	AvgMs float64
+	P50Ms float64
+	P95Ms float64
+	P99Ms float64
+	Count int
 }

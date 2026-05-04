@@ -19,15 +19,12 @@ func parseFlags(args []string, version string) (*Config, map[string]bool, int, e
 
 	flagSet := flag.NewFlagSet("openbyte client", flag.ContinueOnError)
 	flagSet.SetOutput(os.Stdout)
-	flagSet.StringVar(&config.Protocol, "protocol", "", "Protocol: tcp, udp, http")
-	flagSet.StringVar(&config.Protocol, "p", "", "Protocol: tcp, udp, http (short)")
-	flagSet.StringVar(&config.Direction, "direction", "", "Direction: download, upload, bidirectional")
-	flagSet.StringVar(&config.Direction, "d", "", "Direction: download, upload, bidirectional (short)")
+	flagSet.StringVar(&config.Direction, "direction", "", "Direction: download or upload")
+	flagSet.StringVar(&config.Direction, "d", "", "Direction: download or upload (short)")
 	flagSet.IntVar(&config.Duration, "duration", 0, "Test duration in seconds (1-300)")
 	flagSet.IntVar(&config.Duration, "t", 0, "Test duration in seconds (1-300) (short)")
 	flagSet.IntVar(&config.Streams, "streams", 0, "Parallel streams (1-64)")
 	flagSet.IntVar(&config.Streams, "s", 0, "Parallel streams (1-64) (short)")
-	flagSet.IntVar(&config.PacketSize, "packet-size", 0, "Packet size in bytes (64-9000)")
 	flagSet.IntVar(&config.ChunkSize, flagChunkSize, 0, "HTTP chunk size in bytes (65536-4194304)")
 	flagSet.BoolVar(&config.JSON, "json", false, "Output results as JSON")
 	flagSet.BoolVar(&config.NDJSON, "ndjson", false, "Streaming newline-delimited JSON output")
@@ -77,8 +74,6 @@ func parseFlags(args []string, version string) (*Config, map[string]bool, int, e
 
 func applyFlagAlias(flagsSet map[string]bool, name string) {
 	switch name {
-	case "p":
-		flagsSet["protocol"] = true
 	case "d":
 		flagsSet["direction"] = true
 	case "t":

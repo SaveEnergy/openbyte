@@ -110,9 +110,7 @@ func finalizeHTTPStreamRun(input finalizeHTTPStreamRunInput) error {
 	avgSpeed := float64(totalBytes*8) / measuredElapsed.Seconds() / 1_000_000 * input.httpCfg.OverheadFactor
 	metrics.ThroughputMbps = avgSpeed
 
-	httpConfig := *input.config
-	httpConfig.PacketSize = input.config.ChunkSize
-	results := buildResults(protocolHTTP, &httpConfig, metrics, input.startTime)
+	results := buildResults(protocolHTTP, input.config, metrics, input.startTime)
 	input.formatter.FormatComplete(results)
 	if ferr := formatterLastError(input.formatter); ferr != nil {
 		return fmt.Errorf(formatterOutputFailedFmt, ferr)

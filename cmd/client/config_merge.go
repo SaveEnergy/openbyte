@@ -21,11 +21,9 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 
 func applyDefaults(result *Config) {
 	result.ServerURL = defaultServerURL
-	result.Protocol = defaultProtocol
 	result.Direction = defaultDirection
 	result.Duration = defaultDuration
 	result.Streams = defaultStreams
-	result.PacketSize = defaultPacketSize
 	result.ChunkSize = defaultChunkSize
 	result.Timeout = defaultTimeout
 	result.WarmUp = defaultWarmUp
@@ -38,9 +36,6 @@ func applyConfigFileDefaults(result *Config, configFile *ConfigFile) {
 	if configFile.ServerURL != "" {
 		result.ServerURL = configFile.ServerURL
 	}
-	if configFile.Protocol != "" {
-		result.Protocol = configFile.Protocol
-	}
 	if configFile.Direction != "" {
 		result.Direction = configFile.Direction
 	}
@@ -49,9 +44,6 @@ func applyConfigFileDefaults(result *Config, configFile *ConfigFile) {
 	}
 	if configFile.Streams > 0 {
 		result.Streams = configFile.Streams
-	}
-	if configFile.PacketSize > 0 {
-		result.PacketSize = configFile.PacketSize
 	}
 	if configFile.ChunkSize > 0 {
 		result.ChunkSize = configFile.ChunkSize
@@ -69,11 +61,9 @@ func applyConfigFileDefaults(result *Config, configFile *ConfigFile) {
 
 func applyFlagOverrides(result, flagConfig *Config, flagsSet map[string]bool) {
 	applyStringOverride(flagsSet, "server-url", flagConfig.ServerURL, func(v string) { result.ServerURL = v })
-	applyStringOverride(flagsSet, "protocol", flagConfig.Protocol, func(v string) { result.Protocol = v })
 	applyStringOverride(flagsSet, "direction", flagConfig.Direction, func(v string) { result.Direction = v })
 	applyPositiveIntOverride(flagsSet, "duration", flagConfig.Duration, func(v int) { result.Duration = v })
 	applyPositiveIntOverride(flagsSet, "streams", flagConfig.Streams, func(v int) { result.Streams = v })
-	applyPositiveIntOverride(flagsSet, "packet-size", flagConfig.PacketSize, func(v int) { result.PacketSize = v })
 	applyPositiveIntOverride(flagsSet, "chunk-size", flagConfig.ChunkSize, func(v int) { result.ChunkSize = v })
 	applyPositiveIntOverride(flagsSet, "timeout", flagConfig.Timeout, func(v int) { result.Timeout = v })
 	applyBoolOverride(flagsSet, "json", flagConfig.JSON, func(v bool) { result.JSON = v })

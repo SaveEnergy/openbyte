@@ -33,7 +33,7 @@ To start a new run:
    - **`test/perf/README.md`** — how `perf-bench` / `perf-record` / `perf-compare` work.
    - **`scripts/perf/run_benchmarks.sh`** — flags, outputs (do **not** change without human OK).
    - **`test/perf/bench_packages.txt`** — which packages are in the suite (do **not** change without human OK).
-   - **Hot-path code** you intend to touch (e.g. `internal/api`, `internal/websocket`, `internal/stream`, `internal/metrics`, `internal/jsonbody`) — read before editing.
+   - **Hot-path code** you intend to touch (e.g. `internal/api`, `internal/metrics`, `internal/jsonbody`, `internal/results`) — read before editing.
 5. **Verify toolchain**:
    - `go test` works for benchmark packages.
    - Comparisons: **`make perf-compare`** (uses **`benchstat`** on PATH, otherwise **`go run golang.org/x/perf/cmd/benchstat@latest`**). Optional: `go install golang.org/x/perf/cmd/benchstat@latest` for faster repeats.
@@ -69,7 +69,7 @@ make perf-compare | tee build/perf/benchstat.log
 
 **What you MAY do**
 
-- Edit **application code** on agreed hot paths (handlers, websocket, stream, metrics, jsonbody, speedtest paths, etc.).
+- Edit **application code** on agreed hot paths (handlers, metrics, jsonbody, results, speedtest paths, etc.).
 - Refactor **if** it reduces work per request / per tick / per allocation and **`go test ./... -short`** + **`make ci-lint`** stay green.
 
 **What you MUST NOT do (without explicit human approval)**
@@ -189,7 +189,7 @@ Branch: **`autoresearch/perf-N`** where **`N`** is the id from **`test/perf/auto
 
 ## Optional: anchor benchmarks
 
-For simpler decisions, the human may name **1–3 anchor** benchmarks (e.g. `BenchmarkManagerUpdateMetrics`, `BenchmarkManagerSendMetricsUpdates`, `BenchmarkStoreSave`, `BenchmarkUDPSendDownloadPacket`, `BenchmarkMarshalWebsocketMessage`, `BenchmarkReadUploadBody`). Optimize primarily for those; still **avoid** large regressions on the rest of the suite.
+For simpler decisions, the human may name **1–3 anchor** benchmarks (e.g. `BenchmarkStoreSave`, `BenchmarkRespondJSON`, `BenchmarkReadUploadBody`, `BenchmarkDecodeSingleObject`, `BenchmarkLatencyHistogramRecord`, `BenchmarkSpeedtestDownload`). Optimize primarily for those; still **avoid** large regressions on the rest of the suite.
 
 ---
 

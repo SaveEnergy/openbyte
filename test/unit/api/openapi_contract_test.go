@@ -30,20 +30,13 @@ func TestOpenAPIRouteContract(t *testing.T) {
 	}
 
 	expected := map[string]struct{}{
-		"GET /health":                       {},
-		"GET /api/v1/ping":                  {},
-		"GET /api/v1/download":              {},
-		"POST /api/v1/upload":               {},
-		"GET /api/v1/version":               {},
-		"POST /api/v1/stream/start":         {},
-		"GET /api/v1/stream/{id}/status":    {},
-		"GET /api/v1/stream/{id}/results":   {},
-		"POST /api/v1/stream/{id}/cancel":   {},
-		"POST /api/v1/stream/{id}/metrics":  {},
-		"POST /api/v1/stream/{id}/complete": {},
-		"GET /api/v1/stream/{id}/stream":    {},
-		"POST /api/v1/results":              {},
-		"GET /api/v1/results/{id}":          {},
+		"GET /health":              {},
+		"GET /api/v1/ping":         {},
+		"GET /api/v1/download":     {},
+		"POST /api/v1/upload":      {},
+		"GET /api/v1/version":      {},
+		"POST /api/v1/results":     {},
+		"GET /api/v1/results/{id}": {},
 	}
 
 	missing := diff(expected, got)

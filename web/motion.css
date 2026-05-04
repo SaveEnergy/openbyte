@@ -22,15 +22,6 @@
   }
 }
 
-@keyframes modalIn {
-  from {
-    transform: translateY(8px) scale(0.98);
-  }
-  to {
-    transform: translateY(0) scale(1);
-  }
-}
-
 @keyframes pulse {
   0%,
   100% {

@@ -16,32 +16,6 @@ func (c *Config) validatePorts() error {
 	if err != nil || httpPort < 1 || httpPort > 65535 {
 		return fmt.Errorf("invalid port %q: must be 1-65535", c.Port)
 	}
-	if err := validateTestPort("TCP", c.TCPTestPort); err != nil {
-		return err
-	}
-	if err := validateTestPort("UDP", c.UDPTestPort); err != nil {
-		return err
-	}
-	return validatePortCollisions(c.Port, httpPort, c.TCPTestPort, c.UDPTestPort)
-}
-
-func validateTestPort(name string, port int) error {
-	if port <= 0 || port > 65535 {
-		return fmt.Errorf("invalid %s test port: %d", name, port)
-	}
-	return nil
-}
-
-func validatePortCollisions(httpPortRaw string, httpPort, tcpPort, udpPort int) error {
-	if tcpPort == udpPort {
-		return fmt.Errorf("TCP and UDP test ports cannot be the same")
-	}
-	if httpPort == tcpPort {
-		return fmt.Errorf("HTTP port (%s) and TCP test port (%d) cannot be the same", httpPortRaw, tcpPort)
-	}
-	if httpPort == udpPort {
-		return fmt.Errorf("HTTP port (%s) and UDP test port (%d) cannot be the same", httpPortRaw, udpPort)
-	}
 	return nil
 }
 
@@ -52,14 +26,8 @@ func (c *Config) validateLimits() error {
 	if len(c.ServerName) > 200 {
 		return fmt.Errorf("server name must be <= 200 bytes")
 	}
-	if c.MaxConcurrentTests <= 0 {
-		return fmt.Errorf("max concurrent tests must be > 0")
-	}
 	if c.MaxTestDuration <= 0 {
 		return fmt.Errorf("max test duration must be > 0")
-	}
-	if c.MaxStreams <= 0 || c.MaxStreams > 64 {
-		return fmt.Errorf("max streams must be 1-64")
 	}
 	if c.CapacityGbps <= 0 {
 		return fmt.Errorf("capacity gbps must be > 0")
@@ -78,9 +46,6 @@ func (c *Config) validateLimits() error {
 	}
 	if c.MaxConcurrentPerIP <= 0 {
 		return fmt.Errorf("max concurrent per IP must be > 0")
-	}
-	if c.MaxConcurrentPerIP > c.MaxConcurrentTests {
-		return fmt.Errorf("max concurrent per IP must be <= max concurrent tests")
 	}
 	return nil
 }

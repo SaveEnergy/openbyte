@@ -138,22 +138,6 @@ func TestMaxConcurrentHTTPScalesWithCapacity(t *testing.T) {
 	}
 }
 
-func TestMaxStreamsValidation(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.MaxStreams = 32
-	if err := cfg.Validate(); err != nil {
-		t.Fatalf("MaxStreams=32 should be valid: %v", err)
-	}
-	cfg.MaxStreams = 64
-	if err := cfg.Validate(); err != nil {
-		t.Fatalf("MaxStreams=64 should be valid: %v", err)
-	}
-	cfg.MaxStreams = 65
-	if cfg.Validate() == nil {
-		t.Fatalf("MaxStreams=65 should be invalid")
-	}
-}
-
 func TestDataDirValidation(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.DataDir = ""
@@ -254,14 +238,8 @@ func TestConfigValidateCapacityGbpsPositive(t *testing.T) {
 	}
 }
 
-func TestValidateMaxConcurrentPerIPWithinBounds(t *testing.T) {
+func TestValidateMaxConcurrentPerIPPositive(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfg.MaxConcurrentTests = 10
-	cfg.MaxConcurrentPerIP = 11
-	if cfg.Validate() == nil {
-		t.Fatal("max concurrent per IP > max concurrent tests should fail validation")
-	}
-
 	cfg.MaxConcurrentPerIP = 0
 	if cfg.Validate() == nil {
 		t.Fatal("max concurrent per IP <= 0 should fail validation")
@@ -269,7 +247,7 @@ func TestValidateMaxConcurrentPerIPWithinBounds(t *testing.T) {
 
 	cfg.MaxConcurrentPerIP = 5
 	if err := cfg.Validate(); err != nil {
-		t.Fatalf("bounded max concurrent per IP should pass: %v", err)
+		t.Fatalf("positive max concurrent per IP should pass: %v", err)
 	}
 }
 
