@@ -38,8 +38,9 @@ const (
 )
 
 const (
-	speedtestIOIdleTimeout = 5 * time.Second
-	speedtestCloseGrace    = 1 * time.Second
+	speedtestIOIdleTimeout         = 5 * time.Second
+	speedtestDeadlineRefreshPeriod = time.Second
+	speedtestCloseGrace            = 1 * time.Second
 )
 
 func NewSpeedTestHandler(maxConcurrent, maxDurationSec int) *SpeedTestHandler {

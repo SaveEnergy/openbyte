@@ -22,6 +22,8 @@ import {
   attachAdaptiveDiagnostics,
 } from "./speedtest-http-shared.js";
 
+let uploadPayloadCache = null;
+
 async function sendUploadRequest(blob, duration, signal) {
   return fetchWithTimeout(
     `${getApiBase()}/upload`,
@@ -35,6 +37,28 @@ async function sendUploadRequest(blob, duration, signal) {
     },
     duration * 1000 + TEST_CONFIG.HTTP_TIMEOUT_BUFFER_MS,
   );
+}
+
+function createUploadPayloadBlob(blobSize) {
+  const chunks = [];
+  for (let i = 0; i < blobSize; i += TEST_CONFIG.UPLOAD_RANDOM_CHUNK_BYTES) {
+    const piece = new Uint8Array(
+      Math.min(TEST_CONFIG.UPLOAD_RANDOM_CHUNK_BYTES, blobSize - i),
+    );
+    crypto.getRandomValues(piece);
+    chunks.push(piece);
+  }
+  return new Blob(chunks);
+}
+
+function getUploadPayloadBlob(blobSize) {
+  if (!uploadPayloadCache || uploadPayloadCache.size !== blobSize) {
+    uploadPayloadCache = {
+      size: blobSize,
+      blob: createUploadPayloadBlob(blobSize),
+    };
+  }
+  return uploadPayloadCache.blob;
 }
 
 function recordUploadProgress(
@@ -262,16 +286,7 @@ async function runUploadWindow(options) {
   const nominalEndTime = startTime + duration * 1000;
   const endTimeRef = { value: nominalEndTime };
   const extra = { earlyStop, diagnostics, endTimeRef };
-
-  const chunks = [];
-  for (let i = 0; i < blobSize; i += TEST_CONFIG.UPLOAD_RANDOM_CHUNK_BYTES) {
-    const piece = new Uint8Array(
-      Math.min(TEST_CONFIG.UPLOAD_RANDOM_CHUNK_BYTES, blobSize - i),
-    );
-    crypto.getRandomValues(piece);
-    chunks.push(piece);
-  }
-  const blob = new Blob(chunks);
+  const blob = getUploadPayloadBlob(blobSize);
 
   const streamPromises = [];
   for (let i = 0; i < numStreams; i++) {

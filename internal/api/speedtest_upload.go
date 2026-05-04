@@ -2,10 +2,10 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -31,16 +31,21 @@ func readUploadBody(
 	if pool != nil {
 		defer pool.Put(bufPtr)
 	}
+	var nextDeadlineRefresh time.Time
 	for {
 		select {
 		case <-readCtx.Done():
 			return totalBytes, false
 		default:
 		}
-		if time.Now().After(deadline) {
+		now := time.Now()
+		if now.After(deadline) {
 			return totalBytes, false
 		}
-		_ = refreshReadDeadline(controller, deadline)
+		if controller != nil && !now.Before(nextDeadlineRefresh) {
+			_ = refreshReadDeadline(controller, deadline)
+			nextDeadlineRefresh = now.Add(speedtestDeadlineRefreshPeriod)
+		}
 		n, err := body.Read(buf)
 		totalBytes += int64(n)
 		if err != nil {
@@ -70,16 +75,28 @@ func writeUploadResponse(w http.ResponseWriter, controller *http.ResponseControl
 	if elapsed <= 0 {
 		elapsed = time.Millisecond
 	}
+	durationMs := elapsed.Milliseconds()
 	throughputMbps := float64(totalBytes*8) / elapsed.Seconds() / 1_000_000
 
 	w.Header().Set(headerContentType, contentTypeJSON)
-	_ = controller.SetWriteDeadline(time.Now().Add(2 * time.Second))
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]any{
-		"bytes":           totalBytes,
-		"duration_ms":     elapsed.Milliseconds(),
-		"throughput_mbps": throughputMbps,
-	}); err != nil {
-		logging.Warn("speedtest: encode upload response", logging.Field{Key: "error", Value: err})
+	if controller != nil {
+		_ = controller.SetWriteDeadline(time.Now().Add(2 * time.Second))
 	}
+	w.WriteHeader(http.StatusOK)
+	var buf [128]byte
+	payload := appendUploadResponseJSON(buf[:0], totalBytes, durationMs, throughputMbps)
+	if _, err := w.Write(payload); err != nil {
+		logging.Warn("speedtest: write upload response", logging.Field{Key: "error", Value: err})
+	}
+}
+
+func appendUploadResponseJSON(dst []byte, totalBytes, durationMs int64, throughputMbps float64) []byte {
+	dst = append(dst, `{"bytes":`...)
+	dst = strconv.AppendInt(dst, totalBytes, 10)
+	dst = append(dst, `,"duration_ms":`...)
+	dst = strconv.AppendInt(dst, durationMs, 10)
+	dst = append(dst, `,"throughput_mbps":`...)
+	dst = strconv.AppendFloat(dst, throughputMbps, 'f', -1, 64)
+	dst = append(dst, '}')
+	return dst
 }
