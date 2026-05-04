@@ -8,8 +8,9 @@ import (
 )
 
 func parseDownloadParams(r *http.Request, maxDurationSec int) (time.Duration, int, error) {
+	query := r.URL.Query()
 	duration := 10 * time.Second
-	durationRaw := r.URL.Query().Get("duration")
+	durationRaw := query.Get("duration")
 	if d, ok, err := parseOptionalIntInRange(durationRaw, 1, maxDurationSec, "duration must be 1-"+strconv.Itoa(maxDurationSec)); err != nil {
 		return 0, 0, err
 	} else if ok {
@@ -17,7 +18,7 @@ func parseDownloadParams(r *http.Request, maxDurationSec int) (time.Duration, in
 	}
 
 	chunkSize := 1048576
-	chunkRaw := r.URL.Query().Get("chunk")
+	chunkRaw := query.Get("chunk")
 	if c, ok, err := parseOptionalIntInRange(chunkRaw, 65536, 4194304, "chunk must be 65536-4194304"); err != nil {
 		return 0, 0, err
 	} else if ok {
