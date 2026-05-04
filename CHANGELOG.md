@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-05-04
+
+### Fixed
+
+- **Release race gate**: aligned the release workflow with CI by running the race
+  detector in short mode after full non-race tests; full non-short race coverage
+  remains in nightly to avoid hosted-runner SIGTERM failures during release.
+
 ## [0.10.0] - 2026-05-04
 
 ### Added
@@ -126,7 +134,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **golang.org/x/term** v0.41.0, **modernc.org/sqlite** v1.47.0, **github.com/mark3labs/mcp-go** v0.45.0 (and transitive updates).
 - Routine **GitHub Actions** version bumps via Dependabot.
 
-[Unreleased]: https://github.com/SaveEnergy/openbyte/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/SaveEnergy/openbyte/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/SaveEnergy/openbyte/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/SaveEnergy/openbyte/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/SaveEnergy/openbyte/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/SaveEnergy/openbyte/compare/v0.8.0...v0.9.0
