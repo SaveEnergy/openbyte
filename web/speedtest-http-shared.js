@@ -68,9 +68,86 @@ export function applyHttpMeasureTick(
     extra.diagnostics.record(byteCount, now, measuring);
   }
   if (extra?.earlyStop && measuring && extra.earlyStop.record(byteCount, now)) {
-    extra.endTimeRef.value = now;
+    extra.endTimeRef.value = Math.min(now, extra.endTimeRef.value);
   }
   const displayBytes = measuring
+    ? metricsState.totalBytes
+    : metricsState.allBytes;
+  onProgress(displayBytes);
+}
+
+export function measuredIntervalBytes(
+  byteCount,
+  intervalStart,
+  intervalEnd,
+  measureStart,
+  measureEnd,
+) {
+  if (byteCount <= 0) return 0;
+  const intervalMs = intervalEnd - intervalStart;
+  if (intervalMs <= 0) return 0;
+
+  const overlapStart = Math.max(intervalStart, measureStart);
+  const overlapEnd = Math.min(intervalEnd, measureEnd);
+  if (overlapEnd <= overlapStart) return 0;
+
+  return byteCount * ((overlapEnd - overlapStart) / intervalMs);
+}
+
+/**
+ * Upload fetch only reports completion, not socket-level upload progress.
+ * Attribute each completed request by the part of its lifetime that overlaps
+ * the measured window so warm-up and post-deadline bytes do not inflate Mbps.
+ */
+export function applyHttpMeasureIntervalTick(
+  metricsState,
+  warmUp,
+  byteCount,
+  intervalStart,
+  intervalEnd,
+  onProgress,
+  extra,
+) {
+  const wasMeasuring = warmUp.settled();
+  metricsState.allBytes += byteCount;
+
+  if (wasMeasuring) {
+    const measureStart =
+      metricsState.measureStartTime > 0
+        ? metricsState.measureStartTime
+        : intervalStart;
+    const measureEnd = extra?.endTimeRef?.value ?? intervalEnd;
+    const measuredBytes = measuredIntervalBytes(
+      byteCount,
+      intervalStart,
+      intervalEnd,
+      measureStart,
+      measureEnd,
+    );
+    metricsState.totalBytes += measuredBytes;
+
+    if (extra?.diagnostics) {
+      extra.diagnostics.record(measuredBytes, intervalEnd, measuredBytes > 0);
+    }
+    if (
+      extra?.earlyStop &&
+      measuredBytes > 0 &&
+      extra.earlyStop.record(measuredBytes, intervalEnd)
+    ) {
+      extra.endTimeRef.value = Math.min(intervalEnd, extra.endTimeRef.value);
+    }
+  } else {
+    warmUp.record(byteCount, intervalEnd);
+    if (warmUp.settled()) {
+      metricsState.totalBytes = 0;
+      metricsState.measureStartTime = intervalEnd;
+    }
+    if (extra?.diagnostics) {
+      extra.diagnostics.record(byteCount, intervalEnd, false);
+    }
+  }
+
+  const displayBytes = wasMeasuring
     ? metricsState.totalBytes
     : metricsState.allBytes;
   onProgress(displayBytes);

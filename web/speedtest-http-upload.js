@@ -18,7 +18,7 @@ import {
   detectOverheadFactor,
   throwIfZeroBytes,
   resolveStopReason,
-  applyHttpMeasureTick,
+  applyHttpMeasureIntervalTick,
   attachAdaptiveDiagnostics,
 } from "./speedtest-http-shared.js";
 
@@ -40,13 +40,22 @@ async function sendUploadRequest(blob, duration, signal) {
 function recordUploadProgress(
   metricsState,
   warmUp,
-  blobSize,
+  byteCount,
+  requestStart,
   now,
   onProgress,
   extra,
 ) {
   metricsState.successfulStreams += 1;
-  applyHttpMeasureTick(metricsState, warmUp, blobSize, now, onProgress, extra);
+  applyHttpMeasureIntervalTick(
+    metricsState,
+    warmUp,
+    byteCount,
+    requestStart,
+    now,
+    onProgress,
+    extra,
+  );
 }
 
 function handleUploadNonOkResponse(res, metricsState, retryAfterFn) {
@@ -73,15 +82,23 @@ function handleUploadCatchError(
 }
 
 async function processUploadResponse(res, options) {
-  const { blob, metricsState, retryAfterFn, warmUp, onProgress, extra } =
-    options;
+  const {
+    blob,
+    requestStart,
+    metricsState,
+    retryAfterFn,
+    warmUp,
+    onProgress,
+    extra,
+  } = options;
   if (res.ok) {
-    await res.text().catch(() => {});
+    const uploadedBytes = await readUploadResponseBytes(res, blob.size);
     const now = performance.now();
     recordUploadProgress(
       metricsState,
       warmUp,
-      blob.size,
+      uploadedBytes,
+      requestStart,
       now,
       onProgress,
       extra,
@@ -95,6 +112,21 @@ async function processUploadResponse(res, options) {
     return { ok: false, overload: true };
   }
   return { ok: false, retry: true };
+}
+
+async function readUploadResponseBytes(res, fallbackBytes) {
+  const text = await res.text().catch(() => "");
+  if (!text) return fallbackBytes;
+  try {
+    const payload = JSON.parse(text);
+    const bytes = Number(payload?.bytes);
+    if (Number.isFinite(bytes) && bytes >= 0) {
+      return Math.min(bytes, fallbackBytes);
+    }
+  } catch (err) {
+    console.debug("upload response parse failed", err);
+  }
+  return fallbackBytes;
 }
 
 async function continueUploadAfterResponse(
@@ -161,11 +193,13 @@ async function runSingleUploadStream(options) {
   let consecutiveErrors = 0;
   while (performance.now() < endTimeRef.value && !signal.aborted) {
     try {
+      const requestStart = performance.now();
       const res = await sendUploadRequest(blob, duration, signal);
       const responseState = await continueUploadAfterResponse(
         res,
         {
           blob,
+          requestStart,
           metricsState,
           retryAfterFn: retryAfterMs,
           warmUp,
