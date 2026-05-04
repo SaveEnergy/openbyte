@@ -1,10 +1,9 @@
 /** Server health and network info (barrel). */
 
 import { getApiBase, elements, state } from "./state.js";
-import { detectNetworkInfo, updateNetworkDisplay } from "./network-probes.js";
 import { isHealthyServerCandidate } from "./network-health.js";
 
-export { detectNetworkInfo, updateNetworkDisplay };
+export { detectNetworkInfo, updateNetworkDisplay } from "./network-probes.js";
 
 const fallbackServerName = "openByte Server";
 

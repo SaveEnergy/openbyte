@@ -68,7 +68,17 @@ async function runSpeedTest({ id, direction, config }) {
   }
 }
 
+function isTrustedMessageOrigin(event) {
+  // Dedicated worker messages are same-origin by construction, but Chromium
+  // reports an empty origin for parent→worker messages. Keep the explicit
+  // origin gate for browsers that populate it, and only allow the empty worker
+  // origin fallback.
+  return event.origin === "" || event.origin === globalThis.location.origin;
+}
+
 globalThis.addEventListener("message", (event) => {
+  if (!isTrustedMessageOrigin(event)) return;
+
   const message = event.data || {};
 
   if (message.type === "cancel") {

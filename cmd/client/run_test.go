@@ -84,27 +84,32 @@ func TestBuildResultsDirectionThroughput(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg.Direction = tc.direction
 			got := buildResults("stream-id", cfg, metrics, time.Now().Add(-1*time.Second))
-			if got.SchemaVersion != SchemaVersion {
-				t.Fatalf("schema version = %q, want %q", got.SchemaVersion, SchemaVersion)
-			}
-			if got.Config == nil || got.Results == nil || got.Interpretation == nil {
-				t.Fatal("expected populated config/results/interpretation")
-			}
-			if got.Config.Direction != tc.direction {
-				t.Fatalf("direction = %q, want %q", got.Config.Direction, tc.direction)
-			}
-			if got.Config.Protocol != protocolHTTP {
-				t.Fatalf("protocol = %q, want %q", got.Config.Protocol, protocolHTTP)
-			}
-			if got.Config.ChunkSize != cfg.ChunkSize {
-				t.Fatalf("chunk size = %d, want %d", got.Config.ChunkSize, cfg.ChunkSize)
-			}
-			got4k := contains(got.Interpretation.SuitableFor, "streaming_4k")
-			want4k := tc.wantDown >= 25
-			if got4k != want4k {
-				t.Fatalf("streaming_4k suitability = %v, want %v", got4k, want4k)
-			}
+			assertBuildResultsDirection(t, got, tc.direction, cfg.ChunkSize, tc.wantDown)
 		})
+	}
+}
+
+func assertBuildResultsDirection(t *testing.T, got *StreamResults, direction string, chunkSize int, wantDown float64) {
+	t.Helper()
+	if got.SchemaVersion != SchemaVersion {
+		t.Fatalf("schema version = %q, want %q", got.SchemaVersion, SchemaVersion)
+	}
+	if got.Config == nil || got.Results == nil || got.Interpretation == nil {
+		t.Fatal("expected populated config/results/interpretation")
+	}
+	if got.Config.Direction != direction {
+		t.Fatalf("direction = %q, want %q", got.Config.Direction, direction)
+	}
+	if got.Config.Protocol != protocolHTTP {
+		t.Fatalf("protocol = %q, want %q", got.Config.Protocol, protocolHTTP)
+	}
+	if got.Config.ChunkSize != chunkSize {
+		t.Fatalf("chunk size = %d, want %d", got.Config.ChunkSize, chunkSize)
+	}
+	got4k := contains(got.Interpretation.SuitableFor, "streaming_4k")
+	want4k := wantDown >= 25
+	if got4k != want4k {
+		t.Fatalf("streaming_4k suitability = %v, want %v", got4k, want4k)
 	}
 }
 

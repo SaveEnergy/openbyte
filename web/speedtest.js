@@ -58,12 +58,14 @@ function workerMessageError(message) {
 
 function mergeWorkerDiagnostics(diagnostics) {
   if (!diagnostics || typeof diagnostics !== "object") return;
-  state.diagnostics = { ...(state.diagnostics || {}), ...diagnostics };
+  state.diagnostics = state.diagnostics
+    ? { ...state.diagnostics, ...diagnostics }
+    : { ...diagnostics };
 }
 
 function runWorkerSpeedTest(direction, onProgress, signal, callbacks) {
   if (typeof Worker === "undefined") {
-    throw new Error("This browser does not support Web Workers.");
+    throw new TypeError("This browser does not support Web Workers.");
   }
 
   const id = `${Date.now()}-${++workerRunCounter}`;

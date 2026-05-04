@@ -62,6 +62,10 @@ func (e *HTTPTestEngine) runDownloadStream(ctx context.Context, deadline time.Ti
 		return e.handleNonOKResponse(ctx, "download", resp)
 	}
 
+	return e.readDownloadResponse(streamCtx, resp.Body)
+}
+
+func (e *HTTPTestEngine) readDownloadResponse(streamCtx context.Context, body io.Reader) error {
 	bufPtr, ok := e.bufferPool.Get().(*[]byte)
 	if !ok || bufPtr == nil || len(*bufPtr) < clientBufferSize {
 		bufPtr = newClientBuffer()
@@ -70,7 +74,7 @@ func (e *HTTPTestEngine) runDownloadStream(ctx context.Context, deadline time.Ti
 	defer e.bufferPool.Put(bufPtr)
 
 	for {
-		n, readErr := resp.Body.Read(buf)
+		n, readErr := body.Read(buf)
 		if n > 0 {
 			atomic.AddInt64(&e.bytesReceived, int64(n))
 			e.addBytes(int64(n), e.elapsedSinceStart())

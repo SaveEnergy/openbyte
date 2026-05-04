@@ -112,13 +112,9 @@ export async function runAdaptiveHTTPTest(options) {
   let best = { streams: TEST_CONFIG.ADAPTIVE_MIN_STREAMS, mbps: 0 };
   let previousMbps = 0;
   let streams = TEST_CONFIG.ADAPTIVE_MIN_STREAMS;
-  let announcedSaturation = false;
 
+  onPhase?.("Saturating", streams);
   while (!signal.aborted) {
-    if (!announcedSaturation) {
-      onPhase?.("Saturating", streams);
-      announcedSaturation = true;
-    }
     let mbps = 0;
     try {
       mbps = await runWindow({
