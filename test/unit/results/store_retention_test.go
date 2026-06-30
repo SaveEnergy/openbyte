@@ -80,7 +80,9 @@ func TestStoreTrimToMaxDeterministicWithEqualCreatedAt(t *testing.T) {
 	}
 	defer db.Close()
 
-	ts := time.Date(2026, 2, 15, 6, 0, 0, 0, time.UTC)
+	// Use a recent timestamp so age-based retention (90 days) does not delete rows
+	// before max-count trimming is exercised.
+	ts := time.Now().UTC().Truncate(time.Second)
 	ids := []string{"AAAA0001", "BBBB0001", "CCCC0001"}
 	for _, id := range ids {
 		_, execErr := db.Exec(
