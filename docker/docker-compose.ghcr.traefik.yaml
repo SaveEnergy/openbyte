@@ -14,6 +14,7 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@example.com}"
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
     ports:
       - "80:80"
       - "443:443"
@@ -73,6 +74,19 @@ services:
       # Upload body limit middleware (35MB)
       - "traefik.http.middlewares.openbyte-upload-body.buffering.maxRequestBodyBytes=36700160"
       - "traefik.http.middlewares.openbyte-upload-body.buffering.memRequestBodyBytes=1048576"
+      # Optional apex redirect (e.g. sqrtops.de -> speed.sqrtops.de). Set
+      # TRAEFIK_APEX_REDIRECT_RULE and TRAEFIK_CANONICAL_HOST in .env; default rule
+      # matches nothing when unset.
+      - "traefik.http.middlewares.openbyte-apex-redirect.redirectregex.regex=^https?://[^/]+(.*)"
+      - "traefik.http.middlewares.openbyte-apex-redirect.redirectregex.replacement=https://${TRAEFIK_CANONICAL_HOST:-openbyte-apex-redirect.invalid}$${1}"
+      - "traefik.http.middlewares.openbyte-apex-redirect.redirectregex.permanent=true"
+      - "traefik.http.routers.openbyte-apex.rule=${TRAEFIK_APEX_REDIRECT_RULE:-Host(`openbyte-apex-redirect.invalid`)}"
+      - "traefik.http.routers.openbyte-apex.entrypoints=web,websecure"
+      - "traefik.http.routers.openbyte-apex.middlewares=openbyte-apex-redirect"
+      - "traefik.http.routers.openbyte-apex.priority=250"
+      - "traefik.http.routers.openbyte-apex.tls=true"
+      - "traefik.http.routers.openbyte-apex.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.openbyte-apex.service=openbyte"
     networks:
       - traefik
     restart: unless-stopped
