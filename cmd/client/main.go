@@ -24,7 +24,7 @@ const (
 	defaultServerURL = "http://localhost:8080"
 	defaultDirection = "download"
 	defaultDuration  = 30
-	defaultStreams   = 4
+	defaultStreams   = 8
 	defaultChunkSize = 1024 * 1024
 	defaultTimeout   = 60
 	defaultWarmUp    = 2
