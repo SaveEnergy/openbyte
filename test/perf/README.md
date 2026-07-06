@@ -16,6 +16,34 @@ Establish baseline once: `make perf-record && cp build/perf/bench.txt test/perf/
 
 Nightly CI uploads **`build/perf/bench.txt`** as an artifact (see `AGENTS.md`).
 
+## Throughput harnesses (manual)
+
+These scripts measure end-to-end loopback throughput and are intentionally opt-in
+because shared runners are noisy. Use interleaved medians when comparing changes.
+
+```bash
+make build
+WEB_ROOT=./web ./bin/openbyte server
+
+# Browser UI: real adaptive test, JSON lines + median summaries.
+RUNS=5 scripts/perf/browser_throughput.mjs ui
+
+# Browser probes for upload payload sizing, request streams, and sharding gates.
+MODE=upload-blobs BLOB_MB=8,32,64 MAX_STREAMS=4 scripts/perf/browser_throughput.mjs
+MODE=upload-stream MAX_STREAMS=4 scripts/perf/browser_throughput.mjs
+MODE=download-shards SHARDS=1,2,4 scripts/perf/browser_throughput.mjs
+
+# CLI interleaved medians; add a saved baseline binary to BINS for A/B.
+BINS="/tmp/openbyte-baseline ./bin/openbyte" RUNS=5 scripts/perf/run_cli_throughput.sh
+```
+
+Keep no-go experiments in the notes or PR body instead of shipping slower code.
+For the 2026-07 browser/CLI pass: plain-HTTP request-stream uploads failed in
+Chromium (`Failed to fetch`, use TLS/h2 for a real probe), multi-context
+download sharding reduced aggregate throughput on the 4-vCPU Cloud VM, and CLI
+single-request streaming upload was slower than discrete 4 MiB POSTs on Go's
+HTTP/1.1 transport.
+
 ## Autoresearch branch counter
 
 **`autoresearch_counter.txt`** holds one integer: the **next** branch id **`N`**. New work branches are **`autoresearch/perf-N`**. After **`main`** has merged that branch, agents bump the file to **`N+1`**, commit on **`main`**, and **delete** **`autoresearch/perf-N`** locally and on **`origin`** (see **`AGENTS.md`**). If the file is missing, start at **`1`**.

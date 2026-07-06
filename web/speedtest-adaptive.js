@@ -148,6 +148,7 @@ export async function runAdaptiveHTTPTest(options) {
     adaptive: {
       direction,
       selectedStreams: best.streams,
+      bestMbps: best.mbps,
       measureDuration,
       ramp,
     },
