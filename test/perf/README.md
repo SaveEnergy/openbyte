@@ -78,7 +78,9 @@ refactor is justified on this VM.
 
 The bundled Traefik compose overlays use `openbyte-h1@file` by default for the
 openByte HTTPS routers. That keeps browser speed tests off the slower h2 path
-while preserving `openbyte-h2@file` as an explicit comparison mode.
+while preserving `openbyte-h2@file` as an explicit comparison mode. Local
+Traefik on the Cloud VM measured **15.11 Gbit/s download / 12.66 Gbit/s upload**
+median with h1-only ALPN, versus **9.95 Gbit/s / 7.97 Gbit/s** with h2 ALPN.
 
 ## Autoresearch branch counter
 
