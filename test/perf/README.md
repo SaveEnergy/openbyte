@@ -33,6 +33,10 @@ MODE=upload-blobs BLOB_MB=8,32,64 MAX_STREAMS=4 scripts/perf/browser_throughput.
 MODE=upload-stream MAX_STREAMS=4 scripts/perf/browser_throughput.mjs
 MODE=download-shards SHARDS=1,2,4 scripts/perf/browser_throughput.mjs
 
+# Local self-signed TLS/h2 proxy for browser request-stream experiments.
+go run scripts/perf/h2_reverse_proxy.go -target http://localhost:8080 -addr 127.0.0.1:8443
+URL=https://localhost:8443/ IGNORE_HTTPS_ERRORS=1 MODE=upload-stream MAX_STREAMS=4 scripts/perf/browser_throughput.mjs
+
 # CLI interleaved medians; add a saved baseline binary to BINS for A/B.
 BINS="/tmp/openbyte-baseline ./bin/openbyte" RUNS=5 scripts/perf/run_cli_throughput.sh
 ```
@@ -43,6 +47,14 @@ Chromium (`Failed to fetch`, use TLS/h2 for a real probe), multi-context
 download sharding reduced aggregate throughput on the 4-vCPU Cloud VM, and CLI
 single-request streaming upload was slower than discrete 4 MiB POSTs on Go's
 HTTP/1.1 transport.
+
+The local TLS/h2 proxy makes request-stream uploads work, but they were not a
+clear production win on the Cloud VM: Blob uploads and streaming uploads both
+landed around **5.5-5.9 Gbit/s** at 1-8 streams, with streaming only ~1-3%
+faster at 1-4 streams and slower at 8 streams. The full UI through the local
+h2 proxy measured **8.54 Gbit/s download / 5.76 Gbit/s upload** median, below
+plain HTTP loopback, so do not ship browser streaming uploads without target
+hardware measurements showing a real gain.
 
 ## Autoresearch branch counter
 
