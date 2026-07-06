@@ -38,12 +38,20 @@ func streamDownload(w http.ResponseWriter, r *http.Request, randomSource []byte,
 	writeCount := 0
 	flushInterval := 8
 	offset := 0
+	var nextDeadlineRefresh time.Time
 
-	for time.Now().Before(streamDeadline) {
+	for {
+		now := time.Now()
+		if !now.Before(streamDeadline) {
+			break
+		}
 		if r.Context().Err() != nil {
 			return
 		}
-		_ = refreshWriteDeadline(controller, writeDeadline)
+		if !now.Before(nextDeadlineRefresh) {
+			_ = refreshWriteDeadline(controller, writeDeadline)
+			nextDeadlineRefresh = now.Add(speedtestDeadlineRefreshPeriod)
+		}
 		if writeChunkFromSource(w, randomSource, chunkSize, &offset) != nil {
 			return
 		}

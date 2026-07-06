@@ -152,6 +152,7 @@ RestartSec=5
 Environment="PUBLIC_HOST=speedtest.example.com"
 Environment="PORT=8080"
 Environment="CAPACITY_GBPS=25"
+Environment="MAX_CONCURRENT_PER_IP=64"
 Environment="RATE_LIMIT_PER_IP=100"
 Environment="GLOBAL_RATE_LIMIT=1000"
 Environment="TRUST_PROXY_HEADERS=true"
@@ -267,7 +268,7 @@ server {
 
 **Reverse proxy upload limits (important):**
 
-Speed tests upload multi-megabyte request bodies (default ~4MB per request, repeated). Many reverse proxies default to 1MB and will reject or buffer uploads, which can produce errors or unrealistic upload speeds.
+Speed tests upload multi-megabyte request bodies (default 8MB per browser request, repeated). Many reverse proxies default to 1MB and will reject or buffer uploads, which can produce errors or unrealistic upload speeds.
 
 Minimum recommendations:
 
@@ -277,6 +278,27 @@ Minimum recommendations:
 - If you enable HTTP/2 or HTTP/3 at the proxy edge, keep the upstream to OpenByte as HTTP/1.1 for `/api/v1/upload`.
 
 When running behind a proxy, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges so rate limiting and client IP logging are accurate.
+
+## 25 Gbit/s Deployment Notes
+
+For 25 Gbit/s tests, prefer a direct data path for `/api/v1/download`, `/api/v1/upload`, and `/api/v1/ping`:
+
+- Run openByte with direct TLS (`TLS_CERT_FILE` and `TLS_KEY_FILE`) or route the speed-test API paths around the TLS proxy. A reverse proxy copies every byte and can become the bottleneck before openByte does.
+- Use host networking for Docker deployments when the server is dedicated to speed tests. Docker bridge/NAT adds per-packet CPU cost at high packet rates.
+- Keep `CAPACITY_GBPS=25` and `MAX_CONCURRENT_PER_IP=64` unless you deliberately restrict single-client stream count.
+- Disable request buffering on upload routes. Buffering changes a live upload test into a proxy store-and-forward test.
+
+Tune the host network stack to match the bandwidth-delay product of the link. Example starting point:
+
+```bash
+sudo sysctl -w net.core.rmem_max=134217728
+sudo sysctl -w net.core.wmem_max=134217728
+sudo sysctl -w net.ipv4.tcp_rmem='4096 131072 134217728'
+sudo sysctl -w net.ipv4.tcp_wmem='4096 65536 134217728'
+sudo sysctl -w net.ipv4.tcp_congestion_control=bbr
+```
+
+Also verify NIC RSS queues, IRQ affinity, CPU frequency governor, and jumbo MTU only when the full path supports it.
 
 ## Reverse Proxy (Traefik)
 
@@ -302,10 +324,10 @@ docker network inspect traefik --format '{{ (index .IPAM.Config 0).Subnet }}'
 
 For reliable upload tests through Traefik:
 
-- Ensure the upload router allows large request bodies (e.g. 35MB).
-- Apply buffering middleware only to `/api/v1/upload` to avoid impacting download streams.
+- Ensure any request body limit is comfortably above the browser upload payload.
+- Do not use Traefik buffering middleware on `/api/v1/upload`; it prevents live upload streaming and can spill speed-test data to disk.
 
-The provided Traefik compose files include a dedicated upload router with a 35MB request body limit.
+The provided Traefik compose files include dedicated upload routers without buffering middleware.
 
 **Environment variables:**
 

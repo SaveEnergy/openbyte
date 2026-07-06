@@ -58,7 +58,7 @@ func DefaultConfig() *Config {
 		PerfStatsInterval:  0,
 		RuntimeMetrics:     false,
 		RateLimitPerIP:     100,
-		MaxConcurrentPerIP: 10,
+		MaxConcurrentPerIP: 64,
 		GlobalRateLimit:    1000,
 		TrustProxyHeaders:  false,
 		TrustedProxyCIDRs:  nil,

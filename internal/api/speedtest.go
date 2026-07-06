@@ -31,7 +31,7 @@ type speedtestIPCounts struct {
 
 const (
 	speedtestRandomSize    = 4 * 1024 * 1024
-	uploadReadBufferSize   = 256 * 1024
+	uploadReadBufferSize   = 1024 * 1024
 	headerContentType      = "Content-Type"
 	contentTypeJSON        = "application/json"
 	contentTypeOctetStream = "application/octet-stream"
