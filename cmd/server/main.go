@@ -79,6 +79,7 @@ func Run(args []string, version string) int {
 		IdleTimeout:       cfg.IdleTimeout,
 		HTTP2:             speedtestHTTP2Config(cfg),
 	}
+	configureHTTPProtocols(cfg, srv)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
@@ -106,4 +107,13 @@ func speedtestHTTP2Config(cfg *config.Config) *http.HTTP2Config {
 		MaxReceiveBufferPerConnection: receiveWindow,
 		MaxReceiveBufferPerStream:     receiveWindow,
 	}
+}
+
+func configureHTTPProtocols(cfg *config.Config, srv *http.Server) {
+	if cfg == nil || cfg.HTTP2Enabled {
+		return
+	}
+	protocols := new(http.Protocols)
+	protocols.SetHTTP1(true)
+	srv.Protocols = protocols
 }

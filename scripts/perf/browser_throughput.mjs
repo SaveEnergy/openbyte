@@ -194,6 +194,28 @@ async function runDownloadShardProbe(context, shards) {
   }
 }
 
+async function runUploadShardProbe(context, shards) {
+  const pages = await Promise.all(
+    Array.from({ length: shards }, async () => {
+      const page = await context.newPage();
+      await page.goto(baseURL);
+      return page;
+    }),
+  );
+  try {
+    const results = await Promise.all(
+      pages.map((page) => runUploadBlobProbe(page, 8, 1)),
+    );
+    return {
+      shards,
+      gbps: results.reduce((sum, result) => sum + result.gbps, 0),
+      parts: results.map((result) => result.gbps),
+    };
+  } finally {
+    await Promise.all(pages.map((page) => page.close()));
+  }
+}
+
 function printSummary(label, rows, metric) {
   const values = rows.map((row) => row[metric]);
   const summary = {
@@ -239,6 +261,11 @@ try {
     const shardsList = parseList(process.env.SHARDS, "1,2,4");
     for (const shards of shardsList) {
       console.log(JSON.stringify({ mode, ...(await runDownloadShardProbe(context, shards)) }));
+    }
+  } else if (mode === "upload-shards") {
+    const shardsList = parseList(process.env.SHARDS, "1,2,4");
+    for (const shards of shardsList) {
+      console.log(JSON.stringify({ mode, ...(await runUploadShardProbe(context, shards)) }));
     }
   } else {
     throw new Error(`unknown mode: ${mode}`);

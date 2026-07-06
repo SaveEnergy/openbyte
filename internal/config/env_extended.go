@@ -70,7 +70,10 @@ func (c *Config) loadTLSEnv() {
 	if key := os.Getenv("TLS_KEY_FILE"); key != "" {
 		c.TLSKeyFile = key
 	}
-	if autoGen := os.Getenv("TLS_AUTO_GEN"); autoGen == envFalse || autoGen == envZero {
-		c.TLSAutoGen = false
+	if autoGen := os.Getenv("TLS_AUTO_GEN"); autoGen != "" {
+		c.TLSAutoGen = envBool("TLS_AUTO_GEN")
+	}
+	if http2Enabled := os.Getenv("HTTP2_ENABLED"); http2Enabled != "" {
+		c.HTTP2Enabled = envBool("HTTP2_ENABLED")
 	}
 }

@@ -21,6 +21,10 @@ services:
       - GLOBAL_RATE_LIMIT=${GLOBAL_RATE_LIMIT:-1000}
       - DATA_DIR=${DATA_DIR:-/app/data}
       - MAX_STORED_RESULTS=${MAX_STORED_RESULTS:-10000}
+      - TLS_CERT_FILE=${TLS_CERT_FILE:-}
+      - TLS_KEY_FILE=${TLS_KEY_FILE:-}
+      - TLS_AUTO_GEN=${TLS_AUTO_GEN:-false}
+      - HTTP2_ENABLED=${HTTP2_ENABLED:-true}
     volumes:
       - openbyte-data:/app/data
     restart: unless-stopped
