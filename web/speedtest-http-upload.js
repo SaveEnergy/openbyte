@@ -61,6 +61,11 @@ function getUploadPayloadBlob(blobSize) {
   return uploadPayloadCache.blob;
 }
 
+function resolveUploadPayloadSize(chunkSize, duration) {
+  if (duration < TEST_CONFIG.ADAPTIVE_FAST_MEASURE_SECONDS) return chunkSize;
+  return Math.max(chunkSize, TEST_CONFIG.UPLOAD_MIN_PAYLOAD_BYTES);
+}
+
 function recordUploadProgress(
   metricsState,
   warmUp,
@@ -266,7 +271,7 @@ async function runUploadWindow(options) {
   const startTime = performance.now();
   const numStreams = streams;
   const chunkSize = resolveChunkSize();
-  const blobSize = chunkSize;
+  const blobSize = resolveUploadPayloadSize(chunkSize, duration);
   const maxNetworkRetries = TEST_CONFIG.MAX_NETWORK_RETRIES;
   const retryDelayMs = TEST_CONFIG.NETWORK_RETRY_DELAY_MS;
   const metricsState = {

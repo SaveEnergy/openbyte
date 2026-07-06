@@ -95,3 +95,30 @@ func TestCapacityGbpsFlagBypassValidation(t *testing.T) {
 		t.Fatal("expected validation error for capacity-gbps=0")
 	}
 }
+
+func TestSpeedtestHTTP2ConfigUsesThroughputTuning(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.CapacityGbps = 25
+
+	h2 := speedtestHTTP2Config(cfg)
+	if h2.MaxConcurrentStreams != 200 {
+		t.Fatalf("MaxConcurrentStreams = %d, want 200", h2.MaxConcurrentStreams)
+	}
+	if h2.MaxReadFrameSize != 1024*1024 {
+		t.Fatalf("MaxReadFrameSize = %d, want 1048576", h2.MaxReadFrameSize)
+	}
+	const receiveWindow = 4*1024*1024 - 1
+	if h2.MaxReceiveBufferPerConnection != receiveWindow {
+		t.Fatalf("MaxReceiveBufferPerConnection = %d, want %d", h2.MaxReceiveBufferPerConnection, receiveWindow)
+	}
+	if h2.MaxReceiveBufferPerStream != receiveWindow {
+		t.Fatalf("MaxReceiveBufferPerStream = %d, want %d", h2.MaxReceiveBufferPerStream, receiveWindow)
+	}
+}
+
+func TestDefaultMaxConcurrentPerIPMatchesBrowserRamp(t *testing.T) {
+	cfg := config.DefaultConfig()
+	if cfg.MaxConcurrentPerIP != 64 {
+		t.Fatalf("MaxConcurrentPerIP = %d, want 64", cfg.MaxConcurrentPerIP)
+	}
+}

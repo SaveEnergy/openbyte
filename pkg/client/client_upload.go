@@ -8,13 +8,15 @@ import (
 	"time"
 )
 
+const uploadMeasurementGrace = 10 * time.Second
+
 func (c *Client) uploadBurst(ctx context.Context, durationSec int) (float64, bool) {
 	mbps, _, ok := c.uploadMeasured(ctx, durationSec)
 	return mbps, ok
 }
 
 func (c *Client) uploadMeasured(ctx context.Context, durationSec int) (mbps float64, totalBytes int64, ok bool) {
-	upCtx, cancel := context.WithTimeout(ctx, time.Duration(durationSec+3)*time.Second)
+	upCtx, cancel := context.WithTimeout(ctx, time.Duration(durationSec)*time.Second+uploadMeasurementGrace)
 	defer cancel()
 	totalBytes, elapsed := c.uploadLoop(upCtx, durationSec)
 	if elapsed <= 0 || totalBytes == 0 {
