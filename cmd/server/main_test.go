@@ -1,6 +1,7 @@
 package server
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -120,5 +121,30 @@ func TestDefaultMaxConcurrentPerIPMatchesBrowserRamp(t *testing.T) {
 	cfg := config.DefaultConfig()
 	if cfg.MaxConcurrentPerIP != 64 {
 		t.Fatalf("MaxConcurrentPerIP = %d, want 64", cfg.MaxConcurrentPerIP)
+	}
+}
+
+func TestConfigureHTTPProtocolsDefaultsToHTTP2(t *testing.T) {
+	cfg := config.DefaultConfig()
+	srv := &http.Server{}
+	configureHTTPProtocols(cfg, srv)
+	if srv.Protocols != nil {
+		t.Fatal("default protocols should stay nil so Go enables HTTP/1 and HTTP/2 defaults")
+	}
+}
+
+func TestConfigureHTTPProtocolsCanDisableHTTP2(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.HTTP2Enabled = false
+	srv := &http.Server{}
+	configureHTTPProtocols(cfg, srv)
+	if srv.Protocols == nil {
+		t.Fatal("expected explicit protocols when HTTP/2 is disabled")
+	}
+	if !srv.Protocols.HTTP1() {
+		t.Fatal("HTTP/1 should remain enabled")
+	}
+	if srv.Protocols.HTTP2() {
+		t.Fatal("HTTP/2 should be disabled")
 	}
 }

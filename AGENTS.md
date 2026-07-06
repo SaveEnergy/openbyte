@@ -77,7 +77,8 @@
 
 ## Dynamic Backlog
 
-- Live queue is currently empty; replenish with LOC/import-coupling scan plus Sonar OPEN count after next Cloud analysis.
+- Re-run throughput gates on target 25G hardware: direct TLS h2 vs `HTTP2_ENABLED=false`, `MODE=download-shards`, `MODE=upload-shards`, and h2 request-stream upload.
+- If target hardware shows a clear sharding win (>=25% median), implement production multi-worker sharding; otherwise keep it as harness-only.
 - Rich telemetry UI remains deferred by policy unless explicitly opt-in.
 
 ## Verification baseline

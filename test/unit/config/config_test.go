@@ -230,6 +230,36 @@ func TestConfigValidateTLS(t *testing.T) {
 	}
 }
 
+func TestConfigTLSAutoGenIsExplicitOptIn(t *testing.T) {
+	cfg := config.DefaultConfig()
+	if cfg.TLSAutoGen {
+		t.Fatal("TLSAutoGen should be disabled by default to preserve HTTP dev startup")
+	}
+
+	t.Setenv("TLS_AUTO_GEN", "1")
+	if err := cfg.LoadFromEnv(); err != nil {
+		t.Fatalf("load env: %v", err)
+	}
+	if !cfg.TLSAutoGen {
+		t.Fatal("TLS_AUTO_GEN=1 should enable generated TLS")
+	}
+}
+
+func TestConfigLoadHTTP2EnabledEnv(t *testing.T) {
+	cfg := config.DefaultConfig()
+	if !cfg.HTTP2Enabled {
+		t.Fatal("HTTP2Enabled should default to true")
+	}
+
+	t.Setenv("HTTP2_ENABLED", "false")
+	if err := cfg.LoadFromEnv(); err != nil {
+		t.Fatalf("load env: %v", err)
+	}
+	if cfg.HTTP2Enabled {
+		t.Fatal("HTTP2_ENABLED=false should disable HTTP/2")
+	}
+}
+
 func TestConfigValidateCapacityGbpsPositive(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.CapacityGbps = 0

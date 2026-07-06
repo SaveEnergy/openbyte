@@ -8,6 +8,7 @@ const maxStreams = positiveInt(process.env.MAX_STREAMS, 8);
 const rampDuration = positiveInt(process.env.RAMP_DURATION, 1);
 const measureDuration = positiveInt(process.env.MEASURE_DURATION, 3);
 const directionDuration = positiveInt(process.env.DURATION, 3);
+const ignoreHTTPSErrors = process.env.IGNORE_HTTPS_ERRORS === "1";
 
 function positiveInt(raw, fallback) {
   const value = Number.parseInt(raw || "", 10);
@@ -157,10 +158,10 @@ async function runStreamingUploadProbe(page, streams) {
   );
 }
 
-async function runDownloadShardProbe(browser, shards) {
+async function runDownloadShardProbe(context, shards) {
   const pages = await Promise.all(
     Array.from({ length: shards }, async () => {
-      const page = await browser.newPage();
+      const page = await context.newPage();
       await page.goto(baseURL);
       return page;
     }),
@@ -193,6 +194,28 @@ async function runDownloadShardProbe(browser, shards) {
   }
 }
 
+async function runUploadShardProbe(context, shards) {
+  const pages = await Promise.all(
+    Array.from({ length: shards }, async () => {
+      const page = await context.newPage();
+      await page.goto(baseURL);
+      return page;
+    }),
+  );
+  try {
+    const results = await Promise.all(
+      pages.map((page) => runUploadBlobProbe(page, 8, 1)),
+    );
+    return {
+      shards,
+      gbps: results.reduce((sum, result) => sum + result.gbps, 0),
+      parts: results.map((result) => result.gbps),
+    };
+  } finally {
+    await Promise.all(pages.map((page) => page.close()));
+  }
+}
+
 function printSummary(label, rows, metric) {
   const values = rows.map((row) => row[metric]);
   const summary = {
@@ -206,9 +229,10 @@ function printSummary(label, rows, metric) {
 }
 
 const browser = await chromium.launch();
+const context = await browser.newContext({ ignoreHTTPSErrors });
 try {
   if (mode === "ui") {
-    const page = await browser.newPage();
+    const page = await context.newPage();
     const rows = [];
     for (let i = 0; i < runs; i++) {
       const result = await runUI(page);
@@ -220,7 +244,7 @@ try {
     printSummary("upload_mbps", rows, "uploadMbps");
     await page.close();
   } else if (mode === "upload-blobs") {
-    const page = await browser.newPage();
+    const page = await context.newPage();
     await page.goto(baseURL);
     const sizes = parseList(process.env.BLOB_MB, "8,32,64");
     for (const blobMB of sizes) {
@@ -229,18 +253,24 @@ try {
     }
     await page.close();
   } else if (mode === "upload-stream") {
-    const page = await browser.newPage();
+    const page = await context.newPage();
     await page.goto(baseURL);
     console.log(JSON.stringify({ mode, ...(await runStreamingUploadProbe(page, maxStreams)) }));
     await page.close();
   } else if (mode === "download-shards") {
     const shardsList = parseList(process.env.SHARDS, "1,2,4");
     for (const shards of shardsList) {
-      console.log(JSON.stringify({ mode, ...(await runDownloadShardProbe(browser, shards)) }));
+      console.log(JSON.stringify({ mode, ...(await runDownloadShardProbe(context, shards)) }));
+    }
+  } else if (mode === "upload-shards") {
+    const shardsList = parseList(process.env.SHARDS, "1,2,4");
+    for (const shards of shardsList) {
+      console.log(JSON.stringify({ mode, ...(await runUploadShardProbe(context, shards)) }));
     }
   } else {
     throw new Error(`unknown mode: ${mode}`);
   }
 } finally {
+  await context.close();
   await browser.close();
 }
