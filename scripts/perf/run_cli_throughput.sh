@@ -45,6 +45,7 @@ for direction in $DIRECTIONS; do
 				-d "$direction" \
 				-t "$DURATION" \
 				-s "$STREAMS" \
+				--warmup 0 \
 				--plain \
 				--no-progress \
 				"$SERVER_URL" | extract_mbps)"
