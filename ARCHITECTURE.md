@@ -49,5 +49,5 @@ The human/agent quick reference is served at `/api.html`; the machine-readable c
 ## Deployment
 
 - Docker exposes only port `8080`.
-- Traefik deployments route HTTP(S) to internal port `8080` and keep the upload body-limit middleware.
+- Traefik deployments route HTTP(S) to internal port `8080`, keep dedicated upload routers unbuffered, and default openByte HTTPS ALPN to HTTP/1.1.
 - `SERVER_NAME` controls the server display name returned by `/api/v1/version` and shown in the UI.

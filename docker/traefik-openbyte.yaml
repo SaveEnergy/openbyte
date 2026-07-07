@@ -1,0 +1,11 @@
+tls:
+  options:
+    openbyte-h1:
+      minVersion: VersionTLS12
+      alpnProtocols:
+        - http/1.1
+    openbyte-h2:
+      minVersion: VersionTLS12
+      alpnProtocols:
+        - h2
+        - http/1.1

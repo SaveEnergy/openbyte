@@ -77,7 +77,7 @@
 
 ## Dynamic Backlog
 
-- Re-run throughput gates on target 25G hardware: direct TLS h2 vs `HTTP2_ENABLED=false`, `MODE=download-shards`, `MODE=upload-shards`, and h2 request-stream upload.
+- Re-run throughput gates on target 25G hardware: direct TLS h2 vs `HTTP2_ENABLED=false`, Traefik `openbyte-h1@file` vs `openbyte-h2@file`, `MODE=download-shards`, `MODE=upload-shards`, and h2 request-stream upload.
 - If target hardware shows a clear sharding win (>=25% median), implement production multi-worker sharding; otherwise keep it as harness-only.
 - Rich telemetry UI remains deferred by policy unless explicitly opt-in.
 

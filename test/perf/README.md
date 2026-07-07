@@ -44,6 +44,10 @@ URL=https://localhost:8445/ IGNORE_HTTPS_ERRORS=1 RUNS=3 scripts/perf/browser_th
 go run scripts/perf/h2_reverse_proxy.go -target http://localhost:8080 -addr 127.0.0.1:8443
 URL=https://localhost:8443/ IGNORE_HTTPS_ERRORS=1 MODE=upload-stream MAX_STREAMS=4 scripts/perf/browser_throughput.mjs
 
+# Traefik ALPN comparison. The bundled compose files default to openbyte-h1@file;
+# set TRAEFIK_TLS_OPTIONS=openbyte-h2@file for the h2 comparison run.
+URL=https://localhost/ IGNORE_HTTPS_ERRORS=1 RUNS=3 scripts/perf/browser_throughput.mjs ui
+
 # CLI interleaved medians; add a saved baseline binary to BINS for A/B.
 BINS="/tmp/openbyte-baseline ./bin/openbyte" RUNS=5 scripts/perf/run_cli_throughput.sh
 ```
@@ -71,6 +75,12 @@ avoid measuring queued phantom streams beyond Chromium's per-origin connection
 limit. Upload sharding was only a modest gate result (**11.56 -> 13.56 Gbit/s**
 plain HTTP, **9.87 -> 11.20 Gbit/s** direct TLS h1), so no production sharding
 refactor is justified on this VM.
+
+The bundled Traefik compose overlays use `openbyte-h1@file` by default for the
+openByte HTTPS routers. That keeps browser speed tests off the slower h2 path
+while preserving `openbyte-h2@file` as an explicit comparison mode. Local
+Traefik on the Cloud VM measured **15.11 Gbit/s download / 12.66 Gbit/s upload**
+median with h1-only ALPN, versus **9.95 Gbit/s / 7.97 Gbit/s** with h2 ALPN.
 
 ## Autoresearch branch counter
 

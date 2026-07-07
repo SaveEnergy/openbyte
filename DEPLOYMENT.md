@@ -286,6 +286,7 @@ For 25 Gbit/s tests, prefer a direct data path for `/api/v1/download`, `/api/v1/
 - Run openByte with direct TLS (`TLS_CERT_FILE` and `TLS_KEY_FILE`) or route the speed-test API paths around the TLS proxy. A reverse proxy copies every byte and can become the bottleneck before openByte does.
 - For local proof runs, `TLS_AUTO_GEN=1` serves HTTPS with an ephemeral self-signed localhost certificate. Do not use it for public deployments.
 - Keep `HTTP2_ENABLED=true` by default, but benchmark `HTTP2_ENABLED=false` for browser speed-test endpoints on target hardware. On the 4-vCPU Cloud VM, direct TLS with HTTP/1.1 measured **20.38 Gbit/s download / 13.11 Gbit/s upload** median, while direct TLS with HTTP/2 measured **11.26 Gbit/s / 8.77 Gbit/s**.
+- The bundled Traefik HTTPS routers default to `TRAEFIK_TLS_OPTIONS=openbyte-h1@file`, which advertises HTTP/1.1 only for the browser data path. On the 4-vCPU Cloud VM, local Traefik h1-only measured **15.11 Gbit/s download / 12.66 Gbit/s upload** median, while Traefik h2 measured **9.95 Gbit/s / 7.97 Gbit/s**. Set `TRAEFIK_TLS_OPTIONS=openbyte-h2@file` only when you intentionally want to compare Traefik HTTP/2.
 - Use host networking for Docker deployments when the server is dedicated to speed tests. Docker bridge/NAT adds per-packet CPU cost at high packet rates.
 - Keep `CAPACITY_GBPS=25` and `MAX_CONCURRENT_PER_IP=64` unless you deliberately restrict single-client stream count.
 - Disable request buffering on upload routes. Buffering changes a live upload test into a proxy store-and-forward test.
@@ -331,14 +332,20 @@ For reliable upload tests through Traefik:
 
 The provided Traefik compose files include dedicated upload routers without buffering middleware.
 
+The HTTPS routers also use `docker/traefik-openbyte.yaml` via Traefik's file
+provider. By default, `openbyte-h1@file` restricts ALPN to HTTP/1.1 for the
+openByte routers, avoiding the slower h2 browser path measured on the Cloud VM.
+Use `TRAEFIK_TLS_OPTIONS=openbyte-h2@file` for explicit h2 comparison runs.
+
 **Environment variables:**
 
-| Variable               | Default               | Description             |
-| ---------------------- | --------------------- | ----------------------- |
-| `TRAEFIK_HOST`         | `speedtest.localhost` | Domain for HTTP routing |
-| `TRAEFIK_ENTRYPOINT`   | `web`                 | Traefik entrypoint name |
-| `TRAEFIK_NETWORK`      | `traefik`             | External network name   |
-| `TRAEFIK_CERTRESOLVER` | `letsencrypt`         | TLS cert resolver       |
+| Variable               | Default              | Description                                          |
+| ---------------------- | -------------------- | ---------------------------------------------------- |
+| `TRAEFIK_HOST`         | `speedtest.localhost` | Domain for HTTP routing                              |
+| `TRAEFIK_ENTRYPOINT`   | `web`                | Traefik entrypoint name                              |
+| `TRAEFIK_NETWORK`      | `traefik`            | External network name                                |
+| `TRAEFIK_CERTRESOLVER` | `letsencrypt`        | TLS cert resolver                                    |
+| `TRAEFIK_TLS_OPTIONS`  | `openbyte-h1@file`   | TLS ALPN policy for openByte HTTPS routers           |
 
 **Important:** openByte serves the HTTP API and UI on one listener; expose or proxy only port 8080 (or the configured `PORT`), whether that listener is plain HTTP or direct TLS.
 

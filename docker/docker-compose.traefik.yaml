@@ -10,6 +10,8 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=traefik"
+      - "--providers.file.filename=/etc/traefik/dynamic/openbyte.yaml"
+      - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       # Let's Encrypt (production)
@@ -25,6 +27,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik-certs:/letsencrypt
+      - ./traefik-openbyte.yaml:/etc/traefik/dynamic/openbyte.yaml:ro
     networks:
       - traefik
     labels:
@@ -84,12 +87,14 @@ services:
       - "traefik.http.routers.openbyte-secure.entrypoints=websecure"
       - "traefik.http.routers.openbyte-secure.tls=true"
       - "traefik.http.routers.openbyte-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.openbyte-secure.tls.options=${TRAEFIK_TLS_OPTIONS:-openbyte-h1@file}"
       - "traefik.http.routers.openbyte-secure.service=openbyte"
       # HTTPS upload router with larger body limit
       - "traefik.http.routers.openbyte-upload-secure.rule=(Host(`${TRAEFIK_HOST:-speedtest.localhost}`)) && PathPrefix(`/api/v1/upload`)"
       - "traefik.http.routers.openbyte-upload-secure.entrypoints=websecure"
       - "traefik.http.routers.openbyte-upload-secure.tls=true"
       - "traefik.http.routers.openbyte-upload-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.openbyte-upload-secure.tls.options=${TRAEFIK_TLS_OPTIONS:-openbyte-h1@file}"
       - "traefik.http.routers.openbyte-upload-secure.priority=100"
     networks:
       - traefik
