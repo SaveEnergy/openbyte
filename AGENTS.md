@@ -60,7 +60,7 @@
 - **`build-push` + `deploy`** on every `main` push after `checks` (no path filtering—doc-only pushes still roll images). PR Playwright runs are gated by a plain `git diff` check inside `checks` (no third-party filter action).
 - CI builds/pushes `edge` + `sha`; release publishes semver + `latest`.
 - **`release.yml` `deploy`**: same `vars`/secrets as CI; gate on **`needs.release.result == 'success'`** (not derived job booleans).
-- Deploy: **checkout first**, then `validate_env` → sync compose → remote `docker compose pull` + `up -d --force-recreate` → verify; scripts in **`scripts/deploy/`** (`validate_env`, `sync_compose`, `deploy_remote`).
+- Deploy: **checkout first**, then `validate_env` → sync compose → remote `docker compose pull` + `up -d` → verify; previous openByte image is pinned locally for Compose-based rollback; scripts in **`scripts/deploy/`** (`validate_env`, `sync_compose`, `deploy_remote`, `deploy_host`).
 - Traefik deploy uses external `traefik` network; workflows ensure network presence.
 - **Race matrix**: `ci.yml` on `main`: `go test ./... -race -short -p 1`; `nightly.yml`: full `go test -race ./...` + separate `test/e2e` (timeout budget).
 - **Playwright**: `workers` = `2` on `GITHUB_ACTIONS`; optional `PLAYWRIGHT_WORKERS`; trace/reuse unchanged.

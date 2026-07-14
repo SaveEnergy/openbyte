@@ -99,9 +99,9 @@ CI deploy path is Traefik-based (the workflow syncs and uses both compose files)
 
 Workflow behavior details (important for on-call):
 
-- Deployment keeps previous container as `openbyte_rollback_prev` until health checks pass.
+- Deployment pins the previous openByte image under a temporary local rollback tag until health checks pass.
 - Health gate requires both openByte and Traefik to be running and healthy for up to 20 attempts (3s interval, ~60s window).
-- On image mismatch or a failed health gate, the workflow restores `openbyte_rollback_prev` when a previous container exists, then exits non-zero. A failed first deployment is left in place for inspection because there is nothing to restore.
+- On compose failure, image mismatch, or a failed health gate, the workflow recreates only openByte from the pinned image when a previous container exists, verifies that restored image is healthy, then exits non-zero. A failed first deployment is left in place for inspection because there is nothing to restore.
 - GHCR session is logged out on script exit via shell trap.
 
 For direct HTTP access without Traefik, run only the base GHCR compose file:
