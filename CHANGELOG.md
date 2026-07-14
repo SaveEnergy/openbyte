@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **Autoresearch experiment harness**: removed the tracked agent prompt, Cursor
+  command, branch counter, preflight script, Make target, and local TSV workflow.
+  Generic benchmarks and manual throughput harnesses remain available.
 - **Dead metrics code**: removed the unwired `internal/metrics` package (collector,
   multi-stream aggregator, latency histogram) and the `pkg/types` RTT/NetworkInfo
   collectors — none were referenced by production code since the TCP/UDP stack removal.

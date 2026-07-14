@@ -44,7 +44,6 @@ Thumbs.db
 
 # Perf harness (local)
 build/perf/
-test/perf/results.tsv
 
 # Agent tasks/results
 .agent/
