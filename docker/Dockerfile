@@ -29,7 +29,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /openbyte ./cmd/openbyte
 
 # Server image
-FROM alpine:3.21 AS server
+FROM alpine:3.24 AS server
 
 RUN apk add --no-cache ca-certificates tzdata
 
@@ -63,7 +63,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
 ENTRYPOINT ["/app/openbyte", "server"]
 
 # Client image
-FROM alpine:3.21 AS client
+FROM alpine:3.24 AS client
 
 RUN apk add --no-cache ca-certificates tzdata
 
