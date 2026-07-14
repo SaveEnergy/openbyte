@@ -1,6 +1,6 @@
 # Performance benchmarks
 
-Package list: **`bench_packages.txt`** (defaults include **`internal/{metrics,api,jsonbody,results}`** and **`pkg/types`**). Runner: **`scripts/perf/run_benchmarks.sh`**.
+Package list: **`bench_packages.txt`** (currently **`internal/api`**, **`internal/jsonbody`**, **`internal/results`**, and **`pkg/types`**). Runner: **`scripts/perf/run_benchmarks.sh`**.
 
 ```bash
 make perf-bench              # quick, stdout
@@ -14,7 +14,7 @@ Optional (faster repeats): `go install golang.org/x/perf/cmd/benchstat@latest` â
 
 Establish baseline once: `make perf-record && cp build/perf/bench.txt test/perf/bench_baseline.txt`
 
-Nightly CI uploads **`build/perf/bench.txt`** as an artifact (see `AGENTS.md`).
+Nightly CI runs the quick `make perf-bench` pass and keeps its output in the workflow log; it does not create `build/perf/bench.txt`.
 
 ## Throughput harnesses (manual)
 
@@ -84,7 +84,7 @@ median with h1-only ALPN, versus **9.95 Gbit/s / 7.97 Gbit/s** with h2 ALPN.
 
 ## Autoresearch branch counter
 
-**`autoresearch_counter.txt`** holds one integer: the **next** branch id **`N`**. New work branches are **`autoresearch/perf-N`**. After **`main`** has merged that branch, agents bump the file to **`N+1`**, commit on **`main`**, and **delete** **`autoresearch/perf-N`** locally and on **`origin`** (see **`AGENTS.md`**). If the file is missing, start at **`1`**.
+**`autoresearch_counter.txt`** holds one integer: the **next** branch id **`N`**. New work branches are **`autoresearch/perf-N`**. After **`main`** has merged that branch, agents bump the file to **`N+1`**, commit on **`main`**, and **delete** **`autoresearch/perf-N`** locally and on **`origin`** (see **`PROMPT_AUTORESEARCH.md`**). If the file is missing, start at **`1`**.
 
 ## LLM experiment loop (optional)
 

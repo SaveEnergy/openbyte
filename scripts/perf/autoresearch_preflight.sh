@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Verifiable autoresearch bootstrap: exit codes + AUTORESEARCH_* lines on stdout.
-# Usage: ./scripts/perf/autoresearch_preflight.sh   OR   make autoresearch-preflight
+# Usage: bash scripts/perf/autoresearch_preflight.sh   OR   make autoresearch-preflight
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"

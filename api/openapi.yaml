@@ -5,7 +5,9 @@ info:
   description: |
     HTTP API for the openByte browser speed test server.
     All API endpoints are under `/api/v1/` except `/health`.
-    All error responses return `{"error":"message"}`.
+    Errors emitted by matched API handlers return `{"error":"message"}`;
+    unmatched routes or methods may use the Go standard library's plain-text errors.
+    openByte does not implement authentication.
   license:
     name: MIT
 
@@ -43,6 +45,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VersionResponse"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /api/v1/ping:
     get:
@@ -68,9 +72,8 @@ paths:
           schema:
             type: integer
             minimum: 1
-            maximum: 300
             default: 10
-          description: Duration in seconds.
+          description: Duration in seconds. The configured MAX_TEST_DURATION is the upper bound (300 seconds by default).
         - name: chunk
           in: query
           schema:
@@ -89,8 +92,6 @@ paths:
                 format: binary
         "400":
           $ref: "#/components/responses/BadRequest"
-        "429":
-          $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/ServerBusy"
         "500":
@@ -99,6 +100,7 @@ paths:
   /api/v1/upload:
     post:
       summary: Upload speed test sink
+      description: Reads raw request-body bytes until EOF or the configured MAX_TEST_DURATION. Content-Type is not validated; application/octet-stream is recommended.
       operationId: upload
       tags: [SpeedTest]
       requestBody:
@@ -115,8 +117,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UploadResponse"
-        "429":
-          $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/ServerBusy"
         "500":
@@ -133,7 +133,7 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/SaveResultRequest"
-        description: Max 4096 bytes. Content-Type must be application/json.
+        description: Max 4096 bytes. When Content-Type is set, it must begin with application/json.
       responses:
         "201":
           description: Result saved
@@ -147,6 +147,8 @@ paths:
           $ref: "#/components/responses/RequestEntityTooLarge"
         "415":
           $ref: "#/components/responses/UnsupportedMediaType"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
         "500":
@@ -175,6 +177,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
         "503":
           $ref: "#/components/responses/ServiceUnavailable"
         "500":
@@ -282,11 +286,13 @@ components:
 
     SaveResultRequest:
       type: object
+      additionalProperties: false
       description: |
         Single JSON object. Body max 4096 bytes.
+        Unknown fields are rejected. Optional diagnostics metadata is accepted but not persisted.
         Validation: numeric fields >= 0 and finite; download_mbps/upload_mbps <= 100000;
-        latency_ms/jitter_ms/loaded_latency_ms <= 60000; server_name <= 200 chars;
-        ipv4/ipv6 <= 45 chars; bufferbloat_grade <= 5 chars.
+        latency_ms/jitter_ms/loaded_latency_ms <= 60000; server_name <= 200 UTF-8 bytes;
+        ipv4/ipv6 <= 45 UTF-8 bytes; bufferbloat_grade <= 5 UTF-8 bytes.
       properties:
         download_mbps:
           type: number
@@ -310,16 +316,18 @@ components:
           minimum: 0
         bufferbloat_grade:
           type: string
-          maxLength: 5
+          description: Maximum 5 UTF-8 bytes.
         ipv4:
           type: string
-          maxLength: 45
+          description: Maximum 45 UTF-8 bytes.
         ipv6:
           type: string
-          maxLength: 45
+          description: Maximum 45 UTF-8 bytes.
         server_name:
           type: string
-          maxLength: 200
+          description: Maximum 200 UTF-8 bytes.
+        diagnostics:
+          description: Optional client diagnostic metadata; accepted for compatibility but not persisted or returned.
 
     SaveResultResponse:
       type: object
@@ -328,6 +336,7 @@ components:
           type: string
         url:
           type: string
+          description: Same-origin relative result page path, for example `/results/aB3dE7xQ`.
 
     SavedResult:
       type: object

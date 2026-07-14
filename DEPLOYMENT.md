@@ -4,9 +4,9 @@ Production deployment guide for openByte speed test server.
 
 ## Prerequisites
 
-- Go 1.25.0+ installed
+- Go 1.26.5+ installed
 - SSH access to production server
-- Root or sudo access for port binding (<1024)
+- Root or sudo access for service installation and firewall changes
 - Firewall rules configured (port 8080)
 
 ## Quick Deploy
@@ -79,10 +79,9 @@ mkdir -p /opt/openbyte
 cd /opt/openbyte
 ```
 
-Copy both `docker/docker-compose.ghcr.yaml` and `docker/docker-compose.ghcr.traefik.yaml`, then create a `.env` with runtime values:
+Copy `docker/docker-compose.ghcr.yaml`, `docker/docker-compose.ghcr.traefik.yaml`, and `docker/traefik-openbyte.yaml`, then create a `.env` with runtime values:
 
 ```bash
-PUBLIC_HOST="speedtest.example.com"
 SERVER_NAME="Frankfurt 10G"
 ALLOWED_ORIGINS="https://speedtest.example.com"
 TRUST_PROXY_HEADERS=true
@@ -101,8 +100,8 @@ CI deploy path is Traefik-based (the workflow syncs and uses both compose files)
 Workflow behavior details (important for on-call):
 
 - Deployment keeps previous container as `openbyte_rollback_prev` until health checks pass.
-- Health gate polls container state/health for up to 20 attempts (3s interval, ~60s window).
-- On image mismatch or failed health gate, workflow removes failed container, restores `openbyte_rollback_prev`, and exits non-zero.
+- Health gate requires both openByte and Traefik to be running and healthy for up to 20 attempts (3s interval, ~60s window).
+- On image mismatch or a failed health gate, the workflow restores `openbyte_rollback_prev` when a previous container exists, then exits non-zero. A failed first deployment is left in place for inspection because there is nothing to restore.
 - GHCR session is logged out on script exit via shell trap.
 
 For direct HTTP access without Traefik, run only the base GHCR compose file:
@@ -149,7 +148,6 @@ ExecStart=/opt/openbyte/openbyte server
 Restart=always
 RestartSec=5
 
-Environment="PUBLIC_HOST=speedtest.example.com"
 Environment="PORT=8080"
 Environment="CAPACITY_GBPS=25"
 Environment="MAX_CONCURRENT_PER_IP=64"
@@ -174,10 +172,6 @@ WantedBy=multi-user.target
 sudo useradd -r -s /sbin/nologin openbyte
 sudo mkdir -p /opt/openbyte
 sudo chown openbyte:openbyte /opt/openbyte
-
-# Create log directory
-sudo mkdir -p /var/log/openbyte
-sudo chown openbyte:openbyte /var/log/openbyte
 ```
 
 ### 2. Build & Transfer
@@ -185,7 +179,7 @@ sudo chown openbyte:openbyte /var/log/openbyte
 ```bash
 # Local machine
 make build
-tar czf openbyte.tar.gz bin/openbyte
+tar -C bin -czf openbyte.tar.gz openbyte
 
 # Transfer
 scp openbyte.tar.gz user@server:/tmp/
@@ -219,7 +213,7 @@ sudo systemctl status openbyte
 curl http://localhost:8080/health
 
 # Test from client
-./bin/openbyte client https://speedtest.example.com -d download -t 10
+./bin/openbyte client -d download -t 10 https://speedtest.example.com
 ```
 
 ## Reverse Proxy (Nginx)
@@ -228,12 +222,12 @@ curl http://localhost:8080/health
 server {
     listen 80;
     server_name speedtest.example.com;
+    client_max_body_size 70m;
 
     location / {
         proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_request_buffering off;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -243,12 +237,12 @@ server {
 
 **Reverse proxy upload limits (important):**
 
-Speed tests upload multi-megabyte request bodies (default 8MB per browser request, repeated). Many reverse proxies default to 1MB and will reject or buffer uploads, which can produce errors or unrealistic upload speeds.
+Speed tests use adaptive request bodies from 8 MiB through 64 MiB. Many reverse proxies default to 1 MiB and will reject or buffer uploads, which can produce errors or unrealistic upload speeds.
 
 Minimum recommendations:
 
-- Increase max request body (e.g. `client_max_body_size 35m;` in Nginx).
-- Disable request buffering for upload to avoid early responses:
+- Increase the maximum request body above 64 MiB (for example, `client_max_body_size 70m;` in Nginx).
+- Disable request buffering for upload so the proxy does not turn a live measurement into store-and-forward:
   - Nginx: `location /api/v1/upload { proxy_request_buffering off; proxy_http_version 1.1; }`
 - If you enable HTTP/2 or HTTP/3 at the proxy edge, keep the upstream to OpenByte as HTTP/1.1 for `/api/v1/upload`.
 
@@ -258,8 +252,9 @@ When running behind a proxy, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_C
 
 For 25 Gbit/s tests, prefer a direct data path for `/api/v1/download`, `/api/v1/upload`, and `/api/v1/ping`:
 
-- Run openByte with direct TLS (`TLS_CERT_FILE` and `TLS_KEY_FILE`) or route the speed-test API paths around the TLS proxy. A reverse proxy copies every byte and can become the bottleneck before openByte does.
+- For bare-metal deployments, run openByte with direct TLS (`TLS_CERT_FILE` and `TLS_KEY_FILE`) or route the speed-test API paths around the TLS proxy. A reverse proxy copies every byte and can become the bottleneck before openByte does.
 - For local proof runs, `TLS_AUTO_GEN=1` serves HTTPS with an ephemeral self-signed localhost certificate. Do not use it for public deployments.
+- The provided Docker Compose health checks always probe plain HTTP and do not mount certificate files. Use the bundled Traefik overlay for Docker TLS, or supply custom certificate mounts plus an HTTPS health check before enabling direct TLS in the container.
 - Keep `HTTP2_ENABLED=true` by default, but benchmark `HTTP2_ENABLED=false` for browser speed-test endpoints on target hardware. On the 4-vCPU Cloud VM, direct TLS with HTTP/1.1 measured **20.38 Gbit/s download / 13.11 Gbit/s upload** median, while direct TLS with HTTP/2 measured **11.26 Gbit/s / 8.77 Gbit/s**.
 - The bundled Traefik HTTPS routers default to `TRAEFIK_TLS_OPTIONS=openbyte-h1@file`, which advertises HTTP/1.1 only for the browser data path. On the 4-vCPU Cloud VM, local Traefik h1-only measured **15.11 Gbit/s download / 12.66 Gbit/s upload** median, while Traefik h2 measured **9.95 Gbit/s / 7.97 Gbit/s**. Set `TRAEFIK_TLS_OPTIONS=openbyte-h2@file` only when you intentionally want to compare Traefik HTTP/2.
 - Use host networking for Docker deployments when the server is dedicated to speed tests. Docker bridge/NAT adds per-packet CPU cost at high packet rates.
@@ -283,18 +278,13 @@ Also verify NIC RSS queues, IRQ affinity, CPU frequency governor, and jumbo MTU 
 Traefik integration via Docker labels. openByte only needs HTTP(S) proxying to container port 8080.
 
 ```bash
-# Create traefik network first
-docker network create traefik
-
-# Deploy with Traefik labels
+# Source-build deployment; the overlay starts Traefik and manages its network
 cd docker
-TRAEFIK_HOST=speedtest.example.com docker compose up -d
-
-# Or with HTTPS override
-docker compose -f docker-compose.yaml -f docker-compose.traefik.yaml up -d
+TRAEFIK_HOST=speedtest.example.com \
+  docker compose -f docker-compose.yaml -f docker-compose.traefik.yaml up -d
 ```
 
-When running behind Traefik, set `TRUSTED_PROXY_CIDRS` to the Traefik network subnet:
+The GHCR overlay declares `traefik` as an external network; create it before a manual GHCR deployment. CI and release deployments create it automatically. When running behind Traefik, set `TRUST_PROXY_HEADERS=true` and set `TRUSTED_PROXY_CIDRS` to the Traefik network subnet:
 
 ```bash
 docker network inspect traefik --format '{{ (index .IPAM.Config 0).Subnet }}'
@@ -302,7 +292,7 @@ docker network inspect traefik --format '{{ (index .IPAM.Config 0).Subnet }}'
 
 For reliable upload tests through Traefik:
 
-- Ensure any request body limit is comfortably above the browser upload payload.
+- Ensure any request body limit is above the browser's 64 MiB maximum payload.
 - Do not use Traefik buffering middleware on `/api/v1/upload`; it prevents live upload streaming and can spill speed-test data to disk.
 
 The provided Traefik compose files include dedicated upload routers without buffering middleware.
@@ -314,13 +304,14 @@ Use `TRAEFIK_TLS_OPTIONS=openbyte-h2@file` for explicit h2 comparison runs.
 
 **Environment variables:**
 
-| Variable               | Default              | Description                                          |
-| ---------------------- | -------------------- | ---------------------------------------------------- |
-| `TRAEFIK_HOST`         | `speedtest.localhost` | Domain for HTTP routing                              |
-| `TRAEFIK_ENTRYPOINT`   | `web`                | Traefik entrypoint name                              |
-| `TRAEFIK_NETWORK`      | `traefik`            | External network name                                |
-| `TRAEFIK_CERTRESOLVER` | `letsencrypt`        | TLS cert resolver                                    |
-| `TRAEFIK_TLS_OPTIONS`  | `openbyte-h1@file`   | TLS ALPN policy for openByte HTTPS routers           |
+| Variable                 | Default                | Description                                |
+| ------------------------ | ---------------------- | ------------------------------------------ |
+| `TRAEFIK_HOST`           | `speedtest.localhost`  | Source-build overlay hostname              |
+| `TRAEFIK_DASHBOARD_HOST` | `traefik.localhost`    | Dashboard hostname                         |
+| `ACME_EMAIL`             | `admin@example.com`    | Let's Encrypt account email                |
+| `TRAEFIK_TLS_OPTIONS`    | `openbyte-h1@file`     | TLS ALPN policy for openByte HTTPS routers |
+
+The GHCR overlay uses `TRAEFIK_HOST_RULE` instead of `TRAEFIK_HOST`, allowing a compound Traefik rule for the main, IPv4, and IPv6 hosts.
 
 **Important:** openByte serves the HTTP API and UI on one listener; expose or proxy only port 8080 (or the configured `PORT`), whether that listener is plain HTTP or direct TLS.
 
@@ -366,13 +357,13 @@ curl -6 https://v6.speedtest.example.com/api/v1/ping
 
 ### Traefik Configuration
 
-Add both subdomains to the Traefik host rule in `.env`:
+The provided GHCR overlay supports a compound host rule. Add both subdomains to its `.env`:
 
 ```bash
 TRAEFIK_HOST_RULE="Host(`speedtest.example.com`) || Host(`v4.speedtest.example.com`) || Host(`v6.speedtest.example.com`)"
 ```
 
-Traefik auto-issues Let's Encrypt certificates for each subdomain. The IPv6 cert uses HTTP-01 challenge over IPv6 — ensure Traefik listens on IPv6 (default for `traefik:v3`).
+The source-build overlay accepts only one `TRAEFIK_HOST`; use the GHCR overlay or customize its router labels when you need both probe subdomains. Ensure every configured hostname reaches the same Traefik instance on ports 80 and 443 so it can complete certificate validation.
 
 ### Nginx Configuration
 
@@ -425,31 +416,6 @@ sudo firewall-cmd --permanent --add-port=443/tcp
 sudo firewall-cmd --reload
 ```
 
-## TLS Troubleshooting
-
-### "Not secure" / `NET::ERR_CERT_AUTHORITY_INVALID` with a valid cert on the speed-test host
-
-Symptoms: `https://speed.example.com` shows a valid Let's Encrypt certificate, but visiting a **parent/apex domain** (for example `https://example.com` when `speed.example.com` is a CNAME) shows **"Not secure"** and Traefik's **default self-signed certificate**.
-
-Cause: Traefik serves its built-in default cert for any HTTPS request whose `Host` header is not covered by a router with `tls.certresolver=letsencrypt`.
-
-Fix: add an apex redirect in `${REMOTE_DIR}/.env` so the parent domain gets a real certificate and redirects to the canonical speed-test host:
-
-```bash
-TRAEFIK_HOST_RULE="Host(`speed.example.com`) || Host(`v4.speed.example.com`) || Host(`v6.speed.example.com`)"
-TRAEFIK_APEX_REDIRECT_RULE="Host(`example.com`) || Host(`www.example.com`)"
-TRAEFIK_CANONICAL_HOST=speed.example.com
-PUBLIC_HOST=speed.example.com
-ALLOWED_ORIGINS=https://speed.example.com
-```
-
-Redeploy (`docker compose ... up -d --force-recreate`). Verify:
-
-```bash
-curl -sSI https://example.com/ | rg -i '^HTTP|^location'
-curl -sSI https://speed.example.com/ | rg -i '^HTTP|strict-transport'
-```
-
 ### v6 probe console errors
 
 If the browser console shows `v6.<domain> ... ERR_NAME_NOT_RESOLVED` or IPv6 connection failures, ensure:
@@ -465,11 +431,7 @@ These probe failures do not affect the main page padlock, but IPv6-only clients 
 ### Logs
 
 ```bash
-# View logs
 sudo journalctl -u openbyte -f
-
-# Log rotation
-sudo nano /etc/logrotate.d/openbyte
 ```
 
 ### Health Monitoring

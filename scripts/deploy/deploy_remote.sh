@@ -41,6 +41,15 @@ ssh -i "$SSH_TMP_DIR/id_rsa" \
   "REMOTE_DIR=$REMOTE_DIR_Q GHCR_USERNAME=$GHCR_USERNAME_Q GHCR_TOKEN=$GHCR_TOKEN_Q OWNER_LC=$OWNER_LC_Q DEPLOY_TAG=$DEPLOY_TAG_Q SERVER_NAME=$SERVER_NAME_Q sh -seu" <<'EOF'
 [ -n "$REMOTE_DIR" ] || { echo "REMOTE_DIR not set"; exit 1; }
 test -f "$REMOTE_DIR/.env" || { echo "Missing .env at $REMOTE_DIR/.env"; exit 1; }
+traefik_host_rule=$(sed -n 's/^TRAEFIK_HOST_RULE=//p' "$REMOTE_DIR/.env" | tail -n 1)
+if [ -n "$traefik_host_rule" ]; then
+  case "$traefik_host_rule" in
+    \"*\") traefik_host_rule=${traefik_host_rule#\"}; traefik_host_rule=${traefik_host_rule%\"} ;;
+    \'*\') traefik_host_rule=${traefik_host_rule#\'}; traefik_host_rule=${traefik_host_rule%\'} ;;
+  esac
+  TRAEFIK_HOST_RULE=$(printf '%s\n' "$traefik_host_rule" | sed 's/\\`/`/g')
+  export TRAEFIK_HOST_RULE
+fi
 if [ -n "${SERVER_NAME:-}" ]; then
   export SERVER_NAME
 else
@@ -84,7 +93,9 @@ while [ "$i" -le 20 ]; do
     continue
   fi
   status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' openbyte 2>/dev/null || true)
-  if [ "$status" = "healthy" ]; then
+  traefik_state=$(docker inspect -f '{{.State.Status}}' traefik 2>/dev/null || true)
+  traefik_status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' traefik 2>/dev/null || true)
+  if [ "$status" = "healthy" ] && [ "$traefik_state" = "running" ] && [ "$traefik_status" = "healthy" ]; then
     if [ "$rollback_enabled" -eq 1 ]; then
       docker rm -f "$rollback_name" >/dev/null 2>&1 || true
     fi
@@ -95,6 +106,7 @@ while [ "$i" -le 20 ]; do
   sleep 3
 done
 docker inspect openbyte --format '{{json .State}}' || true
+docker inspect traefik --format '{{json .State}}' || true
 if [ "$rollback_enabled" -eq 1 ]; then
   docker rm -f openbyte >/dev/null 2>&1 || true
   docker rename "$rollback_name" openbyte >/dev/null 2>&1 || { echo "rollback rename failed"; exit 1; }

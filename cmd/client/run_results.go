@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"time"
 
@@ -78,6 +79,9 @@ func buildResults(streamID string, config *Config, metrics EngineMetrics, startT
 }
 
 func createFormatter(config *Config) OutputFormatter {
+	if config.Quiet {
+		return NewPlainFormatter(io.Discard, false, true, true)
+	}
 	if config.JSON {
 		return &JSONFormatter{Writer: os.Stdout}
 	}

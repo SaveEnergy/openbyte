@@ -24,12 +24,12 @@
 
 - CORS wildcard matching enforces safe dot-boundary behavior.
 - CSP is strict (`script-src 'self'`, `worker-src 'self'`), with JS moved to external files only.
-- JSON API handlers enforce size limits and single-object decoding for POST payloads (`internal/jsonbody.DecodeSingleObject` shared by API + results).
+- The results POST handler enforces a 4096-byte limit, rejects unknown fields, and decodes exactly one JSON object through `internal/jsonbody.DecodeSingleObject`.
 - Config validation includes trusted CIDR parsing and strict positive limits.
 
 ### Frontend Behavior
 
-- HTTP test mode uses `/download`, `/upload`, `/ping`; never TCP/UDP proxy mode.
+- HTTP test mode uses `/api/v1/download`, `/api/v1/upload`, and `/api/v1/ping`; never TCP/UDP proxy mode.
 - Network probe and health-check fetch paths drain non-OK and malformed JSON responses.
 - Server settings UI: no server selector; a single deployed server tests itself.
 - UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.
@@ -127,16 +127,16 @@ make build && WEB_ROOT=./web ./bin/openbyte server
 | Run server (dev)    | `make run` (or `WEB_ROOT=./web ./bin/openbyte server`) |
 | Lint (Go)           | `make ci-lint`                                         |
 | Lint (OpenAPI)      | `bun run lint:openapi`                                 |
-| Unit tests          | `go test ./... -short`                                 |
-| E2E tests (Go)      | `go test ./test/e2e -short`                            |
-| UI E2E (Playwright) | `make test-ui` (requires running server)               |
+| Short Go suite      | `go test ./... -short`                                 |
+| E2E tests (Go)      | `make test-e2e`                                        |
+| UI E2E (Playwright) | `make test-ui`                                         |
 | Race detector       | `make test-race`                                       |
 | Benchmarks          | `make perf-bench`                                      |
 
 ### Gotchas
 
-- The server must be running before Playwright UI tests (`make test-ui`).
+- Playwright UI tests start a server on `127.0.0.1:8080`, or reuse one already running there.
 - No CGO required; SQLite uses `modernc.org/sqlite` (pure Go).
 - No external databases or services needed to run locally.
-- New `web/*.js` or `web/*.css` files must be added to `internal/api/router_static.go` allowlist or the server returns 404.
+- Any new top-level web asset must be added to the `internal/api/router_static.go` allowlist or the server returns 404; font files under `web/fonts/` are allowlisted by extension.
 - CLI client needs full URL scheme: `./bin/openbyte client http://localhost:8080`, not just `localhost`.

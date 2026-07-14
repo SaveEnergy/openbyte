@@ -62,7 +62,7 @@ Commands:
 
 Examples:
   openbyte server
-  openbyte client -p tcp -d download -t 30
+  openbyte client -d download -t 30 https://speed.example.com
   openbyte check --json https://speed.example.com
 `)
 }
