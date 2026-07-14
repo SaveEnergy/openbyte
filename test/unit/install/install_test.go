@@ -9,6 +9,9 @@ import (
 )
 
 func TestInstallChecksumManifestParsing(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("requires a POSIX shell (sh) on PATH")
+	}
 	dir := t.TempDir()
 	manifest := filepath.Join(dir, "checksums.txt")
 	archive := "openbyte_1.0.0_linux_amd64.tar.gz"

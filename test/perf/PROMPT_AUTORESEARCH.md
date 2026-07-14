@@ -33,7 +33,7 @@ To start a new run:
    - **`test/perf/README.md`** — how `perf-bench` / `perf-record` / `perf-compare` work.
    - **`scripts/perf/run_benchmarks.sh`** — flags, outputs (do **not** change without human OK).
    - **`test/perf/bench_packages.txt`** — which packages are in the suite (do **not** change without human OK).
-   - **Hot-path code** you intend to touch (e.g. `internal/api`, `internal/metrics`, `internal/jsonbody`, `internal/results`) — read before editing.
+   - **Hot-path code** you intend to touch (e.g. `internal/api`, `internal/jsonbody`, `internal/results`) — read before editing.
 5. **Verify toolchain**:
    - `go test` works for benchmark packages.
    - Comparisons: **`make perf-compare`** (uses **`benchstat`** on PATH, otherwise **`go run golang.org/x/perf/cmd/benchstat@latest`**). Optional: `go install golang.org/x/perf/cmd/benchstat@latest` for faster repeats.

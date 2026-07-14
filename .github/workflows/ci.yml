@@ -20,41 +20,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  changes:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      docker: ${{ steps.filter.outputs.docker }}
-      web: ${{ steps.filter.outputs.web }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 0
-      - name: Detect build-impacting changes
-        id: filter
-        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
-        with:
-          filters: |
-            docker:
-              - "docker/**"
-              - "cmd/**"
-              - "internal/**"
-              - "pkg/**"
-              - "api/**"
-              - "go.mod"
-              - "go.sum"
-              - "web/**"
-            web:
-              - "web/**"
-              - "package.json"
-              - "playwright.config.js"
-              - "scripts/run-playwright.mjs"
-              - "test/e2e/**"
-
   checks:
-    needs: changes
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -63,11 +29,24 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
+
+      # Playwright only runs on PRs that touch web-facing paths; pushes always run it.
+      - name: Detect web changes (PRs)
+        id: web-changes
+        if: github.event_name == 'pull_request'
+        run: |
+          if git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD" \
+            | grep -qE '^(web/|package\.json$|bun\.lock$|playwright\.config\.js$|scripts/run-playwright\.mjs$|test/e2e/)'; then
+            echo "web=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "web=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version: "1.26.x"
+          check-latest: true
           cache: true
 
       - name: Lint
@@ -109,12 +88,12 @@ jobs:
         run: go test ./... -race -short -p 1
 
       - name: Get Playwright version
-        if: github.event_name != 'pull_request' || needs.changes.outputs.web == 'true'
+        if: github.event_name != 'pull_request' || steps.web-changes.outputs.web == 'true'
         id: pw-version
         run: echo "version=$(bunx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
-        if: github.event_name != 'pull_request' || needs.changes.outputs.web == 'true'
+        if: github.event_name != 'pull_request' || steps.web-changes.outputs.web == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: pw-cache
         with:
@@ -122,15 +101,15 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
 
       - name: Install Playwright browsers
-        if: (github.event_name != 'pull_request' || needs.changes.outputs.web == 'true') && steps.pw-cache.outputs.cache-hit != 'true'
+        if: (github.event_name != 'pull_request' || steps.web-changes.outputs.web == 'true') && steps.pw-cache.outputs.cache-hit != 'true'
         run: bunx playwright install --with-deps
 
       - name: Install Playwright system deps
-        if: (github.event_name != 'pull_request' || needs.changes.outputs.web == 'true') && steps.pw-cache.outputs.cache-hit == 'true'
+        if: (github.event_name != 'pull_request' || steps.web-changes.outputs.web == 'true') && steps.pw-cache.outputs.cache-hit == 'true'
         run: bunx playwright install-deps
 
       - name: Playwright e2e
-        if: github.event_name != 'pull_request' || needs.changes.outputs.web == 'true'
+        if: github.event_name != 'pull_request' || steps.web-changes.outputs.web == 'true'
         run: env -u NO_COLOR bunx playwright test
 
   build-push:

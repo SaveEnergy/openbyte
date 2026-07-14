@@ -1,6 +1,6 @@
 module github.com/saveenergy/openbyte
 
-go 1.26.1
+go 1.26.5
 
 require (
 	golang.org/x/term v0.44.0

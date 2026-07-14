@@ -36,10 +36,7 @@ func (f *PlainFormatter) FormatComplete(results *StreamResults) {
 		fmt.Fprintf(f.writer, "latency_p95_ms=%.3f\n", results.Results.LatencyMs.P95Ms)
 		fmt.Fprintf(f.writer, "latency_p99_ms=%.3f\n", results.Results.LatencyMs.P99Ms)
 		fmt.Fprintf(f.writer, "jitter_ms=%.3f\n", results.Results.JitterMs)
-		fmt.Fprintf(f.writer, "packet_loss_percent=%.2f\n", results.Results.PacketLossPercent)
 		fmt.Fprintf(f.writer, "bytes_transferred=%d\n", results.Results.BytesTransferred)
-		fmt.Fprintf(f.writer, "packets_sent=%d\n", results.Results.PacketsSent)
-		fmt.Fprintf(f.writer, "packets_received=%d\n", results.Results.PacketsReceived)
 	}
 	if results.StartTime != "" {
 		fmt.Fprintf(f.writer, "start_time=%s\n", results.StartTime)

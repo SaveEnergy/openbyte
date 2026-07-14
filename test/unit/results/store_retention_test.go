@@ -35,6 +35,22 @@ func TestStoreTrimToMax(t *testing.T) {
 	}
 	store.Close()
 
+	// Rapid saves can share a created_at on coarse-timer platforms (Windows),
+	// making the trim tie-break keep rows by random id instead of insertion
+	// order. Assign strictly increasing timestamps so "oldest" is well-defined.
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf(storeOpenSQLiteFmt, err)
+	}
+	base := time.Now().UTC().Add(-time.Minute)
+	for i, id := range ids {
+		if _, execErr := db.Exec(`UPDATE results SET created_at = ? WHERE id = ?`,
+			base.Add(time.Duration(i)*time.Second), id); execErr != nil {
+			t.Fatalf("set created_at for %s: %v", id, execErr)
+		}
+	}
+	db.Close()
+
 	// Reopen — cleanup runs on startup, should trim to 3
 	store2, err := results.New(dbPath, 3)
 	if err != nil {

@@ -1,10 +1,6 @@
 package client
 
-import (
-	"fmt"
-	"strconv"
-	"strings"
-)
+import "fmt"
 
 func formatBytes(bytes int64) string {
 	const unit = 1024
@@ -17,22 +13,4 @@ func formatBytes(bytes int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.2f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
-}
-
-func formatNumber(n int64) string {
-	s := strconv.FormatInt(n, 10)
-	start := 0
-	var result strings.Builder
-	if len(s) > 0 && s[0] == '-' {
-		result.WriteByte('-')
-		start = 1
-	}
-	digits := s[start:]
-	for i, r := range digits {
-		if i > 0 && (len(digits)-i)%3 == 0 {
-			result.WriteString(",")
-		}
-		result.WriteRune(r)
-	}
-	return result.String()
 }

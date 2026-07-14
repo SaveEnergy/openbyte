@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Go 1.26.5 toolchain baseline** (`go.mod`, Docker builder image): fixes
+  GO-2026-5856 (Encrypted Client Hello privacy leak in `crypto/tls`) flagged by
+  the CI govulncheck gate. CI `setup-go` now uses `check-latest` so hosted
+  runners pick up the newest 1.26.x patch instead of a stale cached toolchain.
+  Dependabot now also watches `docker/Dockerfile` base images.
+
+### Fixed
+
+- **Compose env passthrough**: all four compose files now forward
+  `MAX_TEST_DURATION`, `LOG_LEVEL`, `PPROF_ENABLED`, `PPROF_ADDR`,
+  `PERF_STATS_INTERVAL`, and `RUNTIME_METRICS_ENABLED`, which `.env.example`
+  documents but the containers previously ignored. `PORT`/`BIND_ADDRESS`
+  remain container-internal by design (see `.env.example` note).
+
+### Removed
+
+- **Dead metrics code**: removed the unwired `internal/metrics` package (collector,
+  multi-stream aggregator, latency histogram) and the `pkg/types` RTT/NetworkInfo
+  collectors — none were referenced by production code since the TCP/UDP stack removal.
+  `pkg/types/network.go` shrank to the CORS host helpers (`pkg/types/host.go`).
+- **Always-zero CLI JSON fields**: `rtt`, `packet_loss_percent`, `packets_sent`,
+  `packets_received`, and `network` were never populated by the HTTP-only client and
+  are gone from CLI output; CLI JSON schema version is now `3.0`.
+- **Multi-server compose example**: removed `docker/docker-compose.multi.yaml` and the
+  multi-server sections in README/DEPLOYMENT. Run independent instances with their own
+  `PUBLIC_HOST`/`SERVER_NAME` if you want multiple regions.
+- **Stale env vars**: dropped `TCP_TEST_PORT`, `UDP_TEST_PORT`, `MAX_CONCURRENT_TESTS`,
+  and `MAX_STREAMS` from `.env.example` — the server never read them.
+
+### Changed
+
+- **CI/release dependency diet**: dropped `dorny/paths-filter` (replaced by a
+  `git diff` gate for PR Playwright runs), `docker/metadata-action` (image tags are
+  computed in shell), and `softprops/action-gh-release` (releases publish via `gh`).
+  Dependabot now groups Go and GitHub Actions updates into single weekly PRs.
+
 ## [0.10.2] - 2026-05-04
 
 ### Fixed

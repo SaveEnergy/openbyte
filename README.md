@@ -51,9 +51,6 @@ cd docker && docker compose up -d
 
 # With Traefik reverse proxy
 cd docker && docker compose -f docker-compose.yaml -f docker-compose.traefik.yaml up -d
-
-# Multi-server deployment
-cd docker && docker compose -f docker-compose.yaml -f docker-compose.multi.yaml --profile multi up -d
 ```
 
 ### Web Interface
@@ -65,10 +62,8 @@ Open `http://localhost:8080` — minimal fast.com-inspired UI with adaptive stre
 - **Protocols**: HTTP streaming for the Web UI, API, SDK, and CLI
 - **Test Types**: Download, Upload
 - **Metrics**: Throughput, idle latency, jitter, loaded latency, bufferbloat
-- **RTT**: Baseline and during-test round-trip time measurement
 - **Network Info**: Client IP and IPv6 detection
 - **Adaptive web test**: Browser UI ramps parallel HTTP streams automatically, then measures with the stream count that saturated the path; transfer loops run in a Web Worker to keep the UI responsive
-- **Multi-server**: Deploy globally, test against nearest server
 - **Output**: JSON, plain text, interactive CLI
 
 ## Measurement Methodology
@@ -76,7 +71,7 @@ Open `http://localhost:8080` — minimal fast.com-inspired UI with adaptive stre
 Uses BEREC-compliant measurement practices:
 
 - Adaptive Web Worker stream ramping plus dynamic warm-up with throughput stabilization detection (web UI); fixed warm-up via `--warmup` (CLI)
-- Baseline RTT measurement (10 samples before test)
+- Baseline latency measurement before each test
 - Metrics reset after warm-up for accurate results
 - Statistical reporting with P50, P95, P99 percentiles
 
@@ -172,7 +167,6 @@ cmd/
 internal/
   api/        # REST API + HTTP speed test handlers
   config/     # Configuration
-  metrics/    # Metrics aggregation + latency histogram
   results/    # SQLite results store
 pkg/
   types/      # Shared types

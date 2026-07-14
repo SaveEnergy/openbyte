@@ -9,7 +9,6 @@
 
 ### Performance
 
-- Fixed-bucket latency histogram (1ms buckets, 2s window) replaces sort-heavy percentile computation.
 - HTTP/UI speed logic uses warm-up gating and EWMA smoothing for stable live display.
 - Browser tests use adaptive HTTP stream ramping in a module Web Worker, then measure with the selected stream count.
 - **Advanced telemetry (policy)**: Future depth stays **server/internal first** (config-gated, logs, pprof). **Default Web UI** stays the simple speed test. **User-visible** detail requires **explicit opt-in** (env + UI or URL mode)—never default-on.
@@ -49,6 +48,7 @@
 - The former registry service/client/routes/config and web server selector were removed pre-1.0; use explicit URLs outside the app for multi-server comparisons.
 - The CLI client is HTTP-only; TCP/UDP CLI testing, bidirectional CLI mode, and installer/download web page were removed pre-1.0.
 - The server-side TCP/UDP stream stack, `/api/v1/stream/*`, websocket stream API, `cmd/loadtest`, and direct test ports were removed pre-1.0.
+- The unwired `internal/metrics` package, `pkg/types` RTT/NetworkInfo collectors, the always-zero CLI JSON fields (`rtt`, `packet_loss_percent`, `packets_*`, `network`), and the multi-server compose example were removed post-0.10; CLI JSON schema is `3.0`.
 - Go SDK (`pkg/client`): `Check`, `SpeedTest`, `Diagnose`, `Healthy`; implementation split across `client.go` + `client_{check,speedtest,diagnose,health,latency,download,upload}.go` (same exported API).
 - OpenAPI spec lives at `api/openapi.yaml`; CI/release lint it.
 - JSON output supports schema versioning and structured error contracts.
@@ -57,7 +57,7 @@
 
 - Docker exposes only **8080** (HTTP API + UI).
 - **Recovery**: Actions → `ci` → Run workflow on `main` if stuck; or `git fetch` via HTTPS if SSH fails.
-- **`build-push` + `deploy`** on every `main` push after `checks` (path filters do not skip Docker—doc-only can still roll images).
+- **`build-push` + `deploy`** on every `main` push after `checks` (no path filtering—doc-only pushes still roll images). PR Playwright runs are gated by a plain `git diff` check inside `checks` (no third-party filter action).
 - CI builds/pushes `edge` + `sha`; release publishes semver + `latest`.
 - **`release.yml` `deploy`**: same `vars`/secrets as CI; gate on **`needs.release.result == 'success'`** (not derived job booleans).
 - Deploy: **checkout first**, then `validate_env` → sync compose → remote `docker compose pull` + `up -d --force-recreate` → verify; scripts in **`scripts/deploy/`** (`validate_env`, `sync_compose`, `deploy_remote`).
@@ -104,7 +104,7 @@
 
 ### Prerequisites
 
-- **Go 1.26.1** (pre-installed in the VM).
+- **Go 1.26.5+** (`go.mod` baseline; `go` auto-downloads the toolchain if the VM preinstall is older).
 - **Node.js 22** + **bun** (install via `npm install -g bun` if missing).
 - JS dev deps: `bun install` in repo root (Playwright + Redocly CLI).
 - Playwright browser: `bunx playwright install chromium --with-deps`.
