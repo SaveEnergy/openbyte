@@ -284,7 +284,25 @@ func TestNDJSONFormatterCapturesWriteError(t *testing.T) {
 // --- SchemaVersion constant ---
 
 func TestSchemaVersionFormat(t *testing.T) {
-	if client.SchemaVersion != "2.0" {
-		t.Errorf("expected SchemaVersion 2.0, got %s", client.SchemaVersion)
+	if client.SchemaVersion != "3.0" {
+		t.Errorf("expected SchemaVersion 3.0, got %s", client.SchemaVersion)
+	}
+}
+
+// Schema 3.0 dropped the always-zero TCP/UDP-era fields; guard against them
+// reappearing in the JSON result output.
+func TestResultMetricsOmitsRemovedSchemaFields(t *testing.T) {
+	raw, err := json.Marshal(client.ResultMetrics{})
+	if err != nil {
+		t.Fatalf("marshal ResultMetrics: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		t.Fatalf("unmarshal ResultMetrics: %v", err)
+	}
+	for _, key := range []string{"rtt", "packet_loss_percent", "packets_sent", "packets_received", "network"} {
+		if _, ok := parsed[key]; ok {
+			t.Errorf("removed schema field %q still present in JSON output", key)
+		}
 	}
 }

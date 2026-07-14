@@ -15,6 +15,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runners pick up the newest 1.26.x patch instead of a stale cached toolchain.
   Dependabot now also watches `docker/Dockerfile` base images.
 
+### Fixed
+
+- **Compose env passthrough**: all four compose files now forward
+  `MAX_TEST_DURATION`, `LOG_LEVEL`, `PPROF_ENABLED`, `PPROF_ADDR`,
+  `PERF_STATS_INTERVAL`, and `RUNTIME_METRICS_ENABLED`, which `.env.example`
+  documents but the containers previously ignored. `PORT`/`BIND_ADDRESS`
+  remain container-internal by design (see `.env.example` note).
+
 ### Removed
 
 - **Dead metrics code**: removed the unwired `internal/metrics` package (collector,

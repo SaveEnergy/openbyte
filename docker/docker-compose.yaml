@@ -19,12 +19,18 @@ services:
       - MAX_CONCURRENT_PER_IP=${MAX_CONCURRENT_PER_IP:-64}
       - RATE_LIMIT_PER_IP=${RATE_LIMIT_PER_IP:-100}
       - GLOBAL_RATE_LIMIT=${GLOBAL_RATE_LIMIT:-1000}
+      - MAX_TEST_DURATION=${MAX_TEST_DURATION:-300s}
       - DATA_DIR=${DATA_DIR:-/app/data}
       - MAX_STORED_RESULTS=${MAX_STORED_RESULTS:-10000}
       - TLS_CERT_FILE=${TLS_CERT_FILE:-}
       - TLS_KEY_FILE=${TLS_KEY_FILE:-}
       - TLS_AUTO_GEN=${TLS_AUTO_GEN:-false}
       - HTTP2_ENABLED=${HTTP2_ENABLED:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - PPROF_ENABLED=${PPROF_ENABLED:-false}
+      - PPROF_ADDR=${PPROF_ADDR:-127.0.0.1:6060}
+      - PERF_STATS_INTERVAL=${PERF_STATS_INTERVAL:-}
+      - RUNTIME_METRICS_ENABLED=${RUNTIME_METRICS_ENABLED:-false}
     volumes:
       - openbyte-data:/app/data
     restart: unless-stopped
