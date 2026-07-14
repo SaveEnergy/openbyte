@@ -54,7 +54,7 @@ func buildServerFlagSet(cfg *config.Config) (*flag.FlagSet, *serverFlagValues) {
 		port:               fs.String("port", cfg.Port, "HTTP API port (env: PORT)"),
 		bindAddress:        fs.String("bind-address", cfg.BindAddress, "Bind address (env: BIND_ADDRESS)"),
 		serverName:         fs.String("server-name", cfg.ServerName, "Display name for this server (env: SERVER_NAME)"),
-		publicHost:         fs.String("public-host", cfg.PublicHost, "Public host for URLs (env: PUBLIC_HOST)"),
+		publicHost:         fs.String("public-host", cfg.PublicHost, "Reserved public host metadata; currently unused (env: PUBLIC_HOST)"),
 		capacityGbps:       fs.Int("capacity-gbps", cfg.CapacityGbps, "Capacity in Gbps (env: CAPACITY_GBPS)"),
 		maxConcurrentPerIP: fs.Int("max-concurrent-per-ip", cfg.MaxConcurrentPerIP, "Max concurrent tests per IP (env: MAX_CONCURRENT_PER_IP)"),
 		maxTestDuration:    fs.String(flagMaxTestDuration, cfg.MaxTestDuration.String(), "Max test duration, e.g. 300s (env: MAX_TEST_DURATION)"),

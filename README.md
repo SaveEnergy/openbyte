@@ -20,7 +20,7 @@
   </a>
 </p>
 
-High-performance browser-first network speed test server capable of 25 Gbit/s sustained throughput. HTTP streaming, adaptive multi-stream testing, latency, jitter, and bufferbloat measurement.
+High-performance browser-first network speed test server for multi-gigabit links. HTTP streaming, adaptive multi-stream testing, latency, jitter, and bufferbloat measurement.
 
 ## Quick Start
 
@@ -31,7 +31,7 @@ make build
 ./bin/openbyte server
 
 # With server flags (flags override env values when set)
-./bin/openbyte server --public-host speedtest.example.com
+./bin/openbyte server --server-name "Frankfurt 25G"
 ```
 
 ### CLI Client
@@ -64,11 +64,11 @@ Open `http://localhost:8080` — minimal fast.com-inspired UI with adaptive stre
 - **Metrics**: Throughput, idle latency, jitter, loaded latency, bufferbloat
 - **Network Info**: Client IP and IPv6 detection
 - **Adaptive web test**: Browser UI ramps parallel HTTP streams automatically, then measures with the stream count that saturated the path; transfer loops run in a Web Worker to keep the UI responsive
-- **Output**: JSON, plain text, interactive CLI
+- **Output**: JSON, NDJSON, plain text, interactive CLI
 
 ## Measurement Methodology
 
-Uses BEREC-compliant measurement practices:
+Current clients implement:
 
 - Adaptive Web Worker stream ramping plus dynamic warm-up with throughput stabilization detection (web UI); fixed warm-up via `--warmup` (CLI)
 - Baseline latency measurement before each test
@@ -83,29 +83,35 @@ Uses BEREC-compliant measurement practices:
 | --------------------- | ----------------- | ------------------------------------------------------------------ |
 | `PORT`                | 8080              | HTTP API port                                                      |
 | `SERVER_NAME`         | `openByte Server` | Display name shown in the Web UI and saved results                 |
-| `PUBLIC_HOST`         | —                 | Public hostname/IP                                                 |
+| `PUBLIC_HOST`         | —                 | Reserved compatibility value; does not change routing or result URLs |
 | `CAPACITY_GBPS`       | 25                | Server link capacity; HTTP concurrency limits auto-scale from this |
-| `MAX_CONCURRENT_PER_IP` | 64              | Concurrent speed-test streams allowed per client IP                |
-| `RATE_LIMIT_PER_IP`   | 100               | Rate limit per IP per minute                                       |
-| `GLOBAL_RATE_LIMIT`   | 1000              | Global rate limit per minute                                       |
+| `MAX_CONCURRENT_PER_IP` | 64              | Concurrent speed-test streams allowed per client IP and direction  |
+| `RATE_LIMIT_PER_IP`   | 100               | Per-IP requests/minute for version and result routes                |
+| `GLOBAL_RATE_LIMIT`   | 1000              | Global requests/minute for version and result routes                |
 | `TRUST_PROXY_HEADERS` | false             | Trust proxy headers for client IP                                  |
 | `TRUSTED_PROXY_CIDRS` | —                 | Comma-separated trusted proxy CIDRs                                |
 | `ALLOWED_ORIGINS`     | `*`               | Comma-separated CORS allowed origins                               |
 | `WEB_ROOT`            | _(embedded)_      | Override path to static web assets (for development)               |
 | `MAX_TEST_DURATION`   | `300s`            | Maximum test duration (Go duration format)                         |
 | `DATA_DIR`            | `./data`          | Path to SQLite database directory                                  |
-| `MAX_STORED_RESULTS`  | 10000             | Maximum stored test results (older results auto-purged)            |
+| `MAX_STORED_RESULTS`  | 10000             | Maximum stored results; results older than 90 days are also purged  |
 | `BIND_ADDRESS`        | `0.0.0.0`         | Address to bind listeners                                          |
 | `PPROF_ENABLED`       | false             | Enable pprof profiling server                                      |
 | `PPROF_ADDR`          | `127.0.0.1:6060`  | pprof server listen address                                        |
 | `PERF_STATS_INTERVAL` | —                 | Log runtime stats at this interval (e.g. `10s`)                    |
+| `RUNTIME_METRICS_ENABLED` | false         | Expose runtime data at `/debug/runtime-metrics`                     |
+| `LOG_LEVEL`           | `info`            | Logging level (`info` or `debug`)                                   |
+| `TLS_CERT_FILE` / `TLS_KEY_FILE` | —      | Serve TLS with this PEM pair; both values are required              |
+| `TLS_AUTO_GEN`        | false             | Generate an ephemeral self-signed localhost certificate for development |
+| `HTTP2_ENABLED`       | true              | Enable HTTP/2 when the server is serving TLS                        |
 
 Notes:
 
-- If you bind `127.0.0.1` only, open the UI at `http://127.0.0.1:PORT`, or set `PUBLIC_HOST` for stable generated URLs.
+- If you bind `127.0.0.1` only, open the UI at `http://127.0.0.1:PORT`.
+- `PUBLIC_HOST` / `--public-host` is currently parsed for compatibility only. Configure public DNS and reverse-proxy routing outside openByte; saved-result URLs are relative.
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
 - Default CORS allows all origins; set `ALLOWED_ORIGINS` to restrict (supports `*` and `*.example.com`).
-- If running behind a reverse proxy, keep upload body limits comfortably above the 8MB browser payload and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.
+- If running behind a reverse proxy, allow more than the browser's adaptive 64 MiB maximum request payload and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.
 - Server command supports flags for deployment (`openbyte server --help`). If both env var and flag are set, the flag wins.
 
 ### Deployment With Server Flags
@@ -114,10 +120,10 @@ Notes:
 # docker run
 docker run --rm -p 8080:8080 \
   ghcr.io/saveenergy/openbyte:latest \
-  server --public-host speed.example.com
+  --server-name="Frankfurt 25G"
 
 # docker compose service command override
-# command: ["server", "--public-host=speed.example.com"]
+# command: ["--server-name=Frankfurt 25G"]
 ```
 
 ### IPv4/IPv6 Detection
@@ -148,6 +154,8 @@ bunx playwright test
 # or
 make test-ui
 ```
+
+Playwright starts a local server on `127.0.0.1:8080`, or reuses one already running there.
 
 ## Documentation
 

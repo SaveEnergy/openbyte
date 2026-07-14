@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -133,6 +134,17 @@ func TestCreateFormatterSelection(t *testing.T) {
 				t.Fatalf("formatter type = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestCreateFormatterQuietDiscardsSuccessfulOutput(t *testing.T) {
+	formatter := createFormatter(&Config{Quiet: true})
+	plain, ok := formatter.(*PlainFormatter)
+	if !ok {
+		t.Fatalf("quiet formatter type = %T, want *PlainFormatter", formatter)
+	}
+	if plain.writer != io.Discard {
+		t.Fatal("quiet formatter should discard successful output")
 	}
 }
 

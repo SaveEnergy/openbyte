@@ -34,16 +34,16 @@ The human/agent quick reference is served at `/api.html`; the machine-readable c
 ## Frontend
 
 - Static assets are embedded with `//go:embed` and can be overridden with `WEB_ROOT` for development.
-- Speed tests use HTTP `/download`, `/upload`, and `/ping` only.
+- Speed tests use HTTP `/api/v1/download`, `/api/v1/upload`, and `/api/v1/ping` only.
 - Browser tests run in a module Web Worker where supported.
 - Adaptive ramping saturates the link, then measures using the selected stream count.
-- New top-level `web/*.js` / `web/*.css` files must be added to the static allowlist.
+- Any new top-level web asset (HTML, JavaScript, CSS, SVG, and so on) must be added to the static allowlist; font files under `web/fonts/` are allowlisted by extension.
 
 ## Backend
 
 - Routing uses stdlib `net/http.ServeMux` method patterns.
-- Download/upload handlers enforce bounded concurrency, per-IP limits, size/duration limits, and body draining on error paths.
-- Results use pure-Go SQLite (`modernc.org/sqlite`) with WAL mode, retention, and max-count cleanup.
+- Download/upload handlers enforce bounded concurrency, per-IP limits, configured maximum duration, body deadlines, and body draining on error paths; download chunk requests are also range-checked. Upload bodies are read until EOF or the configured deadline and do not have a byte limit.
+- Results use pure-Go SQLite (`modernc.org/sqlite`) with WAL mode, 90-day retention, and max-count cleanup.
 - Config comes from defaults, environment, then CLI flags.
 
 ## Deployment

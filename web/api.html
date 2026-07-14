@@ -87,7 +87,9 @@
             </li>
             <li>
               <strong>Optional share</strong>
-              persist a summary with <code>POST /api/v1/results</code>.
+              persist a summary with <code>POST /api/v1/results</code>. Results
+              expire after 90 days and may be pruned sooner by the server's
+              maximum-result limit.
             </li>
           </ol>
         </section>
@@ -116,7 +118,8 @@
               <div class="api-method get">GET</div>
               <h3><code>/api/v1/download</code></h3>
               <p>
-                Binary stream. Query: <code>duration=1..300</code>,
+                Binary stream. Query: <code>duration=1..server maximum</code>
+                (300 seconds by default),
                 <code>chunk=65536..4194304</code>.
               </p>
             </article>
@@ -124,14 +127,24 @@
               <div class="api-method post">POST</div>
               <h3><code>/api/v1/upload</code></h3>
               <p>
-                Reads an octet-stream body and returns bytes, duration, and
-                throughput.
+                Reads raw request-body bytes until EOF or the server's maximum
+                test duration, then returns bytes, duration, and throughput.
+                Clients should send
+                <code>application/octet-stream</code>.
               </p>
             </article>
             <article class="api-card">
               <div class="api-method post">POST</div>
               <h3><code>/api/v1/results</code></h3>
-              <p>Save a result summary. Returns an 8-character result ID.</p>
+              <p>
+                Save a result summary. Returns an 8-character result ID and a
+                relative result-page URL.
+              </p>
+            </article>
+            <article class="api-card">
+              <div class="api-method get">GET</div>
+              <h3><code>/api/v1/results/{id}</code></h3>
+              <p>Fetch a saved result by its 8-character ID.</p>
             </article>
           </div>
         </section>
@@ -167,7 +180,9 @@ async function downloadMbps(seconds = 5, base = location.origin) {
 
 async function uploadOnce(size = 1048576, base = location.origin) {
   const payload = new Uint8Array(size);
-  crypto.getRandomValues(payload);
+  for (let offset = 0; offset < payload.length; offset += 65536) {
+    crypto.getRandomValues(payload.subarray(offset, offset + 65536));
+  }
   const res = await fetch(`${base}/api/v1/upload`, {
     method: "POST",
     headers: { "Content-Type": "application/octet-stream" },
@@ -181,10 +196,14 @@ async function uploadOnce(size = 1048576, base = location.origin) {
         <section class="api-section api-note" aria-labelledby="notesTitle">
           <h2 class="api-section-title" id="notesTitle">Agent notes</h2>
           <ul>
-            <li>No authentication is required by default.</li>
             <li>
-              Rate limits and server capacity return JSON errors; respect
-              <code>Retry-After</code> when present.
+              openByte does not implement authentication; protect private
+              deployments at the reverse proxy.
+            </li>
+            <li>
+              Version and result routes can return <code>429</code>; transfer
+              endpoints use concurrency limits and can return <code>503</code>.
+              Respect <code>Retry-After</code> when present.
             </li>
             <li>
               The canonical OpenAPI spec lives in

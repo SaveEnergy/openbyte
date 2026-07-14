@@ -4,6 +4,7 @@ services:
     container_name: traefik
     command:
       - "--api.dashboard=true"
+      - "--ping=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=traefik"

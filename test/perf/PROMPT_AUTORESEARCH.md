@@ -69,7 +69,7 @@ make perf-compare | tee build/perf/benchstat.log
 
 **What you MAY do**
 
-- Edit **application code** on agreed hot paths (handlers, metrics, jsonbody, results, speedtest paths, etc.).
+- Edit **application code** on agreed hot paths (handlers, jsonbody, results, speed-test paths, etc.).
 - Refactor **if** it reduces work per request / per tick / per allocation and **`go test ./... -short`** + **`make ci-lint`** stay green.
 
 **What you MUST NOT do (without explicit human approval)**
@@ -189,7 +189,7 @@ Branch: **`autoresearch/perf-N`** where **`N`** is the id from **`test/perf/auto
 
 ## Optional: anchor benchmarks
 
-For simpler decisions, the human may name **1–3 anchor** benchmarks (e.g. `BenchmarkStoreSave`, `BenchmarkRespondJSON`, `BenchmarkReadUploadBody`, `BenchmarkDecodeSingleObject`, `BenchmarkLatencyHistogramRecord`, `BenchmarkSpeedtestDownload`). Optimize primarily for those; still **avoid** large regressions on the rest of the suite.
+For simpler decisions, the human may name **1–3 anchor** benchmarks (e.g. `BenchmarkStoreSave`, `BenchmarkRespondJSON`, `BenchmarkReadUploadBody`, `BenchmarkDecodeSingleObject`, `BenchmarkSpeedTestPing`, `BenchmarkWriteChunkFromSource`). Optimize primarily for those; still **avoid** large regressions on the rest of the suite.
 
 ---
 
@@ -198,4 +198,4 @@ For simpler decisions, the human may name **1–3 anchor** benchmarks (e.g. `Ben
 - **`test/perf/AUTORESEARCH_CURSOR_COMMAND.md`** — Cursor **`/autoresearch`** body (install into **`.cursor/commands/`**).
 - **`test/perf/README.md`** — commands, baseline setup, **`autoresearch_counter.txt`**.
 - **`test/perf/autoresearch_counter.txt`** — next branch id **`N`** for **`autoresearch/perf-N`**.
-- **`AGENTS.md`** — performance architecture, nightly bench artifacts, **post-merge autoresearch cleanup** (delete branch, bump counter).
+- **`AGENTS.md`** — performance architecture, CI policy, and verification commands.
