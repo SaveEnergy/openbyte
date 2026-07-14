@@ -88,7 +88,6 @@ export function resetToIdle() {
   state.uploadResult = 0;
   state.latencyResult = null;
   state.jitterResult = null;
-  state.diagnostics = null;
   state.downloadLatency = 0;
   state.uploadLatency = 0;
   state.resultId = null;
@@ -125,7 +124,6 @@ export async function saveAndEnableShare() {
         ipv4: state.networkInfo.ipv4 || "",
         ipv6: state.networkInfo.ipv6 || "",
         server_name: resolveServerName(),
-        ...(state.diagnostics && { diagnostics: state.diagnostics }),
       }),
     });
     if (!res.ok) {

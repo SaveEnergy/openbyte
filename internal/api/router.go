@@ -85,7 +85,7 @@ func (r *Router) SetupRoutes() http.Handler {
 	r.registerResultsPageRoute(mux, webFS)
 
 	staticHandler := staticCacheMiddleware(newStaticAllowlistHandler(webFS))
-	mux.Handle("/", gzipMiddleware(staticHandler))
+	mux.Handle("/", staticHandler)
 
 	return r.wrapMiddlewares(mux)
 }

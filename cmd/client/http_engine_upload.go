@@ -1,13 +1,12 @@
 package client
 
 import (
-	"bytes"
 	"context"
-	"net/http"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
+
+	"github.com/saveenergy/openbyte/internal/httptransfer"
 )
 
 func (e *HTTPTestEngine) runUpload(ctx context.Context) error {
@@ -35,28 +34,17 @@ func (e *HTTPTestEngine) runUploadStream(ctx context.Context, reqURL string, dea
 	time.Sleep(delay)
 	now := time.Now()
 	for now.Before(deadline) && ctx.Err() == nil {
-		reader := bytes.NewReader(e.uploadPayload)
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, reader)
+		err := httptransfer.Upload(ctx, e.client, reqURL, e.uploadPayload)
 		if err != nil {
-			return err
-		}
-		req.Header.Set("Content-Type", "application/octet-stream")
-
-		resp, err := e.client.Do(req)
-		if err != nil {
-			drainAndClose(resp)
+			if statusErr := asHTTPStatusError(err); statusErr != nil {
+				return e.handleNonOKResponse(ctx, "upload", statusErr)
+			}
 			if ctx.Err() != nil {
 				return nil
 			}
 			return err
 		}
 
-		if resp.StatusCode != http.StatusOK {
-			return e.handleNonOKResponse(ctx, "upload", resp)
-		}
-		drainAndClose(resp)
-
-		atomic.AddInt64(&e.bytesSent, int64(len(e.uploadPayload)))
 		e.addBytes(int64(len(e.uploadPayload)), e.elapsedSinceStart())
 		now = time.Now()
 	}
