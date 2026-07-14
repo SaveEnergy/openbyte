@@ -107,7 +107,7 @@ func executeClientRun(
 	formatter OutputFormatter,
 	interrupted *atomic.Bool,
 ) int {
-	if err := runStream(ctx, config, formatter); err != nil {
+	if err := runHTTPStream(ctx, config, formatter); err != nil {
 		if interrupted.Load() && errors.Is(err, context.Canceled) {
 			return exitInterrupt
 		}

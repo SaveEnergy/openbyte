@@ -69,7 +69,9 @@ type Config struct {
 
 // SchemaVersion is the semantic version of the JSON output schema.
 // Bump major on breaking changes; minor on additive changes.
-const SchemaVersion = "2.0"
+// 3.0: removed always-zero rtt, packet_loss_percent, packets_sent,
+// packets_received, and network fields left over from the TCP/UDP era.
+const SchemaVersion = "3.0"
 
 type StreamResults struct {
 	SchemaVersion   string                     `json:"schema_version"`
@@ -104,13 +106,8 @@ type ResultMetrics struct {
 	ThroughputMbps    float64              `json:"throughput_mbps"`
 	ThroughputAvgMbps float64              `json:"throughput_avg_mbps"`
 	LatencyMs         types.LatencyMetrics `json:"latency_ms"`
-	RTT               types.RTTMetrics     `json:"rtt"`
 	JitterMs          float64              `json:"jitter_ms"`
-	PacketLossPercent float64              `json:"packet_loss_percent"`
 	BytesTransferred  int64                `json:"bytes_transferred"`
-	PacketsSent       int64                `json:"packets_sent"`
-	PacketsReceived   int64                `json:"packets_received"`
-	Network           *types.NetworkInfo   `json:"network,omitempty"`
 }
 
 type EngineMetrics struct {
@@ -119,8 +116,6 @@ type EngineMetrics struct {
 	BytesSent        int64
 	BytesReceived    int64
 	Latency          LatencyStats
-	RTT              types.RTTMetrics
-	Network          *types.NetworkInfo
 	JitterMs         float64
 	Elapsed          time.Duration
 	Running          bool

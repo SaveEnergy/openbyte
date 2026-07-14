@@ -64,14 +64,7 @@ func (f *InteractiveFormatter) FormatComplete(results *StreamResults) {
 	fmt.Fprintf(f.writer, "  %.3f ms (p95)\n", r.LatencyMs.P95Ms)
 	fmt.Fprintf(f.writer, "  %.3f ms (p99)\n", r.LatencyMs.P99Ms)
 	fmt.Fprintf(f.writer, " %s %.3f ms\n", c("35", "Jitter:"), r.JitterMs)
-	lossColor := "32"
-	if r.PacketLossPercent > 1.0 {
-		lossColor = "31"
-	}
-	fmt.Fprintf(f.writer, " %s %.2f%%\n", c(lossColor, "Packet Loss:"), r.PacketLossPercent)
 	fmt.Fprintf(f.writer, " %s %s transferred\n", c("37", "Bytes:"), formatBytes(r.BytesTransferred))
-	fmt.Fprintf(f.writer, " %s %s sent\n", c("37", "Packets:"), formatNumber(r.PacketsSent))
-	fmt.Fprintf(f.writer, "  %s received\n", formatNumber(r.PacketsReceived))
 }
 
 func (f *InteractiveFormatter) FormatError(err error) {

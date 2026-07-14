@@ -222,31 +222,6 @@ curl http://localhost:8080/health
 ./bin/openbyte client https://speedtest.example.com -d download -t 10
 ```
 
-## Multi-Server Deployment
-
-### Server Configuration
-
-Each server needs its own public host:
-
-```bash
-# Server 1 (NYC)
-PUBLIC_HOST=nyc.speedtest.example.com
-SERVER_NAME="New York 10G"
-
-# Server 2 (AMS)
-PUBLIC_HOST=ams.speedtest.example.com
-SERVER_NAME="Amsterdam 10G"
-```
-
-### Client Usage
-
-Point the client at the server you want to test:
-
-```bash
-openbyte client https://nyc.speedtest.example.com -d download
-openbyte client https://ams.speedtest.example.com -d download
-```
-
 ## Reverse Proxy (Nginx)
 
 ```nginx

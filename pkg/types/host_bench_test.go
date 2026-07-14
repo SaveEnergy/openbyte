@@ -23,15 +23,3 @@ func BenchmarkStripHostPort(b *testing.B) {
 		_ = StripHostPort(host)
 	}
 }
-
-// BenchmarkNetworkInfoSetClientIP exercises sanitize + IPv6 flag (colon probe).
-func BenchmarkNetworkInfoSetClientIP(b *testing.B) {
-	const addr = "[2001:db8::1]:443"
-	var n NetworkInfo
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		n.SetClientIP(addr)
-	}
-}
