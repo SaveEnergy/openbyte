@@ -34,7 +34,7 @@ services:
       - "traefik.http.routers.dashboard.service=api@internal"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "traefik", "healthcheck"]
+      test: ["CMD", "traefik", "healthcheck", "--ping=true"]
       interval: 30s
       timeout: 5s
       retries: 3
