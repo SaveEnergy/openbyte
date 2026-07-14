@@ -55,8 +55,8 @@ const (
 	storeBeginExclusiveSQL        = "BEGIN EXCLUSIVE"
 	storeRollbackSQL              = "ROLLBACK"
 	storeCommitSQL                = "COMMIT"
-	storeLockReleaseDelay         = 7 * time.Second
-	storeMinLockWait              = 5 * time.Second
+	storeLockReleaseDelay         = 80 * time.Millisecond
+	storeMinLockWait              = 50 * time.Millisecond
 	storeCacheNoStore             = "no-store"
 	storeTrimmedErrFmt            = "expected id %s to be trimmed, but found it"
 	storeRemainErrFmt             = "expected id %s to remain, but not found"

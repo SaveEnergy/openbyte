@@ -145,6 +145,9 @@ server_url: https://speedtest.example.com
 chunk_size: 1048576
 ```
 
+The configuration file is limited to 64 KiB, must contain at most one YAML document,
+and rejects unknown keys.
+
 ## Testing
 
 ### UI E2E (Playwright)

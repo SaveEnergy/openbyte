@@ -8,15 +8,16 @@ import (
 
 const (
 	sqliteMaxOpenConns = 3
-	sqliteBusyTimeout  = 5000
+	sqliteBusyTimeout  = 0 // Go owns busy retries so request cancellation stays responsive.
 )
 
 type execContexter interface {
 	ExecContext(context.Context, string, ...any) (sql.Result, error)
 }
 
-func migrate(db *sql.DB) error {
-	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS results (
+func migrate(execer execContexter) error {
+	ctx := context.Background()
+	_, err := execWithBusyRetry(ctx, execer, `CREATE TABLE IF NOT EXISTS results (
 		id TEXT PRIMARY KEY,
 		download_mbps REAL NOT NULL,
 		upload_mbps REAL NOT NULL,
@@ -32,7 +33,11 @@ func migrate(db *sql.DB) error {
 	if err != nil {
 		return err
 	}
-	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_results_created_at ON results(created_at)`)
+	_, err = execWithBusyRetry(
+		ctx,
+		execer,
+		`CREATE INDEX IF NOT EXISTS idx_results_created_at ON results(created_at)`,
+	)
 	return err
 }
 
@@ -60,14 +65,14 @@ func configureSQLitePool(db *sql.DB, count int) error {
 }
 
 func configureSQLitePragmas(ctx context.Context, execer execContexter) error {
-	if _, err := execer.ExecContext(ctx, "PRAGMA journal_mode=WAL"); err != nil {
-		return fmt.Errorf("set WAL mode: %w", err)
-	}
-	if _, err := execer.ExecContext(ctx, "PRAGMA synchronous=NORMAL"); err != nil {
-		return fmt.Errorf("set synchronous mode: %w", err)
-	}
 	if _, err := execer.ExecContext(ctx, fmt.Sprintf("PRAGMA busy_timeout=%d", sqliteBusyTimeout)); err != nil {
 		return fmt.Errorf("set busy_timeout: %w", err)
+	}
+	if _, err := execWithBusyRetry(ctx, execer, "PRAGMA journal_mode=WAL"); err != nil {
+		return fmt.Errorf("set WAL mode: %w", err)
+	}
+	if _, err := execWithBusyRetry(ctx, execer, "PRAGMA synchronous=NORMAL"); err != nil {
+		return fmt.Errorf("set synchronous mode: %w", err)
 	}
 	return nil
 }

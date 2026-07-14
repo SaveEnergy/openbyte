@@ -1,6 +1,7 @@
 package results_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -23,7 +24,7 @@ func TestStoreSaveAndGet(t *testing.T) {
 		ServerName:       "Test Server",
 	}
 
-	id, err := store.Save(r)
+	id, err := store.Save(context.Background(), r)
 	if err != nil {
 		t.Fatalf(storeSaveFmt, err)
 	}
@@ -31,7 +32,7 @@ func TestStoreSaveAndGet(t *testing.T) {
 		t.Fatalf(storeExpectedIDLenFmt, id)
 	}
 
-	got, err := store.Get(id)
+	got, err := store.Get(context.Background(), id)
 	if err != nil {
 		t.Fatalf(storeGetFmt, err)
 	}
@@ -56,7 +57,7 @@ func TestStoreGetNotFound(t *testing.T) {
 	store, cleanup := tempStore(t, 100)
 	defer cleanup()
 
-	got, err := store.Get("abcd1234")
+	got, err := store.Get(context.Background(), "abcd1234")
 	if err != nil {
 		t.Fatalf(storeGetFmt, err)
 	}
@@ -82,7 +83,7 @@ func TestGenerateIDUsesValidCharset(t *testing.T) {
 	seen := make(map[rune]struct{})
 
 	for range samples {
-		id, err := store.Save(results.Result{
+		id, err := store.Save(context.Background(), results.Result{
 			DownloadMbps: 1, UploadMbps: 1, LatencyMs: 1, JitterMs: 1,
 		})
 		if err != nil {

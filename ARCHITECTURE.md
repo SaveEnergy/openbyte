@@ -43,7 +43,7 @@ The human/agent quick reference is served at `/api.html`; the machine-readable c
 
 - Routing uses stdlib `net/http.ServeMux` method patterns.
 - Download/upload handlers enforce bounded concurrency, per-IP limits, configured maximum duration, body deadlines, and body draining on error paths; download chunk requests are also range-checked. Upload bodies are read until EOF or the configured deadline and do not have a byte limit.
-- Results use pure-Go SQLite (`modernc.org/sqlite`) with WAL mode, 90-day retention, and max-count cleanup.
+- Results use pure-Go SQLite (`modernc.org/sqlite`) with WAL mode, 90-day retention, max-count cleanup, and cancellation-aware lock retries.
 - Config comes from defaults, environment, then CLI flags.
 
 ## Deployment

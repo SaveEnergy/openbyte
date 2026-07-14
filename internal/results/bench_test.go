@@ -2,6 +2,7 @@ package results
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -87,6 +88,7 @@ func BenchmarkValidResultIDReject(b *testing.B) {
 // BenchmarkStoreSave is INSERT throughput on the results SQLite path (:memory:).
 func BenchmarkStoreSave(b *testing.B) {
 	s := benchOpenStore(b)
+	ctx := context.Background()
 	r := Result{
 		DownloadMbps:     100,
 		UploadMbps:       20,
@@ -101,7 +103,7 @@ func BenchmarkStoreSave(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if _, err := s.Save(r); err != nil {
+		if _, err := s.Save(ctx, r); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -110,7 +112,8 @@ func BenchmarkStoreSave(b *testing.B) {
 // BenchmarkStoreGetByID is repeated SELECT for a fixed row (Save once outside the timer).
 func BenchmarkStoreGetByID(b *testing.B) {
 	s := benchOpenStore(b)
-	id, err := s.Save(Result{
+	ctx := context.Background()
+	id, err := s.Save(ctx, Result{
 		DownloadMbps:     200,
 		UploadMbps:       40,
 		LatencyMs:        8,
@@ -127,7 +130,7 @@ func BenchmarkStoreGetByID(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		got, err := s.Get(id)
+		got, err := s.Get(ctx, id)
 		if err != nil || got == nil {
 			b.Fatalf("get: err=%v got=%v", err, got)
 		}
