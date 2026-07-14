@@ -38,7 +38,9 @@ type Config struct {
 
 	TLSCertFile string
 	TLSKeyFile  string
-	TLSAutoGen  bool // Auto-generate self-signed cert for dev
+	TLSAutoGen  bool // Auto-generate a self-signed cert for dev when explicitly enabled.
+
+	HTTP2Enabled bool
 }
 
 func DefaultConfig() *Config {
@@ -58,7 +60,7 @@ func DefaultConfig() *Config {
 		PerfStatsInterval:  0,
 		RuntimeMetrics:     false,
 		RateLimitPerIP:     100,
-		MaxConcurrentPerIP: 10,
+		MaxConcurrentPerIP: 64,
 		GlobalRateLimit:    1000,
 		TrustProxyHeaders:  false,
 		TrustedProxyCIDRs:  nil,
@@ -68,7 +70,8 @@ func DefaultConfig() *Config {
 		MaxStoredResults:   10000,
 		TLSCertFile:        "",
 		TLSKeyFile:         "",
-		TLSAutoGen:         true, // Auto-generate for dev by default
+		TLSAutoGen:         false,
+		HTTP2Enabled:       true,
 	}
 }
 

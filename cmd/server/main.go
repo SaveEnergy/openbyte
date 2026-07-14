@@ -77,10 +77,9 @@ func Run(args []string, version string) int {
 		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
 		WriteTimeout:      cfg.WriteTimeout,
 		IdleTimeout:       cfg.IdleTimeout,
-		HTTP2: &http.HTTP2Config{
-			StrictMaxConcurrentRequests: true,
-		},
+		HTTP2:             speedtestHTTP2Config(cfg),
 	}
+	configureHTTPProtocols(cfg, srv)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
@@ -94,4 +93,27 @@ func Run(args []string, version string) int {
 
 	logging.Info("Server stopped")
 	return exitCode
+}
+
+func speedtestHTTP2Config(cfg *config.Config) *http.HTTP2Config {
+	maxStreams := 100
+	if cfg != nil {
+		maxStreams = max(maxStreams, cfg.MaxConcurrentHTTP())
+	}
+	const receiveWindow = 4*1024*1024 - 1
+	return &http.HTTP2Config{
+		MaxConcurrentStreams:          maxStreams,
+		MaxReadFrameSize:              1024 * 1024,
+		MaxReceiveBufferPerConnection: receiveWindow,
+		MaxReceiveBufferPerStream:     receiveWindow,
+	}
+}
+
+func configureHTTPProtocols(cfg *config.Config, srv *http.Server) {
+	if cfg == nil || cfg.HTTP2Enabled {
+		return
+	}
+	protocols := new(http.Protocols)
+	protocols.SetHTTP1(true)
+	srv.Protocols = protocols
 }

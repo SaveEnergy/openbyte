@@ -152,6 +152,7 @@ RestartSec=5
 Environment="PUBLIC_HOST=speedtest.example.com"
 Environment="PORT=8080"
 Environment="CAPACITY_GBPS=25"
+Environment="MAX_CONCURRENT_PER_IP=64"
 Environment="RATE_LIMIT_PER_IP=100"
 Environment="GLOBAL_RATE_LIMIT=1000"
 Environment="TRUST_PROXY_HEADERS=true"
@@ -267,7 +268,7 @@ server {
 
 **Reverse proxy upload limits (important):**
 
-Speed tests upload multi-megabyte request bodies (default ~4MB per request, repeated). Many reverse proxies default to 1MB and will reject or buffer uploads, which can produce errors or unrealistic upload speeds.
+Speed tests upload multi-megabyte request bodies (default 8MB per browser request, repeated). Many reverse proxies default to 1MB and will reject or buffer uploads, which can produce errors or unrealistic upload speeds.
 
 Minimum recommendations:
 
@@ -277,6 +278,30 @@ Minimum recommendations:
 - If you enable HTTP/2 or HTTP/3 at the proxy edge, keep the upstream to OpenByte as HTTP/1.1 for `/api/v1/upload`.
 
 When running behind a proxy, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges so rate limiting and client IP logging are accurate.
+
+## 25 Gbit/s Deployment Notes
+
+For 25 Gbit/s tests, prefer a direct data path for `/api/v1/download`, `/api/v1/upload`, and `/api/v1/ping`:
+
+- Run openByte with direct TLS (`TLS_CERT_FILE` and `TLS_KEY_FILE`) or route the speed-test API paths around the TLS proxy. A reverse proxy copies every byte and can become the bottleneck before openByte does.
+- For local proof runs, `TLS_AUTO_GEN=1` serves HTTPS with an ephemeral self-signed localhost certificate. Do not use it for public deployments.
+- Keep `HTTP2_ENABLED=true` by default, but benchmark `HTTP2_ENABLED=false` for browser speed-test endpoints on target hardware. On the 4-vCPU Cloud VM, direct TLS with HTTP/1.1 measured **20.38 Gbit/s download / 13.11 Gbit/s upload** median, while direct TLS with HTTP/2 measured **11.26 Gbit/s / 8.77 Gbit/s**.
+- The bundled Traefik HTTPS routers default to `TRAEFIK_TLS_OPTIONS=openbyte-h1@file`, which advertises HTTP/1.1 only for the browser data path. On the 4-vCPU Cloud VM, local Traefik h1-only measured **15.11 Gbit/s download / 12.66 Gbit/s upload** median, while Traefik h2 measured **9.95 Gbit/s / 7.97 Gbit/s**. Set `TRAEFIK_TLS_OPTIONS=openbyte-h2@file` only when you intentionally want to compare Traefik HTTP/2.
+- Use host networking for Docker deployments when the server is dedicated to speed tests. Docker bridge/NAT adds per-packet CPU cost at high packet rates.
+- Keep `CAPACITY_GBPS=25` and `MAX_CONCURRENT_PER_IP=64` unless you deliberately restrict single-client stream count.
+- Disable request buffering on upload routes. Buffering changes a live upload test into a proxy store-and-forward test.
+
+Tune the host network stack to match the bandwidth-delay product of the link. Example starting point:
+
+```bash
+sudo sysctl -w net.core.rmem_max=134217728
+sudo sysctl -w net.core.wmem_max=134217728
+sudo sysctl -w net.ipv4.tcp_rmem='4096 131072 134217728'
+sudo sysctl -w net.ipv4.tcp_wmem='4096 65536 134217728'
+sudo sysctl -w net.ipv4.tcp_congestion_control=bbr
+```
+
+Also verify NIC RSS queues, IRQ affinity, CPU frequency governor, and jumbo MTU only when the full path supports it.
 
 ## Reverse Proxy (Traefik)
 
@@ -302,24 +327,27 @@ docker network inspect traefik --format '{{ (index .IPAM.Config 0).Subnet }}'
 
 For reliable upload tests through Traefik:
 
-- Ensure the upload router allows large request bodies (e.g. 35MB).
-- Apply buffering middleware only to `/api/v1/upload` to avoid impacting download streams.
+- Ensure any request body limit is comfortably above the browser upload payload.
+- Do not use Traefik buffering middleware on `/api/v1/upload`; it prevents live upload streaming and can spill speed-test data to disk.
 
-The provided Traefik compose files include a dedicated upload router with a 35MB request body limit.
+The provided Traefik compose files include dedicated upload routers without buffering middleware.
+
+The HTTPS routers also use `docker/traefik-openbyte.yaml` via Traefik's file
+provider. By default, `openbyte-h1@file` restricts ALPN to HTTP/1.1 for the
+openByte routers, avoiding the slower h2 browser path measured on the Cloud VM.
+Use `TRAEFIK_TLS_OPTIONS=openbyte-h2@file` for explicit h2 comparison runs.
 
 **Environment variables:**
 
-| Variable                    | Default               | Description                                      |
-| --------------------------- | --------------------- | ------------------------------------------------ |
-| `TRAEFIK_HOST_RULE`         | `Host(\`speedtest.localhost\`)` | Traefik router `Host(...)` rule (GHCR overlay) |
-| `TRAEFIK_APEX_REDIRECT_RULE`| _(disabled)_          | Optional apex `Host(...)` rule for parent-domain redirect |
-| `TRAEFIK_CANONICAL_HOST`    | _(disabled)_          | Redirect target hostname when apex rule is set   |
-| `TRAEFIK_HOST`              | `speedtest.localhost` | Domain for HTTP routing (dev `docker-compose.traefik.yaml`) |
-| `TRAEFIK_ENTRYPOINT`          | `web`                 | Traefik entrypoint name                          |
-| `TRAEFIK_NETWORK`           | `traefik`             | External network name                            |
-| `TRAEFIK_CERTRESOLVER`      | `letsencrypt`         | TLS cert resolver                                |
+| Variable               | Default              | Description                                          |
+| ---------------------- | -------------------- | ---------------------------------------------------- |
+| `TRAEFIK_HOST`         | `speedtest.localhost` | Domain for HTTP routing                              |
+| `TRAEFIK_ENTRYPOINT`   | `web`                | Traefik entrypoint name                              |
+| `TRAEFIK_NETWORK`      | `traefik`            | External network name                                |
+| `TRAEFIK_CERTRESOLVER` | `letsencrypt`        | TLS cert resolver                                    |
+| `TRAEFIK_TLS_OPTIONS`  | `openbyte-h1@file`   | TLS ALPN policy for openByte HTTPS routers           |
 
-**Important:** openByte is HTTP-only; expose or proxy only port 8080.
+**Important:** openByte serves the HTTP API and UI on one listener; expose or proxy only port 8080 (or the configured `PORT`), whether that listener is plain HTTP or direct TLS.
 
 ## IPv4/IPv6 Detection
 

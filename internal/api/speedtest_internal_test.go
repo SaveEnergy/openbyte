@@ -35,3 +35,9 @@ func TestUploadReadDeadline(t *testing.T) {
 		t.Fatalf("default deadline = %v, want %v", got, start.Add(300*time.Second))
 	}
 }
+
+func TestUploadReadBufferSizedForHighThroughput(t *testing.T) {
+	if uploadReadBufferSize != 1024*1024 {
+		t.Fatalf("uploadReadBufferSize = %d, want 1048576", uploadReadBufferSize)
+	}
+}

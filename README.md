@@ -90,6 +90,7 @@ Uses BEREC-compliant measurement practices:
 | `SERVER_NAME`         | `openByte Server` | Display name shown in the Web UI and saved results                 |
 | `PUBLIC_HOST`         | —                 | Public hostname/IP                                                 |
 | `CAPACITY_GBPS`       | 25                | Server link capacity; HTTP concurrency limits auto-scale from this |
+| `MAX_CONCURRENT_PER_IP` | 64              | Concurrent speed-test streams allowed per client IP                |
 | `RATE_LIMIT_PER_IP`   | 100               | Rate limit per IP per minute                                       |
 | `GLOBAL_RATE_LIMIT`   | 1000              | Global rate limit per minute                                       |
 | `TRUST_PROXY_HEADERS` | false             | Trust proxy headers for client IP                                  |
@@ -109,7 +110,7 @@ Notes:
 - If you bind `127.0.0.1` only, open the UI at `http://127.0.0.1:PORT`, or set `PUBLIC_HOST` for stable generated URLs.
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
 - Default CORS allows all origins; set `ALLOWED_ORIGINS` to restrict (supports `*` and `*.example.com`).
-- If running behind a reverse proxy, increase max request body size (e.g. 35MB) and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.
+- If running behind a reverse proxy, keep upload body limits comfortably above the 8MB browser payload and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.
 - Server command supports flags for deployment (`openbyte server --help`). If both env var and flag are set, the flag wins.
 
 ### Deployment With Server Flags

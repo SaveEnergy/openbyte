@@ -1,6 +1,7 @@
 package server
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -93,5 +94,57 @@ func TestCapacityGbpsFlagBypassValidation(t *testing.T) {
 	}
 	if cfg.Validate() == nil {
 		t.Fatal("expected validation error for capacity-gbps=0")
+	}
+}
+
+func TestSpeedtestHTTP2ConfigUsesThroughputTuning(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.CapacityGbps = 25
+
+	h2 := speedtestHTTP2Config(cfg)
+	if h2.MaxConcurrentStreams != 200 {
+		t.Fatalf("MaxConcurrentStreams = %d, want 200", h2.MaxConcurrentStreams)
+	}
+	if h2.MaxReadFrameSize != 1024*1024 {
+		t.Fatalf("MaxReadFrameSize = %d, want 1048576", h2.MaxReadFrameSize)
+	}
+	const receiveWindow = 4*1024*1024 - 1
+	if h2.MaxReceiveBufferPerConnection != receiveWindow {
+		t.Fatalf("MaxReceiveBufferPerConnection = %d, want %d", h2.MaxReceiveBufferPerConnection, receiveWindow)
+	}
+	if h2.MaxReceiveBufferPerStream != receiveWindow {
+		t.Fatalf("MaxReceiveBufferPerStream = %d, want %d", h2.MaxReceiveBufferPerStream, receiveWindow)
+	}
+}
+
+func TestDefaultMaxConcurrentPerIPMatchesBrowserRamp(t *testing.T) {
+	cfg := config.DefaultConfig()
+	if cfg.MaxConcurrentPerIP != 64 {
+		t.Fatalf("MaxConcurrentPerIP = %d, want 64", cfg.MaxConcurrentPerIP)
+	}
+}
+
+func TestConfigureHTTPProtocolsDefaultsToHTTP2(t *testing.T) {
+	cfg := config.DefaultConfig()
+	srv := &http.Server{}
+	configureHTTPProtocols(cfg, srv)
+	if srv.Protocols != nil {
+		t.Fatal("default protocols should stay nil so Go enables HTTP/1 and HTTP/2 defaults")
+	}
+}
+
+func TestConfigureHTTPProtocolsCanDisableHTTP2(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.HTTP2Enabled = false
+	srv := &http.Server{}
+	configureHTTPProtocols(cfg, srv)
+	if srv.Protocols == nil {
+		t.Fatal("expected explicit protocols when HTTP/2 is disabled")
+	}
+	if !srv.Protocols.HTTP1() {
+		t.Fatal("HTTP/1 should remain enabled")
+	}
+	if srv.Protocols.HTTP2() {
+		t.Fatal("HTTP/2 should be disabled")
 	}
 }

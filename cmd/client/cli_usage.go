@@ -20,7 +20,7 @@ Flags:
   -S string               Server URL (short)
   -d, --direction string  Direction: download or upload (default: download)
   -t, --duration int      Test duration in seconds (1-300) (default: 30)
-  -s, --streams int       Parallel streams (1-64) (default: 4)
+  -s, --streams int       Parallel streams (1-64) (default: 8)
   --chunk-size int        HTTP chunk size in bytes (65536-4194304) (default: 1048576)
   --json                  Output results as JSON
   --ndjson                Streaming newline-delimited JSON (progress + result)

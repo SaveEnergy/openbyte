@@ -10,6 +10,8 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=traefik"
+      - "--providers.file.filename=/etc/traefik/dynamic/openbyte.yaml"
+      - "--providers.file.watch=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       # Let's Encrypt (production)
@@ -26,6 +28,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik-certs:/letsencrypt
+      - ./traefik-openbyte.yaml:/etc/traefik/dynamic/openbyte.yaml:ro
     networks:
       - traefik
     labels:
@@ -59,10 +62,15 @@ services:
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
       - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
       - CAPACITY_GBPS=${CAPACITY_GBPS:-25}
+      - MAX_CONCURRENT_PER_IP=${MAX_CONCURRENT_PER_IP:-64}
       - RATE_LIMIT_PER_IP=${RATE_LIMIT_PER_IP:-100}
       - GLOBAL_RATE_LIMIT=${GLOBAL_RATE_LIMIT:-1000}
       - DATA_DIR=${DATA_DIR:-/app/data}
       - MAX_STORED_RESULTS=${MAX_STORED_RESULTS:-10000}
+      - TLS_CERT_FILE=${TLS_CERT_FILE:-}
+      - TLS_KEY_FILE=${TLS_KEY_FILE:-}
+      - TLS_AUTO_GEN=${TLS_AUTO_GEN:-false}
+      - HTTP2_ENABLED=${HTTP2_ENABLED:-true}
     volumes:
       - openbyte-data:/app/data
     labels:
@@ -75,23 +83,20 @@ services:
       - "traefik.http.routers.openbyte-upload.rule=(Host(`${TRAEFIK_HOST:-speedtest.localhost}`)) && PathPrefix(`/api/v1/upload`)"
       - "traefik.http.routers.openbyte-upload.entrypoints=web"
       - "traefik.http.routers.openbyte-upload.priority=100"
-      - "traefik.http.routers.openbyte-upload.middlewares=openbyte-upload-body"
       # HTTPS router (production)
       - "traefik.http.routers.openbyte-secure.rule=Host(`${TRAEFIK_HOST:-speedtest.localhost}`)"
       - "traefik.http.routers.openbyte-secure.entrypoints=websecure"
       - "traefik.http.routers.openbyte-secure.tls=true"
       - "traefik.http.routers.openbyte-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.openbyte-secure.tls.options=${TRAEFIK_TLS_OPTIONS:-openbyte-h1@file}"
       - "traefik.http.routers.openbyte-secure.service=openbyte"
       # HTTPS upload router with larger body limit
       - "traefik.http.routers.openbyte-upload-secure.rule=(Host(`${TRAEFIK_HOST:-speedtest.localhost}`)) && PathPrefix(`/api/v1/upload`)"
       - "traefik.http.routers.openbyte-upload-secure.entrypoints=websecure"
       - "traefik.http.routers.openbyte-upload-secure.tls=true"
       - "traefik.http.routers.openbyte-upload-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.openbyte-upload-secure.tls.options=${TRAEFIK_TLS_OPTIONS:-openbyte-h1@file}"
       - "traefik.http.routers.openbyte-upload-secure.priority=100"
-      - "traefik.http.routers.openbyte-upload-secure.middlewares=openbyte-upload-body"
-      # Upload body limit middleware (35MB)
-      - "traefik.http.middlewares.openbyte-upload-body.buffering.maxRequestBodyBytes=36700160"
-      - "traefik.http.middlewares.openbyte-upload-body.buffering.memRequestBodyBytes=1048576"
     networks:
       - traefik
     restart: unless-stopped

@@ -126,6 +126,24 @@ async function executeDownloadAttempts(
   return "failed";
 }
 
+function acquireDownloadReader(body) {
+  // BYOB readers reuse one large buffer, coalescing reads and avoiding a
+  // fresh allocation per chunk on the multi-Gbit/s hot path.
+  try {
+    return { reader: body.getReader({ mode: "byob" }), byob: true };
+  } catch {
+    return { reader: body.getReader(), byob: false };
+  }
+}
+
+async function readNextDownloadChunk(reader, byob, bufferRef) {
+  if (!byob) return reader.read();
+  const result = await reader.read(new Uint8Array(bufferRef.value));
+  // The buffer is transferred (detached) on each read; keep the returned one.
+  if (result.value) bufferRef.value = result.value.buffer;
+  return result;
+}
+
 function processDownloadChunk(value, now, ctx) {
   applyHttpMeasureTick(
     ctx.readState,
@@ -193,7 +211,12 @@ async function runDownloadWindow(options) {
       return false;
     }
 
-    const reader = res.body.getReader();
+    const { reader, byob } = acquireDownloadReader(res.body);
+    const bufferRef = {
+      value: byob
+        ? new ArrayBuffer(TEST_CONFIG.DOWNLOAD_READ_BUFFER_BYTES)
+        : null,
+    };
     const readCtx = {
       warmUp,
       readState,
@@ -210,7 +233,11 @@ async function runDownloadWindow(options) {
           await reader.cancel();
           break;
         }
-        const { done, value } = await reader.read();
+        const { done, value } = await readNextDownloadChunk(
+          reader,
+          byob,
+          bufferRef,
+        );
         if (done) break;
         processDownloadChunk(value, now, readCtx);
       }

@@ -61,6 +61,29 @@ function getUploadPayloadBlob(blobSize) {
   return uploadPayloadCache.blob;
 }
 
+function roundPayloadSize(bytes) {
+  const unit = TEST_CONFIG.UPLOAD_RANDOM_CHUNK_BYTES;
+  return Math.ceil(bytes / unit) * unit;
+}
+
+function resolveUploadPayloadSize(chunkSize, duration, adaptive) {
+  if (duration < TEST_CONFIG.ADAPTIVE_FAST_MEASURE_SECONDS) return chunkSize;
+  const minPayload = Math.max(chunkSize, TEST_CONFIG.UPLOAD_MIN_PAYLOAD_BYTES);
+  const bestMbps = Number(adaptive?.bestMbps);
+  const streams = Math.max(1, Number(adaptive?.selectedStreams) || 1);
+  if (!Number.isFinite(bestMbps) || bestMbps <= 0) return minPayload;
+
+  const perStreamBytesPerMs = (bestMbps * 1_000_000) / 8 / streams / 1000;
+  const targetBytes =
+    perStreamBytesPerMs * TEST_CONFIG.UPLOAD_TARGET_REQUEST_MS;
+  return roundPayloadSize(
+    Math.min(
+      TEST_CONFIG.UPLOAD_MAX_PAYLOAD_BYTES,
+      Math.max(minPayload, targetBytes),
+    ),
+  );
+}
+
 function recordUploadProgress(
   metricsState,
   warmUp,
@@ -266,7 +289,7 @@ async function runUploadWindow(options) {
   const startTime = performance.now();
   const numStreams = streams;
   const chunkSize = resolveChunkSize();
-  const blobSize = chunkSize;
+  const blobSize = resolveUploadPayloadSize(chunkSize, duration, adaptive);
   const maxNetworkRetries = TEST_CONFIG.MAX_NETWORK_RETRIES;
   const retryDelayMs = TEST_CONFIG.NETWORK_RETRY_DELAY_MS;
   const metricsState = {

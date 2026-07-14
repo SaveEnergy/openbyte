@@ -1,6 +1,8 @@
 /** Adaptive stream ramping for browser HTTP speed tests. */
 
-import { TEST_CONFIG } from "./state.js";
+import { getApiBase, TEST_CONFIG } from "./state.js";
+
+const http1ProtocolNames = new Set(["http/1.0", "http/1.1"]);
 
 function parseIntegerParam(params, name, fallback, min, max) {
   const raw = params.get(name);
@@ -44,6 +46,36 @@ function normalizeAdaptiveConfig(config) {
       ? config.gainThreshold
       : TEST_CONFIG.ADAPTIVE_GAIN_THRESHOLD,
   };
+}
+
+function protocolStreamCap(protocol, maxStreams) {
+  if (!http1ProtocolNames.has(String(protocol || "").toLowerCase())) {
+    return maxStreams;
+  }
+  return Math.min(maxStreams, TEST_CONFIG.ADAPTIVE_HTTP1_MAX_STREAMS);
+}
+
+function latestResourceProtocol(nameFragment) {
+  const entries = performance
+    .getEntriesByType("resource")
+    .filter((entry) => String(entry.name || "").includes(nameFragment));
+  const latest = entries.at(-1);
+  return latest?.nextHopProtocol || "";
+}
+
+async function detectNextHopProtocol(signal) {
+  const nameFragment = `${getApiBase()}/ping`;
+  try {
+    const res = await fetch(`${nameFragment}?proto=${Date.now()}`, {
+      cache: "no-store",
+      credentials: "omit",
+      signal,
+    });
+    await res.text().catch(() => {});
+  } catch {
+    return "";
+  }
+  return latestResourceProtocol(nameFragment);
 }
 
 export function resolveAdaptiveConfig() {
@@ -108,6 +140,8 @@ export async function runAdaptiveHTTPTest(options) {
   const config = options.config
     ? normalizeAdaptiveConfig(options.config)
     : resolveAdaptiveConfig();
+  const nextHopProtocol = await detectNextHopProtocol(signal);
+  config.maxStreams = protocolStreamCap(nextHopProtocol, config.maxStreams);
   const ramp = [];
   let best = { streams: TEST_CONFIG.ADAPTIVE_MIN_STREAMS, mbps: 0 };
   let previousMbps = 0;
@@ -147,7 +181,9 @@ export async function runAdaptiveHTTPTest(options) {
     collectDiagnostics: true,
     adaptive: {
       direction,
+      nextHopProtocol,
       selectedStreams: best.streams,
+      bestMbps: best.mbps,
       measureDuration,
       ramp,
     },
