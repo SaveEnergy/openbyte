@@ -450,6 +450,41 @@ sudo firewall-cmd --permanent --add-port=443/tcp
 sudo firewall-cmd --reload
 ```
 
+## TLS Troubleshooting
+
+### "Not secure" / `NET::ERR_CERT_AUTHORITY_INVALID` with a valid cert on the speed-test host
+
+Symptoms: `https://speed.example.com` shows a valid Let's Encrypt certificate, but visiting a **parent/apex domain** (for example `https://example.com` when `speed.example.com` is a CNAME) shows **"Not secure"** and Traefik's **default self-signed certificate**.
+
+Cause: Traefik serves its built-in default cert for any HTTPS request whose `Host` header is not covered by a router with `tls.certresolver=letsencrypt`.
+
+Fix: add an apex redirect in `${REMOTE_DIR}/.env` so the parent domain gets a real certificate and redirects to the canonical speed-test host:
+
+```bash
+TRAEFIK_HOST_RULE="Host(`speed.example.com`) || Host(`v4.speed.example.com`) || Host(`v6.speed.example.com`)"
+TRAEFIK_APEX_REDIRECT_RULE="Host(`example.com`) || Host(`www.example.com`)"
+TRAEFIK_CANONICAL_HOST=speed.example.com
+PUBLIC_HOST=speed.example.com
+ALLOWED_ORIGINS=https://speed.example.com
+```
+
+Redeploy (`docker compose ... up -d --force-recreate`). Verify:
+
+```bash
+curl -sSI https://example.com/ | rg -i '^HTTP|^location'
+curl -sSI https://speed.example.com/ | rg -i '^HTTP|strict-transport'
+```
+
+### v6 probe console errors
+
+If the browser console shows `v6.<domain> ... ERR_NAME_NOT_RESOLVED` or IPv6 connection failures, ensure:
+
+- `v6.<domain>` has an **AAAA-only** DNS record (no A record).
+- Traefik listens on IPv6 (`443/tcp` allowed in host/cloud firewall for IPv6).
+- `v6.<domain>` is included in `TRAEFIK_HOST_RULE`.
+
+These probe failures do not affect the main page padlock, but IPv6-only clients need working AAAA + Traefik IPv6.
+
 ## Monitoring
 
 ### Logs
