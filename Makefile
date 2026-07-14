@@ -1,4 +1,4 @@
-.PHONY: build openbyte test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench perf-record perf-compare perf-check perf-leakcheck autoresearch-preflight ci-test ci-lint lint-openapi
+.PHONY: build openbyte test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench perf-record perf-compare perf-check perf-leakcheck ci-test ci-lint lint-openapi
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
@@ -66,9 +66,6 @@ perf-compare:
 		echo "perf-compare: benchstat not on PATH; using go run golang.org/x/perf/cmd/benchstat@latest"; \
 		go run golang.org/x/perf/cmd/benchstat@latest test/perf/bench_baseline.txt build/perf/bench.txt; \
 	fi
-
-autoresearch-preflight:
-	@bash "$(CURDIR)/scripts/perf/autoresearch_preflight.sh"
 
 perf-check: perf-record
 	@if [ -f test/perf/bench_baseline.txt ]; then $(MAKE) perf-compare; else echo "perf-check: wrote build/perf/bench.txt (add test/perf/bench_baseline.txt to enable compare)"; fi
@@ -149,7 +146,6 @@ help:
 	@echo "  perf-record   - Write build/perf/bench.txt (stable; for benchstat)"
 	@echo "  perf-compare  - benchstat baseline vs build/perf/bench.txt (go run fallback)"
 	@echo "  perf-check    - perf-record + perf-compare if baseline exists"
-	@echo "  autoresearch-preflight - verify counter/branch + print AUTORESEARCH_* (perf agents)"
 	@echo "  perf-smoke    - Run perf smoke with pprof capture"
 	@echo "  perf-leakcheck - Run goroutine leak profile smoke (Go 1.26 experiment)"
 	@echo "  run           - Run server (development, port 8080)"
