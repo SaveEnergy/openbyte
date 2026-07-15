@@ -17,6 +17,7 @@ export const state = {
   networkInfo: {
     ipv4: null,
     ipv6: null,
+    complete: false,
   },
   serverName: "openByte Server",
   resultId: null,
@@ -42,6 +43,9 @@ export function initElements() {
   elements.loadedLatencyResult = document.getElementById("loadedLatencyResult");
   elements.bufferbloatResult = document.getElementById("bufferbloatResult");
   elements.serverName = document.getElementById("serverName");
+  elements.idleNetworkInfo = document.getElementById("idleNetworkInfo");
+  elements.idleNetworkIPv4 = document.getElementById("idleNetworkIPv4");
+  elements.idleNetworkIPv6 = document.getElementById("idleNetworkIPv6");
   elements.networkIPv4 = document.getElementById("networkIPv4");
   elements.networkIPv6 = document.getElementById("networkIPv6");
   elements.restartBtn = document.getElementById("restartBtn");

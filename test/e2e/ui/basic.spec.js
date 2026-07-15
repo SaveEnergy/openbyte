@@ -127,25 +127,33 @@ test.describe("openByte UI", () => {
     page.on("pageerror", (err) => pageErrors.push(err.message));
     await page.addInitScript(() => {
       const originalFetch = globalThis.fetch.bind(globalThis);
-      let pingCount = 0;
+      globalThis.__loadedLatencyProbe = { entered: false, aborted: false };
       globalThis.fetch = (input, init) => {
         const url = typeof input === "string" ? input : input.url;
-        if (url.includes("/api/v1/ping")) {
-          pingCount += 1;
-          if (pingCount > 35) {
-            return new Promise((resolve, reject) => {
-              const signal = init?.signal;
-              const abort = () => {
-                signal?.removeEventListener("abort", abort);
-                reject(new DOMException("Aborted", "AbortError"));
-              };
-              if (signal?.aborted) {
-                abort();
-                return;
-              }
-              signal?.addEventListener("abort", abort, { once: true });
-            });
-          }
+        const probe = globalThis.__loadedLatencyProbe;
+        const isLoadedLatency =
+          url.includes("/api/v1/ping") &&
+          init?.method === "GET" &&
+          init?.cache === "no-store";
+        if (!probe.entered && isLoadedLatency) {
+          probe.entered = true;
+          return new Promise((_, reject) => {
+            const signal = init?.signal;
+            if (!signal) {
+              reject(new Error("loaded-latency request missing abort signal"));
+              return;
+            }
+            const abort = () => {
+              probe.aborted = true;
+              signal.removeEventListener("abort", abort);
+              reject(new DOMException("Aborted", "AbortError"));
+            };
+            if (signal.aborted) {
+              abort();
+              return;
+            }
+            signal.addEventListener("abort", abort, { once: true });
+          });
         }
         return originalFetch(input, init);
       };
@@ -154,6 +162,18 @@ test.describe("openByte UI", () => {
     await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
 
     await page.locator("#startBtn").click();
+    await expect
+      .poll(
+        () => page.evaluate(() => globalThis.__loadedLatencyProbe.entered),
+        { timeout: 15_000 },
+      )
+      .toBe(true);
+    await expect
+      .poll(
+        () => page.evaluate(() => globalThis.__loadedLatencyProbe.aborted),
+        { timeout: 15_000 },
+      )
+      .toBe(true);
     await expect(page.locator("#resultsState")).toBeVisible({
       timeout: 20_000,
     });
@@ -224,7 +244,7 @@ test.describe("openByte UI", () => {
         loaded_latency_ms: 18.4,
         bufferbloat_grade: "A",
         ipv4: "192.0.2.1",
-        ipv6: "",
+        ipv6: "2001:db8::1",
         server_name: "playwright-server",
       },
     });
@@ -237,6 +257,9 @@ test.describe("openByte UI", () => {
     await expect(page.locator("#resultView")).toBeVisible();
     await expect(page.locator("#downloadResult")).toContainText("123.5");
     await expect(page.locator("#uploadResult")).toContainText("67.9");
+    await expect(page.getByText("Public IP at test time")).toBeVisible();
+    await expect(page.locator("#networkIPv4")).toHaveText("192.0.2.1");
+    await expect(page.locator("#networkIPv6")).toHaveText("2001:db8::1");
     await expect(page.locator("#serverValue")).toContainText(
       "playwright-server",
     );

@@ -22,11 +22,9 @@ export async function loadServerInfo() {
     }
     const data = await response.json();
     setServerName(data?.server_name);
-    setServerOnlineUI();
   } catch (e) {
     console.debug("Server info load failed:", e);
     setServerName(state.serverName);
-    setServerOfflineUI();
   }
 }
 
@@ -65,11 +63,20 @@ function startsWithDigit(value) {
 }
 
 export function updateNetworkDisplay() {
-  if (elements.networkIPv4) {
-    elements.networkIPv4.textContent = state.networkInfo.ipv4 || "-";
+  const pending = state.networkInfo.complete ? "Not detected" : "Detecting…";
+  const ipv4 = state.networkInfo.ipv4 || pending;
+  const ipv6 = state.networkInfo.ipv6 || pending;
+  for (const element of [elements.idleNetworkIPv4, elements.networkIPv4]) {
+    if (element) element.textContent = ipv4;
   }
-  if (elements.networkIPv6) {
-    elements.networkIPv6.textContent = state.networkInfo.ipv6 || "-";
+  for (const element of [elements.idleNetworkIPv6, elements.networkIPv6]) {
+    if (element) element.textContent = ipv6;
+  }
+  if (elements.idleNetworkInfo) {
+    elements.idleNetworkInfo.setAttribute(
+      "aria-busy",
+      state.networkInfo.complete ? "false" : "true",
+    );
   }
 }
 
@@ -81,11 +88,14 @@ async function discoverAddress(url, options) {
       TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
     );
     const data = await parseJSONOrThrow(response);
-    if (!data.client_ip) return;
-    state.networkInfo[data.ipv6 ? "ipv6" : "ipv4"] = data.client_ip;
-    updateNetworkDisplay();
+    if (data.client_ip) {
+      state.networkInfo[data.ipv6 ? "ipv6" : "ipv4"] = data.client_ip;
+      updateNetworkDisplay();
+    }
+    return true;
   } catch (err) {
     console.debug("IP discovery failed", err);
+    return false;
   }
 }
 
@@ -108,9 +118,14 @@ export function getNextHopProtocol() {
 }
 
 export function detectNetworkInfo() {
-  const probes = [
-    discoverAddress(`${getApiBase()}/ping`, { cache: "no-store" }),
-  ];
+  const sameOriginProbe = discoverAddress(`${getApiBase()}/ping`, {
+    cache: "no-store",
+  });
+  void sameOriginProbe.then((ready) => {
+    if (ready) setServerOnlineUI();
+    else setServerOfflineUI();
+  });
+  const probes = [sameOriginProbe];
 
   const hostname = globalThis.location.hostname;
   const canProbe =
@@ -131,5 +146,9 @@ export function detectNetworkInfo() {
     );
   }
 
-  return Promise.allSettled(probes);
+  return Promise.allSettled(probes).then((results) => {
+    state.networkInfo.complete = true;
+    updateNetworkDisplay();
+    return results;
+  });
 }

@@ -16,6 +16,8 @@ in Git history and pull requests, not release notes.
 - Simplified the browser transfer state machines, one-shot worker protocol, and
   instrument animation while retaining adaptive streams, result sharing, and
   eager same-origin/IPv4/IPv6 address discovery.
+- Made discovered public IPv4/IPv6 addresses visible before starting a test;
+  ping readiness remains authoritative if version metadata is rate-limited.
 - Made server configuration environment-only, replaced the custom logger with
   `log/slog`, and consolidated router/result HTTP setup without changing the
   persisted result schema or share URLs.
