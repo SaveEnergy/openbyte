@@ -59,6 +59,8 @@ export const en = Object.freeze({
   "metric.bufferbloatDescription":
     "How much latency rises under load, graded from A+ to F. Lower grades mean more lag when the connection is busy.",
   "network.publicIpAtTest": "Public IP addresses for this test",
+  "history.heading": "Recent tests",
+  "history.justNow": "just now",
 
   "action.testAgain": "Test again",
   "action.share": "Share",
