@@ -36,8 +36,8 @@ and defaults the openByte router to the measured-faster `openbyte-h1@file` ALPN 
 ## Automated GHCR deployment
 
 Pushes to `main` publish `edge` and commit-SHA images. SemVer tags publish
-release archives plus `X.Y.Z`, `X.Y`, `X`, and `latest` multi-architecture
-images with SBOM and provenance.
+Linux/macOS amd64/arm64 archives plus `X.Y.Z`, `X.Y`, `X`, and `latest`
+multi-architecture images with SBOM and provenance.
 
 Configure these GitHub repository variables:
 

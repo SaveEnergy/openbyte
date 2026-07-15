@@ -67,8 +67,11 @@ in Git history and pull requests, not release notes.
 - Deployment now verifies, syncs, and starts the remote release through one SSH
   connection while retaining fingerprint, checksum, image, health, and rollback
   checks.
-- Removed duplicate tag CI and nightly E2E executions. Release and nightly retain
-  their full validation gates.
+- Main workflow dispatches now follow the same build/deploy path as main pushes;
+  branch dispatches run checks only. Nightly is one full race gate, while perf
+  and leak profiling remain explicit local tools.
+- Release archives now match the installer-supported platforms: Linux and macOS
+  on amd64/arm64, all as `.tar.gz` with one checksum manifest.
 - Curated performance benchmarks around transfer, gzip, JSON, ping, and SQLite
   behavior; removed unused baseline-comparison plumbing.
 - Reduced unit-test wall-clock waits without reducing behavioral coverage.

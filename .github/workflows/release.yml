@@ -70,21 +70,13 @@ jobs:
           build_release() {
             local os="$1"
             local arch="$2"
-            local ext=""
-            if [ "$os" = "windows" ]; then
-              ext=".exe"
-            fi
 
             local out="dist/openbyte_${SEMVER}_${os}_${arch}"
             mkdir -p "$out"
 
-            GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "$out/openbyte${ext}" ./cmd/openbyte
+            GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "$out/openbyte" ./cmd/openbyte
 
-            if [ "$os" = "windows" ]; then
-              (cd "$out" && zip -r "../openbyte_${SEMVER}_${os}_${arch}.zip" .)
-            else
-              (cd "$out" && tar -czf "../openbyte_${SEMVER}_${os}_${arch}.tar.gz" .)
-            fi
+            (cd "$out" && tar -czf "../openbyte_${SEMVER}_${os}_${arch}.tar.gz" .)
             rm -rf "$out"
           }
 
@@ -92,15 +84,10 @@ jobs:
           build_release linux arm64
           build_release darwin amd64
           build_release darwin arm64
-          build_release windows amd64
 
           (
             cd dist
-            if command -v sha256sum >/dev/null 2>&1; then
-              sha256sum *.tar.gz *.zip > checksums.txt
-            else
-              shasum -a 256 *.tar.gz *.zip > checksums.txt
-            fi
+            sha256sum *.tar.gz > checksums.txt
           )
 
       - name: Publish GitHub Release

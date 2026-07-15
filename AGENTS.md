@@ -57,8 +57,8 @@
 
 - Docker exposes only **8080** (HTTP API + UI).
 - **Recovery**: Actions → `ci` → Run workflow on `main` if stuck; or `git fetch` via HTTPS if SSH fails.
-- **`build-push` + `deploy`** on every `main` push after `checks` (no path filtering—doc-only pushes still roll images). PR Playwright runs are gated by a plain `git diff` check inside `checks` (no third-party filter action).
-- CI builds/pushes `edge` + `sha`; release publishes semver + `latest`.
+- **`build-push` + `deploy`** on every `main` push or `main` workflow dispatch after `checks` (no path filtering—doc-only pushes still roll images). Dispatches from other refs run checks only. PR Playwright runs are gated by a plain `git diff` check inside `checks` (no third-party filter action).
+- CI builds/pushes `edge` + `sha`; release publishes semver + `latest` images and Linux/macOS amd64/arm64 tarballs.
 - **`release.yml` `deploy`**: same `vars`/secrets as CI; gate on **`needs.release.result == 'success'`** (not derived job booleans).
 - Deploy: **checkout first**, then `scripts/deploy/deploy.sh` validates the host key, streams and checksums the bundle over one SSH connection, and runs `deploy_host.sh`; the previous openByte image is pinned locally for Compose-based rollback.
 - Compose uses a published-image base; local source builds add `docker-compose.local.yaml`. The app healthcheck lives in the Dockerfile.
@@ -66,7 +66,7 @@
 - **Race matrix**: `ci.yml` on `main`: `go test ./... -race -short -p 1`; `nightly.yml`: full `go test -race ./...` (including E2E once).
 - **Playwright**: `workers` = `2` on `GITHUB_ACTIONS`; optional `PLAYWRIGHT_WORKERS`; trace/reuse unchanged.
 - **CI concurrency**: `cancel-in-progress` only for `pull_request`; `push`/`workflow_dispatch` queue on same `ref` (deploy not mid-aborted).
-- **Nightly**: `make perf-bench` each run unless `PERF_BENCH=false`; `perf-leakcheck` still behind `LEAK_PROFILE_SMOKE`.
+- **Nightly**: one full `go test -race ./...` gate. Performance and leak profiling are explicit local investigations, not unattended pass/fail theater.
 - **`make perf-bench`**: runs the curated transfer/gzip/JSON/SQLite suite from **`test/perf/bench_packages.txt`**; explicit experiments save output and use `benchstat` manually. See **`test/perf/README.md`**.
 
 ## Engineering Guardrails
