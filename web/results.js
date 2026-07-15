@@ -6,9 +6,8 @@ import {
 } from "./utils.js";
 import { formatDateTime, t } from "./i18n.js";
 import {
-  formatConnectionAdvisory,
-  formatConnectionVerdict,
   formatLatency,
+  formatLoadedLatencyAdvisory,
   formatSpeed,
 } from "./presentation.js";
 
@@ -77,21 +76,12 @@ function renderBufferbloatBadge(el, grade) {
   if (badgeClass) el.classList.add(badgeClass);
 }
 
-function renderVerdict(d) {
-  const el = document.getElementById("resultsVerdict");
+function renderAdvisory(d) {
   const advisoryEl = document.getElementById("resultsAdvisory");
-  const values = {
-    download: d.download_mbps,
-    upload: d.upload_mbps,
+  const advisory = formatLoadedLatencyAdvisory({
     idleLatency: d.latency_ms,
     loadedLatency: d.loaded_latency_ms,
-  };
-  const verdict = formatConnectionVerdict(values);
-  if (el) {
-    el.textContent = verdict;
-    el.classList.toggle("hidden", verdict === "");
-  }
-  const advisory = formatConnectionAdvisory(values);
+  });
   if (advisoryEl) {
     advisoryEl.textContent = advisory;
     advisoryEl.classList.toggle("hidden", advisory === "");
@@ -169,7 +159,7 @@ function renderResult(d) {
     setText(jitterEl, formatLatencyValue(d.jitter_ms));
     setText(loadedLatencyEl, formatLatencyValue(d.loaded_latency_ms));
     renderBufferbloatBadge(bufferbloatEl, d.bufferbloat_grade);
-    renderVerdict(d);
+    renderAdvisory(d);
 
     setText(ipv4El, d.ipv4 || "-");
     setText(ipv6El, d.ipv6 || "-");

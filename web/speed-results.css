@@ -1,17 +1,4 @@
-/* Result interpretation, metric help, and local history. */
-
-.results-verdict {
-  max-width: 520px;
-  margin-bottom: var(--space-xl);
-  font-size: 1.05rem;
-  line-height: 1.5;
-  color: var(--text-secondary);
-  animation: slideUp var(--motion-duration-slow) var(--ease-out) backwards;
-}
-
-.results-verdict.hidden {
-  display: none;
-}
+/* Result advisory, metric help, and local history. */
 
 .partial-notice {
   display: flex;
@@ -152,10 +139,6 @@
 }
 
 @media (max-width: 600px) {
-  .results-verdict {
-    font-size: 0.95rem;
-  }
-
   .history-item {
     flex-direction: column;
     align-items: center;

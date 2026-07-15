@@ -64,7 +64,7 @@ test.describe("openByte UI", () => {
     ).toBeTruthy();
   });
 
-  test("shows phase stepper during test and verdict with history after", async ({
+  test("shows phase stepper during test with history after", async ({
     page,
   }) => {
     await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
@@ -79,7 +79,6 @@ test.describe("openByte UI", () => {
     await expect(page.locator("#resultsState")).toBeVisible({
       timeout: 60_000,
     });
-    await expect(page.locator("#resultsVerdict")).not.toBeEmpty();
     await expect(page.locator("#historySection")).toBeVisible();
     await expect(page.locator("#historyList .history-item")).toHaveCount(1);
   });
@@ -273,8 +272,8 @@ test.describe("openByte UI", () => {
         upload_mbps: 67.89,
         latency_ms: 12.3,
         jitter_ms: 1.2,
-        loaded_latency_ms: 18.4,
-        bufferbloat_grade: "A",
+        loaded_latency_ms: 80.4,
+        bufferbloat_grade: "D",
         ipv4: "192.0.2.1",
         ipv6: "2001:db8::1",
         server_name: "playwright-server",
@@ -289,8 +288,11 @@ test.describe("openByte UI", () => {
     await expect(page.locator("#resultView")).toBeVisible();
     await expect(page.locator("#downloadResult")).toContainText("123.5");
     await expect(page.locator("#uploadResult")).toContainText("67.9");
-    await expect(page.locator("#loadedLatencyResult")).toHaveText("18.4 ms");
-    await expect(page.locator("#bufferbloatResult")).toHaveText("A");
+    await expect(page.locator("#loadedLatencyResult")).toHaveText("80.4 ms");
+    await expect(page.locator("#bufferbloatResult")).toHaveText("D");
+    await expect(page.locator("#resultsAdvisory")).toContainText(
+      "Latency rises under load",
+    );
     await expect(
       page.getByText("Public IP addresses for this test"),
     ).toBeVisible();

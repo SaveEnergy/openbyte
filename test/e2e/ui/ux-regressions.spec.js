@@ -160,12 +160,9 @@ test.describe("openByte UI regressions", () => {
     await expect(html).not.toHaveAttribute("data-theme", /.+/);
   });
 
-  test("partial verdict and capped-ramp progress stay truthful", async ({
-    page,
-  }) => {
+  test("capped-ramp progress stays truthful", async ({ page }) => {
     await page.goto("/");
     const result = await page.evaluate(async () => {
-      const { computeConnectionVerdict } = await import("/utils.js");
       const { runAdaptiveHTTPTest } = await import("/speedtest-adaptive.js");
       const phases = [];
       await runAdaptiveHTTPTest({
@@ -185,23 +182,10 @@ test.describe("openByte UI regressions", () => {
           }
         },
       });
-      return {
-        phases,
-        verdict: computeConnectionVerdict({
-          download: 600,
-          upload: 0,
-          idleLatency: 10,
-          loadedLatency: 12,
-          partial: true,
-        }),
-      };
+      return phases;
     });
 
-    expect(result.verdict).toEqual({
-      key: "verdict.partial.exceptional",
-      warningKey: null,
-    });
-    expect(result.phases).toEqual([
+    expect(result).toEqual([
       { streams: 1, maxWindows: 4 },
       { streams: 2, maxWindows: 4 },
       { streams: 4, maxWindows: 4 },

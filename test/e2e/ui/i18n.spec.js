@@ -187,24 +187,24 @@ test.describe("German UI", () => {
     );
 
     const formatted = await page.evaluate(async () => {
-      const { formatLatency, formatSpeed, formatConnectionVerdict } =
+      const { formatLatency, formatLoadedLatencyAdvisory, formatSpeed } =
         await import("/presentation.js");
       return {
         mbps: formatSpeed(123.45),
         gbps: formatSpeed(1234.56),
         latency: formatLatency(12.34),
-        verdict: formatConnectionVerdict({
-          download: 600,
-          upload: 120,
+        advisory: formatLoadedLatencyAdvisory({
           idleLatency: 10,
-          loadedLatency: 12,
+          loadedLatency: 82,
         }),
       };
     });
     expect(formatted.mbps).toEqual({ value: "123,5", unit: "Mbps" });
     expect(formatted.gbps).toEqual({ value: "1,23", unit: "Gbps" });
     expect(formatted.latency).toBe("12,3 ms");
-    expect(formatted.verdict).toContain("Außergewöhnlich schnelle Verbindung");
+    expect(formatted.advisory).toBe(
+      "Die Latenz steigt unter Last. Anrufe und Spiele können dann stocken.",
+    );
   });
 
   test("localizes a shared result without propagating locale links", async ({
@@ -223,9 +223,6 @@ test.describe("German UI", () => {
       page.getByText("Öffentliche IP-Adressen beim Test"),
     ).toBeVisible();
     await expect(page.locator("#testedAt")).toContainText(/\d{1,2}\.\d{1,2}\.\d{4}/);
-    await expect(page.locator("#resultsVerdict")).toContainText(
-      "Ideal für Streaming und Videoanrufe.",
-    );
     expect(
       await page.locator('a[href^="/"]').evaluateAll((links) =>
         links.some((link) => new URL(link.href).searchParams.has("lang")),

@@ -46,6 +46,8 @@ export const en = Object.freeze({
   "result.server": "Server",
   "result.tested": "Tested at",
   "result.loading": "Loading result…",
+  "result.loadedLatencyAdvisory":
+    "Latency rises under load, so calls and games may lag while the connection is busy.",
   "metric.idleLatency": "Idle",
   "metric.jitter": "Jitter",
   "metric.loadedLatency": "Under load",
@@ -74,19 +76,6 @@ export const en = Object.freeze({
   "share.nativeTitle": "openByte Speed Test Result",
   "share.copyPrompt": "Copy this link:",
   "nav.speedTest": "Speed Test",
-
-  "verdict.partial.exceptional": "Exceptional download speed.",
-  "verdict.partial.excellent": "Excellent download speed.",
-  "verdict.partial.good": "Good download speed.",
-  "verdict.partial.modest": "Enough for browsing and music.",
-  "verdict.partial.slow": "Slow download speed.",
-  "verdict.complete.exceptional": "Exceptional connection for heavy use.",
-  "verdict.complete.excellent": "Excellent for streaming and calls.",
-  "verdict.complete.good": "Good for everyday use.",
-  "verdict.complete.modest": "Enough for browsing and music.",
-  "verdict.complete.slow": "Slow connection — expect buffering.",
-  "verdict.bufferbloatWarning":
-    "Latency rises under load, so calls and games may lag while the connection is busy.",
 
   "announcement.complete":
     "Speed test complete. Download {download}. Upload {upload}. Latency {latency}.",

@@ -16,54 +16,6 @@ export function computeBufferbloatGrade(idleLatency, loadedLatency) {
   return "F";
 }
 
-/**
- * One-sentence plain-language interpretation of the measured results.
- * Partial runs interpret the measured download without assigning a generic
- * under-load grade from download-only latency.
- */
-export function computeConnectionVerdict({
-  download,
-  upload,
-  idleLatency,
-  loadedLatency,
-  partial,
-}) {
-  if (!Number.isFinite(download) || download <= 0) return null;
-
-  let key;
-  if (partial === true) {
-    if (download >= 500) {
-      key = "verdict.partial.exceptional";
-    } else if (download >= 100) {
-      key = "verdict.partial.excellent";
-    } else if (download >= 25) {
-      key = "verdict.partial.good";
-    } else if (download >= 10) {
-      key = "verdict.partial.modest";
-    } else {
-      key = "verdict.partial.slow";
-    }
-  } else if (download >= 500 && upload >= 100) {
-    key = "verdict.complete.exceptional";
-  } else if (download >= 100 && upload >= 20) {
-    key = "verdict.complete.excellent";
-  } else if (download >= 25 && upload >= 5) {
-    key = "verdict.complete.good";
-  } else if (download >= 10) {
-    key = "verdict.complete.modest";
-  } else {
-    key = "verdict.complete.slow";
-  }
-
-  const grade =
-    partial === true ? null : computeBufferbloatGrade(idleLatency, loadedLatency);
-  const warningKey =
-    grade === "C" || grade === "D" || grade === "F"
-      ? "verdict.bufferbloatWarning"
-      : null;
-  return { key, warningKey };
-}
-
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function createCodedError(code) {

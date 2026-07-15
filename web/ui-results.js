@@ -3,9 +3,8 @@
 import { state, elements } from "./state.js";
 import { t } from "./i18n.js";
 import {
-  formatConnectionAdvisory,
-  formatConnectionVerdict,
   formatLatency,
+  formatLoadedLatencyAdvisory,
   formatSpeed,
   formatSpeedText,
 } from "./presentation.js";
@@ -29,25 +28,12 @@ function renderBufferbloat(grade) {
   if (badgeClass) el.classList.add(badgeClass);
 }
 
-function connectionValues(partial, loadedLatency) {
-  return {
-    download: state.downloadResult,
-    upload: state.uploadResult,
+function renderAdvisory(partial, loadedLatency) {
+  const advisory = formatLoadedLatencyAdvisory({
     idleLatency: state.latencyResult,
     loadedLatency,
     partial,
-  };
-}
-
-function renderVerdict(partial, loadedLatency) {
-  const values = connectionValues(partial, loadedLatency);
-  const verdict = formatConnectionVerdict(values);
-  if (elements.resultsVerdict) {
-    elements.resultsVerdict.textContent = verdict;
-    elements.resultsVerdict.classList.toggle("hidden", verdict === "");
-  }
-
-  const advisory = formatConnectionAdvisory(values);
+  });
   if (elements.resultsAdvisory) {
     elements.resultsAdvisory.textContent = advisory;
     elements.resultsAdvisory.classList.toggle("hidden", advisory === "");
@@ -120,7 +106,7 @@ export function renderResultsContent() {
   elements.bufferbloatStat?.classList.toggle("hidden", partial);
   elements.statsHelp?.classList.toggle("hidden", partial);
   renderBufferbloat(grade);
-  renderVerdict(partial, loadedLatency);
+  renderAdvisory(partial, loadedLatency);
   announceResults(partial, grade);
 
   elements.partialNotice?.classList.toggle("hidden", !partial);
