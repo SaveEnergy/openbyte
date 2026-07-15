@@ -4,12 +4,16 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log/slog"
 	"net/http"
-	"strconv"
 	"sync"
 	"time"
 )
+
+type uploadResponse struct {
+	Bytes          int64   `json:"bytes"`
+	DurationMS     int64   `json:"duration_ms"`
+	ThroughputMbps float64 `json:"throughput_mbps"`
+}
 
 func uploadReadDeadline(start time.Time, maxDurationSec int) time.Time {
 	if maxDurationSec <= 0 {
@@ -77,25 +81,12 @@ func writeUploadResponse(w http.ResponseWriter, controller *http.ResponseControl
 	durationMs := elapsed.Milliseconds()
 	throughputMbps := float64(totalBytes*8) / elapsed.Seconds() / 1_000_000
 
-	w.Header().Set(headerContentType, contentTypeJSON)
 	if controller != nil {
 		_ = controller.SetWriteDeadline(time.Now().Add(2 * time.Second))
 	}
-	w.WriteHeader(http.StatusOK)
-	var buf [128]byte
-	payload := appendUploadResponseJSON(buf[:0], totalBytes, durationMs, throughputMbps)
-	if _, err := w.Write(payload); err != nil {
-		slog.Warn("speedtest: write upload response", "error", err)
-	}
-}
-
-func appendUploadResponseJSON(dst []byte, totalBytes, durationMs int64, throughputMbps float64) []byte {
-	dst = append(dst, `{"bytes":`...)
-	dst = strconv.AppendInt(dst, totalBytes, 10)
-	dst = append(dst, `,"duration_ms":`...)
-	dst = strconv.AppendInt(dst, durationMs, 10)
-	dst = append(dst, `,"throughput_mbps":`...)
-	dst = strconv.AppendFloat(dst, throughputMbps, 'f', -1, 64)
-	dst = append(dst, '}')
-	return dst
+	respondJSON(w, uploadResponse{
+		Bytes:          totalBytes,
+		DurationMS:     durationMs,
+		ThroughputMbps: throughputMbps,
+	}, http.StatusOK)
 }

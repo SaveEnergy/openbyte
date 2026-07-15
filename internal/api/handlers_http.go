@@ -1,50 +1,27 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"log/slog"
+	"mime"
 	"net/http"
-	"sync"
-)
-
-var jsonBufPool = sync.Pool{
-	New: func() any { return &bytes.Buffer{} },
-}
-
-const (
-	jsonContentTypePrefix    = "application/json"
-	jsonContentTypePrefixLen = len(jsonContentTypePrefix)
 )
 
 func isJSONContentType(r *http.Request) bool {
-	ct := r.Header.Get("Content-Type")
-	return len(ct) >= jsonContentTypePrefixLen && ct[:jsonContentTypePrefixLen] == jsonContentTypePrefix
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	return err == nil && mediaType == contentTypeJSON
 }
 
 func respondJSON(w http.ResponseWriter, data any, statusCode int) {
-	buf, ok := jsonBufPool.Get().(*bytes.Buffer)
-	if !ok {
-		buf = &bytes.Buffer{}
-	}
-	defer func() {
-		buf.Reset()
-		jsonBufPool.Put(buf)
-	}()
-	buf.Grow(256)
-	encoder := json.NewEncoder(buf)
-	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(data); err != nil {
+	payload, err := json.Marshal(data)
+	if err != nil {
 		slog.Warn("JSON response marshal failed", "error", err)
 		statusCode = http.StatusInternalServerError
-		buf.Reset()
-		buf.WriteString(`{"error":"internal error"}`)
-	} else if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] == '\n' {
-		buf.Truncate(buf.Len() - 1) // match json.Marshal output (no trailing newline)
+		payload = []byte(`{"error":"internal error"}`)
 	}
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(statusCode)
-	if _, err := w.Write(buf.Bytes()); err != nil {
+	if _, err := w.Write(payload); err != nil {
 		slog.Warn("JSON response write failed", "error", err)
 	}
 }

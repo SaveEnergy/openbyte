@@ -14,11 +14,7 @@ import (
 )
 
 func respondSpeedtestError(w http.ResponseWriter, msg string, code int) {
-	w.Header().Set(headerContentType, contentTypeJSON)
-	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
-		slog.Warn("speedtest: encode error response", "error", err)
-	}
+	respondJSON(w, map[string]string{"error": msg}, code)
 }
 
 func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
@@ -38,14 +34,7 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set(headerContentType, contentTypeOctetStream)
 	w.Header().Set(headerCacheControl, valueNoStore)
 
-	randomSource, release, err := h.resolveRandomSource()
-	if err != nil {
-		respondSpeedtestError(w, "failed to generate random data", http.StatusInternalServerError)
-		return
-	}
-	defer release()
-
-	streamDownload(w, r, randomSource, chunkSize, duration)
+	streamDownload(w, r, h.randomData, chunkSize, duration)
 }
 
 func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {

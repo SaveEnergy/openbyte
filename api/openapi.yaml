@@ -85,8 +85,6 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "503":
           $ref: "#/components/responses/ServerBusy"
-        "500":
-          $ref: "#/components/responses/InternalServerError"
 
   /api/v1/upload:
     post:
@@ -124,7 +122,7 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/SaveResultRequest"
-        description: Max 4096 bytes. When Content-Type is set, it must begin with application/json.
+        description: Max 4096 bytes. When Content-Type is set, it must use the application/json media type.
       responses:
         "201":
           description: Result saved
@@ -275,7 +273,7 @@ components:
       description: |
         Single JSON object. Body max 4096 bytes.
         Unknown fields are rejected.
-        Validation: numeric fields >= 0 and finite; download_mbps/upload_mbps <= 100000;
+        Validation: numeric fields >= 0; download_mbps/upload_mbps <= 100000;
         latency_ms/jitter_ms/loaded_latency_ms <= 60000; server_name <= 200 UTF-8 bytes;
         ipv4/ipv6 <= 45 UTF-8 bytes; bufferbloat_grade <= 5 UTF-8 bytes.
       properties:

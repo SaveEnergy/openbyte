@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,24 +8,6 @@ import (
 
 	"github.com/saveenergy/openbyte/internal/config"
 )
-
-func TestResolveRandomSourceFallback(t *testing.T) {
-	handler := NewSpeedTestHandler(2, 60)
-	handler.randomData = nil
-
-	src, release, err := handler.resolveRandomSource()
-	if err != nil {
-		t.Fatalf("resolveRandomSource: %v", err)
-	}
-	defer release()
-
-	if len(src) != 64*1024 {
-		t.Errorf("len(src) = %d, want %d", len(src), 64*1024)
-	}
-	if bytes.Equal(src, make([]byte, 64*1024)) {
-		t.Error("expected non-zero random data")
-	}
-}
 
 func TestNewSpeedTestHandlerNormalizesImmutablePolicy(t *testing.T) {
 	handler := NewSpeedTestHandlerWithPolicy(2, 60, -1, nil)
