@@ -43,5 +43,5 @@ the UI obtains the configured server name from its same-origin
 ## Deployment
 
 - Docker exposes only port `8080`.
-- Traefik deployments route HTTP(S) to internal port `8080`, keep dedicated upload routers unbuffered, and default openByte HTTPS ALPN to HTTP/1.1.
+- Traefik deployments route HTTP(S) through one generic router per entrypoint to internal port `8080` and default openByte HTTPS ALPN to HTTP/1.1.
 - `SERVER_NAME` controls the server display name returned by bootstrap ping metadata and shown in the UI.

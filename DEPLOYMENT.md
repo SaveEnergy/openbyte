@@ -5,32 +5,32 @@ are embedded in the binary.
 
 ## Docker
 
-Build and run locally:
+Run the published image:
 
 ```bash
 cd docker
 docker compose up -d
 ```
 
-Run the published image directly:
+Build and run the current checkout:
 
 ```bash
 cd docker
-docker compose -f docker-compose.ghcr.yaml up -d
+docker compose -f docker-compose.yaml -f docker-compose.local.yaml up -d --build
 ```
 
-Add the shared Traefik overlay to either base file:
+Add the Traefik overlay to the published image:
 
 ```bash
 cd docker
 TRAEFIK_HOST_RULE='Host(`speedtest.example.com`)' \
   docker compose -f docker-compose.yaml -f docker-compose.traefik.yaml up -d
 
-# Substitute docker-compose.ghcr.yaml to use the published image.
+# Add -f docker-compose.local.yaml before the Traefik overlay to build locally.
 ```
 
-The overlay terminates TLS, keeps uploads unbuffered, and defaults the openByte
-routers to the measured-faster `openbyte-h1@file` ALPN policy. Set
+The overlay terminates TLS, forwards requests without a buffering middleware,
+and defaults the openByte router to the measured-faster `openbyte-h1@file` ALPN policy. Set
 `TRAEFIK_TLS_OPTIONS=openbyte-h2@file` only for an intentional comparison.
 
 ## Automated GHCR deployment

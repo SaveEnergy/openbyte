@@ -1,0 +1,7 @@
+services:
+  openbyte:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: server
+    image: openbyte:latest

@@ -37,10 +37,13 @@ SERVER_NAME="Frankfurt 25G" ./bin/openbyte
 ### Docker
 
 ```bash
-# Single server
+# Published edge image
 cd docker && docker compose up -d
 
-# With Traefik reverse proxy
+# Build the current checkout locally
+cd docker && docker compose -f docker-compose.yaml -f docker-compose.local.yaml up -d --build
+
+# Published image with Traefik reverse proxy
 cd docker && docker compose -f docker-compose.yaml -f docker-compose.traefik.yaml up -d
 ```
 

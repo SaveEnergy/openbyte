@@ -66,7 +66,7 @@ func TestDeployUsesOneVerifiedSSHConnection(t *testing.T) {
 		t.Fatalf("SSH connection count = %q, want 1", got)
 	}
 	for _, path := range []string{
-		"docker/docker-compose.ghcr.yaml",
+		"docker/docker-compose.yaml",
 		"docker/docker-compose.traefik.yaml",
 		"docker/traefik-openbyte.yaml",
 		"scripts/deploy/deploy_host.sh",
@@ -162,7 +162,14 @@ func TestHostDeployRollback(t *testing.T) {
 				t.Fatalf("read Docker log: %v", err)
 			}
 			logText := string(logContents)
+			if strings.Contains(logText, "docker-compose.ghcr.yaml") {
+				t.Fatalf("deployment still used the removed GHCR Compose file:\n%s", logText)
+			}
 			if tt.scenario != "missing_proxy_subnet" {
+				composeFiles := "-f docker/docker-compose.yaml -f docker/docker-compose.traefik.yaml"
+				if !strings.Contains(logText, composeFiles) {
+					t.Fatalf("deployment did not use the base and Traefik Compose files:\n%s", logText)
+				}
 				wantCIDRs := "172.18.0.0/16,fd00:dead:beef::/64"
 				newDeploy := newDeployCommand(logText)
 				if !strings.Contains(newDeploy, "TRUST_PROXY_HEADERS=true") {

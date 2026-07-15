@@ -38,7 +38,7 @@ run_compose() {
   shift
   GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$image_tag" docker compose \
     --env-file "$REMOTE_DIR/.env" \
-    -f docker/docker-compose.ghcr.yaml \
+    -f docker/docker-compose.yaml \
     -f docker/docker-compose.traefik.yaml \
     "$@"
 }

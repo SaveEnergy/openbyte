@@ -63,12 +63,12 @@ docker:
 
 docker-up:
 	@echo "Starting Docker containers..."
-	@cd docker && docker compose up -d
+	@cd docker && docker compose -f docker-compose.yaml -f docker-compose.local.yaml up -d --build
 	@echo "✓ Containers started"
 
 docker-down:
 	@echo "Stopping Docker containers..."
-	@cd docker && docker compose down
+	@cd docker && docker compose -f docker-compose.yaml -f docker-compose.local.yaml down
 	@echo "✓ Containers stopped"
 
 # Cleanup
