@@ -111,6 +111,7 @@
 }
 
 .results-details {
+  width: 100%;
   margin-top: var(--space-2xl);
   padding-top: var(--space-2xl);
   border-top: 1px solid var(--bg-hover);
@@ -255,6 +256,13 @@
 
   .detail-grid {
     gap: var(--space-lg);
+  }
+
+  #networkIPv4,
+  #networkIPv6 {
+    font-size: 0.8125rem;
+    word-break: normal;
+    overflow-wrap: anywhere;
   }
 
   .results-actions {

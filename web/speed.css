@@ -95,7 +95,7 @@
 
 .public-ip-title {
   margin-bottom: var(--space-sm);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -114,7 +114,7 @@
 
 .public-ip-label {
   margin-bottom: var(--space-xs);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 0.7rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -320,6 +320,7 @@
 
   .public-ip-value {
     min-height: 1.25em;
+    font-size: 0.8125rem;
   }
 
   .speed-number {
