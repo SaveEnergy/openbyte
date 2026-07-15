@@ -378,13 +378,8 @@ function renderVerdict(partial, loadedLatency) {
 function announceResults(partial, grade) {
   if (!elements.resultsAnnouncement) return;
   const download = formatSpeedText(state.downloadResult);
-  const key = partial
-    ? grade
-      ? "announcement.partialWithGrade"
-      : "announcement.partial"
-    : grade
-      ? "announcement.completeWithGrade"
-      : "announcement.complete";
+  let key = partial ? "announcement.partial" : "announcement.complete";
+  if (grade) key += "WithGrade";
   elements.resultsAnnouncement.textContent = t(key, {
     download,
     upload: formatSpeedText(state.uploadResult),
