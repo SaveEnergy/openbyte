@@ -38,6 +38,9 @@ in Git history and pull requests, not release notes.
   (filled in by `web/api.js`) instead of the literal text
   `window.location.origin`, and the Agent notes list regained its bullet
   indentation and spacing lost to the global CSS reset.
+- **Shared result page**: aligned with the live results view — verdict line,
+  colored bufferbloat badge, metric explanations, and the theme toggle now
+  appear on `/results/{id}` too.
 
 ### Security
 

@@ -118,10 +118,11 @@ export async function startTest() {
       finishAbortedRun();
     } else {
       console.error("Test failed:", e);
-      showError(e.message || "Test failed");
+      // Reset first: resetToIdle clears toasts, so the error must be shown after.
       if (state.abortController?.signal === signal) {
         resetToIdle();
       }
+      showError(e.message || "Test failed");
     }
   } finally {
     if (state.abortController?.signal === signal) {

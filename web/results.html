@@ -48,10 +48,21 @@
           >
           <div class="server-name" id="serverName">Shared Result</div>
         </div>
+        <div class="header-tools">
+          <button
+            class="theme-toggle"
+            id="themeToggle"
+            type="button"
+            aria-label="Switch theme"
+          >
+            ◐
+          </button>
+        </div>
       </header>
 
       <main class="main" id="mainContent">
         <section class="speed-section" id="resultView">
+          <p class="results-verdict hidden" id="resultsVerdict"></p>
           <div class="results-main" id="resultsMain">
             <div class="result-card result-primary">
               <div class="result-icon">↓</div>
@@ -81,9 +92,35 @@
             </div>
             <div class="extra-stat">
               <span class="extra-label">Bufferbloat</span>
-              <span class="extra-value" id="bufferbloatResult">-</span>
+              <span class="extra-value bb-badge" id="bufferbloatResult">-</span>
             </div>
           </div>
+          <details class="stats-help">
+            <summary>What do these numbers mean?</summary>
+            <dl class="stats-help-list">
+              <dt>Idle Latency</dt>
+              <dd>
+                Round-trip time to the server while the connection is quiet.
+                Lower is better; under 20 ms feels instant.
+              </dd>
+              <dt>Jitter</dt>
+              <dd>
+                How much latency varies between pings. High jitter causes
+                choppy calls and unstable game connections.
+              </dd>
+              <dt>Loaded Latency</dt>
+              <dd>
+                Latency measured while the connection is fully busy
+                downloading or uploading — what you feel during heavy use.
+              </dd>
+              <dt>Bufferbloat</dt>
+              <dd>
+                Grade for how much latency rises under load (A+ best, F
+                worst). Poor grades mean lag in calls and games while others
+                use the connection.
+              </dd>
+            </dl>
+          </details>
           <div class="results-details">
             <div class="detail-section">
               <h3 class="detail-title">Public IP at test time</h3>
