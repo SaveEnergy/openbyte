@@ -13,7 +13,6 @@ type VersionResponse struct {
 }
 
 func (h *Handler) GetVersion(w http.ResponseWriter, r *http.Request) {
-	drainRequestBody(r)
 	version := h.version
 	if version == "" {
 		version = "dev"

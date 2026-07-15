@@ -52,12 +52,12 @@ func TestSpeedTestUploadHandlesReadError(t *testing.T) {
 	}
 }
 
-func TestSpeedTestUploadReadErrorDrainsBody(t *testing.T) {
+func TestSpeedTestUploadReadErrorAbortsBody(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 	tb := &failingTrackingBody{}
 	req := httptest.NewRequest(http.MethodPost, uploadEndpoint, nil)
 	req.Body = tb
-	rec := httptest.NewRecorder()
+	rec := newDeadlineRecorder()
 
 	handler.Upload(rec, req)
 
@@ -69,6 +69,9 @@ func TestSpeedTestUploadReadErrorDrainsBody(t *testing.T) {
 	}
 	if !tb.closed {
 		t.Fatal("expected upload body to be closed")
+	}
+	if len(rec.readDeadlines) == 0 || rec.readDeadlines[len(rec.readDeadlines)-1].After(time.Now()) {
+		t.Fatalf("read deadlines = %v, want immediate abort", rec.readDeadlines)
 	}
 }
 
@@ -202,7 +205,8 @@ func TestUploadAtCapacityDrainsBodyBefore503(t *testing.T) {
 	tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 4096)}
 	req := httptest.NewRequest(http.MethodPost, uploadEndpoint, nil)
 	req.Body = tb
-	rec := httptest.NewRecorder()
+	req.ContentLength = int64(len(tb.data))
+	rec := newDeadlineRecorder()
 
 	handler.Upload(rec, req)
 
@@ -214,6 +218,9 @@ func TestUploadAtCapacityDrainsBodyBefore503(t *testing.T) {
 	}
 	if !tb.closed {
 		t.Fatal(speedtestExpectReqBodyClosed)
+	}
+	if len(rec.readDeadlines) != 2 || !rec.readDeadlines[1].IsZero() {
+		t.Fatalf("read deadlines = %v, want bounded drain then reset", rec.readDeadlines)
 	}
 }
 

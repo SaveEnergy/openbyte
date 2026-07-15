@@ -16,7 +16,7 @@
 
 ### Reliability & Concurrency
 
-- Request/response bodies are drained on error paths to preserve HTTP/2 connection reuse.
+- Request bodies are drained only within strict byte/time bounds; unexpected bodyless-route bodies and incomplete drains are aborted without sacrificing the HTTP/2 connection.
 - HTTP client/browser cancel paths propagate request contexts so aborts tear down transfer loops.
 - Results store shutdown is explicit and idempotent enough for server lifecycle.
 - Upload/download handlers enforce bounded concurrency, per-IP slots, max duration, and safe body deadlines.

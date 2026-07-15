@@ -58,9 +58,10 @@ func TestGetVersionDefault(t *testing.T) {
 	}
 }
 
-func TestGetVersionDrainsUnexpectedBody(t *testing.T) {
+func TestGetVersionDoesNotReadUnexpectedBody(t *testing.T) {
 	handler := api.NewHandler()
-	tb := &trackingBody{data: []byte(`{"unexpected":"payload"}`)}
+	payload := []byte(`{"unexpected":"payload"}`)
+	tb := &trackingBody{data: payload}
 
 	req := httptest.NewRequest(http.MethodGet, versionEndpoint, nil)
 	req.Body = tb
@@ -70,5 +71,5 @@ func TestGetVersionDrainsUnexpectedBody(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
 	}
-	assertTrackingBodyDrained(t, tb)
+	assertTrackingBodyUntouched(t, tb, len(payload))
 }

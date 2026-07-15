@@ -4,6 +4,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"time"
 )
 
 type failingResponseWriter struct {
@@ -65,6 +67,20 @@ type trackingBody struct {
 	offset int
 	reads  int
 	closed bool
+}
+
+type deadlineRecorder struct {
+	*httptest.ResponseRecorder
+	readDeadlines []time.Time
+}
+
+func newDeadlineRecorder() *deadlineRecorder {
+	return &deadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
+}
+
+func (w *deadlineRecorder) SetReadDeadline(deadline time.Time) error {
+	w.readDeadlines = append(w.readDeadlines, deadline)
+	return nil
 }
 
 func (tb *trackingBody) Read(p []byte) (int, error) {

@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
 	"math"
 	"net/http"
 	"strings"
 	"sync"
 
+	"github.com/saveenergy/openbyte/internal/httpbody"
 	"github.com/saveenergy/openbyte/internal/jsonbody"
 	"github.com/saveenergy/openbyte/internal/logging"
 )
@@ -94,7 +94,7 @@ func writeJSON(w http.ResponseWriter, code int, payload any) {
 func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 	ct := r.Header.Get("Content-Type")
 	if ct != "" && !strings.HasPrefix(ct, "application/json") {
-		drainRequestBody(r)
+		httpbody.DrainAndClose(w, r)
 		respondJSONError(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -202,12 +202,4 @@ func hasNonFinite(vals ...float64) bool {
 		}
 	}
 	return false
-}
-
-func drainRequestBody(r *http.Request) {
-	if r == nil || r.Body == nil {
-		return
-	}
-	_, _ = io.Copy(io.Discard, r.Body)
-	_ = r.Body.Close()
 }

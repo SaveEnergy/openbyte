@@ -6,6 +6,8 @@ import (
 	stdErrors "errors"
 	"io"
 	"net/http"
+
+	"github.com/saveenergy/openbyte/internal/httpbody"
 )
 
 // ErrTrailingJSON is returned when the body contains valid JSON followed by
@@ -16,8 +18,8 @@ var ErrTrailingJSON = stdErrors.New("request body must contain a single JSON obj
 // DisallowUnknownFields. When limit > 0, the body is wrapped with
 // http.MaxBytesReader using w for the error response path.
 //
-// On any decode error, the remainder of the body is drained. The caller must
-// not read r.Body after an error return.
+// On any decode error, a small, promptly available remainder is drained. The
+// caller must not read r.Body after an error return.
 func DecodeSingleObject(w http.ResponseWriter, r *http.Request, dst any, limit int64) error {
 	if limit > 0 {
 		r.Body = http.MaxBytesReader(w, r.Body, limit)
@@ -25,11 +27,11 @@ func DecodeSingleObject(w http.ResponseWriter, r *http.Request, dst any, limit i
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(dst); err != nil {
-		_, _ = io.Copy(io.Discard, r.Body)
+		httpbody.DrainAndClose(w, r)
 		return err
 	}
 	if err := dec.Decode(&struct{}{}); !stdErrors.Is(err, io.EOF) {
-		_, _ = io.Copy(io.Discard, r.Body)
+		httpbody.DrainAndClose(w, r)
 		return ErrTrailingJSON
 	}
 	return nil

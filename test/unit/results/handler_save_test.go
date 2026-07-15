@@ -100,8 +100,9 @@ func TestHandlerSaveRejectsWrongContentTypeDrainsBody(t *testing.T) {
 	tb := &trackingBody{data: []byte(`{"download_mbps":1}`)}
 	req := httptest.NewRequest(http.MethodPost, resultsPath, nil)
 	req.Body = tb
+	req.ContentLength = int64(len(tb.data))
 	req.Header.Set(contentTypeHeader, plainTextType)
-	rec := httptest.NewRecorder()
+	rec := newDeadlineRecorder()
 
 	h.Save(rec, req)
 
@@ -113,6 +114,9 @@ func TestHandlerSaveRejectsWrongContentTypeDrainsBody(t *testing.T) {
 	}
 	if !tb.closed {
 		t.Fatal("expected body to be closed")
+	}
+	if len(rec.readDeadlines) != 2 || !rec.readDeadlines[1].IsZero() {
+		t.Fatalf("read deadlines = %v, want bounded drain then reset", rec.readDeadlines)
 	}
 }
 
