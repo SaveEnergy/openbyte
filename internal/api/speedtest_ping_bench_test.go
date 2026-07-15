@@ -11,7 +11,7 @@ import (
 // BenchmarkSpeedTestPing is the /api/v1/ping JSON response path (frequent health-style probe).
 func BenchmarkSpeedTestPing(b *testing.B) {
 	cfg := config.DefaultConfig()
-	h := NewSpeedTestHandler(cfg.MaxConcurrentHTTP(), 300, 0, nil)
+	h := NewSpeedTestHandler(cfg.MaxConcurrentHTTP(), 300)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/ping", nil)
 	req.RemoteAddr = "192.0.2.10:54321"
 

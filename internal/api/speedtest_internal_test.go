@@ -11,7 +11,7 @@ import (
 )
 
 func TestResolveRandomSourceFallback(t *testing.T) {
-	handler := NewSpeedTestHandler(2, 60, 0, nil)
+	handler := NewSpeedTestHandler(2, 60)
 	handler.randomData = nil
 
 	src, release, err := handler.resolveRandomSource()
@@ -29,7 +29,7 @@ func TestResolveRandomSourceFallback(t *testing.T) {
 }
 
 func TestNewSpeedTestHandlerNormalizesImmutablePolicy(t *testing.T) {
-	handler := NewSpeedTestHandler(2, 60, -1, nil)
+	handler := NewSpeedTestHandlerWithPolicy(2, 60, -1, nil)
 
 	if handler.maxConcurrentPerIP != 0 {
 		t.Fatalf("max concurrent per IP = %d, want 0", handler.maxConcurrentPerIP)

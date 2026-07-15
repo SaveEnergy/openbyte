@@ -48,10 +48,6 @@ func Run(args []string, version string) int {
 		return exitFailure
 	}
 	pprofServer := startPprofServer(cfg)
-	defer func() {
-		resultsStore.Close()
-		shutdownPprofServer(pprofServer, 5*time.Second)
-	}()
 
 	srv := &http.Server{
 		Addr:              cfg.BindAddress + ":" + cfg.Port,
@@ -71,6 +67,8 @@ func Run(args []string, version string) int {
 	exitCode := waitForShutdown(quit, srvErrCh)
 	shutdownHTTPServer(srv, 30*time.Second)
 
+	resultsStore.Close()
+	shutdownPprofServer(pprofServer, 5*time.Second)
 	slog.Info("Server stopped")
 	return exitCode
 }

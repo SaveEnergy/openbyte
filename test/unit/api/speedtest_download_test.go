@@ -12,7 +12,7 @@ import (
 )
 
 func TestSpeedTestDownloadWritesData(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10, 300, 0, nil)
+	handler := api.NewSpeedTestHandler(10, 300)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 	t.Cleanup(cancel)
@@ -39,7 +39,7 @@ func TestSpeedTestDownloadWritesData(t *testing.T) {
 
 func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 	maxConcurrent := 2
-	handler := api.NewSpeedTestHandler(maxConcurrent, 300, 0, nil)
+	handler := api.NewSpeedTestHandler(maxConcurrent, 300)
 
 	// Fill all slots with long-running downloads using signal writers
 	cancels := make([]context.CancelFunc, maxConcurrent)
@@ -98,7 +98,7 @@ func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 }
 
 func TestDownloadAtCapacityDoesNotReadUnexpectedBody(t *testing.T) {
-	handler := api.NewSpeedTestHandler(0, 300, 0, nil)
+	handler := api.NewSpeedTestHandler(0, 300)
 
 	tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 4096)}
 	req := httptest.NewRequest(http.MethodGet, downloadEndpointBase+speedtestQueryDur1Chunk, nil)
@@ -119,7 +119,7 @@ func TestDownloadAtCapacityDoesNotReadUnexpectedBody(t *testing.T) {
 }
 
 func TestDownloadPerIPLimitRejectsSameIPAllowsDifferentIP(t *testing.T) {
-	handler := api.NewSpeedTestHandler(4, 300, 2, nil)
+	handler := api.NewSpeedTestHandlerWithPolicy(4, 300, 2, nil)
 
 	sameIP := "203.0.113.10:1234"
 	otherIP := "203.0.113.11:1234"
@@ -177,7 +177,7 @@ func TestDownloadPerIPLimitRejectsSameIPAllowsDifferentIP(t *testing.T) {
 }
 
 func TestDownloadValidationDoesNotReadUnexpectedBody(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10, 300, 0, nil)
+	handler := api.NewSpeedTestHandler(10, 300)
 
 	tests := []string{
 		downloadEndpointBase + speedtestQueryDurZero,
@@ -205,7 +205,7 @@ func TestDownloadValidationDoesNotReadUnexpectedBody(t *testing.T) {
 
 func TestDownloadRespectsMaxDuration(t *testing.T) {
 	// maxDurationSec=5: duration=5 should work, duration=10 should be rejected.
-	handler := api.NewSpeedTestHandler(10, 5, 0, nil)
+	handler := api.NewSpeedTestHandler(10, 5)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	t.Cleanup(cancel)

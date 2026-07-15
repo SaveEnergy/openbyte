@@ -42,7 +42,11 @@ const (
 	speedtestCloseGrace            = 1 * time.Second
 )
 
-func NewSpeedTestHandler(maxConcurrent, maxDurationSec, maxConcurrentPerIP int, resolver *ClientIPResolver) *SpeedTestHandler {
+func NewSpeedTestHandler(maxConcurrent, maxDurationSec int) *SpeedTestHandler {
+	return NewSpeedTestHandlerWithPolicy(maxConcurrent, maxDurationSec, 0, nil)
+}
+
+func NewSpeedTestHandlerWithPolicy(maxConcurrent, maxDurationSec, maxConcurrentPerIP int, resolver *ClientIPResolver) *SpeedTestHandler {
 	if maxDurationSec <= 0 {
 		maxDurationSec = 300
 	}
