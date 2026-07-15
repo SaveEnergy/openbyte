@@ -1,21 +1,13 @@
 /** German catalog. Technical units, protocol names, and product names stay invariant. */
 
 export const de = Object.freeze({
-  "meta.home.description":
-    "Open-Source-Internet-Speedtest zum Messen von Download- und Upload-Geschwindigkeit, Latenz, Jitter und Bufferbloat.",
-  "meta.home.ogTitle": "openByte — Speedtest",
-  "meta.shared.description":
-    "openByte-Speedtest-Ergebnis mit Download- und Upload-Geschwindigkeit, Latenz und Bufferbloat.",
-  "meta.shared.ogTitle": "openByte — Speedtest-Ergebnis",
-  "meta.shared.ogDescription":
-    "Dieses mit openByte gemessene Speedtest-Ergebnis ansehen.",
   "meta.shared.title": "openByte — Geteiltes Testergebnis",
 
   "common.skipToMain": "Zum Hauptinhalt springen",
   "common.error": "Fehler",
   "common.success": "Erfolgreich",
   "language.label": "Sprache auswählen",
-  "language.auto": "Auto",
+  "language.system": "System · {locale}",
 
   "theme.switch": "Farbschema wechseln",
   "theme.systemNextLight":
@@ -28,87 +20,75 @@ export const de = Object.freeze({
   "server.connecting": "Verbindung wird hergestellt…",
   "server.ready": "Bereit",
   "server.offline": "Offline",
-  "test.heading": "openByte-Internet-Speedtest",
-  "test.startAria": "LOS — Speedtest starten",
-  "test.startShort": "LOS",
-  "test.connecting": "Verbindung wird hergestellt…",
-  "test.readyHint": "Zum Starten klicken",
-  "test.offlineHint": "Server offline – erneuter Versuch folgt",
-  "network.publicIp": "Öffentliche IP-Adresse",
+  "test.heading": "Internet-Speedtest mit openByte",
+  "test.startAria": "GO — Speedtest starten",
+  "test.startShort": "GO",
+  "test.connecting": "Wird verbunden…",
+  "test.readyHint": "Speedtest starten",
+  "test.offlineHint": "Offline – neuer Versuch…",
+  "network.publicIp": "Öffentliche IP-Adressen",
   "network.detecting": "Wird ermittelt…",
-  "network.notDetected": "Nicht erkannt",
+  "network.notDetected": "Nicht verfügbar",
   "test.progressAria": "Netzwerkmessung läuft",
   "test.progressText": "Netzwerk wird gemessen",
   "test.phasesAria": "Testphasen",
   "test.phase.ping": "Ping",
   "test.phase.download": "Download",
   "test.phase.upload": "Upload",
-  "test.stage.saturating": "Auslastung",
-  "test.stage.measuring": "Messung",
   "test.phaseInProgress": "{phase} läuft",
   "test.cancel": "Abbrechen",
 
-  "result.heading": "Ergebnisse",
-  "result.partialNotice":
-    "Test vorzeitig abgebrochen – Upload wurde nicht gemessen.",
+  "result.heading": "Ergebnis",
+  "result.partialNotice": "Teilergebnis – Upload nicht gemessen.",
   "result.download": "Download",
   "result.upload": "Upload",
   "result.notMeasured": "nicht gemessen",
-  "result.sharedHeading": "Geteiltes Testergebnis",
+  "result.sharedHeading": "Testergebnis",
   "result.server": "Server",
-  "result.tested": "Getestet",
+  "result.tested": "Getestet am",
   "result.loading": "Ergebnis wird geladen…",
-  "metric.idleLatency": "Latenz im Leerlauf",
+  "metric.idleLatency": "Leerlauf",
   "metric.jitter": "Jitter",
-  "metric.loadedLatency": "Latenz unter Last",
+  "metric.loadedLatency": "Unter Last",
+  "metric.downloadLatency": "Beim Download",
   "metric.bufferbloat": "Bufferbloat",
-  "metric.helpSummary": "Was bedeuten diese Werte?",
+  "metric.helpSummary": "Was bedeuten die Werte?",
   "metric.idleLatencyDescription":
-    "Zeit für ein Datenpaket zum Server und zurück, solange die Verbindung nicht ausgelastet ist. Je niedriger, desto besser; unter 20 ms sind Verzögerungen kaum spürbar.",
+    "Zeit zum Server und zurück, wenn die Verbindung frei ist. Niedriger ist besser.",
   "metric.jitterDescription":
-    "Wie stark die Latenz zwischen einzelnen Pings schwankt. Hoher Jitter kann Anrufe abgehackt und Online-Spiele instabil machen.",
+    "Schwankung zwischen Latenzmessungen. Hoher Jitter stört Anrufe und Spiele.",
   "metric.loadedLatencyDescription":
-    "Die Latenz, während die Verbindung durch Downloads oder Uploads voll ausgelastet ist – dieser Wert ist bei intensiver Nutzung spürbar.",
+    "Zeit zum Server und zurück, während die Verbindung ausgelastet ist. Je niedriger, desto reaktionsschneller bleibt sie.",
   "metric.bufferbloatDescription":
-    "Bewertung dafür, wie stark die Latenz unter Last ansteigt (A+ ist am besten, F am schlechtesten). Schlechte Bewertungen bedeuten Verzögerungen bei Anrufen und Spielen, wenn andere die Verbindung nutzen.",
-  "network.publicIpAtTest": "Öffentliche IP-Adresse zum Testzeitpunkt",
-  "history.heading": "Letzte Tests auf diesem Gerät",
+    "Anstieg der Latenz unter Last, bewertet von A+ bis F. Niedrige Noten bedeuten mehr Verzögerung.",
+  "network.publicIpAtTest": "Öffentliche IP-Adressen beim Test",
+  "history.heading": "Letzte Tests",
   "history.justNow": "gerade eben",
 
-  "action.testAgain": "Erneut testen",
+  "action.testAgain": "Nochmal testen",
   "action.share": "Teilen",
   "action.runOwnTest": "Eigenen Speedtest starten",
   "action.runSpeedTest": "Speedtest starten",
-  "share.preparing": "Wird vorbereitet…",
-  "share.copied": "Link in die Zwischenablage kopiert",
+  "share.preparing": "Link wird erstellt…",
+  "share.copied": "Link kopiert",
   "share.unavailable":
     "Der Link zum Teilen kann gerade nicht erstellt werden",
   "share.nativeTitle": "openByte-Speedtest-Ergebnis",
   "share.copyPrompt": "Diesen Link kopieren:",
   "nav.speedTest": "Speedtest",
 
-  "verdict.partial.exceptional":
-    "Außergewöhnlich hohe Downloadgeschwindigkeit – mehr als genug für mehrere 4K-Streams und große Downloads.",
-  "verdict.partial.excellent":
-    "Sehr hohe Downloadgeschwindigkeit – flüssiges 4K-Streaming und schnelle Downloads.",
-  "verdict.partial.good":
-    "Gute Downloadgeschwindigkeit – problemloses HD-Streaming und Surfen.",
-  "verdict.partial.modest":
-    "Mäßige Downloadgeschwindigkeit – ausreichend zum Surfen und Musikhören.",
-  "verdict.partial.slow":
-    "Langsame Downloadgeschwindigkeit – mit Unterbrechungen und langen Downloadzeiten ist zu rechnen.",
-  "verdict.complete.exceptional":
-    "Außergewöhnlich schnelle Verbindung – bewältigt 4K-Streaming, Cloud-Backups und viele gleichzeitige Nutzer mühelos.",
-  "verdict.complete.excellent":
-    "Sehr schnelle Verbindung – flüssiges 4K-Streaming, Videoanrufe und Online-Gaming sind problemlos möglich.",
-  "verdict.complete.good":
-    "Gute Verbindung – problemloses HD-Streaming und stabile Videoanrufe.",
-  "verdict.complete.modest":
-    "Mäßig schnelle Verbindung – ausreichend zum Surfen und Musikhören; große Downloads dauern etwas länger.",
-  "verdict.complete.slow":
-    "Langsame Verbindung – mit Unterbrechungen und langen Downloadzeiten ist zu rechnen.",
+  "verdict.partial.exceptional": "Extrem schneller Download.",
+  "verdict.partial.excellent": "Sehr schneller Download.",
+  "verdict.partial.good": "Gute Downloadgeschwindigkeit.",
+  "verdict.partial.modest": "Genug zum Surfen und Musikhören.",
+  "verdict.partial.slow": "Langsamer Download.",
+  "verdict.complete.exceptional": "Außergewöhnlich schnelle Verbindung.",
+  "verdict.complete.excellent": "Ideal für Streaming und Videoanrufe.",
+  "verdict.complete.good": "Gut für den Alltag.",
+  "verdict.complete.modest": "Genug zum Surfen und Musikhören.",
+  "verdict.complete.slow": "Langsame Verbindung – Unterbrechungen möglich.",
   "verdict.bufferbloatWarning":
-    "Die Latenz steigt unter Last deutlich an (Bufferbloat). Dadurch kann es bei Anrufen und Spielen zu Verzögerungen kommen, wenn die Verbindung ausgelastet ist.",
+    "Die Latenz steigt unter Last. Anrufe und Spiele können dann stocken.",
 
   "announcement.complete":
     "Speedtest abgeschlossen. Download {download}. Upload {upload}. Latenz {latency}.",
@@ -116,35 +96,27 @@ export const de = Object.freeze({
     "Speedtest abgeschlossen. Download {download}. Upload {upload}. Latenz {latency}. Bufferbloat-Bewertung {grade}.",
   "announcement.partial":
     "Speedtest vorzeitig abgebrochen. Download {download}. Latenz {latency}.",
-  "announcement.partialWithGrade":
-    "Speedtest vorzeitig abgebrochen. Download {download}. Latenz {latency}. Bufferbloat-Bewertung {grade}.",
-
   "error.testInProgress": "Ein Test läuft bereits.",
   "error.serverNotReady": "Der Server ist noch nicht bereit.",
   "error.testFailed": "Speedtest fehlgeschlagen. Bitte erneut versuchen.",
-  "error.workerUnsupported":
-    "Dieser Browser unterstützt keine Web Worker.",
-  "error.workerFailed":
-    "Der Speedtest-Worker ist fehlgeschlagen. Bitte erneut versuchen.",
-  "error.workerUnreadable":
-    "Der Speedtest-Worker hat eine unlesbare Antwort zurückgegeben.",
+  "error.workerUnsupported": "Dieser Browser kann den Speedtest nicht ausführen.",
+  "error.workerFailed": "Der Speedtest wurde gestoppt. Bitte erneut versuchen.",
+  "error.workerUnreadable": "Der Speedtest hat ungültige Daten geliefert.",
   "error.downloadNetwork":
     "Netzwerkfehler während des Downloads. Bitte erneut versuchen.",
   "error.uploadNetwork":
     "Netzwerkfehler während des Uploads. Bitte erneut versuchen.",
   "error.serverOverloaded":
     "Der Server ist überlastet. Bitte in Kürze erneut versuchen.",
-  "error.downloadNoStreams":
-    "Download fehlgeschlagen. Kein Datenstrom wurde erfolgreich abgeschlossen.",
-  "error.uploadNoStreams":
-    "Upload fehlgeschlagen. Kein Datenstrom wurde erfolgreich abgeschlossen.",
+  "error.downloadNoStreams": "Download-Test fehlgeschlagen. Bitte erneut versuchen.",
+  "error.uploadNoStreams": "Upload-Test fehlgeschlagen. Bitte erneut versuchen.",
   "error.resultNotFound":
     "Ergebnis nicht gefunden oder nicht mehr verfügbar.",
   "error.resultServer": "Serverfehler beim Laden des Ergebnisses.",
   "error.resultUnavailable": "Ergebnis kann nicht geladen werden.",
   "error.resultInvalidPayload": "Ungültige Ergebnisdaten.",
   "error.resultRender": "Ergebnis kann nicht angezeigt werden.",
-  "error.resultInvalidId": "Ungültige Ergebnis-ID.",
+  "error.resultInvalidId": "Dieser Ergebnislink ist ungültig.",
   "error.resultTimeout":
-    "Die Anfrage hat zu lange gedauert. Bitte erneut versuchen.",
+    "Das Laden des Ergebnisses dauert zu lange. Bitte erneut versuchen.",
 });

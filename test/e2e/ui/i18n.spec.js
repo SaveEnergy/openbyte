@@ -97,10 +97,24 @@ test.describe("English and German localization", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await page.locator("#languageSelect").selectOption("auto");
     await expect(page.locator("html")).toHaveAttribute("lang", "de");
+    await expect(page.locator('#languageSelect option[value="auto"]')).toHaveText(
+      "System · DE",
+    );
     expect(
       await page.evaluate(() => localStorage.getItem("openbyte-language")),
     ).toBeNull();
     await context.close();
+  });
+
+  test("System names the browser locale behind an explicit override", async ({
+    page,
+  }) => {
+    await page.goto("/?lang=de");
+    await expect(page.locator('#languageSelect option[value="auto"]')).toHaveText(
+      "System · EN",
+    );
+    await page.locator("#languageSelect").selectOption("auto");
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
   });
 });
 
@@ -114,14 +128,16 @@ test.describe("German UI", () => {
 
     await expect(page.locator("html")).toHaveAttribute("lang", "de");
     await expect(page.locator("#languageSelect")).toHaveValue("auto");
-    await expect(page.locator("#startBtn .start-btn-text")).toHaveText("LOS");
+    await expect(page.locator("#startBtn .start-btn-text")).toHaveText("GO");
     await expect(page.locator("#startBtn")).toHaveAttribute(
       "aria-label",
-      /LOS.*Speedtest starten/,
+      /GO.*Speedtest starten/,
     );
-    await expect(page.getByRole("heading", { name: "Öffentliche IP-Adresse" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Öffentliche IP-Adressen" }),
+    ).toBeVisible();
     await expect(page.locator(".stats-help summary")).toHaveText(
-      "Was bedeuten diese Werte?",
+      "Was bedeuten die Werte?",
     );
     await expect(page.locator("#themeToggle")).toHaveAttribute(
       "aria-label",
@@ -129,7 +145,7 @@ test.describe("German UI", () => {
     );
     await expect(page.locator('meta[name="description"]')).toHaveAttribute(
       "content",
-      /Open-Source-Internet-Speedtest/,
+      /Open-source internet speed test/,
     );
 
     const formatted = await page.evaluate(async () => {
@@ -165,10 +181,12 @@ test.describe("German UI", () => {
     await expect(page.locator("#downloadResult")).toHaveText("123,5");
     await expect(page.locator("#uploadResult")).toHaveText("67,9");
     await expect(page.locator("#latencyResult")).toHaveText("12,3 ms");
-    await expect(page.getByText("Öffentliche IP-Adresse zum Testzeitpunkt")).toBeVisible();
+    await expect(
+      page.getByText("Öffentliche IP-Adressen beim Test"),
+    ).toBeVisible();
     await expect(page.locator("#testedAt")).toContainText(/\d{1,2}\.\d{1,2}\.\d{4}/);
     await expect(page.locator("#resultsVerdict")).toContainText(
-      "Sehr schnelle Verbindung",
+      "Ideal für Streaming und Videoanrufe.",
     );
     await expect(page.locator('a[data-locale-link]').first()).toHaveAttribute(
       "href",
@@ -216,7 +234,7 @@ test.describe("German UI", () => {
     await expect(page.locator("#resultsState")).toBeVisible({
       timeout: 60_000,
     });
-    await expect(page.locator("#restartBtn")).toHaveText("Erneut testen");
+    await expect(page.locator("#restartBtn")).toHaveText("Nochmal testen");
     await expect(page.locator("#resultsVerdict")).not.toBeEmpty();
   });
 

@@ -6,6 +6,7 @@ import {
 } from "./utils.js";
 import { formatDateTime, onLocaleChange, t } from "./i18n.js";
 import {
+  formatConnectionAdvisory,
   formatConnectionVerdict,
   formatLatency,
   formatSpeed,
@@ -18,6 +19,7 @@ const loadingView = document.getElementById("loadingView");
 const resultView = document.getElementById("resultView");
 const errorView = document.getElementById("errorView");
 const errorMessage = document.querySelector("#errorView .error-message");
+const errorCode = document.getElementById("errorCode");
 let currentResult = null;
 let currentErrorKey = null;
 
@@ -48,6 +50,10 @@ function showError(key) {
   if (loadingView) loadingView.classList.add("hidden");
   if (resultView) resultView.classList.add("hidden");
   if (errorMessage) errorMessage.textContent = t(key);
+  if (errorCode) {
+    errorCode.textContent = "404";
+    errorCode.classList.toggle("hidden", key !== "error.resultNotFound");
+  }
   if (errorView) errorView.classList.remove("hidden");
 }
 
@@ -76,15 +82,23 @@ function renderBufferbloatBadge(el, grade) {
 
 function renderVerdict(d) {
   const el = document.getElementById("resultsVerdict");
-  if (!el) return;
-  const verdict = formatConnectionVerdict({
+  const advisoryEl = document.getElementById("resultsAdvisory");
+  const values = {
     download: d.download_mbps,
     upload: d.upload_mbps,
     idleLatency: d.latency_ms,
     loadedLatency: d.loaded_latency_ms,
-  });
-  el.textContent = verdict;
-  el.classList.toggle("hidden", verdict === "");
+  };
+  const verdict = formatConnectionVerdict(values);
+  if (el) {
+    el.textContent = verdict;
+    el.classList.toggle("hidden", verdict === "");
+  }
+  const advisory = formatConnectionAdvisory(values);
+  if (advisoryEl) {
+    advisoryEl.textContent = advisory;
+    advisoryEl.classList.toggle("hidden", advisory === "");
+  }
 }
 
 function updateServerDetails(d, refs) {

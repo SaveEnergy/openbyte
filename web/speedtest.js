@@ -254,16 +254,8 @@ async function runTest(direction, signal) {
   let result;
   try {
     result = await runWorkerSpeedTest(direction, onProgress, signal, {
-      onPhase: (stage, streams, info) => {
+      onPhase: (_stage, _streams, info) => {
         noteRampWindow(progressModel, info);
-        updateTestType(
-          `test.stage.${stage}`,
-          direction === "download" ? "downloading" : "uploading",
-          {
-            icon: direction === "download" ? "↓" : "↑",
-            streams,
-          },
-        );
       },
       onMeasureStart: (streams, duration) => {
         noteMeasureStart(progressModel, duration);

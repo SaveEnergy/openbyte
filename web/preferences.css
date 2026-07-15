@@ -1,0 +1,92 @@
+/* Compact language and theme preferences shared by both pages. */
+
+.header-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-shrink: 0;
+}
+
+.preference-controls {
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid var(--control-border);
+  border-radius: 12px;
+  background: var(--bg-secondary);
+  transition:
+    border-color var(--motion-duration-base) ease,
+    box-shadow var(--motion-duration-base) ease;
+}
+
+.preference-controls:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.language-select,
+.theme-toggle {
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    color var(--motion-duration-base) ease,
+    background-color var(--motion-duration-base) ease;
+}
+
+.language-select {
+  min-width: 108px;
+  padding: 0 var(--space-sm);
+  font-size: 0.875rem;
+}
+
+.theme-toggle {
+  width: 44px;
+  border-left: 1px solid var(--control-border);
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.language-select:hover,
+.theme-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--accent-primary);
+}
+
+.language-select:focus-visible,
+.theme-toggle:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent-primary);
+}
+
+@media (max-width: 720px) {
+  .server-info {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    gap: var(--space-sm);
+  }
+
+  .brand {
+    max-width: calc(100% - 158px);
+  }
+
+  .server-name {
+    display: none;
+  }
+
+  .header-tools {
+    gap: 0;
+  }
+
+  .language-select {
+    min-width: 104px;
+    width: 104px;
+  }
+}

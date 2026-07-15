@@ -79,12 +79,16 @@ export function initElements() {
     upload: document.getElementById("phaseValueUpload"),
   };
   elements.resultsVerdict = document.getElementById("resultsVerdict");
+  elements.resultsAdvisory = document.getElementById("resultsAdvisory");
+  elements.loadedLatencyLabel = document.getElementById("loadedLatencyLabel");
+  elements.bufferbloatStat = document.getElementById("bufferbloatStat");
   elements.partialNotice = document.getElementById("partialNotice");
   elements.resultsAnnouncement = document.getElementById(
     "resultsAnnouncement",
   );
   elements.historySection = document.getElementById("historySection");
   elements.historyList = document.getElementById("historyList");
+  elements.statsHelp = document.querySelector(".stats-help");
   elements.startBtnHint = document.querySelector(".start-btn-hint");
 }
 

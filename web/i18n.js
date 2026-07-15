@@ -133,7 +133,14 @@ function syncLocalizedLinks(root) {
 
 function syncLanguageControl(root) {
   const control = root.querySelector("#languageSelect");
-  if (control) control.value = preference;
+  if (!control) return;
+  const systemOption = control.querySelector('option[value="auto"]');
+  if (systemOption) {
+    systemOption.textContent = t("language.system", {
+      locale: browserLocale().toUpperCase(),
+    });
+  }
+  control.value = preference;
 }
 
 export function localizeDocument(root = document) {

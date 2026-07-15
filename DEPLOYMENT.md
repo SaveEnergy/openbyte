@@ -146,7 +146,7 @@ curl -4 https://v4.speedtest.example.com/api/v1/ping
 curl -6 https://v6.speedtest.example.com/api/v1/ping
 ```
 
-A failed single-stack probe displays `Not detected` for that family without
+A failed single-stack probe displays `Not available` for that family without
 preventing the speed test. Make sure HTTP/HTTPS firewall rules permit both IPv4
 and IPv6. `/api/v1/ping` is the only API route that allows cross-origin reads;
 openByte does not expose configurable generic CORS for the remaining routes.

@@ -5,17 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      data-i18n-content="meta.shared.description"
       content="openByte speed test result — download, upload, latency, and bufferbloat."
     />
     <meta
       property="og:title"
-      data-i18n-content="meta.shared.ogTitle"
       content="openByte — Speed Test Result"
     />
     <meta
       property="og:description"
-      data-i18n-content="meta.shared.ogDescription"
       content="See this internet speed test result on openByte."
     />
     <meta property="og:type" content="website" />
@@ -38,6 +35,7 @@
       crossorigin
     />
     <link rel="stylesheet" href="/base.css" />
+    <link rel="stylesheet" href="/preferences.css" />
     <link rel="stylesheet" href="/speed-results.css" />
     <link rel="stylesheet" href="/results.css" />
     <link rel="stylesheet" href="/motion.css" />
@@ -59,41 +57,45 @@
             id="serverName"
             data-i18n="result.sharedHeading"
           >
-            Shared Result
+            Test result
           </div>
         </div>
         <div class="header-tools">
-          <label
-            class="visually-hidden"
-            for="languageSelect"
-            data-i18n="language.label"
-            >Choose language</label
-          >
-          <select
-            class="language-select"
-            id="languageSelect"
-            data-i18n-aria-label="language.label"
-            aria-label="Choose language"
-          >
-            <option value="auto" data-i18n="language.auto">Auto</option>
-            <option value="en" lang="en">English</option>
-            <option value="de" lang="de">Deutsch</option>
-          </select>
-          <button
-            class="theme-toggle"
-            id="themeToggle"
-            type="button"
-            data-i18n-aria-label="theme.switch"
-            aria-label="Switch theme"
-          >
-            ◐
-          </button>
+          <div class="preference-controls">
+            <label
+              class="visually-hidden"
+              for="languageSelect"
+              data-i18n="language.label"
+              >Choose language</label
+            >
+            <select
+              class="language-select"
+              id="languageSelect"
+              data-i18n-aria-label="language.label"
+              aria-label="Choose language"
+            >
+              <option value="auto">System · EN</option>
+              <option value="en" lang="en">English</option>
+              <option value="de" lang="de">Deutsch</option>
+            </select>
+            <button
+              class="theme-toggle"
+              id="themeToggle"
+              type="button"
+              data-i18n-aria-label="theme.switch"
+              aria-label="Switch theme"
+            >
+              ◐
+            </button>
+          </div>
         </div>
       </header>
 
       <main class="main" id="mainContent">
+        <h1 class="visually-hidden" data-i18n="result.sharedHeading">
+          Test result
+        </h1>
         <section class="speed-section" id="resultView">
-          <p class="results-verdict hidden" id="resultsVerdict"></p>
           <div class="results-main" id="resultsMain">
             <div class="result-card result-primary">
               <div class="result-icon">↓</div>
@@ -110,10 +112,11 @@
               <div class="result-unit">Mbps</div>
             </div>
           </div>
+          <p class="results-verdict hidden" id="resultsVerdict"></p>
           <div class="results-extra">
             <div class="extra-stat">
               <span class="extra-label" data-i18n="metric.idleLatency"
-                >Idle Latency</span
+                >Idle</span
               >
               <span class="extra-value" id="latencyResult">-</span>
             </div>
@@ -123,7 +126,7 @@
             </div>
             <div class="extra-stat">
               <span class="extra-label" data-i18n="metric.loadedLatency"
-                >Loaded Latency</span
+                >Under load</span
               >
               <span class="extra-value" id="loadedLatencyResult">-</span>
             </div>
@@ -134,6 +137,7 @@
               <span class="extra-value bb-badge" id="bufferbloatResult">-</span>
             </div>
           </div>
+          <p class="results-advisory hidden" id="resultsAdvisory"></p>
           <details class="stats-help">
             <summary data-i18n="metric.helpSummary">
               What do these numbers mean?
@@ -143,7 +147,7 @@
           <div class="results-details">
             <div class="detail-section">
               <h3 class="detail-title" data-i18n="network.publicIpAtTest">
-                Public IP at test time
+                Public IP addresses for this test
               </h3>
               <div class="detail-grid">
                 <div class="detail-item">
@@ -174,7 +178,7 @@
               <div class="detail-grid">
                 <div class="detail-item">
                   <span class="detail-label" data-i18n="result.tested"
-                    >Tested</span
+                    >Tested at</span
                   >
                   <span class="detail-value" id="testedAt">-</span>
                 </div>
@@ -187,14 +191,14 @@
               class="restart-btn btn-link"
               data-locale-link
               data-i18n="action.runOwnTest"
-              >Run Your Own Test</a
+              >Run your own test</a
             >
           </div>
         </section>
 
         <section class="speed-section hidden" id="errorView">
           <div class="error-view">
-            <div class="error-code">404</div>
+            <div class="error-code" id="errorCode">404</div>
             <div class="error-message" data-i18n="error.resultNotFound">
               Result not found or has expired.
             </div>
@@ -203,7 +207,7 @@
               class="restart-btn btn-link"
               data-locale-link
               data-i18n="action.runSpeedTest"
-              >Run a Speed Test</a
+              >Run a speed test</a
             >
           </div>
         </section>
