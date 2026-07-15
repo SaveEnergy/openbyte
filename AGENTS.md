@@ -92,7 +92,7 @@
 
 ## Verification baseline
 
-- `go test ./cmd/server ./cmd/openbyte`
+- `go test ./cmd/openbyte`
 - `go test ./test/unit/api ./test/unit/results`
 - `go test ./internal/results`
 - `bun run lint:openapi`
