@@ -321,6 +321,78 @@
   animation: instrumentArcBreathe 1.6s ease-in-out infinite;
 }
 
+/* Live throughput sparkline under the speed number */
+.speed-sparkline {
+  position: relative;
+  z-index: 2;
+  width: 280px;
+  height: 44px;
+  margin-top: var(--space-lg);
+}
+
+/* Phase stepper: ping / download / upload with measured values */
+.phase-steps {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  gap: var(--space-sm);
+  list-style: none;
+  margin-top: var(--space-md);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.phase-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--bg-hover);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  transition:
+    border-color var(--motion-duration-medium) ease,
+    color var(--motion-duration-medium) ease;
+}
+
+.phase-step::before {
+  content: "○";
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.phase-step[data-status="active"] {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.phase-step[data-status="active"]::before {
+  content: "●";
+  color: var(--accent-primary);
+  animation: instrumentStatusPulse 1.4s ease-in-out infinite;
+}
+
+.phase-step[data-status="done"] {
+  color: var(--text-secondary);
+}
+
+.phase-step[data-status="done"]::before {
+  content: "✓";
+  color: var(--accent-primary);
+}
+
+.phase-step-value {
+  font-family: var(--font-display);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.phase-step-value:empty {
+  display: none;
+}
+
 .cancel-btn {
   position: absolute;
   bottom: 0;
@@ -392,5 +464,19 @@
   .instrument-ring-container {
     width: 220px;
     height: 220px;
+  }
+
+  .speed-sparkline {
+    width: 240px;
+    height: 40px;
+  }
+
+  .phase-steps {
+    gap: var(--space-xs);
+  }
+
+  .phase-step {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.75rem;
   }
 }

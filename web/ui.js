@@ -2,11 +2,17 @@
 
 import { state, elements, TEST_CONFIG, toast } from "./state.js";
 import { formatNumber, t } from "./i18n.js";
-import { formatSpeed } from "./presentation.js";
+import {
+  formatLatency,
+  formatSpeed,
+  formatSpeedText as localizedSpeedText,
+} from "./presentation.js";
 import { enterResults } from "./ui-results.js";
 
 /** Circumference of the progress ring arc (r=90 in the 200x200 viewBox). */
 const RING_CIRCUMFERENCE = 2 * Math.PI * 90;
+
+const PHASE_ORDER = ["ping", "download", "upload"];
 
 function focusStateAction(stateName) {
   const targets = {
@@ -45,6 +51,14 @@ function getToastElements(isError) {
   };
 }
 
+export function formatLatencyMs(val) {
+  return formatLatency(val);
+}
+
+export function formatSpeedText(mbps) {
+  return localizedSpeedText(mbps);
+}
+
 function setInstrumentActivity(speed, direction) {
   if (!elements.testingState) return;
 
@@ -64,6 +78,124 @@ function setInstrumentActivity(speed, direction) {
   );
 }
 
+/* ---- Live sparkline ---- */
+
+const sparkline = { samples: [], direction: "download" };
+
+function sparklineColorFor(direction, element) {
+  const property =
+    direction === "upload" ? "--upload-color" : "--download-color";
+  return getComputedStyle(element).getPropertyValue(property).trim();
+}
+
+function ensureSparklineScale(canvas) {
+  if (canvas.dataset.scaled) return;
+  canvas.dataset.scaled = "1";
+  const ratio = globalThis.devicePixelRatio || 1;
+  if (ratio === 1) return;
+  const cssWidth = canvas.width;
+  const cssHeight = canvas.height;
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
+  canvas.width = Math.round(cssWidth * ratio);
+  canvas.height = Math.round(cssHeight * ratio);
+}
+
+function drawSparkline() {
+  const canvas = elements.speedSparkline;
+  if (!canvas || typeof canvas.getContext !== "function") return;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ensureSparklineScale(canvas);
+
+  const { width, height } = canvas;
+  const ratio = globalThis.devicePixelRatio || 1;
+  ctx.clearRect(0, 0, width, height);
+
+  const samples = sparkline.samples;
+  if (samples.length < 2) return;
+  const max = Math.max(...samples);
+  if (max <= 0) return;
+  const color = sparklineColorFor(sparkline.direction, canvas);
+
+  const padding = 2 * ratio;
+  const stepX = (width - 2 * padding) / (samples.length - 1);
+  const usableHeight = height - 2 * padding;
+
+  ctx.beginPath();
+  for (let i = 0; i < samples.length; i++) {
+    const x = padding + i * stepX;
+    const y = height - padding - (samples[i] / max) * usableHeight;
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2 * ratio;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.stroke();
+
+  ctx.lineTo(padding + (samples.length - 1) * stepX, height);
+  ctx.lineTo(padding, height);
+  ctx.closePath();
+  ctx.globalAlpha = 0.12;
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+export function resetSparkline() {
+  sparkline.samples = [];
+  drawSparkline();
+}
+
+function recordSparklinePoint(speed, direction) {
+  if (direction !== "download" && direction !== "upload") return;
+  sparkline.direction = direction;
+  sparkline.samples.push(speed);
+  if (sparkline.samples.length > TEST_CONFIG.SPARKLINE_MAX_POINTS) {
+    sparkline.samples.shift();
+  }
+  drawSparkline();
+}
+
+/* ---- Phase stepper ---- */
+
+export function resetPhaseSteps() {
+  for (const phase of PHASE_ORDER) {
+    const step = elements.phaseSteps?.[phase];
+    const value = elements.phaseValues?.[phase];
+    if (step) step.dataset.status = "pending";
+    if (value) value.textContent = "";
+  }
+}
+
+export function setActivePhaseStep(activePhase) {
+  const activeIndex = PHASE_ORDER.indexOf(activePhase);
+  if (activeIndex === -1) return;
+  PHASE_ORDER.forEach((phase, index) => {
+    const step = elements.phaseSteps?.[phase];
+    if (!step) return;
+    if (index < activeIndex) {
+      step.dataset.status = "done";
+    } else if (index === activeIndex) {
+      step.dataset.status = "active";
+    } else {
+      step.dataset.status = "pending";
+    }
+  });
+}
+
+export function setPhaseStepValue(phase, text) {
+  const step = elements.phaseSteps?.[phase];
+  const value = elements.phaseValues?.[phase];
+  if (step) step.dataset.status = "done";
+  if (value) value.textContent = text;
+}
+
 /* ---- Speed and progress display ---- */
 
 export function updateSpeed(speed, direction) {
@@ -72,6 +204,7 @@ export function updateSpeed(speed, direction) {
   if (!elements.speedNumber || !elements.speedUnit) return;
   state.currentSpeed = speed;
   setInstrumentActivity(speed, direction);
+  recordSparklinePoint(speed, direction);
 
   let displaySpeed, unit;
 
@@ -154,6 +287,7 @@ export function updateTestType(key, className, options = {}) {
       elements.speedUnit.textContent =
         className === "measuring" ? "ms" : "Mbps";
     }
+    resetSparkline();
     if (elements.testingState) {
       elements.testingState.dataset.phase = className;
     }

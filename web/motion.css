@@ -66,6 +66,18 @@
   }
 }
 
+@keyframes instrumentStatusPulse {
+  0%,
+  100% {
+    transform: scale(0.86);
+    opacity: 0.65;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -79,6 +91,7 @@
   .instrument-ring-pulse,
   .instrument-ring-spark,
   .instrument-ring-arc,
+  .phase-step[data-status="active"]::before,
   .test-type::before {
     animation: none !important;
   }

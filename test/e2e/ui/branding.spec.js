@@ -198,22 +198,21 @@ test.describe("visual branding", () => {
       )
       .toEqual(["#ffcc00", "#ffcc00", "#ffcc00", "#4f8cff"]);
 
-    const instrumentColors = await page.evaluate(async () => {
-      const { updateTestType } = await import("/ui.js");
-      const testingState = document.getElementById("testingState");
+    const sparklineColors = await page.evaluate(async () => {
+      const { resetSparkline, updateSpeed } = await import("/ui.js");
+      const context = document.getElementById("speedSparkline").getContext("2d");
 
-      updateTestType("test.phase.download", "downloading");
-      const download = getComputedStyle(testingState)
-        .getPropertyValue("--instrument-color")
-        .trim();
+      resetSparkline();
+      updateSpeed(10, "download");
+      updateSpeed(20, "download");
+      const download = context.strokeStyle;
 
-      updateTestType("test.phase.upload", "uploading");
-      const upload = getComputedStyle(testingState)
-        .getPropertyValue("--instrument-color")
-        .trim();
-      return { download, upload };
+      resetSparkline();
+      updateSpeed(10, "upload");
+      updateSpeed(20, "upload");
+      return { download, upload: context.strokeStyle };
     });
-    expect(instrumentColors).toEqual({
+    expect(sparklineColors).toEqual({
       download: "#ffcc00",
       upload: "#4f8cff",
     });
