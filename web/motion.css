@@ -66,18 +66,6 @@
   }
 }
 
-@keyframes instrumentStatusPulse {
-  0%,
-  100% {
-    transform: scale(0.86);
-    opacity: 0.65;
-  }
-  50% {
-    transform: scale(1.12);
-    opacity: 1;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
