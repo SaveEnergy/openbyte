@@ -34,15 +34,6 @@ make build
 ./bin/openbyte server --server-name "Frankfurt 25G"
 ```
 
-### CLI Client
-
-```bash
-./bin/openbyte client -d download -t 30        # 30-second download test
-./bin/openbyte client -S https://speed.example.com
-./bin/openbyte client https://speed.example.com
-./bin/openbyte client -d upload                # HTTP streaming upload
-```
-
 ### Docker
 
 ```bash
@@ -59,18 +50,18 @@ Open `http://localhost:8080` — minimal fast.com-inspired UI with adaptive stre
 
 ## Features
 
-- **Protocols**: HTTP streaming for the Web UI, API, SDK, and CLI
+- **Protocols**: HTTP streaming for the Web UI, API, and SDK
 - **Test Types**: Download, Upload
 - **Metrics**: Throughput, idle latency, jitter, loaded latency, bufferbloat
 - **Network Info**: Client IP and IPv6 detection
 - **Adaptive web test**: Browser UI ramps parallel HTTP streams automatically, then measures with the stream count that saturated the path; transfer loops run in a Web Worker to keep the UI responsive
-- **Output**: JSON, NDJSON, plain text, interactive CLI
+- **Automation**: OpenAPI-documented HTTP API, Go SDK, and `check --json`
 
 ## Measurement Methodology
 
-Current clients implement:
+The browser client implements:
 
-- Adaptive Web Worker stream ramping plus dynamic warm-up with throughput stabilization detection (web UI); fixed warm-up via `--warmup` (CLI)
+- Adaptive Web Worker stream ramping plus dynamic warm-up with throughput stabilization detection
 - Baseline latency measurement before each test
 - Metrics reset after warm-up for accurate results
 - Statistical reporting with P50, P95, P99 percentiles
@@ -136,18 +127,6 @@ The web UI displays both client IPv4 and IPv6 addresses using dedicated single-s
 
 See [Deployment Guide](DEPLOYMENT.md#ipv4ipv6-detection) for details.
 
-### Client Configuration
-
-`~/.config/openbyte/config.yaml`:
-
-```yaml
-server_url: https://speedtest.example.com
-chunk_size: 1048576
-```
-
-The configuration file is limited to 64 KiB, must contain at most one YAML document,
-and rejects unknown keys.
-
 ## Testing
 
 ### UI E2E (Playwright)
@@ -172,15 +151,15 @@ Playwright starts a local server on `127.0.0.1:8080`, or reuses one already runn
 
 ```
 cmd/
-  openbyte/   # Unified server/client entry point
-  client/     # Client implementation
+  openbyte/   # Unified binary entry point
+  check/      # Quick connectivity command
   server/     # Server implementation
 internal/
   api/        # REST API + HTTP speed test handlers
   config/     # Configuration
   results/    # SQLite results store
 pkg/
-  types/      # Shared types
+  types/      # Shared HTTP host helpers
 docker/       # Docker + Compose configurations
 web/          # Web UI (embedded in binary)
   fonts/      # Self-hosted font files

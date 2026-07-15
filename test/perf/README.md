@@ -47,16 +47,12 @@ URL=https://localhost:8443/ IGNORE_HTTPS_ERRORS=1 MODE=upload-stream MAX_STREAMS
 # set TRAEFIK_TLS_OPTIONS=openbyte-h2@file for the h2 comparison run.
 URL=https://localhost/ IGNORE_HTTPS_ERRORS=1 RUNS=3 scripts/perf/browser_throughput.mjs ui
 
-# CLI interleaved medians; add a saved baseline binary to BINS for A/B.
-BINS="/tmp/openbyte-baseline ./bin/openbyte" RUNS=5 scripts/perf/run_cli_throughput.sh
 ```
 
 Keep no-go experiments in the notes or PR body instead of shipping slower code.
-For the 2026-07 browser/CLI pass: plain-HTTP request-stream uploads failed in
+For the 2026-07 browser pass: plain-HTTP request-stream uploads failed in
 Chromium (`Failed to fetch`, use TLS/h2 for a real probe), multi-context
-download sharding reduced aggregate throughput on the 4-vCPU Cloud VM, and CLI
-single-request streaming upload was slower than discrete 4 MiB POSTs on Go's
-HTTP/1.1 transport.
+download sharding reduced aggregate throughput on the 4-vCPU Cloud VM.
 
 The local TLS/h2 proxy makes request-stream uploads work, but they were not a
 clear production win on the Cloud VM: Blob uploads and streaming uploads both

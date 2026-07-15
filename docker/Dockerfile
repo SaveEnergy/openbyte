@@ -61,20 +61,3 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD wget -q --spider http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["/app/openbyte", "server"]
-
-# Client image
-FROM alpine:3.24 AS client
-
-RUN apk add --no-cache ca-certificates tzdata
-
-WORKDIR /app
-
-# Copy openbyte binary
-COPY --from=builder-openbyte /openbyte /app/openbyte
-
-# Create non-root user
-RUN adduser -D -H -s /sbin/nologin openbyte
-USER openbyte
-
-ENTRYPOINT ["/app/openbyte", "client"]
-CMD ["--help"]

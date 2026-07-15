@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **Full CLI speed-test client**: removed `openbyte client`, its YAML configuration,
+  terminal formatters, Docker target, and CLI throughput harness. The browser UI
+  remains the primary speed test; automation uses the HTTP API, Go SDK, or
+  `openbyte check --json`.
 - **Autoresearch experiment harness**: removed the tracked agent prompt, Cursor
   command, branch counter, preflight script, Make target, and local TSV workflow.
   Generic benchmarks and manual throughput harnesses remain available.

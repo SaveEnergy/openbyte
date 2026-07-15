@@ -2,7 +2,7 @@
 
 ### Core Runtime
 
-- Single `openbyte` binary with `server` / `client` / `check` subcommands.
+- Single `openbyte` binary with `server` / `check` subcommands.
 - Routing uses stdlib `net/http.ServeMux` (`METHOD /path/{param}` + `r.PathValue`).
 - Web assets are embedded (`//go:embed`) with optional `WEB_ROOT` override for development.
 - Runtime is HTTP-only: no MCP server, registry, server selector, downloads page, TCP/UDP data ports, `/api/v1/stream/*`, or websocket metrics feed.
@@ -17,7 +17,7 @@
 ### Reliability & Concurrency
 
 - Request/response bodies are drained on error paths to preserve HTTP/2 connection reuse.
-- HTTP client/browser cancel paths propagate request contexts so aborts tear down transfer loops.
+- SDK/browser cancel paths propagate request contexts so aborts tear down transfer loops.
 - Results store shutdown is explicit and idempotent enough for server lifecycle.
 - Upload/download handlers enforce bounded concurrency, per-IP slots, max duration, and safe body deadlines.
 
@@ -47,12 +47,12 @@
 
 - Agent integrations use the HTTP API / OpenAPI contract and Go SDK; the former `openbyte mcp` stdio server was removed pre-1.0.
 - The former registry service/client/routes/config and web server selector were removed pre-1.0; use explicit URLs outside the app for multi-server comparisons.
-- The CLI client is HTTP-only; TCP/UDP CLI testing, bidirectional CLI mode, and installer/download web page were removed pre-1.0.
+- The full CLI speed-test client was removed during alpha; use the browser UI, HTTP API, Go SDK, or `openbyte check`.
 - The server-side TCP/UDP stream stack, `/api/v1/stream/*`, websocket stream API, `cmd/loadtest`, and direct test ports were removed pre-1.0.
-- The unwired `internal/metrics` package, `pkg/types` RTT/NetworkInfo collectors, the always-zero CLI JSON fields (`rtt`, `packet_loss_percent`, `packets_*`, `network`), and the multi-server compose example were removed post-0.10; CLI JSON schema is `3.0`.
-- Go SDK (`pkg/client`): `Check`, `SpeedTest`, `Diagnose`, `Healthy`; implementation split across `client.go` + `client_{check,speedtest,diagnose,health,measure}.go` (same exported API). CLI and SDK share stateless request/body handling through `internal/httptransfer`; timing and concurrency policy stay with each caller.
+- The unwired `internal/metrics` package, `pkg/types` RTT/NetworkInfo/CLI metric collectors, and the multi-server compose example were removed post-0.10.
+- Go SDK (`pkg/client`): `Check`, `SpeedTest`, `Diagnose`, `Healthy`; implementation split across `client.go` + `client_{check,speedtest,diagnose,health,measure}.go` (same exported API). The SDK uses stateless request/body handling from `internal/httptransfer`.
 - OpenAPI spec lives at `api/openapi.yaml`; CI/release lint it.
-- JSON output supports schema versioning and structured error contracts.
+- `openbyte check --json` supports schema versioning and structured error contracts.
 
 ### Build / CI / Deploy
 
@@ -84,7 +84,7 @@
 
 ## Verification baseline
 
-- `go test ./cmd/check ./cmd/server ./cmd/client`
+- `go test ./cmd/check ./cmd/server ./cmd/openbyte`
 - `go test ./test/unit/api ./test/unit/client ./test/unit/results`
 - `go test ./internal/results`
 - `bun run lint:openapi`
@@ -140,4 +140,4 @@ make build && WEB_ROOT=./web ./bin/openbyte server
 - No CGO required; SQLite uses `modernc.org/sqlite` (pure Go).
 - No external databases or services needed to run locally.
 - Any new top-level web asset must be added to the `internal/api/router_static.go` allowlist or the server returns 404; font files under `web/fonts/` are allowlisted by extension.
-- CLI client needs full URL scheme: `./bin/openbyte client http://localhost:8080`, not just `localhost`.
+- `openbyte check` needs a full URL scheme: `./bin/openbyte check http://localhost:8080`, not just `localhost`.
