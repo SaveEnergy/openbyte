@@ -5,11 +5,6 @@ on:
   push:
     branches: ["main"]
   workflow_dispatch:
-    inputs:
-      force_build:
-        description: "Force build/push/deploy even if no watched paths changed"
-        type: boolean
-        default: false
 
 # PRs: cancel superseded runs (save minutes). main/dispatch: do not cancel — avoids
 # aborting an in-flight deploy when another push lands (next run queues per group).
@@ -79,7 +74,7 @@ jobs:
 
       # -short: skip heavy tests (e.g. test/e2e skipIfShort). -p 1: serial packages, cap memory on GHA under race.
       - name: Race tests (main)
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+        if: github.ref == 'refs/heads/main'
         run: go test ./... -race -short -p 1
 
       - name: Get Playwright version
@@ -109,9 +104,7 @@ jobs:
 
   build-push:
     needs: checks
-    if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && inputs.force_build)
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -173,8 +166,13 @@ jobs:
       SSH_KEY: ${{ secrets.SSH_KEY }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
     if: |
-      (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.SSH_HOST != '' && vars['SSH_HOST_FINGERPRINT'] != '' && vars.SSH_USER != '' && vars.REMOTE_DIR != '' && vars.GHCR_USERNAME != '' && needs.build-push.result == 'success') ||
-      (github.event_name == 'workflow_dispatch' && inputs.force_build && vars.SSH_HOST != '' && vars['SSH_HOST_FINGERPRINT'] != '' && vars.SSH_USER != '' && vars.REMOTE_DIR != '' && vars.GHCR_USERNAME != '' && needs.build-push.result == 'success')
+      github.ref == 'refs/heads/main' &&
+      vars.SSH_HOST != '' &&
+      vars['SSH_HOST_FINGERPRINT'] != '' &&
+      vars.SSH_USER != '' &&
+      vars.REMOTE_DIR != '' &&
+      vars.GHCR_USERNAME != '' &&
+      needs.build-push.result == 'success'
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
