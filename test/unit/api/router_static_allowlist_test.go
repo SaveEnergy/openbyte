@@ -11,21 +11,21 @@ import (
 	"github.com/saveenergy/openbyte/internal/config"
 )
 
-func TestRouterStaticServesSpeedtestHTTPModules(t *testing.T) {
+func TestRouterStaticServesFrontendModules(t *testing.T) {
 	handler := api.NewHandler()
 	router := api.NewRouter(handler, config.DefaultConfig())
 	h := router.SetupRoutes()
 
 	for _, name := range []string{
-		"speedtest-http.js",
+		"openbyte.js",
+		"network.js",
+		"speedtest.js",
 		"speedtest-http-download.js",
 		"speedtest-http-shared.js",
 		"speedtest-http-upload.js",
-		"network-probes.js",
 		"speedtest-adaptive.js",
 		"speedtest-worker.js",
 		"speedtest-orchestrator.js",
-		"events.js",
 		"toast.css",
 		"api.html",
 		"api.css",

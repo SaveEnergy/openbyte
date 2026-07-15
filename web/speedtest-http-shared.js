@@ -1,5 +1,7 @@
 /** Shared helpers for HTTP speed tests (download + upload). */
 
+import { TEST_CONFIG } from "./state.js";
+
 export function resolveChunkSize() {
   return 1024 * 1024;
 }
@@ -27,20 +29,6 @@ export function throwIfZeroBytes(streamState, totalBytes, messages) {
   if (streamState.successfulStreams === 0) throw new Error(messages.noStreams);
 }
 
-export function resolveStopReason(signal, endTimeRef, nominalEndTime) {
-  if (signal.aborted) return "aborted";
-  if (endTimeRef.value < nominalEndTime - 500) return "early_stable";
-  return "duration";
-}
-
-export function attachAdaptiveDiagnostics(diag, adaptive, streams) {
-  const out = { ...diag, streams };
-  if (adaptive) {
-    out.adaptive = adaptive;
-  }
-  return out;
-}
-
 /**
  * Shared warmup + measure accounting + progress callback for HTTP upload/download.
  * `metricsState` must have `allBytes`, `totalBytes`, `measureStartTime`.
@@ -63,9 +51,6 @@ export function applyHttpMeasureTick(
       metricsState.totalBytes = 0;
       metricsState.measureStartTime = now;
     }
-  }
-  if (extra?.diagnostics) {
-    extra.diagnostics.record(byteCount, now, measuring);
   }
   if (extra?.earlyStop && measuring && extra.earlyStop.record(byteCount, now)) {
     extra.endTimeRef.value = Math.min(now, extra.endTimeRef.value);
@@ -126,9 +111,6 @@ export function applyHttpMeasureIntervalTick(
     );
     metricsState.totalBytes += measuredBytes;
 
-    if (extra?.diagnostics) {
-      extra.diagnostics.record(measuredBytes, intervalEnd, measuredBytes > 0);
-    }
     if (
       extra?.earlyStop &&
       measuredBytes > 0 &&
@@ -142,13 +124,99 @@ export function applyHttpMeasureIntervalTick(
       metricsState.totalBytes = 0;
       metricsState.measureStartTime = intervalEnd;
     }
-    if (extra?.diagnostics) {
-      extra.diagnostics.record(byteCount, intervalEnd, false);
-    }
   }
 
   const displayBytes = wasMeasuring
     ? metricsState.totalBytes
     : metricsState.allBytes;
   onProgress(displayBytes);
+}
+
+const EARLY_STOP_WINDOW_MS = 500;
+const EARLY_STOP_DELTA_THRESHOLD = 0.05;
+const EARLY_STOP_STABLE_WINDOWS = 3;
+const EARLY_STOP_MIN_WINDOWS = 2;
+
+export function createEarlyStopDetector(settledFn) {
+  let windowBytes = 0;
+  let windowStart = 0;
+  const recentSpeeds = [];
+
+  return {
+    record(bytes, now) {
+      if (!settledFn()) return false;
+      if (windowStart === 0) windowStart = now;
+      windowBytes += bytes;
+      const elapsed = now - windowStart;
+      if (elapsed < EARLY_STOP_WINDOW_MS) return false;
+      const speed = (windowBytes * 8) / (elapsed / 1000);
+      recentSpeeds.push(speed);
+      windowBytes = 0;
+      windowStart = now;
+      const recent = recentSpeeds.slice(-EARLY_STOP_STABLE_WINDOWS);
+      if (
+        recentSpeeds.length < EARLY_STOP_MIN_WINDOWS ||
+        recent.length < EARLY_STOP_STABLE_WINDOWS
+      ) {
+        return false;
+      }
+      const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
+      if (avg <= 0) return false;
+      const maxDelta = Math.max(...recent.map((s) => Math.abs(s - avg) / avg));
+      return maxDelta < EARLY_STOP_DELTA_THRESHOLD;
+    },
+  };
+}
+
+export function createWarmUpDetector(durationMs) {
+  const windowMs = TEST_CONFIG.WARMUP_WINDOW_MS;
+  const stabilityThreshold = TEST_CONFIG.WARMUP_STABILITY_THRESHOLD;
+  const requiredStableWindows = TEST_CONFIG.WARMUP_REQUIRED_WINDOWS;
+  const maxGraceMs = Math.min(
+    durationMs * TEST_CONFIG.WARMUP_MAX_GRACE_RATIO,
+    TEST_CONFIG.WARMUP_MAX_GRACE_MS,
+  );
+
+  let windowBytes = 0;
+  let windowStart = 0;
+  let detectorStart = 0;
+  const recentSpeeds = [];
+  let settled = false;
+
+  return {
+    settled() {
+      return settled;
+    },
+    record(bytes, now) {
+      if (settled) return;
+      if (detectorStart === 0) {
+        detectorStart = now;
+        windowStart = now;
+      }
+      windowBytes += bytes;
+      const windowElapsed = now - windowStart;
+
+      if (windowElapsed >= windowMs) {
+        const speed = (windowBytes * 8) / (windowElapsed / 1000);
+        recentSpeeds.push(speed);
+        windowBytes = 0;
+        windowStart = now;
+
+        if (recentSpeeds.length >= requiredStableWindows) {
+          const recent = recentSpeeds.slice(-requiredStableWindows);
+          const avg = recent.reduce((a, b) => a + b, 0) / recent.length;
+          if (avg === 0) {
+            settled = true;
+            return;
+          }
+          const maxDev = Math.max(
+            ...recent.map((s) => Math.abs(s - avg) / avg),
+          );
+          if (maxDev < stabilityThreshold) settled = true;
+        }
+
+        if (now - detectorStart > maxGraceMs) settled = true;
+      }
+    },
+  };
 }

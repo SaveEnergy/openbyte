@@ -2,15 +2,13 @@ package client
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"net/url"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
+
+	"github.com/saveenergy/openbyte/internal/httptransfer"
 )
 
 func (e *HTTPTestEngine) runDownload(ctx context.Context) error {
@@ -45,27 +43,6 @@ func (e *HTTPTestEngine) runDownloadStream(ctx context.Context, deadline time.Ti
 		return nil
 	}
 
-	req, err := http.NewRequestWithContext(streamCtx, http.MethodGet, e.buildDownloadURL(remaining), nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Accept-Encoding", "identity")
-
-	resp, err := e.client.Do(req)
-	if err != nil {
-		drainAndClose(resp)
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return e.handleNonOKResponse(ctx, "download", resp)
-	}
-
-	return e.readDownloadResponse(streamCtx, resp.Body)
-}
-
-func (e *HTTPTestEngine) readDownloadResponse(streamCtx context.Context, body io.Reader) error {
 	bufPtr, ok := e.bufferPool.Get().(*[]byte)
 	if !ok || bufPtr == nil || len(*bufPtr) < clientBufferSize {
 		bufPtr = newClientBuffer()
@@ -73,19 +50,22 @@ func (e *HTTPTestEngine) readDownloadResponse(streamCtx context.Context, body io
 	buf := *bufPtr
 	defer e.bufferPool.Put(bufPtr)
 
-	for {
-		n, readErr := body.Read(buf)
-		if n > 0 {
-			atomic.AddInt64(&e.bytesReceived, int64(n))
+	err := httptransfer.Download(
+		streamCtx,
+		e.client,
+		e.buildDownloadURL(remaining),
+		buf,
+		func(n int) {
 			e.addBytes(int64(n), e.elapsedSinceStart())
-		}
-		if readErr != nil {
-			if errors.Is(readErr, io.EOF) || streamCtx.Err() != nil {
-				return nil
-			}
-			return readErr
-		}
+		},
+	)
+	if statusErr := asHTTPStatusError(err); statusErr != nil {
+		return e.handleNonOKResponse(ctx, "download", statusErr)
 	}
+	if err != nil && streamCtx.Err() != nil {
+		return nil
+	}
+	return err
 }
 
 func waitForStreamDelay(ctx context.Context, delay time.Duration) bool {

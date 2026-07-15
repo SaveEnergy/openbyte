@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"github.com/saveenergy/openbyte/internal/httptransfer"
 )
 
 func joinStreamErrors(direction string, errCh <-chan error) error {
@@ -26,24 +27,27 @@ func joinStreamErrors(direction string, errCh <-chan error) error {
 	return fmt.Errorf("%s streams failed: %w", direction, errors.Join(errs...))
 }
 
-func drainAndClose(resp *http.Response) {
-	if resp == nil {
-		return
+func asHTTPStatusError(err error) *httptransfer.StatusError {
+	var statusErr *httptransfer.StatusError
+	if errors.As(err, &statusErr) {
+		return statusErr
 	}
-	io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
+	return nil
 }
 
-func (e *HTTPTestEngine) handleNonOKResponse(ctx context.Context, direction string, resp *http.Response) error {
-	if resp.StatusCode == http.StatusTooManyRequests {
-		wait := parseRetryAfter(resp.Header.Get("Retry-After"), time.Second)
+func (e *HTTPTestEngine) handleNonOKResponse(
+	ctx context.Context,
+	direction string,
+	statusErr *httptransfer.StatusError,
+) error {
+	if statusErr.Code == http.StatusTooManyRequests {
+		wait := parseRetryAfter(statusErr.RetryAfter, time.Second)
 		select {
 		case <-time.After(wait):
 		case <-ctx.Done():
 		}
 	}
-	drainAndClose(resp)
-	return fmt.Errorf("%s failed: %s", direction, resp.Status)
+	return fmt.Errorf("%s failed: %s", direction, statusErr.Status)
 }
 
 func (e *HTTPTestEngine) addBytes(n int64, elapsed time.Duration) {
@@ -51,11 +55,7 @@ func (e *HTTPTestEngine) addBytes(n int64, elapsed time.Duration) {
 		return
 	}
 	if elapsed < e.config.GraceTime {
-		atomic.AddInt64(&e.graceBytes, n)
 		return
-	}
-	if atomic.CompareAndSwapInt32(&e.graceDone, 0, 1) {
-		atomic.StoreInt64(&e.totalBytes, 0)
 	}
 	atomic.AddInt64(&e.totalBytes, n)
 }
@@ -103,18 +103,8 @@ func measureHTTPPing(ctx context.Context, serverURL string, samples int) ([]time
 		if err != nil {
 			return results, err
 		}
-		resp, err := client.Do(req)
-		if err != nil {
-			if resp != nil {
-				io.Copy(io.Discard, resp.Body)
-				resp.Body.Close()
-			}
-			continue
-		}
-		io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
-		if resp.StatusCode == http.StatusOK {
-			results = append(results, time.Since(start))
+		if latency, ok := httptransfer.MeasurePing(client, req, start); ok {
+			results = append(results, latency)
 		}
 	}
 	return results, nil

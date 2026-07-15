@@ -1,11 +1,29 @@
 package api
 
 import (
+	"bytes"
 	"compress/gzip"
+	"io"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
+
+type staticGzipAsset struct {
+	size    int64
+	modTime time.Time
+	data    []byte
+}
+
+type staticAssetHandler struct {
+	webFS     http.FileSystem
+	allowed   map[string]bool
+	gzipMu    sync.Mutex
+	gzipCache map[string]staticGzipAsset
+}
 
 func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 	allowed := map[string]bool{
@@ -16,21 +34,13 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 		"state.js":                   true,
 		"utils.js":                   true,
 		"network.js":                 true,
-		"network-probes.js":          true,
-		"network-helpers.js":         true,
-		"network-health.js":          true,
 		"speedtest-orchestrator.js":  true,
 		"speedtest-adaptive.js":      true,
 		"speedtest-worker.js":        true,
 		"speedtest.js":               true,
-		"speedtest-http.js":          true,
 		"speedtest-http-download.js": true,
 		"speedtest-http-shared.js":   true,
 		"speedtest-http-upload.js":   true,
-		"speedtest-latency.js":       true,
-		"warmup.js":                  true,
-		"diagnostics.js":             true,
-		"events.js":                  true,
 		"ui.js":                      true,
 		"results.js":                 true,
 		"api.css":                    true,
@@ -40,36 +50,134 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 		"motion.css":                 true,
 		"favicon.svg":                true,
 	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			http.NotFound(w, r)
+	return &staticAssetHandler{
+		webFS:     webFS,
+		allowed:   allowed,
+		gzipCache: make(map[string]staticGzipAsset),
+	}
+}
+
+func (h *staticAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.NotFound(w, r)
+		return
+	}
+	name := path.Clean(strings.TrimPrefix(r.URL.Path, "/"))
+	if name == "." || name == "/" {
+		name = "index.html"
+	}
+	switch name {
+	case "api", "results":
+		name += ".html"
+	}
+	if strings.Contains(name, "..") || !isAllowedStaticAsset(name, h.allowed) {
+		http.NotFound(w, r)
+		return
+	}
+	f, err := h.webFS.Open(name)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer f.Close()
+	stat, err := f.Stat()
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	gzipCandidate := !strings.HasPrefix(name, staticFontsDirPrefix)
+	if gzipCandidate {
+		w.Header().Add("Vary", "Accept-Encoding")
+	}
+	acceptEncoding := strings.Join(r.Header.Values("Accept-Encoding"), ",")
+	if gzipCandidate && r.Header.Get("Range") == "" && acceptsGzip(acceptEncoding) {
+		compressed, compressErr := h.gzipAsset(f, name, stat.Size(), stat.ModTime())
+		if compressErr == nil {
+			http.ServeContent(
+				&staticGzipResponseWriter{ResponseWriter: w},
+				r,
+				name,
+				stat.ModTime(),
+				bytes.NewReader(compressed),
+			)
 			return
 		}
-		name := path.Clean(strings.TrimPrefix(r.URL.Path, "/"))
-		if name == "." || name == "/" {
-			name = "index.html"
-		}
-		switch name {
-		case "api", "results":
-			name += ".html"
-		}
-		if strings.Contains(name, "..") || !isAllowedStaticAsset(name, allowed) {
-			http.NotFound(w, r)
+		if _, seekErr := f.Seek(0, io.SeekStart); seekErr != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
-		f, err := webFS.Open(name)
-		if err != nil {
-			http.NotFound(w, r)
-			return
+	}
+
+	http.ServeContent(w, r, name, stat.ModTime(), f)
+}
+
+type staticGzipResponseWriter struct {
+	http.ResponseWriter
+}
+
+func (w *staticGzipResponseWriter) WriteHeader(status int) {
+	if status == http.StatusOK {
+		w.Header().Set("Content-Encoding", "gzip")
+	}
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (h *staticAssetHandler) gzipAsset(f http.File, name string, size int64, modTime time.Time) ([]byte, error) {
+	h.gzipMu.Lock()
+	defer h.gzipMu.Unlock()
+	if cached, ok := h.gzipCache[name]; ok && cached.size == size && cached.modTime.Equal(modTime) {
+		return cached.data, nil
+	}
+
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	_, copyErr := io.Copy(gz, f)
+	closeErr := gz.Close()
+	if copyErr != nil {
+		return nil, copyErr
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	compressed := buf.Bytes()
+	h.gzipCache[name] = staticGzipAsset{size: size, modTime: modTime, data: compressed}
+	return compressed, nil
+}
+
+func acceptsGzip(header string) bool {
+	gzipQuality, gzipFound := encodingQuality(header, "gzip")
+	if gzipFound {
+		return gzipQuality > 0
+	}
+	wildcardQuality, wildcardFound := encodingQuality(header, "*")
+	return wildcardFound && wildcardQuality > 0
+}
+
+func encodingQuality(header, wanted string) (float64, bool) {
+	var quality float64
+	found := false
+	for part := range strings.SplitSeq(header, ",") {
+		fields := strings.Split(part, ";")
+		if !strings.EqualFold(strings.TrimSpace(fields[0]), wanted) {
+			continue
 		}
-		defer f.Close()
-		stat, err := f.Stat()
-		if err != nil {
-			http.NotFound(w, r)
-			return
+		quality = 1
+		found = true
+		for _, param := range fields[1:] {
+			key, value, ok := strings.Cut(param, "=")
+			if !ok || !strings.EqualFold(strings.TrimSpace(key), "q") {
+				continue
+			}
+			parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+			if err != nil || parsed < 0 || parsed > 1 {
+				quality = 0
+			} else {
+				quality = parsed
+			}
 		}
-		http.ServeContent(w, r, name, stat.ModTime(), f)
-	})
+	}
+	return quality, found
 }
 
 const (
@@ -116,36 +224,4 @@ func staticCacheMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-// gzipMiddleware compresses static responses when client accepts gzip.
-func gzipMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			next.ServeHTTP(w, r)
-			return
-		}
-		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			next.ServeHTTP(w, r)
-			return
-		}
-		gzW := gzip.NewWriter(w)
-		defer gzW.Close()
-		w.Header().Set("Content-Encoding", "gzip")
-		next.ServeHTTP(&gzipResponseWriter{ResponseWriter: w, Writer: gzW}, r)
-	})
-}
-
-type gzipResponseWriter struct {
-	http.ResponseWriter
-	Writer *gzip.Writer
-}
-
-func (g *gzipResponseWriter) Write(b []byte) (int, error) {
-	return g.Writer.Write(b)
-}
-
-func (g *gzipResponseWriter) WriteHeader(code int) {
-	g.Header().Del("Content-Length")
-	g.ResponseWriter.WriteHeader(code)
 }

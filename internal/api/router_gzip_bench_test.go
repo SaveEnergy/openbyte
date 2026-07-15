@@ -5,17 +5,20 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"testing/fstest"
+	"time"
 )
 
-// BenchmarkGzipMiddlewareSmallAsset compresses a small static-sized payload when Accept-Encoding: gzip.
-func BenchmarkGzipMiddlewareSmallAsset(b *testing.B) {
+// BenchmarkStaticCachedGzipSmallAsset serves a precompressed static-sized payload.
+func BenchmarkStaticCachedGzipSmallAsset(b *testing.B) {
 	payload := bytes.Repeat([]byte("x"), 8192)
-	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/javascript")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write(payload)
+	webFS := http.FS(fstest.MapFS{
+		"openbyte.js": &fstest.MapFile{Data: payload, ModTime: time.Unix(1, 0)},
 	})
-	h := gzipMiddleware(inner)
+	h := newStaticAllowlistHandler(webFS)
+	warmReq := httptest.NewRequest(http.MethodGet, "/openbyte.js", nil)
+	warmReq.Header.Set("Accept-Encoding", "gzip")
+	h.ServeHTTP(httptest.NewRecorder(), warmReq)
 
 	b.ReportAllocs()
 	b.ResetTimer()

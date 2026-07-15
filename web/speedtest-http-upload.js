@@ -1,6 +1,6 @@
-/** HTTP upload test: blob streaming, retries, warmup/diagnostics. */
+/** HTTP upload test: blob streaming, retries, warm-up, and measurement. */
 
-import { getApiBase, state, TEST_CONFIG } from "./state.js";
+import { getApiBase, TEST_CONFIG } from "./state.js";
 import {
   runAdaptiveHTTPTest,
   streamDelayForIndex,
@@ -11,15 +11,13 @@ import {
   isNetworkError,
   fetchWithTimeout,
 } from "./utils.js";
-import { createWarmUpDetector, createEarlyStopDetector } from "./warmup.js";
-import { createDiagnosticsCollector } from "./diagnostics.js";
 import {
   resolveChunkSize,
   detectOverheadFactor,
   throwIfZeroBytes,
-  resolveStopReason,
   applyHttpMeasureIntervalTick,
-  attachAdaptiveDiagnostics,
+  createWarmUpDetector,
+  createEarlyStopDetector,
 } from "./speedtest-http-shared.js";
 
 let uploadPayloadCache = null;
@@ -283,7 +281,7 @@ async function runUploadWindow(options) {
     streams,
     onProgress,
     signal,
-    collectDiagnostics = true,
+    isRamp = false,
     adaptive,
   } = options;
   const startTime = performance.now();
@@ -303,12 +301,8 @@ async function runUploadWindow(options) {
 
   const warmUp = createWarmUpDetector(duration * 1000);
   const earlyStop = createEarlyStopDetector(() => warmUp.settled());
-  const diagnostics = collectDiagnostics
-    ? createDiagnosticsCollector(TEST_CONFIG.WARMUP_WINDOW_MS)
-    : null;
-  const nominalEndTime = startTime + duration * 1000;
-  const endTimeRef = { value: nominalEndTime };
-  const extra = { earlyStop, diagnostics, endTimeRef };
+  const endTimeRef = { value: startTime + duration * 1000 };
+  const extra = { earlyStop, endTimeRef };
   const blob = getUploadPayloadBlob(blobSize);
 
   const streamPromises = [];
@@ -349,19 +343,8 @@ async function runUploadWindow(options) {
     overload: "Server overloaded. Try again in a moment or change server.",
     noStreams: "Upload failed. No stream completed successfully.",
   });
-  if (!collectDiagnostics && metricsState.sawOverload) {
+  if (isRamp && metricsState.sawOverload) {
     throw new Error("Server overloaded during adaptive upload ramp");
-  }
-
-  const stopReason = resolveStopReason(signal, endTimeRef, nominalEndTime);
-  if (diagnostics) {
-    const diag = diagnostics.finish(stopReason);
-    state.diagnostics = state.diagnostics || {};
-    state.diagnostics.upload = attachAdaptiveDiagnostics(
-      diag,
-      adaptive,
-      numStreams,
-    );
   }
 
   return Math.max(avgSpeed, 0);

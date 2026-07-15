@@ -1,23 +1,29 @@
 /** Main entry: wiring, network detection, share/init. */
 
-import { initElements } from "./state.js";
+import { elements, initElements } from "./state.js";
 import {
   startTest,
   resetToIdle,
   handleShare,
 } from "./speedtest-orchestrator.js";
 import { checkServer, detectNetworkInfo, loadServerInfo } from "./network.js";
-import { bindEvents } from "./events.js";
+
+function bindEvents() {
+  if (!elements.startBtn || !elements.restartBtn) {
+    console.warn("Core UI elements missing; skipping event binding");
+    return;
+  }
+  elements.startBtn.addEventListener("click", startTest);
+  elements.restartBtn.addEventListener("click", resetToIdle);
+  elements.cancelBtn?.addEventListener("click", resetToIdle);
+  elements.shareBtn?.addEventListener("click", handleShare);
+}
 
 function init() {
   initElements();
   loadServerInfo();
   checkServer();
-  bindEvents({
-    startTest,
-    resetToIdle,
-    handleShare,
-  });
+  bindEvents();
   detectNetworkInfo();
 }
 

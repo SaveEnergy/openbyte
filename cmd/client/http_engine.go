@@ -16,15 +16,14 @@ import (
 const clientBufferSize = 1024 * 1024
 
 type HTTPTestConfig struct {
-	ServerURL      string
-	Duration       time.Duration
-	Streams        int
-	ChunkSize      int
-	Direction      string
-	GraceTime      time.Duration
-	StreamDelay    time.Duration
-	OverheadFactor float64
-	Timeout        time.Duration
+	ServerURL   string
+	Duration    time.Duration
+	Streams     int
+	ChunkSize   int
+	Direction   string
+	GraceTime   time.Duration
+	StreamDelay time.Duration
+	Timeout     time.Duration
 }
 
 func newClientBuffer() *[]byte {
@@ -37,11 +36,6 @@ type HTTPTestEngine struct {
 	client        *http.Client
 	startUnixNano int64
 	totalBytes    int64
-	graceBytes    int64
-	graceDone     int32
-	bytesSent     int64
-	bytesReceived int64
-	running       int32
 	uploadPayload []byte
 	bufferPool    sync.Pool
 }
@@ -81,8 +75,6 @@ func NewHTTPTestEngine(cfg *HTTPTestConfig) (*HTTPTestEngine, error) {
 }
 
 func (e *HTTPTestEngine) Run(ctx context.Context) error {
-	atomic.StoreInt32(&e.running, 1)
-	defer atomic.StoreInt32(&e.running, 0)
 	atomic.StoreInt64(&e.startUnixNano, time.Now().UnixNano())
 
 	switch e.config.Direction {
@@ -98,8 +90,6 @@ func (e *HTTPTestEngine) Run(ctx context.Context) error {
 func (e *HTTPTestEngine) GetMetrics() EngineMetrics {
 	elapsed := e.elapsedSinceStart()
 	totalBytes := atomic.LoadInt64(&e.totalBytes)
-	bytesSent := atomic.LoadInt64(&e.bytesSent)
-	bytesRecv := atomic.LoadInt64(&e.bytesReceived)
 	throughputMbps := 0.0
 	if elapsed.Seconds() > 0 {
 		throughputMbps = float64(totalBytes*8) / elapsed.Seconds() / 1_000_000
@@ -107,10 +97,6 @@ func (e *HTTPTestEngine) GetMetrics() EngineMetrics {
 	return EngineMetrics{
 		ThroughputMbps:   throughputMbps,
 		BytesTransferred: totalBytes,
-		BytesSent:        bytesSent,
-		BytesReceived:    bytesRecv,
-		Elapsed:          elapsed,
-		Running:          atomic.LoadInt32(&e.running) == 1,
 	}
 }
 

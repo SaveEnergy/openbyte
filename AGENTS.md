@@ -11,6 +11,7 @@
 
 - HTTP/UI speed logic uses warm-up gating and EWMA smoothing for stable live display.
 - Browser tests use adaptive HTTP stream ramping in a module Web Worker, then measure with the selected stream count.
+- Allowlisted text assets are gzipped lazily and cached per file version; fonts and byte-range responses stay identity encoded.
 - **Advanced telemetry (policy)**: Future depth stays **server/internal first** (config-gated, logs, pprof). **Default Web UI** stays the simple speed test. **User-visible** detail requires **explicit opt-in** (env + UI or URL mode)—never default-on.
 
 ### Reliability & Concurrency
@@ -33,7 +34,7 @@
 - Network probe and health-check fetch paths drain non-OK and malformed JSON responses.
 - Server settings UI: no server selector; a single deployed server tests itself.
 - UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.
-- Speed test: **`speedtest-orchestrator.js`** (lifecycle + share) + thin **`openbyte.js`** init; **`speedtest.js`** bridges UI state to **`speedtest-worker.js`**; **`speedtest-adaptive.js`** chooses stream count/duration; **`speedtest-http.js`** barrels **`speedtest-http-{shared,download,upload}.js`** (shared warmup/progress via **`applyHttpMeasureTick`** in **`speedtest-http-shared.js`**); API docs page is **`api.html`** + **`api.css`**; network **`network-{helpers,health,probes}.js`** + **`network.js`**. Any new top-level **`web/*.js`** (or HTML/CSS) must be added to **`internal/api/router_static.go`** allowlist or the server returns **404**.
+- Speed test: **`speedtest-orchestrator.js`** owns lifecycle/share; **`speedtest.js`** owns latency and bridges UI state to **`speedtest-worker.js`**; **`speedtest-adaptive.js`** chooses stream count/duration; **`speedtest-http-{shared,download,upload}.js`** owns warm-up, progress, and transfer loops. Thin **`openbyte.js`** owns init/events; **`network.js`** owns health and address probes. API docs are **`api.html`** + **`api.css`**. Any new top-level **`web/*.js`** (or HTML/CSS) must be added to **`internal/api/router_static.go`** allowlist or the server returns **404**.
 
 ### Storage
 
@@ -49,7 +50,7 @@
 - The CLI client is HTTP-only; TCP/UDP CLI testing, bidirectional CLI mode, and installer/download web page were removed pre-1.0.
 - The server-side TCP/UDP stream stack, `/api/v1/stream/*`, websocket stream API, `cmd/loadtest`, and direct test ports were removed pre-1.0.
 - The unwired `internal/metrics` package, `pkg/types` RTT/NetworkInfo collectors, the always-zero CLI JSON fields (`rtt`, `packet_loss_percent`, `packets_*`, `network`), and the multi-server compose example were removed post-0.10; CLI JSON schema is `3.0`.
-- Go SDK (`pkg/client`): `Check`, `SpeedTest`, `Diagnose`, `Healthy`; implementation split across `client.go` + `client_{check,speedtest,diagnose,health,latency,download,upload}.go` (same exported API).
+- Go SDK (`pkg/client`): `Check`, `SpeedTest`, `Diagnose`, `Healthy`; implementation split across `client.go` + `client_{check,speedtest,diagnose,health,measure}.go` (same exported API). CLI and SDK share stateless request/body handling through `internal/httptransfer`; timing and concurrency policy stay with each caller.
 - OpenAPI spec lives at `api/openapi.yaml`; CI/release lint it.
 - JSON output supports schema versioning and structured error contracts.
 

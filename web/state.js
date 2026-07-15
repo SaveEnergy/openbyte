@@ -23,8 +23,6 @@ export const state = {
   serverName: "openByte Server",
   resultId: null,
   shareSavePromise: null,
-  /** Internal diagnostics (peak/sustained/volatility, stop_reason) — not shown in default UI */
-  diagnostics: null,
 };
 
 /** Populated by `initElements()` after the document is ready (module load can precede DOM). */
