@@ -20,22 +20,6 @@ export function resolveChunkSize() {
   return 1024 * 1024;
 }
 
-export function detectOverheadFactor() {
-  try {
-    const entries = performance.getEntriesByType("resource");
-    for (let i = entries.length - 1; i >= 0; i--) {
-      const e = entries[i];
-      if (e.name && e.name.includes("/api/v1/") && e.nextHopProtocol) {
-        if (e.nextHopProtocol === "h2" || e.nextHopProtocol === "h3") return 1;
-        return 1.02;
-      }
-    }
-  } catch (err) {
-    console.debug("protocol detection failed", err);
-  }
-  return 1.02;
-}
-
 export function throwIfZeroBytes(streamState, totalBytes, direction) {
   if (totalBytes > 0) return;
   const messages = TRANSFER_ERROR_MESSAGES[direction];
