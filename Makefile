@@ -93,7 +93,7 @@ perf-leakcheck:
 	@mkdir -p bin
 	@GOEXPERIMENT=goroutineleakprofile go build -ldflags "$(LDFLAGS)" -o bin/openbyte-leak ./cmd/openbyte
 	@echo "Starting leak-profile server with pprof..."
-	@PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6061 PORT=8090 ./bin/openbyte-leak server & echo $$! > /tmp/openbyte-leak.pid
+	@PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6061 PORT=8090 ./bin/openbyte-leak & echo $$! > /tmp/openbyte-leak.pid
 	@sleep 2
 	@curl -sf "http://127.0.0.1:6061/debug/pprof/goroutineleak?debug=1" -o /tmp/openbyte-goroutineleak.txt
 	@kill `cat /tmp/openbyte-leak.pid` || true
