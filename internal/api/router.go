@@ -30,7 +30,7 @@ func NewRouter(cfg *config.Config, resultsStore *results.Store) *Router {
 	// safest usable limit instead of widening a truncated value to 300 seconds.
 	maxDur := max(1, int(cfg.MaxTestDuration/time.Second))
 	resolver := NewClientIPResolver(cfg)
-	speedtest := NewSpeedTestHandlerWithPolicy(cfg.MaxConcurrentHTTP(), maxDur, cfg.MaxConcurrentPerIP, resolver)
+	speedtest := NewSpeedTestHandlerWithPolicy(cfg.MaxConcurrentTransfers, maxDur, cfg.MaxConcurrentPerIP, resolver)
 
 	serverName := strings.TrimSpace(cfg.ServerName)
 	if serverName == "" {

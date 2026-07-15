@@ -145,23 +145,30 @@ func TestConfigValidatePortRange(t *testing.T) {
 	}
 }
 
-func TestMaxConcurrentHTTPScalesWithCapacity(t *testing.T) {
-	tests := []struct {
-		capacity int
-		wantMin  int
-	}{
-		{1, 50},   // floor
-		{5, 50},   // still floor
-		{10, 80},  // 10 * 8
-		{25, 200}, // 25 * 8
+func TestConfigLoadMaxConcurrentTransfersEnv(t *testing.T) {
+	cfg := config.DefaultConfig()
+	if cfg.MaxConcurrentTransfers != 200 {
+		t.Fatalf("default max concurrent transfers = %d, want 200", cfg.MaxConcurrentTransfers)
 	}
-	for _, tt := range tests {
-		cfg := config.DefaultConfig()
-		cfg.CapacityGbps = tt.capacity
-		got := cfg.MaxConcurrentHTTP()
-		if got != tt.wantMin {
-			t.Errorf("CapacityGbps=%d: MaxConcurrentHTTP()=%d, want %d", tt.capacity, got, tt.wantMin)
-		}
+
+	t.Setenv("MAX_CONCURRENT_TRANSFERS", "80")
+	if err := cfg.LoadFromEnv(); err != nil {
+		t.Fatalf("load MAX_CONCURRENT_TRANSFERS: %v", err)
+	}
+	if cfg.MaxConcurrentTransfers != 80 {
+		t.Fatalf("max concurrent transfers = %d, want 80", cfg.MaxConcurrentTransfers)
+	}
+}
+
+func TestConfigLoadRejectsInvalidMaxConcurrentTransfers(t *testing.T) {
+	for _, value := range []string{"0", "-1", "not-a-number"} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("MAX_CONCURRENT_TRANSFERS", value)
+			cfg := config.DefaultConfig()
+			if err := cfg.LoadFromEnv(); err == nil {
+				t.Fatalf("expected MAX_CONCURRENT_TRANSFERS=%q to fail", value)
+			}
+		})
 	}
 }
 
@@ -287,11 +294,20 @@ func TestConfigLoadHTTP2EnabledEnv(t *testing.T) {
 	}
 }
 
-func TestConfigValidateCapacityGbpsPositive(t *testing.T) {
+func TestConfigValidateMaxConcurrentTransfersPositive(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfg.CapacityGbps = 0
+	cfg.MaxConcurrentTransfers = 0
 	if cfg.Validate() == nil {
-		t.Fatal("expected error for non-positive capacity gbps")
+		t.Fatal("expected error for non-positive max concurrent transfers")
+	}
+}
+
+func TestConfigAllowsTransferLimitBelowPerIPLimit(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.MaxConcurrentTransfers = 50
+	cfg.MaxConcurrentPerIP = 64
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("independent global and per-IP transfer limits should be valid: %v", err)
 	}
 }
 

@@ -22,6 +22,11 @@ func (c *Config) loadLimitsAndNetworkEnv() error {
 	} else if ok {
 		c.GlobalRateLimit = limit
 	}
+	if limit, ok, err := parsePositiveIntEnv("MAX_CONCURRENT_TRANSFERS"); err != nil {
+		return err
+	} else if ok {
+		c.MaxConcurrentTransfers = limit
+	}
 	if limit, ok, err := parsePositiveIntEnv("MAX_CONCURRENT_PER_IP"); err != nil {
 		return err
 	} else if ok {

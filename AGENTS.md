@@ -20,6 +20,7 @@
 - Browser cancel paths propagate request contexts so aborts tear down transfer loops; cancelling always discards the incomplete run and returns to idle.
 - Results store shutdown is explicit and idempotent enough for server lifecycle.
 - Upload/download handlers enforce bounded concurrency, per-IP slots, max duration, and safe body deadlines.
+- `MAX_CONCURRENT_TRANSFERS` is the explicit server-wide stream limit for each direction (default 200); `MAX_CONCURRENT_PER_IP` remains an independent per-direction client limit.
 
 ### Security & Validation
 

@@ -93,7 +93,7 @@ func parseServerArgs(args []string) (bool, error) {
 func speedtestHTTP2Config(cfg *config.Config) *http.HTTP2Config {
 	maxStreams := 100
 	if cfg != nil {
-		maxStreams = max(maxStreams, cfg.MaxConcurrentHTTP())
+		maxStreams = max(maxStreams, cfg.MaxConcurrentTransfers)
 	}
 	const receiveWindow = 4*1024*1024 - 1
 	return &http.HTTP2Config{
