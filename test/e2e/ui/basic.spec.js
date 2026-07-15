@@ -15,9 +15,7 @@ test.describe("openByte UI", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          pong: true,
           client_ip: "198.51.100.10",
-          ipv6: false,
           server_name: "Frankfurt 10G",
         }),
       });

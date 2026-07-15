@@ -29,11 +29,8 @@ const (
 	speedtestQueryChunkABC             = "?chunk=abc"
 	speedtestWaitTimeout               = 2 * time.Second
 	pingClientIPKey                    = "client_ip"
-	pingIPv6Key                        = "ipv6"
 	pingClientIPv4Want                 = "203.0.113.10"
 	pingClientIPv6Want                 = "2001:db8::1"
-	pingIPv6FalseMsg                   = "ipv6 = %v, want false"
-	pingIPv6TrueMsg                    = "ipv6 = %v, want true"
 	speedtestContentTypeKey            = "Content-Type"
 	speedtestCacheControlKey           = "Cache-Control"
 	speedtestDecodeRespFmt             = "decode response: %v"

@@ -30,6 +30,10 @@ in Git history and pull requests, not release notes.
 
 ### Changed
 
+- **Ping response**: `/api/v1/ping` now returns only `client_ip` by default;
+  `?meta=1` also returns `server_name`. Removed `pong`, `timestamp`, and the
+  redundant `ipv6` flag; the UI derives the address family locally while keeping
+  eager same-origin, IPv4, and IPv6 discovery.
 - **Throughput reporting**: download and upload now report measured payload
   goodput without adding an estimated HTTP/1 protocol-overhead multiplier.
 - **One-tap share**: tapping Share now saves the result and copies the link in

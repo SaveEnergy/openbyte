@@ -26,6 +26,12 @@ func TestPingBootstrapIncludesServerName(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
 		t.Fatalf("decode ping metadata: %v", err)
 	}
+	if len(response) != 2 {
+		t.Fatalf("metadata ping fields = %v, want client_ip and server_name", response)
+	}
+	if got := response["client_ip"]; got != "192.0.2.1" {
+		t.Fatalf("client_ip = %v, want 192.0.2.1", got)
+	}
 	if got := response["server_name"]; got != "Frankfurt 10G" {
 		t.Fatalf("server_name = %v, want Frankfurt 10G", got)
 	}
@@ -41,8 +47,11 @@ func TestPlainPingOmitsServerName(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
 		t.Fatalf("decode ping: %v", err)
 	}
-	if _, exists := response["server_name"]; exists {
-		t.Fatalf("plain ping unexpectedly included server_name: %s", rec.Body.String())
+	if len(response) != 1 {
+		t.Fatalf("plain ping fields = %v, want only client_ip", response)
+	}
+	if _, exists := response["client_ip"]; !exists {
+		t.Fatalf("plain ping missing client_ip: %s", rec.Body.String())
 	}
 }
 

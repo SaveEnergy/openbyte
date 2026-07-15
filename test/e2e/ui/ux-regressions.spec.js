@@ -32,7 +32,7 @@ test.describe("openByte UI regressions", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ client_ip: "203.0.113.99", ipv6: false }),
+        body: JSON.stringify({ client_ip: "203.0.113.99" }),
       });
     });
 
@@ -118,7 +118,6 @@ test.describe("openByte UI regressions", () => {
           client_ip: hostname.startsWith("v6.")
             ? "2001:db8::99"
             : "198.51.100.99",
-          ipv6: hostname.startsWith("v6."),
         }),
       });
     });

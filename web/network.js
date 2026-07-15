@@ -112,7 +112,8 @@ async function discoverAddress(
     const data = await parseJSONOrThrow(response);
     if (includeServerName) setServerName(data?.server_name);
     if (data.client_ip && shouldUpdate()) {
-      state.networkInfo[data.ipv6 ? "ipv6" : "ipv4"] = data.client_ip;
+      const family = data.client_ip.includes(":") ? "ipv6" : "ipv4";
+      state.networkInfo[family] = data.client_ip;
       updateNetworkDisplay();
     }
     return true;
