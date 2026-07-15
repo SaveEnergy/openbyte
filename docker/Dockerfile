@@ -48,7 +48,7 @@ EXPOSE 8080
 # Environment variables for server runtime
 ENV PORT=8080 \
     BIND_ADDRESS=0.0.0.0 \
-    CAPACITY_GBPS=25 \
+    MAX_CONCURRENT_TRANSFERS=200 \
     RATE_LIMIT_PER_IP=100 \
     DATA_DIR=/app/data
 

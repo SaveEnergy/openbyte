@@ -200,7 +200,7 @@ Group=openbyte
 WorkingDirectory=/opt/openbyte
 ExecStart=/opt/openbyte/openbyte
 Environment="PORT=8080"
-Environment="CAPACITY_GBPS=25"
+Environment="MAX_CONCURRENT_TRANSFERS=200"
 Environment="DATA_DIR=/opt/openbyte/data"
 Restart=always
 RestartSec=5
@@ -216,8 +216,8 @@ only the application port or reverse-proxy ports required by the deployment.
 
 - Prefer direct TLS or a bypass for ping/download/upload when proxy CPU becomes
   the bottleneck.
-- Keep `CAPACITY_GBPS=25` and `MAX_CONCURRENT_PER_IP=64` unless deliberately
-  restricting a client.
+- Keep `MAX_CONCURRENT_TRANSFERS=200` and `MAX_CONCURRENT_PER_IP=64` unless
+  deliberately changing server-wide or per-client stream limits.
 - Benchmark `HTTP2_ENABLED=false` and Traefik h1/h2 on the target hardware.
 - Use host networking only after measuring Docker bridge/NAT overhead.
 - Tune socket buffers, RSS queues, IRQ affinity, CPU governor, congestion

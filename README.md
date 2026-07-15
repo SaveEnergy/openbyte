@@ -80,7 +80,7 @@ The browser client implements:
 | `BRAND_PRIMARY_COLOR_DARK` / `BRAND_PRIMARY_COLOR_LIGHT` | — | Primary action/download color pair, in exact `#RRGGBB` form |
 | `BRAND_SECONDARY_COLOR_DARK` / `BRAND_SECONDARY_COLOR_LIGHT` | — | Secondary/upload color pair, in exact `#RRGGBB` form |
 | `BRAND_LOGO_PATH`     | —                 | PNG or JPEG logo path readable by the server (maximum 1 MiB)       |
-| `CAPACITY_GBPS`       | 25                | Server link capacity; HTTP concurrency limits auto-scale from this |
+| `MAX_CONCURRENT_TRANSFERS` | 200           | Concurrent HTTP transfer streams allowed server-wide per direction |
 | `MAX_CONCURRENT_PER_IP` | 64              | Concurrent speed-test streams allowed per client IP and direction  |
 | `RATE_LIMIT_PER_IP`   | 100               | Per-IP requests/minute for shared-result routes                     |
 | `GLOBAL_RATE_LIMIT`   | 1000              | Global requests/minute for shared-result routes                     |
@@ -106,6 +106,8 @@ Notes:
 - There is no `/api/v1/version` route. A ping returns `client_ip`, and the UI infers its address family from the canonical address; `/api/v1/ping?meta=1` also returns `server_name` during bootstrap.
 - If running behind a reverse proxy, allow more than the browser's adaptive 64 MiB maximum request payload and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.
 - Server configuration uses environment variables only; `openbyte --help` lists command-only options.
+- During alpha, the inferred capacity setting was removed. Migrate its old value
+  with `MAX_CONCURRENT_TRANSFERS=max(old*8, 50)`.
 
 Brand colors are optional, but each dark/light pair must be set together.
 Primary colors must meet a 4.5:1 contrast ratio and secondary colors a 3:1

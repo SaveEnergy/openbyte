@@ -9,8 +9,6 @@ type Config struct {
 	BindAddress string
 	ServerName  string
 
-	CapacityGbps int
-
 	MaxTestDuration time.Duration
 
 	ReadTimeout       time.Duration
@@ -21,9 +19,10 @@ type Config struct {
 	PprofEnabled bool
 	PprofAddress string
 
-	RateLimitPerIP     int
-	MaxConcurrentPerIP int
-	GlobalRateLimit    int
+	RateLimitPerIP         int
+	GlobalRateLimit        int
+	MaxConcurrentTransfers int
+	MaxConcurrentPerIP     int
 
 	TrustProxyHeaders bool
 	TrustedProxyCIDRs []string
@@ -49,29 +48,29 @@ type Config struct {
 
 func DefaultConfig() *Config {
 	return &Config{
-		Port:               "8080",
-		BindAddress:        "0.0.0.0",
-		ServerName:         DefaultServerName,
-		CapacityGbps:       25,
-		MaxTestDuration:    300 * time.Second,
-		ReadTimeout:        0,                // disabled; upload handlers manage own body deadline
-		ReadHeaderTimeout:  15 * time.Second, // protects against slowloris
-		WriteTimeout:       0,                // disabled; streaming endpoints manage own duration
-		IdleTimeout:        60 * time.Second,
-		PprofEnabled:       false,
-		PprofAddress:       "127.0.0.1:6060",
-		RateLimitPerIP:     100,
-		MaxConcurrentPerIP: 64,
-		GlobalRateLimit:    1000,
-		TrustProxyHeaders:  false,
-		TrustedProxyCIDRs:  nil,
-		WebRoot:            "",
-		DataDir:            "./data",
-		MaxStoredResults:   10000,
-		TLSCertFile:        "",
-		TLSKeyFile:         "",
-		TLSAutoGen:         false,
-		HTTP2Enabled:       true,
+		Port:                   "8080",
+		BindAddress:            "0.0.0.0",
+		ServerName:             DefaultServerName,
+		MaxTestDuration:        300 * time.Second,
+		ReadTimeout:            0,                // disabled; upload handlers manage own body deadline
+		ReadHeaderTimeout:      15 * time.Second, // protects against slowloris
+		WriteTimeout:           0,                // disabled; streaming endpoints manage own duration
+		IdleTimeout:            60 * time.Second,
+		PprofEnabled:           false,
+		PprofAddress:           "127.0.0.1:6060",
+		RateLimitPerIP:         100,
+		GlobalRateLimit:        1000,
+		MaxConcurrentTransfers: 200,
+		MaxConcurrentPerIP:     64,
+		TrustProxyHeaders:      false,
+		TrustedProxyCIDRs:      nil,
+		WebRoot:                "",
+		DataDir:                "./data",
+		MaxStoredResults:       10000,
+		TLSCertFile:            "",
+		TLSKeyFile:             "",
+		TLSAutoGen:             false,
+		HTTP2Enabled:           true,
 	}
 }
 
@@ -104,13 +103,4 @@ func (c *Config) Validate() error {
 		return err
 	}
 	return c.validateBranding()
-}
-
-// MaxConcurrentHTTP returns the concurrent download/upload limit for
-// HTTP speed tests, derived from CapacityGbps. Each HTTP stream can
-// push ~150 Mbps on a single TCP connection, so we allow roughly
-// 8 slots per Gbps of declared capacity with a floor of 50.
-func (c *Config) MaxConcurrentHTTP() int {
-	limit := max(c.CapacityGbps*8, 50)
-	return limit
 }

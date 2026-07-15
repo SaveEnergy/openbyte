@@ -15,7 +15,14 @@ func (c *Config) loadCoreEnv() error {
 	if name := strings.TrimSpace(os.Getenv("SERVER_NAME")); name != "" {
 		c.ServerName = name
 	}
-	return c.loadCoreEnvCapacityAndLimits()
+	if durRaw := os.Getenv("MAX_TEST_DURATION"); durRaw != "" {
+		d, err := time.ParseDuration(durRaw)
+		if err != nil || d < time.Second || d%time.Second != 0 {
+			return fmt.Errorf("invalid MAX_TEST_DURATION %q: must be a whole number of seconds >= 1s (e.g. 300s)", durRaw)
+		}
+		c.MaxTestDuration = d
+	}
+	return nil
 }
 
 func (c *Config) loadCoreEnvPortsAndBind() error {
@@ -27,24 +34,6 @@ func (c *Config) loadCoreEnvPortsAndBind() error {
 	}
 	if addr := os.Getenv("BIND_ADDRESS"); addr != "" {
 		c.BindAddress = addr
-	}
-	return nil
-}
-
-func (c *Config) loadCoreEnvCapacityAndLimits() error {
-	if capRaw := os.Getenv("CAPACITY_GBPS"); capRaw != "" {
-		g, err := strconv.Atoi(capRaw)
-		if err != nil || g <= 0 {
-			return fmt.Errorf("invalid CAPACITY_GBPS %q: must be a positive integer", capRaw)
-		}
-		c.CapacityGbps = g
-	}
-	if durRaw := os.Getenv("MAX_TEST_DURATION"); durRaw != "" {
-		d, err := time.ParseDuration(durRaw)
-		if err != nil || d < time.Second || d%time.Second != 0 {
-			return fmt.Errorf("invalid MAX_TEST_DURATION %q: must be a whole number of seconds >= 1s (e.g. 300s)", durRaw)
-		}
-		c.MaxTestDuration = d
 	}
 	return nil
 }

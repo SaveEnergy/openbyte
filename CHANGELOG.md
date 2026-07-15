@@ -23,6 +23,10 @@ in Git history and pull requests, not release notes.
   secondary metrics without assigning a subjective connection label.
 ### Changed
 
+- **Transfer concurrency**: replaced the inferred capacity heuristic with the
+  explicit `MAX_CONCURRENT_TRANSFERS` limit, defaulting to the same 200
+  download streams and 200 upload streams. Migrate a previous capacity value
+  with `max(old*8, 50)`.
 - **Ping response**: `/api/v1/ping` now returns only `client_ip` by default;
   `?meta=1` also returns `server_name`. Removed `pong`, `timestamp`, and the
   redundant `ipv6` flag; the UI derives the address family locally while keeping

@@ -27,14 +27,10 @@ func TestParseServerArgs(t *testing.T) {
 	}
 }
 
-func TestSpeedtestHTTP2ConfigUsesThroughputTuning(t *testing.T) {
+func TestSpeedtestHTTP2ConfigUsesThroughputWindows(t *testing.T) {
 	cfg := config.DefaultConfig()
-	cfg.CapacityGbps = 25
 
 	h2 := speedtestHTTP2Config(cfg)
-	if h2.MaxConcurrentStreams != 200 {
-		t.Fatalf("MaxConcurrentStreams = %d, want 200", h2.MaxConcurrentStreams)
-	}
 	if h2.MaxReadFrameSize != 1024*1024 {
 		t.Fatalf("MaxReadFrameSize = %d, want 1048576", h2.MaxReadFrameSize)
 	}
@@ -44,6 +40,30 @@ func TestSpeedtestHTTP2ConfigUsesThroughputTuning(t *testing.T) {
 	}
 	if h2.MaxReceiveBufferPerStream != receiveWindow {
 		t.Fatalf("MaxReceiveBufferPerStream = %d, want %d", h2.MaxReceiveBufferPerStream, receiveWindow)
+	}
+}
+
+func TestSpeedtestHTTP2ConfigUsesTransferLimitWithProtocolFloor(t *testing.T) {
+	tests := []struct {
+		name  string
+		cfg   *config.Config
+		limit int
+		want  int
+	}{
+		{name: "nil config", want: 100},
+		{name: "below protocol floor", cfg: config.DefaultConfig(), limit: 50, want: 100},
+		{name: "default", cfg: config.DefaultConfig(), limit: 200, want: 200},
+		{name: "above default", cfg: config.DefaultConfig(), limit: 320, want: 320},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.cfg != nil {
+				test.cfg.MaxConcurrentTransfers = test.limit
+			}
+			if got := speedtestHTTP2Config(test.cfg).MaxConcurrentStreams; got != test.want {
+				t.Fatalf("MaxConcurrentStreams = %d, want %d", got, test.want)
+			}
+		})
 	}
 }
 

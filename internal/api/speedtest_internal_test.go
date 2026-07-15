@@ -70,3 +70,13 @@ func TestNewRouterDoesNotBroadenFractionalDurationLimit(t *testing.T) {
 		t.Fatalf("max duration seconds = %d, want safe 1-second fallback", got)
 	}
 }
+
+func TestNewRouterUsesExplicitTransferLimit(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.MaxConcurrentTransfers = 73
+
+	router := NewRouter(cfg, nil)
+	if got := router.speedtest.maxConcurrent; got != 73 {
+		t.Fatalf("max concurrent transfers = %d, want 73", got)
+	}
+}

@@ -30,9 +30,6 @@ func (c *Config) validateLimits() error {
 	if c.MaxTestDuration < time.Second || c.MaxTestDuration%time.Second != 0 {
 		return fmt.Errorf("max test duration must be a whole number of seconds >= 1s")
 	}
-	if c.CapacityGbps <= 0 {
-		return fmt.Errorf("capacity gbps must be > 0")
-	}
 	if c.PprofEnabled && c.PprofAddress == "" {
 		return fmt.Errorf("pprof address cannot be empty when enabled")
 	}
@@ -44,6 +41,9 @@ func (c *Config) validateLimits() error {
 	}
 	if c.GlobalRateLimit < c.RateLimitPerIP {
 		return fmt.Errorf("global rate limit must be >= rate limit per IP")
+	}
+	if c.MaxConcurrentTransfers <= 0 {
+		return fmt.Errorf("max concurrent transfers must be > 0")
 	}
 	if c.MaxConcurrentPerIP <= 0 {
 		return fmt.Errorf("max concurrent per IP must be > 0")
