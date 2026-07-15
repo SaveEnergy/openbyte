@@ -163,6 +163,10 @@ body {
   white-space: nowrap;
 }
 
+.hidden {
+  display: none !important;
+}
+
 body::before {
   content: "";
   position: fixed;
@@ -309,4 +313,14 @@ body::before {
 
 .footer-divider {
   color: var(--text-muted);
+}
+
+@media (max-width: 600px) {
+  .header {
+    padding: var(--space-md);
+  }
+
+  .logo {
+    font-size: 1.25rem;
+  }
 }

@@ -16,7 +16,7 @@ func (r *Router) registerResultsAPIRoutes(v1 func(method, route string, handler 
 	v1("GET", "/results/{id}", r.resultsHandler.get)
 }
 
-func (r *Router) registerResultsPageRoute(mux *http.ServeMux, webFS http.FileSystem) {
+func (r *Router) registerResultsPageRoute(mux *http.ServeMux, staticHandler http.Handler) {
 	if r.resultsHandler == nil {
 		return
 	}
@@ -25,19 +25,10 @@ func (r *Router) registerResultsPageRoute(mux *http.ServeMux, webFS http.FileSys
 			http.NotFound(w, req)
 			return
 		}
-		w.Header().Set(headerCacheControl, valueNoStore)
-		f, err := webFS.Open(resultsHTML)
-		if err != nil {
-			http.NotFound(w, req)
-			return
-		}
-		defer f.Close()
-		stat, err := f.Stat()
-		if err != nil {
-			http.NotFound(w, req)
-			return
-		}
-		http.ServeContent(w, req, resultsHTML, stat.ModTime(), f)
+		staticReq := req.Clone(req.Context())
+		staticReq.URL.Path = "/" + resultsHTML
+		staticReq.URL.RawPath = ""
+		staticHandler.ServeHTTP(w, staticReq)
 	}
 	if r.limiter != nil {
 		resultsPageHandler = applyRateLimit(r.limiter, resultsPageHandler)
