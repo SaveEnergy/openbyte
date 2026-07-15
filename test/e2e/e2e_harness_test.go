@@ -52,19 +52,12 @@ func NewTestServerWithOrigins(t *testing.T, allowedOrigins []string) *TestServer
 	cfg := config.DefaultConfig()
 	cfg.BindAddress = "127.0.0.1"
 	cfg.Port = "0"
-
-	handler := api.NewHandler()
-	handler.SetConfig(cfg)
-	router := api.NewRouter(handler, cfg)
-	router.SetRateLimiter(cfg)
-	router.SetAllowedOrigins(allowedOrigins)
+	cfg.AllowedOrigins = allowedOrigins
 
 	resultsStore, err := results.New(t.TempDir()+"/results.db", 1000)
 	if err != nil {
 		t.Fatalf(createResultsStoreErrFmt, err)
 	}
-	router.SetResultsHandler(results.NewHandler(resultsStore))
-
 	webDir := "./web"
 	if _, err := os.Stat(webDir); os.IsNotExist(err) {
 		webDir = "../../web"
@@ -73,7 +66,8 @@ func NewTestServerWithOrigins(t *testing.T, allowedOrigins []string) *TestServer
 	if err != nil {
 		t.Fatalf(absPathErrFmt, err)
 	}
-	router.SetWebRoot(absWebDir)
+	cfg.WebRoot = absWebDir
+	router := api.NewRouter(cfg, "", resultsStore)
 
 	listener, err := net.Listen("tcp", ":0")
 	if err != nil {
@@ -82,8 +76,6 @@ func NewTestServerWithOrigins(t *testing.T, allowedOrigins []string) *TestServer
 
 	srv := &http.Server{Handler: router.SetupRoutes()}
 	go srv.Serve(listener)
-
-	time.Sleep(100 * time.Millisecond)
 
 	port := listener.Addr().(*net.TCPAddr).Port
 	return &TestServer{

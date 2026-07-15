@@ -9,7 +9,6 @@ type Config struct {
 	BindAddress string
 	ServerName  string
 
-	PublicHost   string
 	CapacityGbps int
 
 	MaxTestDuration time.Duration
@@ -19,10 +18,8 @@ type Config struct {
 	WriteTimeout      time.Duration
 	IdleTimeout       time.Duration
 
-	PprofEnabled      bool
-	PprofAddress      string
-	PerfStatsInterval time.Duration
-	RuntimeMetrics    bool
+	PprofEnabled bool
+	PprofAddress string
 
 	RateLimitPerIP     int
 	MaxConcurrentPerIP int
@@ -48,7 +45,6 @@ func DefaultConfig() *Config {
 		Port:               "8080",
 		BindAddress:        "0.0.0.0",
 		ServerName:         DefaultServerName,
-		PublicHost:         "",
 		CapacityGbps:       25,
 		MaxTestDuration:    300 * time.Second,
 		ReadTimeout:        0,                // disabled; upload handlers manage own body deadline
@@ -57,8 +53,6 @@ func DefaultConfig() *Config {
 		IdleTimeout:        60 * time.Second,
 		PprofEnabled:       false,
 		PprofAddress:       "127.0.0.1:6060",
-		PerfStatsInterval:  0,
-		RuntimeMetrics:     false,
 		RateLimitPerIP:     100,
 		MaxConcurrentPerIP: 64,
 		GlobalRateLimit:    1000,
@@ -79,9 +73,7 @@ func (c *Config) LoadFromEnv() error {
 	if err := c.loadCoreEnv(); err != nil {
 		return err
 	}
-	if err := c.loadRuntimeEnv(); err != nil {
-		return err
-	}
+	c.loadRuntimeEnv()
 	if err := c.loadLimitsAndNetworkEnv(); err != nil {
 		return err
 	}

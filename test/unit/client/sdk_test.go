@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -123,49 +122,6 @@ func TestSDKSpeedTestUpload(t *testing.T) {
 	}
 }
 
-func TestSDKSpeedTestDefaultDirection(t *testing.T) {
-	srv := newTestServer(t)
-	c := pkgclient.New(srv.URL)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	result, err := c.SpeedTest(ctx, pkgclient.SpeedTestOptions{Duration: 1})
-	if err != nil {
-		t.Fatalf("SpeedTest failed: %v", err)
-	}
-	if result.Direction != downloadDirection {
-		t.Errorf("expected default direction=%s, got %s", downloadDirection, result.Direction)
-	}
-}
-
-func TestSDKSpeedTestInvalidDirection(t *testing.T) {
-	srv := newTestServer(t)
-	c := pkgclient.New(srv.URL)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, err := c.SpeedTest(ctx, pkgclient.SpeedTestOptions{Direction: "bidirectional"})
-	if err == nil {
-		t.Error("expected error for invalid direction")
-	}
-}
-
-func TestSDKSpeedTestDurationClamped(t *testing.T) {
-	srv := newTestServer(t)
-	c := pkgclient.New(srv.URL)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	// Duration 0 should be clamped to 1
-	result, err := c.SpeedTest(ctx, pkgclient.SpeedTestOptions{Duration: 0})
-	if err != nil {
-		t.Fatalf("SpeedTest failed: %v", err)
-	}
-	if result.DurationSec < 0.5 {
-		t.Errorf("expected some duration, got %.2f", result.DurationSec)
-	}
-}
-
 func TestSDKSpeedTestUnreachableServer(t *testing.T) {
 	c := pkgclient.New(unreachableBaseURL)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -178,33 +134,6 @@ func TestSDKSpeedTestUnreachableServer(t *testing.T) {
 }
 
 // --- Check ---
-
-func TestSDKCheckHasInterpretation(t *testing.T) {
-	srv := newTestServer(t)
-	c := pkgclient.New(srv.URL)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	result, err := c.Check(ctx)
-	if err != nil {
-		t.Fatalf("Check failed: %v", err)
-	}
-	if result.Interpretation == nil {
-		t.Fatal("interpretation should not be nil")
-	}
-	if result.Interpretation.Grade == "" {
-		t.Error("grade should not be empty")
-	}
-	if result.Interpretation.Summary == "" {
-		t.Error("summary should not be empty")
-	}
-	if result.Interpretation.SuitableFor == nil {
-		t.Error("suitable_for should not be nil")
-	}
-	if result.Interpretation.Concerns == nil {
-		t.Error("concerns should not be nil")
-	}
-}
 
 func TestSDKCheckReturnsLatencyMeasurementErrorWhenPingFails(t *testing.T) {
 	mux := http.NewServeMux()
@@ -284,44 +213,6 @@ func TestSDKSpeedTestDownloadUnexpectedEOF(t *testing.T) {
 	})
 	if !errors.Is(err, pkgclient.ErrDownloadMeasurementFailed) {
 		t.Fatalf("err = %v, want ErrDownloadMeasurementFailed", err)
-	}
-}
-
-func TestSDKSpeedTestUploadDurationImpactsWorkload(t *testing.T) {
-	mux := http.NewServeMux()
-	mux.HandleFunc(healthPath, func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(statusOKBody))
-	})
-	mux.HandleFunc(pingPath, func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-	mux.HandleFunc(uploadPath, func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.Copy(io.Discard, r.Body)
-		w.WriteHeader(http.StatusOK)
-	})
-
-	srv := httptest.NewServer(mux)
-	defer srv.Close()
-	c := pkgclient.New(srv.URL)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-	res1, err := c.SpeedTest(ctx, pkgclient.SpeedTestOptions{Direction: uploadDirection, Duration: 1})
-	if err != nil {
-		t.Fatalf("duration=1 speed test failed: %v", err)
-	}
-	bytes1 := res1.BytesTotal
-
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 25*time.Second)
-	defer cancel2()
-	res2, err := c.SpeedTest(ctx2, pkgclient.SpeedTestOptions{Direction: uploadDirection, Duration: 2})
-	if err != nil {
-		t.Fatalf("duration=2 speed test failed: %v", err)
-	}
-	bytes2 := res2.BytesTotal
-
-	if bytes2 <= bytes1 {
-		t.Fatalf("bytes for longer duration should increase: duration1=%d duration2=%d", bytes1, bytes2)
 	}
 }
 

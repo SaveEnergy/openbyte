@@ -11,9 +11,11 @@ export function resolveServerName() {
 
 export async function loadServerInfo() {
   try {
-    const response = await fetch(`${getApiBase()}/version`, {
-      cache: "no-store",
-    });
+    const response = await fetchWithTimeout(
+      `${getApiBase()}/version`,
+      { cache: "no-store" },
+      TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
+    );
     if (!response.ok) {
       await response.text().catch(() => {});
       throw new Error(`version endpoint returned ${response.status}`);
@@ -52,7 +54,7 @@ function setStartAvailability(online) {
 
 function setServerOnlineUI() {
   if (elements.serverDot) {
-    elements.serverDot.classList.remove("error", "warning");
+    elements.serverDot.classList.remove("error");
     elements.serverDot.classList.add("connected");
   }
   if (elements.serverText) elements.serverText.textContent = "Ready";
@@ -61,58 +63,11 @@ function setServerOnlineUI() {
 
 function setServerOfflineUI() {
   if (elements.serverDot) {
-    elements.serverDot.classList.remove("connected", "warning");
+    elements.serverDot.classList.remove("connected");
     elements.serverDot.classList.add("error");
   }
   if (elements.serverText) elements.serverText.textContent = "Offline";
   setStartAvailability(false);
-}
-
-export async function checkServer() {
-  const candidates = ["/health", `${getApiBase()}/ping`];
-
-  try {
-    for (const url of candidates) {
-      if (await isHealthyServerCandidate(url)) {
-        setServerOnlineUI();
-        return;
-      }
-    }
-    throw new Error("Server offline");
-  } catch (e) {
-    console.debug("Server health check failed:", e);
-    setServerOfflineUI();
-  }
-}
-
-async function isHealthyServerCandidate(url) {
-  try {
-    const res = await fetchWithTimeout(
-      url,
-      {},
-      TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-      await res.text().catch(() => {});
-      return false;
-    }
-
-    let data;
-    try {
-      data = await res.json();
-    } catch (err) {
-      console.debug("failed to parse health response", err);
-      await res.text().catch(() => {});
-      return false;
-    }
-
-    return (
-      data.status === "ok" || data.status === "healthy" || data.pong === true
-    );
-  } catch (err) {
-    console.debug("server health candidate failed", err);
-    return false;
-  }
 }
 
 function startsWithDigit(value) {
@@ -122,27 +77,78 @@ function startsWithDigit(value) {
 }
 
 export function updateNetworkDisplay() {
-  if (elements.networkIPv4) {
-    elements.networkIPv4.textContent = state.networkInfo.ipv4 || "-";
+  const pending = state.networkInfo.complete ? "Not detected" : "Detecting…";
+  const ipv4 = state.networkInfo.ipv4 || pending;
+  const ipv6 = state.networkInfo.ipv6 || pending;
+  for (const element of [elements.idleNetworkIPv4, elements.networkIPv4]) {
+    if (element) element.textContent = ipv4;
   }
-  if (elements.networkIPv6) {
-    elements.networkIPv6.textContent = state.networkInfo.ipv6 || "-";
+  for (const element of [elements.idleNetworkIPv6, elements.networkIPv6]) {
+    if (element) element.textContent = ipv6;
+  }
+  if (elements.idleNetworkInfo) {
+    elements.idleNetworkInfo.setAttribute(
+      "aria-busy",
+      state.networkInfo.complete ? "false" : "true",
+    );
   }
 }
 
-export function detectNetworkInfo() {
-  const mainPing = fetch(`${getApiBase()}/ping`)
-    .then((res) => parseJSONOrThrow(res))
-    .then((data) => {
-      if (data.client_ip) {
-        if (data.ipv6) {
-          state.networkInfo.ipv6 = data.client_ip;
-        } else {
-          state.networkInfo.ipv4 = data.client_ip;
-        }
+async function discoverAddress(url, options) {
+  try {
+    const response = await fetchWithTimeout(
+      url,
+      options,
+      TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
+    );
+    const data = await parseJSONOrThrow(response);
+    if (data.client_ip) {
+      state.networkInfo[data.ipv6 ? "ipv6" : "ipv4"] = data.client_ip;
+      updateNetworkDisplay();
+    }
+    return true;
+  } catch (err) {
+    console.debug("IP discovery failed", err);
+    return false;
+  }
+}
+
+export function getNextHopProtocol() {
+  try {
+    const entries = performance.getEntriesByType("resource");
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const entry = entries[i];
+      if (
+        String(entry.name || "").includes(`${getApiBase()}/ping`) &&
+        entry.nextHopProtocol
+      ) {
+        return entry.nextHopProtocol;
       }
-    })
-    .catch(() => {});
+    }
+  } catch (err) {
+    console.debug("protocol detection failed", err);
+  }
+  return "";
+}
+
+/** Periodic idle re-check: probe the same-origin ping and update readiness. */
+export async function checkServer() {
+  const online = await discoverAddress(`${getApiBase()}/ping`, {
+    cache: "no-store",
+  });
+  if (online) setServerOnlineUI();
+  else setServerOfflineUI();
+}
+
+export function detectNetworkInfo() {
+  const sameOriginProbe = discoverAddress(`${getApiBase()}/ping`, {
+    cache: "no-store",
+  });
+  void sameOriginProbe.then((ready) => {
+    if (ready) setServerOnlineUI();
+    else setServerOfflineUI();
+  });
+  const probes = [sameOriginProbe];
 
   const hostname = globalThis.location.hostname;
   const canProbe =
@@ -156,27 +162,16 @@ export function detectNetworkInfo() {
   const probeOpts = { cache: "no-store", credentials: "omit", mode: "cors" };
   const proto = globalThis.location.protocol;
 
-  const v4Ping = canProbe
-    ? fetch(`${proto}//v4.${hostname}/api/v1/ping`, probeOpts)
-        .then((res) => parseJSONOrThrow(res))
-        .then((data) => {
-          if (!data.ipv6 && data.client_ip) {
-            state.networkInfo.ipv4 = data.client_ip;
-          }
-        })
-        .catch(() => {})
-    : Promise.resolve();
+  if (canProbe) {
+    probes.push(
+      discoverAddress(`${proto}//v4.${hostname}/api/v1/ping`, probeOpts),
+      discoverAddress(`${proto}//v6.${hostname}/api/v1/ping`, probeOpts),
+    );
+  }
 
-  const v6Ping = canProbe
-    ? fetch(`${proto}//v6.${hostname}/api/v1/ping`, probeOpts)
-        .then((res) => parseJSONOrThrow(res))
-        .then((data) => {
-          if (data.ipv6 && data.client_ip) {
-            state.networkInfo.ipv6 = data.client_ip;
-          }
-        })
-        .catch(() => {})
-    : Promise.resolve();
-
-  Promise.allSettled([mainPing, v4Ping, v6Ping]).then(updateNetworkDisplay);
+  return Promise.allSettled(probes).then((results) => {
+    state.networkInfo.complete = true;
+    updateNetworkDisplay();
+    return results;
+  });
 }

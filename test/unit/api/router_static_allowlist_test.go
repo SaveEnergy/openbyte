@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,30 +10,27 @@ import (
 
 	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/internal/config"
+	"github.com/saveenergy/openbyte/web"
 )
 
 func TestRouterStaticServesFrontendModules(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, config.DefaultConfig())
+	router := api.NewRouter(config.DefaultConfig(), "", nil)
 	h := router.SetupRoutes()
 
-	for _, name := range []string{
-		"openbyte.js",
-		"network.js",
-		"speedtest.js",
-		"speedtest-http-download.js",
-		"speedtest-http-shared.js",
-		"speedtest-http-upload.js",
-		"speedtest-adaptive.js",
-		"speedtest-worker.js",
-		"speedtest-orchestrator.js",
-		"theme.js",
-		"history.js",
-		"toast.css",
-		"api.html",
-		"api.css",
-		"api.js",
-	} {
+	var assets []string
+	if err := fs.WalkDir(web.Assets, ".", func(name string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !entry.IsDir() {
+			assets = append(assets, name)
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("walk embedded frontend assets: %v", err)
+	}
+
+	for _, name := range assets {
 		t.Run(name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/"+name, nil)
 			rec := httptest.NewRecorder()
@@ -45,10 +43,18 @@ func TestRouterStaticServesFrontendModules(t *testing.T) {
 }
 
 func TestRouterStaticFileServerAllowlist(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, config.DefaultConfig())
-	h := router.SetupRoutes()
+	webRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(webRoot, "index.html"), []byte("ok"), 0o644); err != nil {
+		t.Fatalf(routerWriteIndexFmt, err)
+	}
+	if err := os.WriteFile(filepath.Join(webRoot, "embed.go"), []byte("secret"), 0o644); err != nil {
+		t.Fatalf("write disallowed source: %v", err)
+	}
+	cfg := config.DefaultConfig()
+	cfg.WebRoot = webRoot
+	router := api.NewRouter(cfg, "", nil)
 
+	h := router.SetupRoutes()
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/embed.go", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -58,9 +64,6 @@ func TestRouterStaticFileServerAllowlist(t *testing.T) {
 }
 
 func TestRouterStaticFileServerAllowlistServesFontsFromWebRoot(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, config.DefaultConfig())
-
 	webRoot := t.TempDir()
 	fontDir := filepath.Join(webRoot, "fonts")
 	if err := os.MkdirAll(fontDir, 0o755); err != nil {
@@ -72,7 +75,9 @@ func TestRouterStaticFileServerAllowlistServesFontsFromWebRoot(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(fontDir, "dm-sans-latin.woff2"), []byte("font-bytes"), 0o644); err != nil {
 		t.Fatalf(routerWriteFontFmt, err)
 	}
-	router.SetWebRoot(webRoot)
+	cfg := config.DefaultConfig()
+	cfg.WebRoot = webRoot
+	router := api.NewRouter(cfg, "", nil)
 
 	h := router.SetupRoutes()
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/fonts/dm-sans-latin.woff2", nil)
@@ -84,8 +89,7 @@ func TestRouterStaticFileServerAllowlistServesFontsFromWebRoot(t *testing.T) {
 }
 
 func TestCriticalRoutesRespondOK(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, config.DefaultConfig())
+	router := api.NewRouter(config.DefaultConfig(), "", nil)
 	h := router.SetupRoutes()
 
 	tests := []struct {

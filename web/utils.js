@@ -1,6 +1,7 @@
 /** HTTP/network helpers and shared utilities. */
 
-import { TEST_CONFIG } from "./state.js";
+const RETRY_AFTER_DEFAULT_MS = 1000;
+const RETRY_AFTER_MAX_MS = 120000;
 
 export function computeBufferbloatGrade(idleLatency, loadedLatency) {
   if (!Number.isFinite(idleLatency) || !Number.isFinite(loadedLatency))
@@ -71,65 +72,13 @@ export async function consumeErrorBody(res) {
   }
 }
 
-function normalizeMessage(value) {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function responseMessageFromJSON(payload) {
-  if (!payload || typeof payload !== "object") return "";
-  return (
-    normalizeMessage(payload.error) ||
-    normalizeMessage(payload.message) ||
-    normalizeMessage(payload.detail)
-  );
-}
-
-export async function readErrorResponseMessage(res, fallbackMessage) {
-  if (!res) return normalizeMessage(fallbackMessage);
-
-  const fallback = normalizeMessage(fallbackMessage) || `HTTP ${res.status}`;
-  const contentType = res.headers.get("Content-Type") || "";
-  const isJSON = contentType.includes("application/json");
-  const responseClone = typeof res.clone === "function" ? res.clone() : null;
-  let parseFailed = false;
-
-  try {
-    if (isJSON) {
-      const payload = await res.json();
-      const message = responseMessageFromJSON(payload);
-      return message || fallback;
-    } else {
-      const text = normalizeMessage(await res.text());
-      if (text) return text;
-      return fallback;
-    }
-  } catch (err) {
-    parseFailed = true;
-    console.debug("failed to parse error response body", err);
-  }
-
-  if (responseClone && parseFailed) {
-    try {
-      const text = normalizeMessage(await responseClone.text());
-      if (text) return text;
-    } catch (err) {
-      console.debug("failed to read fallback error response body", err);
-    }
-  }
-
-  return fallback;
-}
-
-export function retryAfterMs(
-  response,
-  fallbackMs = TEST_CONFIG.RETRY_AFTER_DEFAULT_MS,
-) {
+export function retryAfterMs(response, fallbackMs = RETRY_AFTER_DEFAULT_MS) {
   if (!response?.headers) return fallbackMs;
   const value = response.headers.get("Retry-After");
   if (!value) return fallbackMs;
   const seconds = Number.parseInt(value, 10);
   if (!Number.isFinite(seconds) || seconds < 1) return fallbackMs;
-  return Math.min(seconds * 1000, TEST_CONFIG.RETRY_AFTER_MAX_MS);
+  return Math.min(seconds * 1000, RETRY_AFTER_MAX_MS);
 }
 
 export function isNetworkError(err) {
@@ -150,16 +99,6 @@ export const parseJSONOrThrow = (res) =>
     : res.text().then(() => {
         throw new Error(`HTTP ${res.status}`);
       });
-
-export function isSameOriginURL(url) {
-  try {
-    const parsed = new URL(url, globalThis.location.origin);
-    return parsed.origin === globalThis.location.origin;
-  } catch (e) {
-    console.debug("invalid URL for same-origin check", e);
-    return false;
-  }
-}
 
 export function fetchWithTimeout(url, options, timeoutMs) {
   if (typeof AbortController === "undefined" || !timeoutMs) {

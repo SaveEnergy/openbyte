@@ -1,9 +1,7 @@
 # Changelog
 
-All notable changes to this project are documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Notable user-facing changes are documented here. Internal refactor diaries belong
+in Git history and pull requests, not release notes.
 
 ## [Unreleased]
 
@@ -43,179 +41,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- **Go 1.26.5 toolchain baseline** (`go.mod`, Docker builder image): fixes
-  GO-2026-5856 (Encrypted Client Hello privacy leak in `crypto/tls`) flagged by
-  the CI govulncheck gate. CI `setup-go` now uses `check-latest` so hosted
-  runners pick up the newest 1.26.x patch instead of a stale cached toolchain.
-  Dependabot now also watches `docker/Dockerfile` base images.
-
-### Fixed
-
-- **Compose env passthrough**: all four compose files now forward
-  `MAX_TEST_DURATION`, `LOG_LEVEL`, `PPROF_ENABLED`, `PPROF_ADDR`,
-  `PERF_STATS_INTERVAL`, and `RUNTIME_METRICS_ENABLED`, which `.env.example`
-  documents but the containers previously ignored. `PORT`/`BIND_ADDRESS`
-  remain container-internal by design (see `.env.example` note).
-
-### Removed
-
-- **Autoresearch experiment harness**: removed the tracked agent prompt, Cursor
-  command, branch counter, preflight script, Make target, and local TSV workflow.
-  Generic benchmarks and manual throughput harnesses remain available.
-- **Dead metrics code**: removed the unwired `internal/metrics` package (collector,
-  multi-stream aggregator, latency histogram) and the `pkg/types` RTT/NetworkInfo
-  collectors — none were referenced by production code since the TCP/UDP stack removal.
-  `pkg/types/network.go` shrank to the CORS host helpers (`pkg/types/host.go`).
-- **Always-zero CLI JSON fields**: `rtt`, `packet_loss_percent`, `packets_sent`,
-  `packets_received`, and `network` were never populated by the HTTP-only client and
-  are gone from CLI output; CLI JSON schema version is now `3.0`.
-- **Multi-server compose example**: removed `docker/docker-compose.multi.yaml` and the
-  multi-server sections in README/DEPLOYMENT. Run independent instances with their own
-  `PUBLIC_HOST`/`SERVER_NAME` if you want multiple regions.
-- **Stale env vars**: dropped `TCP_TEST_PORT`, `UDP_TEST_PORT`, `MAX_CONCURRENT_TESTS`,
-  and `MAX_STREAMS` from `.env.example` — the server never read them.
+- Raised the Go baseline to 1.26.5 for the `crypto/tls` fix tracked as
+  GO-2026-5856; CI follows the latest 1.26.x patch and Dependabot watches Docker
+  base images.
 
 ### Changed
 
-- **CI/release dependency diet**: dropped `dorny/paths-filter` (replaced by a
-  `git diff` gate for PR Playwright runs), `docker/metadata-action` (image tags are
-  computed in shell), and `softprops/action-gh-release` (releases publish via `gh`).
-  Dependabot now groups Go and GitHub Actions updates into single weekly PRs.
+- Simplified the browser transfer state machines, one-shot worker protocol, and
+  instrument animation while retaining adaptive streams, result sharing, and
+  eager same-origin/IPv4/IPv6 address discovery.
+- Made discovered public IPv4/IPv6 addresses visible before starting a test;
+  ping readiness remains authoritative if version metadata is rate-limited.
+- Made server configuration environment-only, replaced the custom logger with
+  `log/slog`, and consolidated router/result HTTP setup without changing the
+  persisted result schema or share URLs.
+- Consolidated the source and GHCR Traefik configurations into one overlay.
+- Deployment now verifies, syncs, and starts the remote release through one SSH
+  connection while retaining fingerprint, checksum, image, health, and rollback
+  checks.
+- Removed duplicate tag CI and nightly E2E executions. Release and nightly retain
+  their full validation gates.
+- Curated performance benchmarks around transfer, gzip, JSON, ping, and SQLite
+  behavior; removed unused baseline-comparison plumbing.
+- Reduced unit-test wall-clock waits without reducing behavioral coverage.
+
+### Removed
+
+- Removed the full `openbyte client`, its YAML configuration, terminal output
+  formats, Docker target, and CLI throughput harness. Use the browser, HTTP API,
+  Go SDK, or `openbyte check --json`.
+- Removed the compatibility-only `diagnostics` field from result creation;
+  result sharing and persisted result fields are unchanged.
+- Removed unused `PUBLIC_HOST`, nonfunctional `LOG_LEVEL`, periodic runtime
+  statistics, and `/debug/runtime-metrics`; loopback pprof remains available.
+- Removed the unwired metrics collectors, always-zero legacy CLI JSON fields,
+  obsolete multi-server Compose example, and abandoned autoresearch harness.
 
 ## [0.10.2] - 2026-05-04
 
 ### Fixed
 
-- **Web upload measurement**: corrected browser upload accounting so completed
-  POST bodies are only counted for the portion overlapping the measured window,
-  preventing warm-up or post-deadline bytes from inflating upload Mbps.
+- Corrected browser upload accounting so only bytes overlapping the measured
+  window contribute to upload throughput.
 
 ## [0.10.1] - 2026-05-04
 
 ### Fixed
 
-- **Release race gate**: aligned the release workflow with CI by running the race
-  detector in short mode after full non-race tests; full non-short race coverage
-  remains in nightly to avoid hosted-runner SIGTERM failures during release.
+- Aligned release race coverage with CI while retaining the full race suite in
+  nightly runs.
 
 ## [0.10.0] - 2026-05-04
 
 ### Added
 
-- **Adaptive Web UI speed test**: the browser now ramps HTTP stream concurrency automatically,
-  then measures with the stream count that saturated the path; HTTP transfer loops now run
-  in a browser Web Worker so the UI thread stays responsive during high-throughput tests.
-- **Web API quick reference**: added `/api.html` with agent-friendly HTTP endpoint notes
-  and browser snippets for ping, download, upload, and result sharing.
+- Added adaptive browser stream ramping and Web Worker transfer loops.
+- Added the in-app `/api.html` quick reference.
 
 ### Removed
 
-- **Manual Web UI speed settings**: removed visible stream-count and duration controls; the
-  default browser test now uses the same adaptive strategy for slow and high-capacity links.
-- **TCP/UDP CLI testing**: removed the CLI TCP/UDP client data plane, stream-start/websocket
-  client plumbing, `--protocol`/`-p`, `--packet-size`, and bidirectional CLI mode. The CLI
-  is HTTP-only now; CLI JSON schema version is now `2.0` and reports `chunk_size`.
-- **Downloads page**: removed the browser downloads page and GitHub release/platform detection
-  scripts; the web app now points agents and users to the API page instead.
-- **Server-side TCP/UDP stream stack**: removed raw TCP/UDP listeners, `/api/v1/stream/*`,
-  websocket metrics fanout, `cmd/loadtest`, stream result/state types, direct test-port config,
-  and the `gorilla/websocket` plus custom stream-error dependencies. Docker now
-  exposes only port `8080`.
+- Removed manual browser stream/duration settings, TCP/UDP testing, websocket
+  stream APIs, direct data ports, the downloads page, and the load-test command.
+  The runtime is HTTP-only and exposes port 8080.
 
 ## [0.9.1] - 2026-05-03
 
 ### Added
 
-- **Server display name**: `SERVER_NAME` / `--server-name` now drives the Web UI server subtitle
-  and the `server_name` saved with shared results; CI/release deploys can source it from the
-  `SERVER_NAME` GitHub repository variable.
+- Added `SERVER_NAME` for the UI, version response, and shared results.
 
 ## [0.9.0] - 2026-05-03
 
 ### Removed
 
-- **MCP server**: removed the pre-1.0 `openbyte mcp` stdio server, its command wiring,
-  tests, docs, and `github.com/mark3labs/mcp-go` dependency. Agent integrations should
-  use the HTTP API / OpenAPI contract or Go SDK.
-- **Registry service**: removed the unused pre-1.0 registry service/client, `/api/v1/registry/*`
-  routes, config flags/env vars, tests, and Docker profile to keep the product single-purpose.
-- **Standalone agent guide page**: removed the generated integration-guide file and matching web page;
-  `API.md` and `api/openapi.yaml` are the canonical integration surface.
-- **Server selection**: removed the single-option web server selector, `/api/v1/servers`,
-  server identity config, and related metadata tests/docs after the registry cut.
-- **CLI server selection aliases**: removed `openbyte client --servers`, `--auto` / `-a`,
-  `--server`, bare config aliases, legacy `obyte` config fallback, and API-key request
-  plumbing from CLI / `check` / Go SDK. Client targeting is now explicit URL-only.
-- **Perf autoresearch outer loop**: **`make autoresearch-loop-complete`**, **`scripts/perf/autoresearch_loop_complete.sh`**, and **`/autoresearch --loop`** / loop-mode docs — merge **`perf-N`** → **`main`**, counter bump, and next branch are **manual** (see **`test/perf/PROMPT_AUTORESEARCH.md`**).
-
-### Changed
-
-- **`make perf-compare`**: runs **`benchstat`** from **`PATH`** when present, otherwise **`go run golang.org/x/perf/cmd/benchstat@latest`** (no separate install required for autoresearch agents).
-- **cmd/client**: split **`engine.go`** / removed **`engine_direction.go`** → **`engine_dial.go`** (TCP/UDP dial, capture NAT info), **`engine_readwrite.go`** (download/upload + shared read/write loops), **`engine_bidirectional.go`**, **`engine_latency.go`** (latency/jitter stats, `isTimeoutError`); split **`formatter.go`** → **`formatter_classify.go`**, **`formatter_json.go`**, **`formatter_plain.go`**, **`formatter_interactive.go`**, **`formatter_ndjson.go`**, **`formatter_helpers.go`**; **`20260322-refactor-04`** Done (`go test ./cmd/client/...`).
-- **test/unit/stream**: split **`manager_test.go`** into **`manager_test_common_test.go`**, **`manager_lifecycle_test.go`**, **`manager_limits_test.go`**, **`manager_broadcast_metrics_test.go`**, **`manager_terminal_test.go`**; **`20260322-refactor-03`** Done (`go test ./test/unit/stream/...`).
-- **test/unit/results**: split **`store_test.go`** into **`store_test_common_test.go`**, **`store_crud_test.go`**, **`store_retention_test.go`**, **`store_busy_test.go`**, **`store_handler_routes_test.go`**; **`20260322-refactor-02`** Done (`go test ./test/unit/results/...`).
-- **test/unit/api**: split **`router_test.go`** into **`router_test_common_test.go`** (shared constants), **`router_middleware_stream_test.go`**, **`router_static_cache_ratelimit_test.go`**, **`router_results_api_routes_test.go`**, **`router_static_allowlist_test.go`**; **`20260322-refactor-01`** Done (`go test ./test/unit/api/...`).
-- **AGENTS.md**: compacted — merged refactor intake narratives into short backlog notes; single slimmer Live Queue table; trimmed Sonar/closed-ID/decision-note walls; **~280 → ~154 lines** (detail remains in CHANGELOG / git history).
-
-### Added
-
-- **Perf benchmark suite**: **`test/perf/bench_packages.txt`** targets **`internal/{metrics,stream,websocket,api,jsonbody,results}`** and **`pkg/types`** — adds **`Manager.UpdateMetrics`** (serial + **`RunParallel`**), **`CancelStream`/`CompleteStream`/`FailStreamWithError`**, **`udpSendDownloadPacket`**, results **`Store.Save`/`Get`** (`:memory:` SQLite), stream start **`decodeAndValidateStartRequest`** + **`validateConfig`**, **`respondError`** (StreamError vs generic), plus speedtest slots, metrics/jitter, **`validID`**, **`MarshalMetricsJSON`**, gzip, CORS, **`writeRandomChunk`**, **`MarshalWebsocketMessage`**, etc.; multi-WS client fan-out stays in **`test/unit/websocket`** (see **`broadcast_bench_test.go`** note); removed synthetic **`test/unit/stream`** microbenches (consolidated under **`internal/*`**).
-- **Perf autoresearch**: **`make autoresearch-preflight`** + **`scripts/perf/autoresearch_preflight.sh`** (exit code + **`AUTORESEARCH_*`** stdout); tracked **`test/perf/AUTORESEARCH_CURSOR_COMMAND.md`** as the canonical Cursor **`/autoresearch`** body; **`PROMPT_AUTORESEARCH.md`** / **`test/perf/README.md`** / **`AGENTS.md`** aligned (resume-on-branch, autonomous default, **`make perf-compare`** fallback).
-- **AGENTS.md**: **Refactor analysis intake (2026-03-23)** — complementary deep pass: large tests (**`handlers_test`**, **`diagnostic_test`**, **`websocket/server_test`**, **`results/handler_test`**), **`internal/metrics`**, **`pkg/diagnostic`**, **`cmd/client`** **`config`/`api`**, **`router`/`handlers`**, web **HTTP speed** further dedupe, **`cmd/check`**; **Live Queue** **`20260323-refactor-01`**..**`10`** with checks.
-- **AGENTS.md**: **Refactor analysis intake (2026-03-22)** — deep pass: test-suite **LOC** hotspots (**`router_test`**, **`store_test`**, **`manager_test`**, **`e2e_test`**), **`cmd/client`** engine/formatter, optional **`speedtest.go`**, **web** **`ui`/`openbyte`**, **MCP/loadtest**; **Live Queue** **`20260322-refactor-01`**..**`09`** with checks.
-- **AGENTS.md**: **Refactor analysis intake (2026-03-20)** + backlog **`20260320-refactor-14`**..**`16`** (**`cmd/client`**, **`web`**, **`internal/stream` `Server`**) **Done**.
-- **AGENTS.md**: Architecture § Performance **advanced telemetry** policy (**`20260320-perf-03`**): server/internal-first, minimal default Web UI, explicit opt-in for user-visible detail; implementation remains deferred.
-- **Benchmarks**: **`internal/api`** (**`respondJSON`**, **`validateMetricsPayload`**, **`normalizeHost`**) and **`internal/jsonbody`** (**`DecodeSingleObject`**); **`Makefile`** **`perf-bench`** runs them with existing unit benches; **AGENTS.md** documents **`benchstat`** comparison (manual).
-- **Playwright**: **`playwright.config.js`** sets **`workers`** to **`2`** when **`GITHUB_ACTIONS`** is set (GitHub-hosted runners); optional **`PLAYWRIGHT_WORKERS`** override.
-- **AGENTS.md**: documented **CI** vs **nightly** race-detector matrix (**`-short`**/**`-p 1`** on **`main`** vs full **`go test -race ./...`** nightly); comments in **`ci.yml`** / **`nightly.yml`**.
-- **CI**: **`govulncheck`** in **`checks`** (`go run golang.org/x/vuln/cmd/govulncheck@latest ./...`); **Redocly** pinned as **`@redocly/cli@2.18.1`** with **`bun run lint:openapi`** (replaces cold **`npx @redocly/cli`** per run); **`Makefile`** **`lint-openapi`** for local parity.
-
-### Fixed
-
-- **Static analysis cleanup**: staticcheck now passes cleanly after removing unused
-  locks/helpers and switching hot-path `sync.Pool` buffers to pointer-backed values.
-- **Web / server**: **`internal/api/router_static.go`** allowlists **`speedtest-http-{download,shared,upload}.js`** (split modules were **404**); regression test **`TestRouterStaticServesSpeedtestHTTPModules`**. **`README.md`** Configuration notes: **`PUBLIC_HOST`** for stable advertised hosts.
-- **SonarQube** (targets **2026-03-20** OPEN list): **`[[`** conditionals in **`scripts/deploy/*.sh`**; **`TestDecodeSingleObject*`** names in **`internal/jsonbody/decode_test.go`**; **`go:S1192`** via shared format / path constants in tests; **`playwright.config.js`** **`resolvePlaywrightWorkers()`** (no nested ternary); **`execContexter`** in **`internal/results/store_migrate.go`**; **`test/e2e/ui/basic.spec.js`** fetch mock: **`init?.signal`** / **`signal?.`** for **`javascript:S6582`**; success toast **`<output>`** in **`web/index.html`** + assertion update. **AGENTS.md** Sonar snapshot updated.
-- **CI**: `build-push` / `deploy` no longer skipped on docs-only `main` pushes (removed `paths-filter` `docker` gate from image job; `changes` still used for PR Playwright gating).
-- **Release**: `deploy` no longer gated on `image_pushed` job output (boolean→string mismatch with `'true'` could skip SSH deploy after a successful `release` job); use `needs.release.result == 'success'` like CI `deploy`.
-
-### Changed
-
-- **cmd/client**: replaced monolithic **`run.go`** with **`run_stream.go`**, **`run_http.go`**, **`run_progress.go`**, **`run_results.go`**; split **`http_engine.go`** into **`http_engine_download.go`**, **`http_engine_upload.go`**, **`http_engine_misc.go`** (ping + stream helpers) + slim core **`http_engine.go`**.
-- **pkg/client**: replaced **`client_http.go`** with **`client_{check,speedtest,diagnose,health,latency,download,upload}.go`** + slim **`client.go`** (same exported API).
-- **test/unit/api**: split **`speedtest_test.go`** into **`speedtest_helpers_test.go`**, **`speedtest_download_test.go`**, **`speedtest_upload_test.go`**, **`speedtest_ping_test.go`** (same **`package api_test`**; no assertion changes).
-- **internal/stream**: split TCP workload path out of **`server.go`** into **`server_tcp.go`** (**`server.go`** keeps **`NewServer`**, **`Close`**, buffer pool, **`isTimeoutError`** for UDP + TCP); **`server_udp.go`** unchanged.
-- **Web**: split **`download.js`** into **`download-platform.js`**, **`download-github.js`**, and slim **`download.js`**; split **`network.js`** into helper/probe/health modules; **`internal/api/router_static.go`** allowlists the new **`*.js`** assets.
-- **cmd/client**: split former **`cli.go`** into **`cli_flags.go`**, **`cli_usage.go`**, **`cli_validate.go`**, **`cli_servers.go`** (behavior-preserving; same **`package client`**).
-- **Nightly** (`nightly.yml`): **`make perf-bench`** runs on each schedule unless repo variable **`PERF_BENCH`** is **`false`** (replaces **`PERF_SMOKE == 'true'`** gate); **`make perf-leakcheck`** still **`vars.LEAK_PROFILE_SMOKE == 'true'`**.
-- **CI** (`ci.yml`): **`cancel-in-progress`** only when **`github.event_name == 'pull_request'`** — **`main`** / tags / **`workflow_dispatch`** no longer cancel an in-flight run (avoids aborting **`deploy`**); next run **queues** on the same ref. **`AGENTS.md`** documents tradeoff (possible **`main`** backlog).
-- **cmd/server**: split monolithic `main.go` into `flags.go` and `runtime.go` (behavior-preserving; easier navigation).
-- **internal/config**: split `env.go` into `env_helpers.go`, `env_core.go`, and `env_extended.go` (same `LoadFromEnv` behavior).
-- **CI / release**: `deploy` jobs use shared **`scripts/deploy/`** bash (`validate_env`, `sync_compose`, `deploy_remote`) instead of duplicated inline shell.
-- **internal/results**: split SQLite store into `store_migrate.go`, `store_id.go`, `store_crud.go`, `store_cleanup.go` + slim `store.go` (no API change).
-- **Web**: split `speedtest-http.js` into `speedtest-http-shared.js`, `speedtest-http-download.js`, `speedtest-http-upload.js` (barrel keeps same exports).
-- **internal/api**: split `router_middleware.go` into `router_middleware_{ratelimit,cors,logging,security}.go` (same middleware chain).
-- **internal/stream**: split `manager.go` into `manager_streams.go`, `manager_cleanup.go`, `manager_broadcast.go` (same `Manager` API).
+- Removed the MCP server, registry, server selector, legacy client aliases, and
+  standalone integration guide. Integrations use the HTTP/OpenAPI contract.
 
 ## [0.8.0] - 2026-03-19
 
-### Security
-
-- Go **1.26.1** toolchain baseline; Docker builder image **golang:1.26.1-alpine**.
-- Transitive **github.com/buger/jsonparser** updated to **v1.1.2** (addresses Dependabot advisory).
-
 ### Changed
 
-- **internal/jsonbody**: shared single-object JSON request decoding for API and results handlers.
-- **internal/websocket**: split large `server.go` into focused files (origin/CORS, broadcast, limits, ping, lifecycle, message types).
-- **internal/api**: split `speedtest` and `handlers` across `speedtest_*.go`, `handlers_meta.go`, `handlers_stream.go`.
-- **pkg/client**: HTTP/latency/download/upload helpers moved to **client_http.go** (no exported API renames).
-- **CI**: race tests also run on **workflow_dispatch** for `main`; **AGENTS.md** documents recovery when a push-triggered run is stuck.
-
-### Dependencies
-
-- **golang.org/x/term** v0.41.0, **modernc.org/sqlite** v1.47.0, **github.com/mark3labs/mcp-go** v0.45.0 (and transitive updates).
-- Routine **GitHub Actions** version bumps via Dependabot.
+- Moved shared JSON decoding and HTTP client helpers into focused packages and
+  upgraded the Go and dependency baselines.
 
 [Unreleased]: https://github.com/SaveEnergy/openbyte/compare/v0.10.2...HEAD
 [0.10.2]: https://github.com/SaveEnergy/openbyte/compare/v0.10.1...v0.10.2

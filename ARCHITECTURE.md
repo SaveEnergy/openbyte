@@ -5,7 +5,7 @@ openByte is a browser-first HTTP speed test server. The product deliberately sta
 ## Runtime shape
 
 ```text
-Browser / CLI / agent
+Browser / check / agent
         │
         ▼
 openbyte server (:8080)
@@ -19,17 +19,9 @@ There are no separate TCP/UDP test ports and no websocket stream API. Those pre-
 
 ## Public API
 
-```text
-GET  /health
-GET  /api/v1/version
-GET  /api/v1/ping
-GET  /api/v1/download
-POST /api/v1/upload
-POST /api/v1/results
-GET  /api/v1/results/{id}
-```
-
-The human/agent quick reference is served at `/api.html`; the machine-readable contract lives in `api/openapi.yaml`.
+The human quick reference is served at `/api.html`. The authoritative,
+machine-readable contract is [`api/openapi.yaml`](api/openapi.yaml); endpoint
+tables are not duplicated here.
 
 ## Frontend
 
@@ -37,14 +29,14 @@ The human/agent quick reference is served at `/api.html`; the machine-readable c
 - Speed tests use HTTP `/api/v1/download`, `/api/v1/upload`, and `/api/v1/ping` only.
 - Browser tests run in a module Web Worker where supported.
 - Adaptive ramping saturates the link, then measures using the selected stream count.
-- Any new top-level web asset (HTML, JavaScript, CSS, SVG, and so on) must be added to the static allowlist; font files under `web/fonts/` are allowlisted by extension.
+- Static serving derives its allowed paths from `web/embed.go`; `WEB_ROOT` can override those files but cannot expose additional paths.
 
 ## Backend
 
 - Routing uses stdlib `net/http.ServeMux` method patterns.
 - Download/upload handlers enforce bounded concurrency, per-IP limits, configured maximum duration, body deadlines, and body draining on error paths; download chunk requests are also range-checked. Upload bodies are read until EOF or the configured deadline and do not have a byte limit.
 - Results use pure-Go SQLite (`modernc.org/sqlite`) with WAL mode, 90-day retention, max-count cleanup, and cancellation-aware lock retries.
-- Config comes from defaults, environment, then CLI flags.
+- Config comes from defaults and environment variables.
 
 ## Deployment
 

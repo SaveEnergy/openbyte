@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
+	"io/fs"
 	"net/http"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/saveenergy/openbyte/web"
 )
 
 type staticGzipAsset struct {
@@ -20,44 +23,34 @@ type staticGzipAsset struct {
 
 type staticAssetHandler struct {
 	webFS     http.FileSystem
-	allowed   map[string]bool
 	gzipMu    sync.Mutex
 	gzipCache map[string]staticGzipAsset
 }
 
 func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
-	allowed := map[string]bool{
-		"index.html":                 true,
-		"api.html":                   true,
-		resultsHTML:                  true,
-		"openbyte.js":                true,
-		"state.js":                   true,
-		"utils.js":                   true,
-		"network.js":                 true,
-		"speedtest-orchestrator.js":  true,
-		"speedtest-adaptive.js":      true,
-		"speedtest-worker.js":        true,
-		"speedtest.js":               true,
-		"speedtest-http-download.js": true,
-		"speedtest-http-shared.js":   true,
-		"speedtest-http-upload.js":   true,
-		"ui.js":                      true,
-		"results.js":                 true,
-		"theme.js":                   true,
-		"history.js":                 true,
-		"api.js":                     true,
-		"api.css":                    true,
-		"base.css":                   true,
-		"speed.css":                  true,
-		"toast.css":                  true,
-		"motion.css":                 true,
-		"favicon.svg":                true,
-	}
 	return &staticAssetHandler{
 		webFS:     webFS,
-		allowed:   allowed,
 		gzipCache: make(map[string]staticGzipAsset),
 	}
+}
+
+var embeddedStaticAssets = loadEmbeddedStaticAssets()
+
+func loadEmbeddedStaticAssets() map[string]bool {
+	assets := make(map[string]bool)
+	err := fs.WalkDir(web.Assets, ".", func(name string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !entry.IsDir() {
+			assets[name] = true
+		}
+		return nil
+	})
+	if err != nil {
+		panic("read embedded web assets: " + err.Error())
+	}
+	return assets
 }
 
 func (h *staticAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +66,7 @@ func (h *staticAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "api", "results":
 		name += ".html"
 	}
-	if strings.Contains(name, "..") || !isAllowedStaticAsset(name, h.allowed) {
+	if strings.Contains(name, "..") || !isAllowedStaticAsset(name) {
 		http.NotFound(w, r)
 		return
 	}
@@ -89,7 +82,7 @@ func (h *staticAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gzipCandidate := !strings.HasPrefix(name, staticFontsDirPrefix)
+	gzipCandidate := !strings.HasPrefix(name, "fonts/")
 	if gzipCandidate {
 		w.Header().Add("Vary", "Accept-Encoding")
 	}
@@ -183,31 +176,8 @@ func encodingQuality(header, wanted string) (float64, bool) {
 	return quality, found
 }
 
-const (
-	staticFontsDirPrefix    = "fonts/"
-	staticFontsDirPrefixLen = len(staticFontsDirPrefix)
-	staticWoff2Suffix       = ".woff2"
-	staticWoff2SuffixLen    = len(staticWoff2Suffix)
-	staticWoffSuffix        = ".woff"
-	staticWoffSuffixLen     = len(staticWoffSuffix)
-)
-
-func isAllowedStaticAsset(name string, allowed map[string]bool) bool {
-	if allowed[name] {
-		return true
-	}
-	if len(name) >= staticFontsDirPrefixLen && name[:staticFontsDirPrefixLen] == staticFontsDirPrefix {
-		return staticFontAssetSuffixOK(name)
-	}
-	return false
-}
-
-func staticFontAssetSuffixOK(name string) bool {
-	n := len(name)
-	if n >= staticWoff2SuffixLen && name[n-staticWoff2SuffixLen:] == staticWoff2Suffix {
-		return true
-	}
-	return n >= staticWoffSuffixLen && name[n-staticWoffSuffixLen:] == staticWoffSuffix
+func isAllowedStaticAsset(name string) bool {
+	return embeddedStaticAssets[name]
 }
 
 func staticPathIsRootOrHTML(path string) bool {

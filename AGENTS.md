@@ -2,7 +2,7 @@
 
 ### Core Runtime
 
-- Single `openbyte` binary with `server` / `client` / `check` subcommands.
+- Single `openbyte` binary with `server` / `check` subcommands.
 - Routing uses stdlib `net/http.ServeMux` (`METHOD /path/{param}` + `r.PathValue`).
 - Web assets are embedded (`//go:embed`) with optional `WEB_ROOT` override for development.
 - Runtime is HTTP-only: no MCP server, registry, server selector, downloads page, TCP/UDP data ports, `/api/v1/stream/*`, or websocket metrics feed.
@@ -17,7 +17,7 @@
 ### Reliability & Concurrency
 
 - Request/response bodies are drained on error paths to preserve HTTP/2 connection reuse.
-- HTTP client/browser cancel paths propagate request contexts so aborts tear down transfer loops.
+- SDK/browser cancel paths propagate request contexts so aborts tear down transfer loops.
 - Results store shutdown is explicit and idempotent enough for server lifecycle.
 - Upload/download handlers enforce bounded concurrency, per-IP slots, max duration, and safe body deadlines.
 
@@ -25,16 +25,16 @@
 
 - CORS wildcard matching enforces safe dot-boundary behavior.
 - CSP is strict (`script-src 'self'`, `worker-src 'self'`), with JS moved to external files only.
-- The results POST handler enforces a 4096-byte limit, rejects unknown fields, and decodes exactly one JSON object through `internal/jsonbody.DecodeSingleObject`.
+- The results POST handler enforces a 4096-byte limit, rejects unknown fields, and decodes exactly one JSON object in `internal/api/results_handler.go`.
 - Config validation includes trusted CIDR parsing and strict positive limits.
 
 ### Frontend Behavior
 
 - HTTP test mode uses `/api/v1/download`, `/api/v1/upload`, and `/api/v1/ping`; never TCP/UDP proxy mode.
-- Network probe and health-check fetch paths drain non-OK and malformed JSON responses.
+- Network and version probe fetch paths drain non-OK and malformed JSON responses.
 - Server settings UI: no server selector; a single deployed server tests itself.
 - UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.
-- Speed test: **`speedtest-orchestrator.js`** owns lifecycle/share/partial-cancel; **`speedtest.js`** owns latency, the determinate progress model, and bridges UI state to **`speedtest-worker.js`**; **`speedtest-adaptive.js`** chooses stream count/duration and reports ramp-window/measure progress; **`speedtest-http-{shared,download,upload}.js`** owns warm-up, progress, and transfer loops. Thin **`openbyte.js`** owns init/events; **`network.js`** owns health and address probes (offline disables the start button); **`theme.js`** owns the manual light/dark override; **`history.js`** owns the localStorage recent-results list. API docs are **`api.html`** + **`api.css`** + **`api.js`** (fills in the concrete base URL). Any new top-level **`web/*.js`** (or HTML/CSS) must be added to **`internal/api/router_static.go`** allowlist or the server returns **404**.
+- Speed test: **`speedtest-orchestrator.js`** owns lifecycle/share/partial-cancel; **`speedtest.js`** owns latency, the determinate progress model, and bridges UI state to the one-shot **`speedtest-worker.js`**; **`speedtest-adaptive.js`** chooses stream count/duration and reports ramp-window/measure progress; **`speedtest-http-{shared,download,upload}.js`** owns warm-up, progress, and transfer loops. Thin **`openbyte.js`** owns init/events; **`network.js`** owns readiness and address probes (offline disables the start button); **`theme.js`** owns the manual light/dark override; **`history.js`** owns the localStorage recent-results list. Client IP discovery is a user-facing feature: same-origin and IPv4/IPv6 probes stay eager on page load, never deferred until **GO**. API docs are **`api.html`** + **`api.css`** + **`api.js`** (fills in the concrete base URL). Static serving derives its safe path set from assets embedded by **`web/embed.go`**; **`WEB_ROOT`** may override file contents but cannot expose additional paths.
 
 ### Storage
 
@@ -47,12 +47,12 @@
 
 - Agent integrations use the HTTP API / OpenAPI contract and Go SDK; the former `openbyte mcp` stdio server was removed pre-1.0.
 - The former registry service/client/routes/config and web server selector were removed pre-1.0; use explicit URLs outside the app for multi-server comparisons.
-- The CLI client is HTTP-only; TCP/UDP CLI testing, bidirectional CLI mode, and installer/download web page were removed pre-1.0.
+- The full CLI speed-test client was removed during alpha; use the browser UI, HTTP API, Go SDK, or `openbyte check`.
 - The server-side TCP/UDP stream stack, `/api/v1/stream/*`, websocket stream API, `cmd/loadtest`, and direct test ports were removed pre-1.0.
-- The unwired `internal/metrics` package, `pkg/types` RTT/NetworkInfo collectors, the always-zero CLI JSON fields (`rtt`, `packet_loss_percent`, `packets_*`, `network`), and the multi-server compose example were removed post-0.10; CLI JSON schema is `3.0`.
-- Go SDK (`pkg/client`): `Check`, `SpeedTest`, `Diagnose`, `Healthy`; implementation split across `client.go` + `client_{check,speedtest,diagnose,health,measure}.go` (same exported API). CLI and SDK share stateless request/body handling through `internal/httptransfer`; timing and concurrency policy stay with each caller.
+- The unwired `internal/metrics` package, `pkg/types` RTT/NetworkInfo/CLI metric collectors, and the multi-server compose example were removed post-0.10.
+- Go SDK (`pkg/client`): `Check`, `SpeedTest`, `Diagnose`, `Healthy`; implementation split across `client.go` + `client_{check,speedtest,diagnose,health,measure}.go` (same exported API). The SDK uses stateless request/body handling from `internal/httptransfer`.
 - OpenAPI spec lives at `api/openapi.yaml`; CI/release lint it.
-- JSON output supports schema versioning and structured error contracts.
+- `openbyte check --json` supports schema versioning and structured error contracts.
 
 ### Build / CI / Deploy
 
@@ -61,13 +61,13 @@
 - **`build-push` + `deploy`** on every `main` push after `checks` (no path filtering—doc-only pushes still roll images). PR Playwright runs are gated by a plain `git diff` check inside `checks` (no third-party filter action).
 - CI builds/pushes `edge` + `sha`; release publishes semver + `latest`.
 - **`release.yml` `deploy`**: same `vars`/secrets as CI; gate on **`needs.release.result == 'success'`** (not derived job booleans).
-- Deploy: **checkout first**, then `validate_env` → sync compose → remote `docker compose pull` + `up -d` → verify; previous openByte image is pinned locally for Compose-based rollback; scripts in **`scripts/deploy/`** (`validate_env`, `sync_compose`, `deploy_remote`, `deploy_host`).
+- Deploy: **checkout first**, then `scripts/deploy/deploy.sh` validates the host key, streams and checksums the bundle over one SSH connection, and runs `deploy_host.sh`; the previous openByte image is pinned locally for Compose-based rollback.
 - Traefik deploy uses external `traefik` network; workflows ensure network presence.
-- **Race matrix**: `ci.yml` on `main`: `go test ./... -race -short -p 1`; `nightly.yml`: full `go test -race ./...` + separate `test/e2e` (timeout budget).
+- **Race matrix**: `ci.yml` on `main`: `go test ./... -race -short -p 1`; `nightly.yml`: full `go test -race ./...` (including E2E once).
 - **Playwright**: `workers` = `2` on `GITHUB_ACTIONS`; optional `PLAYWRIGHT_WORKERS`; trace/reuse unchanged.
 - **CI concurrency**: `cancel-in-progress` only for `pull_request`; `push`/`workflow_dispatch` queue on same `ref` (deploy not mid-aborted).
 - **Nightly**: `make perf-bench` each run unless `PERF_BENCH=false`; `perf-leakcheck` still behind `LEAK_PROFILE_SMOKE`.
-- **`make perf-bench`**: runs **`scripts/perf/run_benchmarks.sh`** (package list **`test/perf/bench_packages.txt`**) to stdout; **`make perf-record`** → **`build/perf/bench.txt`** for **`make perf-compare`** (**`benchstat`** on PATH, else **`go run golang.org/x/perf/cmd/benchstat@latest`**). See **`test/perf/README.md`**.
+- **`make perf-bench`**: runs the curated transfer/gzip/JSON/SQLite suite from **`test/perf/bench_packages.txt`**; explicit experiments save output and use `benchstat` manually. See **`test/perf/README.md`**.
 
 ## Engineering Guardrails
 
@@ -84,7 +84,7 @@
 
 ## Verification baseline
 
-- `go test ./cmd/check ./cmd/server ./cmd/client`
+- `go test ./cmd/check ./cmd/server ./cmd/openbyte`
 - `go test ./test/unit/api ./test/unit/client ./test/unit/results`
 - `go test ./internal/results`
 - `bun run lint:openapi`
@@ -139,5 +139,5 @@ make build && WEB_ROOT=./web ./bin/openbyte server
 - Playwright UI tests start a server on `127.0.0.1:8080`, or reuse one already running there.
 - No CGO required; SQLite uses `modernc.org/sqlite` (pure Go).
 - No external databases or services needed to run locally.
-- Any new top-level web asset must be added to the `internal/api/router_static.go` allowlist or the server returns 404; font files under `web/fonts/` are allowlisted by extension.
-- CLI client needs full URL scheme: `./bin/openbyte client http://localhost:8080`, not just `localhost`.
+- New web assets matching `web/embed.go` are served automatically; `WEB_ROOT` remains restricted to those embedded paths.
+- `openbyte check` needs a full URL scheme: `./bin/openbyte check http://localhost:8080`, not just `localhost`.

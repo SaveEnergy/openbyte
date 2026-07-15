@@ -59,9 +59,6 @@ jobs:
       - name: OpenAPI lint
         run: bun run lint:openapi
 
-      - name: OpenAPI route contract
-        run: go test ./test/unit/api -run TestOpenAPIRouteContract
-
       - name: Build release assets
         run: |
           set -euo pipefail
@@ -177,36 +174,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Validate deploy configuration
-        run: bash scripts/deploy/validate_env.sh
-
-      - name: Sync compose files to server
+      - name: Deploy
         env:
-          SSH_HOST: ${{ env.SSH_HOST }}
-          SSH_HOST_FINGERPRINT: ${{ env.SSH_HOST_FINGERPRINT }}
-          SSH_USER: ${{ env.SSH_USER }}
-          SSH_PORT: ${{ env.SSH_PORT }}
-          REMOTE_DIR: ${{ env.REMOTE_DIR }}
-          SSH_KEY: ${{ env.SSH_KEY }}
-        run: bash scripts/deploy/sync_compose.sh
-
-      - name: Deploy via SSH
-        env:
-          SSH_HOST: ${{ env.SSH_HOST }}
-          SSH_HOST_FINGERPRINT: ${{ env.SSH_HOST_FINGERPRINT }}
-          SSH_USER: ${{ env.SSH_USER }}
-          SSH_PORT: ${{ env.SSH_PORT }}
-          REMOTE_DIR: ${{ env.REMOTE_DIR }}
-          SSH_KEY: ${{ env.SSH_KEY }}
-          GHCR_USERNAME: ${{ env.GHCR_USERNAME }}
-          GHCR_TOKEN: ${{ env.GHCR_TOKEN }}
-        run: |
-          set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
-          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "invalid release tag format: $tag"; exit 1; }
-          export DEPLOY_TAG="${tag#v}"
-          bash scripts/deploy/deploy_remote.sh
-
-      - name: Cleanup SSH key material
-        if: always()
-        run: rm -f ~/.ssh/id_rsa ~/.ssh/known_hosts ~/.ssh/known_hosts.tmp
+          DEPLOY_TAG: ${{ github.ref_name }}
+        run: bash scripts/deploy/deploy.sh

@@ -171,6 +171,21 @@ func TestSuitabilityGamingZeroMetrics(t *testing.T) {
 	}
 }
 
+func TestSuitabilityGamingRequiresMeasuredPacketLoss(t *testing.T) {
+	interp := diagnostic.Interpret(diagnostic.Params{
+		DownloadMbps: 100,
+		UploadMbps:   50,
+		LatencyMs:    10,
+		JitterMs:     2,
+		PacketLoss:   -1,
+	})
+	for _, useCase := range interp.SuitableFor {
+		if useCase == useGaming {
+			t.Fatal("gaming should not be inferred when packet loss is unmeasured")
+		}
+	}
+}
+
 // --- Concerns ---
 
 func TestConcernsNoConcerns(t *testing.T) {

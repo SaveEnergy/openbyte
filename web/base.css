@@ -312,11 +312,6 @@ body::before {
   background: var(--error);
 }
 
-.server-dot.warning {
-  background: var(--warning);
-  box-shadow: 0 0 8px rgba(254, 202, 87, 0.35);
-}
-
 .main {
   flex: 1;
   display: flex;
@@ -334,14 +329,6 @@ body::before {
   align-items: flex-start;
   padding-top: var(--space-lg);
   padding-bottom: calc(var(--space-2xl) + env(safe-area-inset-bottom));
-}
-
-.download-main {
-  flex: 1;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: var(--space-xl);
 }
 
 .footer {

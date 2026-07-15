@@ -45,6 +45,10 @@ function normalizeAdaptiveConfig(config) {
     gainThreshold: Number.isFinite(config?.gainThreshold)
       ? config.gainThreshold
       : TEST_CONFIG.ADAPTIVE_GAIN_THRESHOLD,
+    nextHopProtocol:
+      typeof config?.nextHopProtocol === "string"
+        ? config.nextHopProtocol
+        : "",
   };
 }
 
@@ -136,13 +140,13 @@ export function streamDelayForIndex(index) {
 }
 
 export async function runAdaptiveHTTPTest(options) {
-  const { direction, runWindow, onPhase, onMeasureStart, signal } = options;
+  const { runWindow, onPhase, onMeasureStart, signal } = options;
   const config = options.config
     ? normalizeAdaptiveConfig(options.config)
     : resolveAdaptiveConfig();
-  const nextHopProtocol = await detectNextHopProtocol(signal);
+  const nextHopProtocol =
+    config.nextHopProtocol || (await detectNextHopProtocol(signal));
   config.maxStreams = protocolStreamCap(nextHopProtocol, config.maxStreams);
-  const ramp = [];
   let best = { streams: TEST_CONFIG.ADAPTIVE_MIN_STREAMS, mbps: 0 };
   let previousMbps = 0;
   let streams = TEST_CONFIG.ADAPTIVE_MIN_STREAMS;
@@ -170,7 +174,6 @@ export async function runAdaptiveHTTPTest(options) {
       throw err;
     }
 
-    ramp.push({ streams, mbps: Math.round(mbps * 100) / 100 });
     if (mbps > best.mbps) best = { streams, mbps };
     if (shouldStopRamping(previousMbps, mbps, config.gainThreshold)) break;
 
@@ -190,12 +193,8 @@ export async function runAdaptiveHTTPTest(options) {
     duration: measureDuration,
     streams: best.streams,
     adaptive: {
-      direction,
-      nextHopProtocol,
       selectedStreams: best.streams,
       bestMbps: best.mbps,
-      measureDuration,
-      ramp,
     },
   });
   return Math.max(mbps, 0);

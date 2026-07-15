@@ -28,97 +28,37 @@ function buildDownloadChunkAttempts(chunkSize) {
   return attempts;
 }
 
-function classifyDownloadStreamError(e, signal, streamState) {
-  if (e.name === "AbortError" || signal.aborted) return "aborted";
-  if (e.status === 503 || e.status === 429) {
-    streamState.sawOverload = true;
-    return "overloaded";
-  }
-  if (isNetworkError(e)) {
-    streamState.sawNetworkError = true;
-    return "network_retry";
-  }
-  return "failed";
-}
-
-async function handleDownloadStreamCatch(e, options) {
-  const { attemptIndex, attemptsLength, signal, streamState } = options;
-  const action = classifyDownloadStreamError(e, signal, streamState);
-  if (action === "aborted") return { done: true, result: "aborted" };
-  if (action === "overloaded") {
-    await sleep(e.retryAfter || 500);
-    return { done: true, result: "overloaded" };
-  }
-  if (action === "failed") {
-    const msg =
-      attemptIndex < attemptsLength - 1
-        ? "Download stream failed, retrying smaller chunk"
-        : "Download stream failed after retries";
-    console.warn(msg, e);
-    return { done: true, result: "failed" };
-  }
-  if (action === "network_retry") return { done: false, retry: true };
-  return { done: true, result: "failed" };
-}
-
-async function tryDownloadChunkWithRetries(options) {
-  const {
-    attemptChunk,
-    attemptIndex,
-    attemptsLength,
-    downloadStream,
-    signal,
-    maxNetworkRetries,
-    retryDelayMs,
-    streamState,
-  } = options;
-  for (let retry = 0; retry <= maxNetworkRetries; retry++) {
-    if (signal.aborted) return "aborted";
-    try {
-      if (await downloadStream(attemptChunk)) return "success";
-      return "failed";
-    } catch (e) {
-      const outcome = await handleDownloadStreamCatch(e, {
-        attemptIndex,
-        attemptsLength,
-        signal,
-        maxNetworkRetries,
-        retryDelayMs,
-        streamState,
-      });
-      if (outcome.done) return outcome.result;
-      await sleep(retryDelayMs);
-    }
-  }
-  return "failed";
-}
-
-async function executeDownloadAttempts(
-  attempts,
-  downloadStream,
-  signal,
-  maxNetworkRetries,
-  retryDelayMs,
-  streamState,
-) {
+async function runDownloadStream(downloadChunk, signal, streamState) {
+  const attempts = buildDownloadChunkAttempts(resolveChunkSize());
   for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
-    if (signal.aborted) return "aborted";
-    const result = await tryDownloadChunkWithRetries({
-      attemptChunk: attempts[attemptIndex],
-      attemptIndex,
-      attemptsLength: attempts.length,
-      downloadStream,
-      signal,
-      maxNetworkRetries,
-      retryDelayMs,
-      streamState,
-    });
-    if (
-      result === "success" ||
-      result === "aborted" ||
-      result === "overloaded"
-    ) {
-      return result;
+    for (let retry = 0; retry <= TEST_CONFIG.MAX_NETWORK_RETRIES; retry++) {
+      if (signal.aborted) return "aborted";
+      try {
+        if (await downloadChunk(attempts[attemptIndex])) return "success";
+        break;
+      } catch (error) {
+        if (error.name === "AbortError" || signal.aborted) return "aborted";
+        if (error.status === 503 || error.status === 429) {
+          streamState.sawOverload = true;
+          await sleep(error.retryAfter || 500);
+          return "overloaded";
+        }
+        if (isNetworkError(error)) {
+          streamState.sawNetworkError = true;
+          if (retry < TEST_CONFIG.MAX_NETWORK_RETRIES) {
+            await sleep(TEST_CONFIG.NETWORK_RETRY_DELAY_MS);
+            continue;
+          }
+          break;
+        }
+        console.warn(
+          attemptIndex < attempts.length - 1
+            ? "Download stream failed, retrying smaller chunk"
+            : "Download stream failed after retries",
+          error,
+        );
+        break;
+      }
     }
   }
   return "failed";
@@ -142,17 +82,6 @@ async function readNextDownloadChunk(reader, byob, bufferRef) {
   return result;
 }
 
-function processDownloadChunk(value, now, ctx) {
-  applyHttpMeasureTick(
-    ctx.readState,
-    ctx.warmUp,
-    value.length,
-    now,
-    ctx.onProgress,
-    ctx,
-  );
-}
-
 async function runDownloadWindow(options) {
   const {
     duration,
@@ -162,10 +91,6 @@ async function runDownloadWindow(options) {
     isRamp = false,
   } = options;
   const startTime = performance.now();
-  const numStreams = streams;
-  const chunkSize = resolveChunkSize();
-  const maxNetworkRetries = TEST_CONFIG.MAX_NETWORK_RETRIES;
-  const retryDelayMs = TEST_CONFIG.NETWORK_RETRY_DELAY_MS;
   const endTimeRef = { value: startTime + duration * 1000 };
   const streamState = {
     sawNetworkError: false,
@@ -176,6 +101,7 @@ async function runDownloadWindow(options) {
   const warmUp = createWarmUpDetector(duration * 1000);
   const earlyStop = createEarlyStopDetector(() => warmUp.settled());
   const readState = { totalBytes: 0, measureStartTime: 0, allBytes: 0 };
+  const measureContext = { endTimeRef, earlyStop };
 
   const downloadStream = async (chunk) => {
     const res = await fetchWithTimeout(
@@ -206,13 +132,6 @@ async function runDownloadWindow(options) {
         ? new ArrayBuffer(TEST_CONFIG.DOWNLOAD_READ_BUFFER_BYTES)
         : null,
     };
-    const readCtx = {
-      warmUp,
-      readState,
-      endTimeRef,
-      earlyStop,
-      onProgress,
-    };
     try {
       while (true) {
         if (signal.aborted) break;
@@ -227,7 +146,14 @@ async function runDownloadWindow(options) {
           bufferRef,
         );
         if (done) break;
-        processDownloadChunk(value, now, readCtx);
+        applyHttpMeasureTick(
+          readState,
+          warmUp,
+          value.length,
+          now,
+          onProgress,
+          measureContext,
+        );
       }
     } finally {
       reader.releaseLock();
@@ -236,22 +162,18 @@ async function runDownloadWindow(options) {
   };
 
   const streamPromises = [];
-  for (let i = 0; i < numStreams; i++) {
-    const delay = streamDelayForIndex(i);
-    const streamPromise = (async () => {
-      await new Promise((r) => setTimeout(r, delay));
-      const attempts = buildDownloadChunkAttempts(chunkSize);
-      const result = await executeDownloadAttempts(
-        attempts,
-        downloadStream,
-        signal,
-        maxNetworkRetries,
-        retryDelayMs,
-        streamState,
-      );
-      if (result === "success") streamState.successfulStreams += 1;
-    })();
-    streamPromises.push(streamPromise);
+  for (let i = 0; i < streams; i++) {
+    streamPromises.push(
+      (async () => {
+        await sleep(streamDelayForIndex(i));
+        const result = await runDownloadStream(
+          downloadStream,
+          signal,
+          streamState,
+        );
+        if (result === "success") streamState.successfulStreams += 1;
+      })(),
+    );
   }
 
   await Promise.all(streamPromises);
@@ -281,7 +203,6 @@ async function runDownloadWindow(options) {
 
 export async function runDownloadTest(onProgress, signal, options = {}) {
   return runAdaptiveHTTPTest({
-    direction: "download",
     signal,
     config: options.config,
     onPhase: options.onPhase,

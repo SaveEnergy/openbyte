@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	check "github.com/saveenergy/openbyte/cmd/check"
-	client "github.com/saveenergy/openbyte/cmd/client"
 	server "github.com/saveenergy/openbyte/cmd/server"
 )
 
@@ -14,7 +13,6 @@ var version = "dev"
 
 var (
 	runServer = func(args []string, ver string) int { return server.Run(args, ver) }
-	runClient = func(args []string, ver string) int { return client.Run(args, ver) }
 	runCheck  = func(args []string, ver string) int { return check.Run(args, ver) }
 )
 
@@ -30,8 +28,6 @@ func run(args []string, ver string) int {
 	switch args[0] {
 	case "server":
 		return runServer(args[1:], ver)
-	case "client":
-		return runClient(args[1:], ver)
 	case "check":
 		return runCheck(args[1:], ver)
 	case "help", "-h", "--help":
@@ -57,12 +53,10 @@ func printUsage() {
 
 Commands:
   server    Run the speed test server (default when no command provided)
-  client    Run the client CLI
   check     Quick connectivity check (~3-5 seconds)
 
 Examples:
   openbyte server
-  openbyte client -d download -t 30 https://speed.example.com
   openbyte check --json https://speed.example.com
 `)
 }

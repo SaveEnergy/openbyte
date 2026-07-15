@@ -56,16 +56,6 @@
   }
 }
 
-@keyframes instrumentBreath {
-  0%,
-  100% {
-    transform: scale(0.96);
-  }
-  50% {
-    transform: scale(1.04);
-  }
-}
-
 @keyframes instrumentArcBreathe {
   0%,
   100% {
@@ -97,11 +87,11 @@
     transition-duration: 0.01ms !important;
   }
 
-  .instrument-ring-container::before,
   .instrument-ring-grid,
   .instrument-ring-pulse,
   .instrument-ring-spark,
   .instrument-ring-arc,
+  .phase-step[data-status="active"]::before,
   .test-type::before {
     animation: none !important;
   }

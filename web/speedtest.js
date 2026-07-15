@@ -10,9 +10,7 @@ import {
 } from "./ui.js";
 import { resolveAdaptiveConfig } from "./speedtest-adaptive.js";
 import { fetchWithTimeout } from "./utils.js";
-import { updateNetworkDisplay } from "./network.js";
-
-let workerRunCounter = 0;
+import { getNextHopProtocol, updateNetworkDisplay } from "./network.js";
 
 /** Portion of a direction phase's progress allotted to the ramp-up stage. */
 const RAMP_PROGRESS_PORTION = 0.45;
@@ -124,11 +122,13 @@ function runWorkerSpeedTest(direction, onProgress, signal, callbacks) {
     throw new TypeError("This browser does not support Web Workers.");
   }
 
-  const id = `${Date.now()}-${++workerRunCounter}`;
   const worker = new Worker(new URL("./speedtest-worker.js", import.meta.url), {
     type: "module",
   });
-  const config = resolveAdaptiveConfig();
+  const config = {
+    ...resolveAdaptiveConfig(),
+    nextHopProtocol: getNextHopProtocol(),
+  };
 
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -149,13 +149,11 @@ function runWorkerSpeedTest(direction, onProgress, signal, callbacks) {
     };
 
     const onAbort = () => {
-      worker.postMessage({ type: "cancel", id });
       settle(reject, makeAbortError());
     };
 
     const onMessage = (event) => {
       const message = event.data || {};
-      if (message.id !== id) return;
 
       if (message.type === "progress") {
         onProgress(message.bytes || 0);
@@ -188,7 +186,7 @@ function runWorkerSpeedTest(direction, onProgress, signal, callbacks) {
       return;
     }
 
-    worker.postMessage({ type: "run", id, direction, config });
+    worker.postMessage({ direction, config });
   });
 }
 

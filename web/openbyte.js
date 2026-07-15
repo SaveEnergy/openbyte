@@ -23,7 +23,6 @@ function bindEvents() {
 function init() {
   initElements();
   loadServerInfo();
-  checkServer();
   bindEvents();
   detectNetworkInfo();
   setInterval(() => {

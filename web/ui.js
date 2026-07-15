@@ -246,7 +246,6 @@ export function updateProgress(progress) {
 
 export function resetProgress() {
   if (!elements.speedNumber) return;
-  state.progress = 0;
   if (elements.progressMeter) {
     elements.progressMeter.value = 0;
     elements.progressMeter.textContent = "Measuring network";
@@ -262,8 +261,7 @@ export function resetProgress() {
 }
 
 export function updateTestType(text, className) {
-  if (!elements.testType || !elements.progressRing || !elements.speedNumber)
-    return;
+  if (!elements.testType || !elements.speedNumber) return;
   elements.testType.textContent = text;
   if (elements.progressMeter) {
     elements.progressMeter.setAttribute("aria-label", `${text} in progress`);
