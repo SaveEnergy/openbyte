@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -33,6 +34,34 @@ type trackingBody struct {
 	offset int
 	reads  int
 	closed bool
+}
+
+type streamingRequestBody struct {
+	closed chan struct{}
+	sent   bool
+	once   sync.Once
+}
+
+func newStreamingRequestBody() *streamingRequestBody {
+	return &streamingRequestBody{closed: make(chan struct{})}
+}
+
+func (b *streamingRequestBody) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	if !b.sent {
+		b.sent = true
+		p[0] = 'x'
+		return 1, nil
+	}
+	<-b.closed
+	return 0, io.ErrClosedPipe
+}
+
+func (b *streamingRequestBody) Close() error {
+	b.once.Do(func() { close(b.closed) })
+	return nil
 }
 
 func (b *trackingBody) Read(p []byte) (int, error) {
@@ -219,8 +248,9 @@ func testHTTP2BodyCleanup(t *testing.T, cleanup func(http.ResponseWriter, *http.
 	srv.StartTLS()
 	t.Cleanup(srv.Close)
 
-	reader, writer := io.Pipe()
-	req, err := http.NewRequest(http.MethodGet, srv.URL, reader)
+	body := newStreamingRequestBody()
+	defer body.Close()
+	req, err := http.NewRequest(http.MethodGet, srv.URL, body)
 	if err != nil {
 		t.Fatalf("new request: %v", err)
 	}
@@ -233,9 +263,6 @@ func testHTTP2BodyCleanup(t *testing.T, cleanup func(http.ResponseWriter, *http.
 		resp, requestErr := srv.Client().Do(req)
 		done <- result{resp: resp, err: requestErr}
 	}()
-	if _, err := writer.Write([]byte("x")); err != nil {
-		t.Fatalf("write request body: %v", err)
-	}
 
 	var first result
 	select {
@@ -243,7 +270,6 @@ func testHTTP2BodyCleanup(t *testing.T, cleanup func(http.ResponseWriter, *http.
 	case <-time.After(2 * time.Second):
 		t.Fatal("HTTP/2 response blocked on request body")
 	}
-	_ = writer.Close()
 	if first.err != nil {
 		t.Fatalf("first request: %v", first.err)
 	}
