@@ -11,18 +11,22 @@ export function resolveServerName() {
 
 export async function loadServerInfo() {
   try {
-    const response = await fetch(`${getApiBase()}/version`, {
-      cache: "no-store",
-    });
+    const response = await fetchWithTimeout(
+      `${getApiBase()}/version`,
+      { cache: "no-store" },
+      TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
+    );
     if (!response.ok) {
       await response.text().catch(() => {});
       throw new Error(`version endpoint returned ${response.status}`);
     }
     const data = await response.json();
     setServerName(data?.server_name);
+    setServerOnlineUI();
   } catch (e) {
     console.debug("Server info load failed:", e);
     setServerName(state.serverName);
+    setServerOfflineUI();
   }
 }
 
@@ -40,7 +44,7 @@ function normalizeServerName(name) {
 
 function setServerOnlineUI() {
   if (elements.serverDot) {
-    elements.serverDot.classList.remove("error", "warning");
+    elements.serverDot.classList.remove("error");
     elements.serverDot.classList.add("connected");
   }
   if (elements.serverText) elements.serverText.textContent = "Ready";
@@ -48,57 +52,10 @@ function setServerOnlineUI() {
 
 function setServerOfflineUI() {
   if (elements.serverDot) {
-    elements.serverDot.classList.remove("connected", "warning");
+    elements.serverDot.classList.remove("connected");
     elements.serverDot.classList.add("error");
   }
   if (elements.serverText) elements.serverText.textContent = "Offline";
-}
-
-export async function checkServer() {
-  const candidates = ["/health", `${getApiBase()}/ping`];
-
-  try {
-    for (const url of candidates) {
-      if (await isHealthyServerCandidate(url)) {
-        setServerOnlineUI();
-        return;
-      }
-    }
-    throw new Error("Server offline");
-  } catch (e) {
-    console.debug("Server health check failed:", e);
-    setServerOfflineUI();
-  }
-}
-
-async function isHealthyServerCandidate(url) {
-  try {
-    const res = await fetchWithTimeout(
-      url,
-      {},
-      TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
-    );
-    if (!res.ok) {
-      await res.text().catch(() => {});
-      return false;
-    }
-
-    let data;
-    try {
-      data = await res.json();
-    } catch (err) {
-      console.debug("failed to parse health response", err);
-      await res.text().catch(() => {});
-      return false;
-    }
-
-    return (
-      data.status === "ok" || data.status === "healthy" || data.pong === true
-    );
-  } catch (err) {
-    console.debug("server health candidate failed", err);
-    return false;
-  }
 }
 
 function startsWithDigit(value) {
@@ -116,19 +73,44 @@ export function updateNetworkDisplay() {
   }
 }
 
-export function detectNetworkInfo() {
-  const mainPing = fetch(`${getApiBase()}/ping`)
-    .then((res) => parseJSONOrThrow(res))
-    .then((data) => {
-      if (data.client_ip) {
-        if (data.ipv6) {
-          state.networkInfo.ipv6 = data.client_ip;
-        } else {
-          state.networkInfo.ipv4 = data.client_ip;
-        }
+async function discoverAddress(url, options) {
+  try {
+    const response = await fetchWithTimeout(
+      url,
+      options,
+      TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
+    );
+    const data = await parseJSONOrThrow(response);
+    if (!data.client_ip) return;
+    state.networkInfo[data.ipv6 ? "ipv6" : "ipv4"] = data.client_ip;
+    updateNetworkDisplay();
+  } catch (err) {
+    console.debug("IP discovery failed", err);
+  }
+}
+
+export function getNextHopProtocol() {
+  try {
+    const entries = performance.getEntriesByType("resource");
+    for (let i = entries.length - 1; i >= 0; i--) {
+      const entry = entries[i];
+      if (
+        String(entry.name || "").includes(`${getApiBase()}/ping`) &&
+        entry.nextHopProtocol
+      ) {
+        return entry.nextHopProtocol;
       }
-    })
-    .catch(() => {});
+    }
+  } catch (err) {
+    console.debug("protocol detection failed", err);
+  }
+  return "";
+}
+
+export function detectNetworkInfo() {
+  const probes = [
+    discoverAddress(`${getApiBase()}/ping`, { cache: "no-store" }),
+  ];
 
   const hostname = globalThis.location.hostname;
   const canProbe =
@@ -142,27 +124,12 @@ export function detectNetworkInfo() {
   const probeOpts = { cache: "no-store", credentials: "omit", mode: "cors" };
   const proto = globalThis.location.protocol;
 
-  const v4Ping = canProbe
-    ? fetch(`${proto}//v4.${hostname}/api/v1/ping`, probeOpts)
-        .then((res) => parseJSONOrThrow(res))
-        .then((data) => {
-          if (!data.ipv6 && data.client_ip) {
-            state.networkInfo.ipv4 = data.client_ip;
-          }
-        })
-        .catch(() => {})
-    : Promise.resolve();
+  if (canProbe) {
+    probes.push(
+      discoverAddress(`${proto}//v4.${hostname}/api/v1/ping`, probeOpts),
+      discoverAddress(`${proto}//v6.${hostname}/api/v1/ping`, probeOpts),
+    );
+  }
 
-  const v6Ping = canProbe
-    ? fetch(`${proto}//v6.${hostname}/api/v1/ping`, probeOpts)
-        .then((res) => parseJSONOrThrow(res))
-        .then((data) => {
-          if (data.ipv6 && data.client_ip) {
-            state.networkInfo.ipv6 = data.client_ip;
-          }
-        })
-        .catch(() => {})
-    : Promise.resolve();
-
-  Promise.allSettled([mainPing, v4Ping, v6Ping]).then(updateNetworkDisplay);
+  return Promise.allSettled(probes);
 }
