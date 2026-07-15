@@ -21,18 +21,7 @@ func TestStoreSaveStopsWhenContextExpiresDuringBusyWait(t *testing.T) {
 	}
 	defer store.Close()
 
-	lockDB, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		t.Fatalf(storeOpenLockDBFmt, err)
-	}
-	defer lockDB.Close()
-	if _, err := lockDB.Exec(storeBusyTimeoutSQL); err != nil {
-		t.Fatalf(storeSetBusyTimeoutFmt, err)
-	}
-	if _, err := lockDB.Exec(storeBeginExclusiveSQL); err != nil {
-		t.Fatalf(storeBeginExclusiveFmt, err)
-	}
-	defer lockDB.Exec(storeRollbackSQL)
+	beginExclusiveLock(t, dbPath)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -57,19 +46,7 @@ func TestStoreSaveRetriesOnBusyError(t *testing.T) {
 	}
 	defer store.Close()
 
-	lockDB, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		t.Fatalf(storeOpenLockDBFmt, err)
-	}
-	defer lockDB.Close()
-
-	if _, err := lockDB.Exec(storeBusyTimeoutSQL); err != nil {
-		t.Fatalf(storeSetBusyTimeoutFmt, err)
-	}
-	if _, err := lockDB.Exec(storeBeginExclusiveSQL); err != nil {
-		t.Fatalf(storeBeginExclusiveFmt, err)
-	}
-	defer lockDB.Exec(storeRollbackSQL)
+	lockDB := beginExclusiveLock(t, dbPath)
 
 	released := make(chan struct{})
 	go func() {
@@ -113,18 +90,7 @@ func TestStoreGetRetriesOnBusyError(t *testing.T) {
 		t.Fatalf(storeSaveSeedFmt, err)
 	}
 
-	lockDB, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		t.Fatalf(storeOpenLockDBFmt, err)
-	}
-	defer lockDB.Close()
-	if _, err := lockDB.Exec(storeBusyTimeoutSQL); err != nil {
-		t.Fatalf(storeSetBusyTimeoutFmt, err)
-	}
-	if _, err := lockDB.Exec(storeBeginExclusiveSQL); err != nil {
-		t.Fatalf(storeBeginExclusiveFmt, err)
-	}
-	defer lockDB.Exec(storeRollbackSQL)
+	lockDB := beginExclusiveLock(t, dbPath)
 
 	released := make(chan struct{})
 	go func() {
@@ -170,18 +136,7 @@ func TestStoreCleanupRetriesOnBusyError(t *testing.T) {
 	}
 	db.Close()
 
-	lockDB, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		t.Fatalf(storeOpenLockDBFmt, err)
-	}
-	defer lockDB.Close()
-	if _, err := lockDB.Exec(storeBusyTimeoutSQL); err != nil {
-		t.Fatalf(storeSetBusyTimeoutFmt, err)
-	}
-	if _, err := lockDB.Exec(storeBeginExclusiveSQL); err != nil {
-		t.Fatalf(storeBeginExclusiveFmt, err)
-	}
-	defer lockDB.Exec(storeRollbackSQL)
+	lockDB := beginExclusiveLock(t, dbPath)
 
 	released := make(chan struct{})
 	go func() {
@@ -208,4 +163,23 @@ func TestStoreCleanupRetriesOnBusyError(t *testing.T) {
 	if trimmed != nil {
 		t.Fatal(storeExpectedCleanupDeleteMsg)
 	}
+}
+
+func beginExclusiveLock(t *testing.T, dbPath string) *sql.DB {
+	t.Helper()
+	lockDB, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf(storeOpenLockDBFmt, err)
+	}
+	t.Cleanup(func() {
+		_, _ = lockDB.Exec(storeRollbackSQL)
+		_ = lockDB.Close()
+	})
+	if _, err := lockDB.Exec(storeBusyTimeoutSQL); err != nil {
+		t.Fatalf(storeSetBusyTimeoutFmt, err)
+	}
+	if _, err := lockDB.Exec(storeBeginExclusiveSQL); err != nil {
+		t.Fatalf(storeBeginExclusiveFmt, err)
+	}
+	return lockDB
 }
