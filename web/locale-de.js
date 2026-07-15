@@ -9,14 +9,6 @@ export const de = Object.freeze({
   "language.label": "Sprache auswählen",
   "language.system": "System · {locale}",
 
-  "theme.switch": "Farbschema wechseln",
-  "theme.systemNextLight":
-    "Das Farbschema folgt der Systemeinstellung. Aktivieren, um das helle Farbschema zu verwenden.",
-  "theme.lightNextDark":
-    "Helles Farbschema aktiv. Aktivieren, um zum dunklen Farbschema zu wechseln.",
-  "theme.darkNextSystem":
-    "Dunkles Farbschema aktiv. Aktivieren, um der Systemeinstellung zu folgen.",
-
   "server.connecting": "Verbindung wird hergestellt…",
   "server.ready": "Bereit",
   "server.offline": "Offline",

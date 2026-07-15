@@ -31,12 +31,9 @@ func renderBrandingCSS(palette config.BrandPalette, colorsConfigured, logoConfig
 		writeBrandTheme(&css, palette.Dark, palette.HasPrimary, palette.HasSecondary, "  ")
 		css.WriteString("}\n")
 		css.WriteString("@media (prefers-color-scheme: light) {\n")
-		css.WriteString("  :root:not([data-theme=\"dark\"]) {\n")
+		css.WriteString("  :root {\n")
 		writeBrandTheme(&css, palette.Light, palette.HasPrimary, palette.HasSecondary, "    ")
 		css.WriteString("  }\n}\n")
-		css.WriteString(":root[data-theme=\"light\"] {\n")
-		writeBrandTheme(&css, palette.Light, palette.HasPrimary, palette.HasSecondary, "  ")
-		css.WriteString("}\n")
 	}
 	return []byte(css.String())
 }

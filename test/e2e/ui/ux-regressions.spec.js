@@ -137,28 +137,6 @@ test.describe("openByte UI regressions", () => {
     await page.locator("#cancelBtn").click();
   });
 
-  test("theme toggle cycles when storage is unavailable", async ({ page }) => {
-    await page.addInitScript(() => {
-      for (const method of ["getItem", "setItem", "removeItem"]) {
-        Object.defineProperty(Storage.prototype, method, {
-          configurable: true,
-          value() {
-            throw new DOMException("Storage blocked", "SecurityError");
-          },
-        });
-      }
-    });
-    await page.goto("/");
-    const html = page.locator("html");
-
-    await page.locator("#themeToggle").click();
-    await expect(html).toHaveAttribute("data-theme", "light");
-    await page.locator("#themeToggle").click();
-    await expect(html).toHaveAttribute("data-theme", "dark");
-    await page.locator("#themeToggle").click();
-    await expect(html).not.toHaveAttribute("data-theme", /.+/);
-  });
-
   test("capped-ramp progress stays truthful", async ({ page }) => {
     await page.goto("/");
     const result = await page.evaluate(async () => {
@@ -378,6 +356,7 @@ test.describe("openByte UI regressions", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 320, height: 720 });
+    await page.emulateMedia({ colorScheme: "light" });
     await page.goto("/");
     const audit = await page.evaluate(() => {
       const rgb = (value) => value.match(/[\d.]+/g).slice(0, 3).map(Number);
@@ -401,29 +380,21 @@ test.describe("openByte UI regressions", () => {
         return (values[0] + 0.05) / (values[1] + 0.05);
       };
 
-      document.documentElement.dataset.theme = "light";
       document.getElementById("idleState").classList.add("hidden");
       document.getElementById("resultsState").classList.remove("hidden");
       const badge = document.getElementById("bufferbloatResult");
       badge.classList.add("bb-good");
       const background = getComputedStyle(document.body).backgroundColor;
-      const themeRect = document
-        .getElementById("themeToggle")
-        .getBoundingClientRect();
       const summaryRect = document
         .querySelector(".stats-help summary")
         .getBoundingClientRect();
       return {
         badgeContrast: contrast(getComputedStyle(badge).color, background),
         summaryHeight: summaryRect.height,
-        themeHeight: themeRect.height,
-        themeWidth: themeRect.width,
       };
     });
 
     expect(audit.badgeContrast).toBeGreaterThanOrEqual(4.5);
     expect(audit.summaryHeight).toBeGreaterThanOrEqual(44);
-    expect(audit.themeHeight).toBeGreaterThanOrEqual(44);
-    expect(audit.themeWidth).toBeGreaterThanOrEqual(44);
   });
 });
