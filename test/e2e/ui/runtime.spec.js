@@ -1,4 +1,5 @@
 const { test, expect } = require("@playwright/test");
+const http = require("node:http");
 
 test.describe("browser speed-test runtime", () => {
   test("shows the client IP eagerly when version metadata fails", async ({
@@ -111,34 +112,74 @@ test.describe("browser speed-test runtime", () => {
     await expect(page.locator("#startBtn")).toBeFocused();
   });
 
-  test("cancel terminates an active worker download", async ({ page }) => {
-    await page.addInitScript(() => {
-      const OriginalWorker = globalThis.Worker;
-      globalThis.__openbyteWorkerTerminated = false;
-      globalThis.Worker = class TrackedWorker extends OriginalWorker {
-        terminate() {
-          globalThis.__openbyteWorkerTerminated = true;
-          super.terminate();
-        }
-      };
+  test("cancel aborts an active worker download", async ({ page }) => {
+    let active = false;
+    let aborted = false;
+    const server = http.createServer((request, response) => {
+      active = true;
+      request.once("aborted", () => {
+        aborted = true;
+      });
+      response.once("close", () => {
+        if (!response.writableEnded) aborted = true;
+      });
+      // Keep the response pending so cancel must tear down a live connection.
     });
-    await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
+    await new Promise((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(0, "127.0.0.1", resolve);
+    });
 
-    const downloadStarted = page.waitForRequest((request) =>
-      request.url().includes("/api/v1/download?"),
-    );
-    await page.locator("#startBtn").click();
-    await downloadStarted;
+    const pattern = "**/api/v1/download?**";
+    const { port } = server.address();
+    try {
+      await page.addInitScript(() => {
+        const OriginalWorker = globalThis.Worker;
+        globalThis.__workerLifecycle = { created: 0, terminated: 0 };
+        globalThis.Worker = class TrackedWorker extends OriginalWorker {
+          constructor(...args) {
+            super(...args);
+            globalThis.__workerLifecycle.created += 1;
+          }
 
-    await page.locator("#cancelBtn").click();
+          terminate() {
+            globalThis.__workerLifecycle.terminated += 1;
+            return super.terminate();
+          }
+        };
+      });
+      await page.route(pattern, async (route) => {
+        const url = new URL(route.request().url());
+        await route.continue({
+          url: `http://127.0.0.1:${port}${url.pathname}${url.search}`,
+        });
+      });
 
-    await expect
-      .poll(() =>
-        page.evaluate(() => globalThis.__openbyteWorkerTerminated),
-      )
-      .toBe(true);
-    await expect(page.locator("#idleState")).toBeVisible();
-    await expect(page.locator("#startBtn")).toBeFocused();
+      await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
+      await page.locator("#startBtn").click();
+
+      await expect.poll(() => active, { timeout: 15_000 }).toBe(true);
+      expect(
+        await page.evaluate(() => globalThis.__workerLifecycle),
+      ).toEqual({ created: 1, terminated: 0 });
+
+      await page.locator("#cancelBtn").click();
+
+      await expect.poll(() => aborted).toBe(true);
+      await expect
+        .poll(() =>
+          page.evaluate(() => globalThis.__workerLifecycle.terminated),
+        )
+        .toBe(1);
+      await expect(page.locator("#idleState")).toBeVisible();
+      await expect(page.locator("#startBtn")).toBeFocused();
+    } finally {
+      await page.unroute(pattern);
+      await new Promise((resolve) => {
+        server.close(resolve);
+        server.closeAllConnections();
+      });
+    }
   });
 
   test("reduced motion keeps measurement status static", async ({ page }) => {
