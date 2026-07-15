@@ -190,10 +190,7 @@ async function runDownloadWindow(options) {
 
   throwIfZeroBytes(streamState, totalBytes, "download");
   if (isRamp && streamState.sawOverload) {
-    throw createCodedError(
-      "server.overloaded",
-      "Server overloaded during adaptive download ramp",
-    );
+    throw createCodedError("server.overloaded");
   }
 
   return Math.max(avgSpeed, 0);

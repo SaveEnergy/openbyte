@@ -147,10 +147,7 @@ async function runSingleUploadStream(index, options) {
       metricsState.sawNetworkError = true;
       consecutiveErrors += 1;
       if (consecutiveErrors > TEST_CONFIG.MAX_NETWORK_RETRIES) {
-        throw createCodedError(
-          "upload.network",
-          error.message || "Network error during upload",
-        );
+        throw createCodedError("upload.network");
       }
       await sleep(TEST_CONFIG.NETWORK_RETRY_DELAY_MS);
     }
@@ -213,10 +210,7 @@ async function runUploadWindow(options) {
 
   throwIfZeroBytes(metricsState, metricsState.totalBytes, "upload");
   if (isRamp && metricsState.sawOverload) {
-    throw createCodedError(
-      "server.overloaded",
-      "Server overloaded during adaptive upload ramp",
-    );
+    throw createCodedError("server.overloaded");
   }
 
   return Math.max(avgSpeed, 0);

@@ -66,8 +66,8 @@ export function computeConnectionVerdict({
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export function createCodedError(code, message) {
-  const error = new Error(message);
+export function createCodedError(code) {
+  const error = new Error(code);
   error.code = code;
   return error;
 }

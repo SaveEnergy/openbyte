@@ -97,16 +97,16 @@ export const en = Object.freeze({
   "error.testInProgress": "Test already in progress",
   "error.serverNotReady": "Server is not ready yet",
   "error.testFailed": "Speed test failed. Please try again.",
-  "error.workerUnsupported": "This browser cannot run the speed test.",
-  "error.workerFailed": "The speed test stopped. Please try again.",
-  "error.workerUnreadable": "The speed test returned an invalid response.",
-  "error.downloadNetwork":
+  "worker.unsupported": "This browser cannot run the speed test.",
+  "worker.failed": "The speed test stopped. Please try again.",
+  "worker.unreadable": "The speed test returned an invalid response.",
+  "download.network":
     "Network error during download. Please try again.",
-  "error.uploadNetwork": "Network error during upload. Please try again.",
-  "error.serverOverloaded":
+  "upload.network": "Network error during upload. Please try again.",
+  "server.overloaded":
     "Server overloaded. Please try again in a moment.",
-  "error.downloadNoStreams": "Download test failed. Please try again.",
-  "error.uploadNoStreams": "Upload test failed. Please try again.",
+  "download.noStreams": "Download test failed. Please try again.",
+  "upload.noStreams": "Upload test failed. Please try again.",
   "error.resultNotFound": "Result not found or has expired.",
   "error.resultServer": "Server error while loading result.",
   "error.resultUnavailable": "Unable to load result.",
