@@ -97,29 +97,7 @@
           </div>
           <details class="stats-help">
             <summary>What do these numbers mean?</summary>
-            <dl class="stats-help-list">
-              <dt>Idle Latency</dt>
-              <dd>
-                Round-trip time to the server while the connection is quiet.
-                Lower is better; under 20 ms feels instant.
-              </dd>
-              <dt>Jitter</dt>
-              <dd>
-                How much latency varies between pings. High jitter causes
-                choppy calls and unstable game connections.
-              </dd>
-              <dt>Loaded Latency</dt>
-              <dd>
-                Latency measured while the connection is fully busy
-                downloading or uploading — what you feel during heavy use.
-              </dd>
-              <dt>Bufferbloat</dt>
-              <dd>
-                Grade for how much latency rises under load (A+ best, F
-                worst). Poor grades mean lag in calls and games while others
-                use the connection.
-              </dd>
-            </dl>
+            <dl class="stats-help-list" id="statsHelpList"></dl>
           </details>
           <div class="results-details">
             <div class="detail-section">
@@ -191,6 +169,7 @@
     </div>
 
     <script type="module" src="/theme.js"></script>
+    <script type="module" src="/stats-help.js"></script>
     <script type="module" src="/results.js"></script>
   </body>
 </html>

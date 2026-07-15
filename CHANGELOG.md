@@ -40,7 +40,8 @@ in Git history and pull requests, not release notes.
   indentation and spacing lost to the global CSS reset.
 - **Shared result page**: aligned with the live results view — verdict line,
   colored bufferbloat badge, metric explanations, and the theme toggle now
-  appear on `/results/{id}` too.
+  appear on `/results/{id}` too. The explanations live in a shared
+  `stats-help.js` module used by both pages.
 
 ### Security
 
