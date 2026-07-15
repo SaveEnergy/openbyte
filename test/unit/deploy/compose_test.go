@@ -7,6 +7,28 @@ import (
 	"testing"
 )
 
+func TestTraefikImageIsVersionAndDigestPinned(t *testing.T) {
+	t.Parallel()
+
+	const want = "traefik:v3.6.23@sha256:f5dba1e65167778cd5f8d1b463fc5d200f49d40c6458fc9f4b391a68ebfb9534"
+	contents, err := os.ReadFile(filepath.Join(repositoryRoot(t), "docker", "docker-compose.traefik.yaml"))
+	if err != nil {
+		t.Fatalf("read compose file: %v", err)
+	}
+
+	var got string
+	for line := range strings.SplitSeq(string(contents), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "image: traefik:") {
+			got = strings.TrimPrefix(line, "image: ")
+			break
+		}
+	}
+	if got != want {
+		t.Fatalf("Traefik image = %q, want %q", got, want)
+	}
+}
+
 func TestTraefikHealthcheckCarriesPingConfiguration(t *testing.T) {
 	t.Parallel()
 
