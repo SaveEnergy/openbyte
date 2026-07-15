@@ -34,7 +34,7 @@
 - Network probe and health-check fetch paths drain non-OK and malformed JSON responses.
 - Server settings UI: no server selector; a single deployed server tests itself.
 - UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.
-- Speed test: **`speedtest-orchestrator.js`** owns lifecycle/share; **`speedtest.js`** owns latency and bridges UI state to **`speedtest-worker.js`**; **`speedtest-adaptive.js`** chooses stream count/duration; **`speedtest-http-{shared,download,upload}.js`** owns warm-up, progress, and transfer loops. Thin **`openbyte.js`** owns init/events; **`network.js`** owns health and address probes. API docs are **`api.html`** + **`api.css`**. Any new top-level **`web/*.js`** (or HTML/CSS) must be added to **`internal/api/router_static.go`** allowlist or the server returns **404**.
+- Speed test: **`speedtest-orchestrator.js`** owns lifecycle/share; **`speedtest.js`** owns latency and bridges UI state to the one-shot **`speedtest-worker.js`**; **`speedtest-adaptive.js`** chooses stream count/duration; **`speedtest-http-{shared,download,upload}.js`** owns warm-up, progress, and transfer loops. Thin **`openbyte.js`** owns init/events; **`network.js`** owns readiness and address probes. Client IP discovery is a user-facing feature: same-origin and IPv4/IPv6 probes stay eager on page load, never deferred until **GO**. API docs are **`api.html`** + **`api.css`**. Static serving derives its safe path set from assets embedded by **`web/embed.go`**; **`WEB_ROOT`** may override file contents but cannot expose additional paths.
 
 ### Storage
 
@@ -139,5 +139,5 @@ make build && WEB_ROOT=./web ./bin/openbyte server
 - Playwright UI tests start a server on `127.0.0.1:8080`, or reuse one already running there.
 - No CGO required; SQLite uses `modernc.org/sqlite` (pure Go).
 - No external databases or services needed to run locally.
-- Any new top-level web asset must be added to the `internal/api/router_static.go` allowlist or the server returns 404; font files under `web/fonts/` are allowlisted by extension.
+- New web assets matching `web/embed.go` are served automatically; `WEB_ROOT` remains restricted to those embedded paths.
 - `openbyte check` needs a full URL scheme: `./bin/openbyte check http://localhost:8080`, not just `localhost`.

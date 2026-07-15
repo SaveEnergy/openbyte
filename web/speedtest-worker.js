@@ -1,13 +1,9 @@
-/** Worker data plane for browser HTTP speed tests. */
+/** One-shot worker data plane for one browser HTTP speed-test direction. */
 
 import { TEST_CONFIG } from "./state.js";
-import { runDownloadTest } from "./speedtest-http-download.js";
-import { runUploadTest } from "./speedtest-http-upload.js";
 
-let currentRun = null;
-
-function post(id, type, payload = {}) {
-  globalThis.postMessage({ id, type, ...payload });
+function post(type, payload = {}) {
+  globalThis.postMessage({ type, ...payload });
 }
 
 function serializeError(error) {
@@ -17,7 +13,7 @@ function serializeError(error) {
   };
 }
 
-function createProgressReporter(id) {
+function createProgressReporter() {
   let lastPost = 0;
   let lastSeenBytes = 0;
 
@@ -25,68 +21,48 @@ function createProgressReporter(id) {
     const now = performance.now();
     const reset = bytes < lastSeenBytes;
     lastSeenBytes = bytes;
-
     if (reset || now - lastPost >= TEST_CONFIG.PROGRESS_TICK_MS) {
       lastPost = now;
-      post(id, "progress", { bytes });
+      post("progress", { bytes });
     }
   };
 }
 
-function runByDirection(direction, onProgress, signal, options) {
+async function loadDirection(direction) {
   if (direction === "download") {
-    return runDownloadTest(onProgress, signal, options);
+    return (await import("./speedtest-http-download.js")).runDownloadTest;
   }
   if (direction === "upload") {
-    return runUploadTest(onProgress, signal, options);
+    return (await import("./speedtest-http-upload.js")).runUploadTest;
   }
   throw new Error(`Unknown speed test direction: ${direction}`);
 }
 
-async function runSpeedTest({ id, direction, config }) {
-  if (currentRun) currentRun.controller.abort();
-
-  const controller = new AbortController();
-  currentRun = { id, controller };
-
+async function runSpeedTest({ direction, config }) {
   try {
-    const mbps = await runByDirection(
-      direction,
-      createProgressReporter(id),
-      controller.signal,
+    const run = await loadDirection(direction);
+    const mbps = await run(
+      createProgressReporter(),
+      new AbortController().signal,
       {
         config,
-        onPhase: (stage, streams) => post(id, "phase", { stage, streams }),
-        onMeasureStart: (streams) => post(id, "measureStart", { streams }),
+        onPhase: (stage) => post("phase", { stage }),
+        onMeasureStart: () => post("measureStart"),
       },
     );
-    post(id, "result", { mbps });
+    post("result", { mbps });
   } catch (error) {
-    post(id, "error", serializeError(error));
-  } finally {
-    if (currentRun?.id === id) currentRun = null;
+    post("error", serializeError(error));
   }
 }
 
-function isTrustedMessageOrigin(event) {
-  // Dedicated worker messages are same-origin by construction, but Chromium
-  // reports an empty origin for parent→worker messages. Keep the explicit
-  // origin gate for browsers that populate it, and only allow the empty worker
-  // origin fallback.
-  return event.origin === "" || event.origin === globalThis.location.origin;
-}
-
-globalThis.addEventListener("message", (event) => {
-  if (!isTrustedMessageOrigin(event)) return;
-
-  const message = event.data || {};
-
-  if (message.type === "cancel") {
-    if (currentRun?.id === message.id) currentRun.controller.abort();
-    return;
-  }
-
-  if (message.type === "run") {
-    void runSpeedTest(message);
-  }
-});
+globalThis.addEventListener(
+  "message",
+  (event) => {
+    if (event.origin !== "" && event.origin !== globalThis.location.origin) {
+      return;
+    }
+    void runSpeedTest(event.data || {});
+  },
+  { once: true },
+);
