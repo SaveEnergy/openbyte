@@ -15,7 +15,7 @@ if [[ "$DEPLOY_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 
 files=(
-  docker/docker-compose.ghcr.yaml
+  docker/docker-compose.yaml
   docker/docker-compose.traefik.yaml
   docker/traefik-openbyte.yaml
   scripts/deploy/deploy_host.sh

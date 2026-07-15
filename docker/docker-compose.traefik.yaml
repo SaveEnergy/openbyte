@@ -3,7 +3,6 @@ services:
     image: traefik:v3.6.23@sha256:f5dba1e65167778cd5f8d1b463fc5d200f49d40c6458fc9f4b391a68ebfb9534
     container_name: traefik
     command:
-      - "--api.dashboard=true"
       - "--ping=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
@@ -27,11 +26,6 @@ services:
       - ./traefik-openbyte.yaml:/etc/traefik/dynamic/openbyte.yaml:ro
     networks:
       - traefik
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=Host(`${TRAEFIK_DASHBOARD_HOST:-traefik.localhost}`)"
-      - "traefik.http.routers.dashboard.entrypoints=web"
-      - "traefik.http.routers.dashboard.service=api@internal"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "traefik", "healthcheck", "--ping=true"]
@@ -45,21 +39,12 @@ services:
       - "traefik.http.routers.openbyte.rule=${TRAEFIK_HOST_RULE:-Host(`speedtest.localhost`)}"
       - "traefik.http.routers.openbyte.entrypoints=web"
       - "traefik.http.services.openbyte.loadbalancer.server.port=8080"
-      - "traefik.http.routers.openbyte-upload.rule=(${TRAEFIK_HOST_RULE:-Host(`speedtest.localhost`)}) && PathPrefix(`/api/v1/upload`)"
-      - "traefik.http.routers.openbyte-upload.entrypoints=web"
-      - "traefik.http.routers.openbyte-upload.priority=100"
       - "traefik.http.routers.openbyte-secure.rule=${TRAEFIK_HOST_RULE:-Host(`speedtest.localhost`)}"
       - "traefik.http.routers.openbyte-secure.entrypoints=websecure"
       - "traefik.http.routers.openbyte-secure.tls=true"
       - "traefik.http.routers.openbyte-secure.tls.certresolver=letsencrypt"
       - "traefik.http.routers.openbyte-secure.tls.options=${TRAEFIK_TLS_OPTIONS:-openbyte-h1@file}"
       - "traefik.http.routers.openbyte-secure.service=openbyte"
-      - "traefik.http.routers.openbyte-upload-secure.rule=(${TRAEFIK_HOST_RULE:-Host(`speedtest.localhost`)}) && PathPrefix(`/api/v1/upload`)"
-      - "traefik.http.routers.openbyte-upload-secure.entrypoints=websecure"
-      - "traefik.http.routers.openbyte-upload-secure.tls=true"
-      - "traefik.http.routers.openbyte-upload-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.openbyte-upload-secure.tls.options=${TRAEFIK_TLS_OPTIONS:-openbyte-h1@file}"
-      - "traefik.http.routers.openbyte-upload-secure.priority=100"
     networks:
       - traefik
 

@@ -61,7 +61,9 @@ in Git history and pull requests, not release notes.
 - Made server configuration environment-only, replaced the custom logger with
   `log/slog`, and consolidated router/result HTTP setup without changing the
   persisted result schema or share URLs.
-- Consolidated the source and GHCR Traefik configurations into one overlay.
+- Consolidated duplicated source/GHCR Compose definitions into a published-image
+  base plus a minimal local-build override; removed the unused Traefik dashboard
+  and redundant upload-specific routers.
 - Deployment now verifies, syncs, and starts the remote release through one SSH
   connection while retaining fingerprint, checksum, image, health, and rollback
   checks.

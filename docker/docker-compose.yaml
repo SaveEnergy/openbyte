@@ -1,11 +1,7 @@
 services:
-  # Single server deployment
+  # Published single-server deployment
   openbyte:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-      target: server
-    image: openbyte:latest
+    image: ghcr.io/${GHCR_OWNER:-saveenergy}/openbyte:${IMAGE_TAG:-edge}
     container_name: openbyte
     ports:
       - "8080:8080" # API + Web UI
@@ -29,12 +25,6 @@ services:
     volumes:
       - openbyte-data:/app/data
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
 
 volumes:
   openbyte-data:
