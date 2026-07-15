@@ -26,6 +26,8 @@ func TestRouterStaticServesFrontendModules(t *testing.T) {
 		"speedtest-adaptive.js",
 		"speedtest-worker.js",
 		"speedtest-orchestrator.js",
+		"theme.js",
+		"history.js",
 		"toast.css",
 		"api.html",
 		"api.css",

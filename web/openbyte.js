@@ -1,9 +1,10 @@
 /** Main entry: wiring, network detection, share/init. */
 
-import { elements, initElements } from "./state.js";
+import { elements, initElements, state, TEST_CONFIG } from "./state.js";
 import {
   startTest,
   resetToIdle,
+  handleCancel,
   handleShare,
 } from "./speedtest-orchestrator.js";
 import { checkServer, detectNetworkInfo, loadServerInfo } from "./network.js";
@@ -15,7 +16,7 @@ function bindEvents() {
   }
   elements.startBtn.addEventListener("click", startTest);
   elements.restartBtn.addEventListener("click", resetToIdle);
-  elements.cancelBtn?.addEventListener("click", resetToIdle);
+  elements.cancelBtn?.addEventListener("click", handleCancel);
   elements.shareBtn?.addEventListener("click", handleShare);
 }
 
@@ -25,6 +26,9 @@ function init() {
   checkServer();
   bindEvents();
   detectNetworkInfo();
+  setInterval(() => {
+    if (!state.isRunning) checkServer();
+  }, TEST_CONFIG.SERVER_RECHECK_MS);
 }
 
 if (document.readyState === "loading") {

@@ -146,8 +146,17 @@ export async function runAdaptiveHTTPTest(options) {
   let best = { streams: TEST_CONFIG.ADAPTIVE_MIN_STREAMS, mbps: 0 };
   let previousMbps = 0;
   let streams = TEST_CONFIG.ADAPTIVE_MIN_STREAMS;
+  // Stream counts double each ramp window, so the window count is bounded;
+  // the UI uses this bound to render determinate progress.
+  const maxWindows = Math.floor(Math.log2(config.maxStreams)) + 1;
+  let windowIndex = 0;
+  const phaseInfo = () => ({
+    windowIndex,
+    maxWindows,
+    rampDuration: config.rampDuration,
+  });
 
-  onPhase?.("Saturating", streams);
+  onPhase?.("Saturating", streams, phaseInfo());
   while (!signal.aborted) {
     let mbps = 0;
     try {
@@ -169,12 +178,14 @@ export async function runAdaptiveHTTPTest(options) {
     if (next === streams) break;
     previousMbps = mbps;
     streams = next;
+    windowIndex += 1;
+    onPhase?.("Saturating", streams, phaseInfo());
   }
 
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");
   const measureDuration = resolveMeasureDuration(best.mbps, config);
-  onPhase?.("Measuring", best.streams);
-  onMeasureStart?.(best.streams);
+  onPhase?.("Measuring", best.streams, phaseInfo());
+  onMeasureStart?.(best.streams, measureDuration);
   const mbps = await runWindow({
     duration: measureDuration,
     streams: best.streams,

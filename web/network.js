@@ -38,12 +38,25 @@ function normalizeServerName(name) {
   return value || fallbackServerName;
 }
 
+function setStartAvailability(online) {
+  state.serverOnline = online;
+  if (elements.startBtn) {
+    elements.startBtn.disabled = !online;
+  }
+  if (elements.startBtnHint) {
+    elements.startBtnHint.textContent = online
+      ? "Click to test your speed"
+      : "Server offline — retrying";
+  }
+}
+
 function setServerOnlineUI() {
   if (elements.serverDot) {
     elements.serverDot.classList.remove("error", "warning");
     elements.serverDot.classList.add("connected");
   }
   if (elements.serverText) elements.serverText.textContent = "Ready";
+  setStartAvailability(true);
 }
 
 function setServerOfflineUI() {
@@ -52,6 +65,7 @@ function setServerOfflineUI() {
     elements.serverDot.classList.add("error");
   }
   if (elements.serverText) elements.serverText.textContent = "Offline";
+  setStartAvailability(false);
 }
 
 export async function checkServer() {

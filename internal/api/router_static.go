@@ -43,6 +43,8 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 		"speedtest-http-upload.js":   true,
 		"ui.js":                      true,
 		"results.js":                 true,
+		"theme.js":                   true,
+		"history.js":                 true,
 		"api.css":                    true,
 		"base.css":                   true,
 		"speed.css":                  true,

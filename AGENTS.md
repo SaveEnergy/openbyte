@@ -34,7 +34,7 @@
 - Network probe and health-check fetch paths drain non-OK and malformed JSON responses.
 - Server settings UI: no server selector; a single deployed server tests itself.
 - UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.
-- Speed test: **`speedtest-orchestrator.js`** owns lifecycle/share; **`speedtest.js`** owns latency and bridges UI state to **`speedtest-worker.js`**; **`speedtest-adaptive.js`** chooses stream count/duration; **`speedtest-http-{shared,download,upload}.js`** owns warm-up, progress, and transfer loops. Thin **`openbyte.js`** owns init/events; **`network.js`** owns health and address probes. API docs are **`api.html`** + **`api.css`**. Any new top-level **`web/*.js`** (or HTML/CSS) must be added to **`internal/api/router_static.go`** allowlist or the server returns **404**.
+- Speed test: **`speedtest-orchestrator.js`** owns lifecycle/share/partial-cancel; **`speedtest.js`** owns latency, the determinate progress model, and bridges UI state to **`speedtest-worker.js`**; **`speedtest-adaptive.js`** chooses stream count/duration and reports ramp-window/measure progress; **`speedtest-http-{shared,download,upload}.js`** owns warm-up, progress, and transfer loops. Thin **`openbyte.js`** owns init/events; **`network.js`** owns health and address probes (offline disables the start button); **`theme.js`** owns the manual light/dark override; **`history.js`** owns the localStorage recent-results list. API docs are **`api.html`** + **`api.css`**. Any new top-level **`web/*.js`** (or HTML/CSS) must be added to **`internal/api/router_static.go`** allowlist or the server returns **404**.
 
 ### Storage
 

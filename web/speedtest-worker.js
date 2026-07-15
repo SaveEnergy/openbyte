@@ -56,8 +56,10 @@ async function runSpeedTest({ id, direction, config }) {
       controller.signal,
       {
         config,
-        onPhase: (stage, streams) => post(id, "phase", { stage, streams }),
-        onMeasureStart: (streams) => post(id, "measureStart", { streams }),
+        onPhase: (stage, streams, info) =>
+          post(id, "phase", { stage, streams, ...info }),
+        onMeasureStart: (streams, duration) =>
+          post(id, "measureStart", { streams, duration }),
       },
     );
     post(id, "result", { mbps });

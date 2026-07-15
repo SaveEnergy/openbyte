@@ -14,6 +14,9 @@ import { updateNetworkDisplay } from "./network.js";
 
 let workerRunCounter = 0;
 
+/** Portion of a direction phase's progress allotted to the ramp-up stage. */
+const RAMP_PROGRESS_PORTION = 0.45;
+
 function setTestPhase(phase, label, className) {
   state.phase = phase;
   if (phase === "latency") {
@@ -24,9 +27,69 @@ function setTestPhase(phase, label, className) {
   updateTestType(label, className);
 }
 
-function adaptivePhaseLabel(direction, stage) {
+function adaptivePhaseLabel(direction, stage, streams) {
   const icon = direction === "download" ? "↓" : "↑";
-  return `${icon} ${stage}`;
+  const streamsSuffix =
+    Number.isFinite(streams) && streams > 1 ? ` ×${streams}` : "";
+  return `${icon} ${stage}${streamsSuffix}`;
+}
+
+function createDirectionProgressModel() {
+  const now = performance.now();
+  return {
+    windowIndex: 0,
+    maxWindows: 1,
+    windowStartedAt: now,
+    rampDurationMs: TEST_CONFIG.ADAPTIVE_RAMP_SECONDS * 1000,
+    measureStartedAt: 0,
+    measureDurationMs: 0,
+    highWaterMark: 0,
+  };
+}
+
+function noteRampWindow(model, info) {
+  if (!info) return;
+  if (Number.isFinite(info.windowIndex)) model.windowIndex = info.windowIndex;
+  if (Number.isFinite(info.maxWindows) && info.maxWindows >= 1) {
+    model.maxWindows = info.maxWindows;
+  }
+  if (Number.isFinite(info.rampDuration) && info.rampDuration > 0) {
+    model.rampDurationMs = info.rampDuration * 1000;
+  }
+  model.windowStartedAt = performance.now();
+}
+
+function noteMeasureStart(model, duration) {
+  model.measureStartedAt = performance.now();
+  model.measureDurationMs =
+    Number.isFinite(duration) && duration > 0 ? duration * 1000 : 0;
+}
+
+/**
+ * Progress estimate for a direction phase: the ramp stage advances by
+ * completed windows (bounded by maxWindows), the measure stage by elapsed
+ * time over its known duration. Monotonic so early ramp exit jumps forward.
+ */
+function directionProgressPercent(model) {
+  const now = performance.now();
+  let progress;
+  if (model.measureStartedAt > 0 && model.measureDurationMs > 0) {
+    const measured = Math.min(
+      (now - model.measureStartedAt) / model.measureDurationMs,
+      1,
+    );
+    progress = RAMP_PROGRESS_PORTION + (1 - RAMP_PROGRESS_PORTION) * measured;
+  } else {
+    const windowElapsed = Math.min(
+      (now - model.windowStartedAt) / model.rampDurationMs,
+      1,
+    );
+    progress =
+      RAMP_PROGRESS_PORTION *
+      Math.min((model.windowIndex + windowElapsed) / model.maxWindows, 1);
+  }
+  model.highWaterMark = Math.max(model.highWaterMark, Math.min(progress, 1));
+  return model.highWaterMark * 100;
 }
 
 function nextFrame() {
@@ -97,9 +160,9 @@ function runWorkerSpeedTest(direction, onProgress, signal, callbacks) {
       if (message.type === "progress") {
         onProgress(message.bytes || 0);
       } else if (message.type === "phase") {
-        callbacks.onPhase?.(message.stage, message.streams);
+        callbacks.onPhase?.(message.stage, message.streams, message);
       } else if (message.type === "measureStart") {
-        callbacks.onMeasureStart?.(message.streams);
+        callbacks.onMeasureStart?.(message.streams, message.duration);
       } else if (message.type === "result") {
         settle(resolve, Math.max(message.mbps || 0, 0));
       } else if (message.type === "error") {
@@ -138,9 +201,10 @@ async function runTest(direction, signal) {
   let ewmaSpeed = 0;
   const ewmaAlpha = TEST_CONFIG.EWMA_ALPHA;
 
+  const progressModel = createDirectionProgressModel();
   const progressTick = setInterval(() => {
     if (signal.aborted) return;
-    updateProgress(0);
+    updateProgress(directionProgressPercent(progressModel));
   }, TEST_CONFIG.PROGRESS_TICK_MS);
 
   const onProgress = (bytes) => {
@@ -177,12 +241,17 @@ async function runTest(direction, signal) {
   let result;
   try {
     result = await runWorkerSpeedTest(direction, onProgress, signal, {
-      onPhase: (stage) =>
+      onPhase: (stage, streams, info) => {
+        noteRampWindow(progressModel, info);
         updateTestType(
-          adaptivePhaseLabel(direction, stage),
+          adaptivePhaseLabel(direction, stage, streams),
           direction === "download" ? "downloading" : "uploading",
-        ),
-      onMeasureStart: startMeasureLatencyProbe,
+        );
+      },
+      onMeasureStart: (streams, duration) => {
+        noteMeasureStart(progressModel, duration);
+        startMeasureLatencyProbe();
+      },
     });
   } finally {
     clearInterval(progressTick);

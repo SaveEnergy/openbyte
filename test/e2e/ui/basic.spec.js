@@ -70,6 +70,42 @@ test.describe("openByte UI", () => {
     ).toBeTruthy();
   });
 
+  test("shows phase stepper during test and verdict with history after", async ({
+    page,
+  }) => {
+    await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
+
+    await page.locator("#startBtn").click();
+    await expect(page.locator("#phaseSteps")).toBeVisible();
+    await expect(page.locator("#phaseStepPing")).toHaveAttribute(
+      "data-status",
+      /active|done/,
+    );
+
+    await expect(page.locator("#resultsState")).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(page.locator("#resultsVerdict")).not.toBeEmpty();
+    await expect(page.locator("#historySection")).toBeVisible();
+    await expect(page.locator("#historyList .history-item")).toHaveCount(1);
+  });
+
+  test("theme toggle cycles system, light, dark", async ({ page }) => {
+    await page.goto("/");
+    const html = page.locator("html");
+
+    await expect(html).not.toHaveAttribute("data-theme", /.+/);
+    await page.locator("#themeToggle").click();
+    await expect(html).toHaveAttribute("data-theme", "light");
+    await page.locator("#themeToggle").click();
+    await expect(html).toHaveAttribute("data-theme", "dark");
+
+    await page.reload();
+    await expect(html).toHaveAttribute("data-theme", "dark");
+    await page.locator("#themeToggle").click();
+    await expect(html).not.toHaveAttribute("data-theme", /.+/);
+  });
+
   test("toast regions keep accessible roles", async ({ page }) => {
     await page.goto("/");
 
@@ -100,9 +136,9 @@ test.describe("openByte UI", () => {
 
     await page.locator("#startBtn").click();
     await expect(page.locator("#testingState")).toBeVisible({ timeout: 10000 });
-    await expect(page.locator("#progressMeter")).not.toHaveAttribute(
+    await expect(page.locator("#progressMeter")).toHaveAttribute(
       "value",
-      /.+/,
+      /[\d.]+/,
     );
     await expect(page.locator("#testType")).toContainText(
       /Ping|Saturating|Measuring/,
