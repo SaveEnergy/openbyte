@@ -27,6 +27,7 @@
   );
   border: 2px solid var(--accent-primary);
   color: var(--text-primary);
+  box-shadow: var(--card-shadow);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -72,6 +73,22 @@
   transform: scale(0.98);
 }
 
+.start-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  border-color: var(--text-muted);
+}
+
+.start-btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.start-btn:disabled .start-btn-text {
+  color: var(--text-muted);
+  text-shadow: none;
+}
+
 .start-btn-text {
   font-family: var(--font-display);
   font-size: 3rem;
@@ -84,6 +101,16 @@
   font-size: 0.75rem;
   color: var(--text-secondary);
   max-width: 120px;
+}
+
+.instrument-cluster {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 300px;
+  min-height: 300px;
 }
 
 .public-ip {
@@ -147,6 +174,9 @@
   text-shadow: 0 0 100px var(--accent-glow);
   transition: color var(--motion-duration-medium) ease;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  min-width: 5ch;
+  text-align: center;
 }
 
 .speed-number.downloading {
@@ -219,6 +249,9 @@
 
 .instrument-ring-container {
   position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   width: 280px;
   height: 280px;
   pointer-events: none;
@@ -233,6 +266,9 @@
 }
 
 .instrument-ring-bg,
+.instrument-ring-grid,
+.instrument-ring-pulse,
+.instrument-ring-spark,
 .instrument-ring-arc {
   fill: none;
 }
@@ -240,19 +276,123 @@
 .instrument-ring-bg {
   stroke: var(--bg-card);
   stroke-width: 4;
-  opacity: 0.75;
 }
 
+.instrument-ring-grid {
+  stroke: var(--bg-hover);
+  stroke-width: 1;
+  stroke-dasharray: 2 14;
+  opacity: 0.9;
+  transform-origin: 100px 100px;
+  animation: instrumentGridDrift 8s linear infinite;
+}
+
+.instrument-ring-pulse {
+  stroke: var(--instrument-color);
+  stroke-width: 18;
+  opacity: 0.08;
+  transform-origin: 100px 100px;
+  animation: instrumentPulse 2s ease-in-out infinite;
+}
+
+.instrument-ring-spark {
+  stroke: var(--instrument-color);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 18 497;
+  opacity: 0.55;
+  transform-origin: 100px 100px;
+  animation: instrumentOrbit var(--instrument-orbit-duration, 3.2s) linear
+    infinite reverse;
+}
+
+/* Determinate progress arc: length driven from JS, 12 o'clock start. */
 .instrument-ring-arc {
   stroke: var(--instrument-color);
   stroke-width: 4.5;
   stroke-linecap: round;
-  stroke-dasharray: 96 470;
+  stroke-dasharray: 0 565.5;
   stroke-dashoffset: 0;
   transform-origin: 100px 100px;
-  filter: drop-shadow(0 0 10px var(--instrument-color));
-  transition: stroke var(--motion-duration-medium) ease;
-  animation: instrumentOrbit 2s linear infinite;
+  transform: rotate(-90deg);
+  filter: drop-shadow(0 0 var(--instrument-glow-size) var(--instrument-color));
+  transition:
+    stroke var(--motion-duration-medium) ease,
+    filter var(--motion-duration-medium) ease,
+    stroke-dasharray var(--motion-duration-base) linear;
+  animation: instrumentArcBreathe 1.6s ease-in-out infinite;
+}
+
+/* Live throughput sparkline under the speed number */
+.speed-sparkline {
+  position: relative;
+  z-index: 2;
+  width: 280px;
+  height: 44px;
+  margin-top: var(--space-lg);
+}
+
+/* Phase stepper: ping / download / upload with measured values */
+.phase-steps {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  gap: var(--space-sm);
+  list-style: none;
+  margin-top: var(--space-md);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.phase-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--bg-hover);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  transition:
+    border-color var(--motion-duration-medium) ease,
+    color var(--motion-duration-medium) ease;
+}
+
+.phase-step::before {
+  content: "○";
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.phase-step[data-status="active"] {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.phase-step[data-status="active"]::before {
+  content: "●";
+  color: var(--accent-primary);
+  animation: instrumentStatusPulse 1.4s ease-in-out infinite;
+}
+
+.phase-step[data-status="done"] {
+  color: var(--text-secondary);
+}
+
+.phase-step[data-status="done"]::before {
+  content: "✓";
+  color: var(--accent-primary);
+}
+
+.phase-step-value {
+  font-family: var(--font-display);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.phase-step-value:empty {
+  display: none;
 }
 
 .cancel-btn {
@@ -299,11 +439,6 @@
     font-size: 2.5rem;
   }
 
-  .speed-section {
-    width: 220px;
-    height: 220px;
-  }
-
   #idleState {
     width: min(100%, 320px);
     height: auto;
@@ -331,8 +466,27 @@
     max-width: 300px;
   }
 
+  .instrument-cluster {
+    min-width: 240px;
+    min-height: 240px;
+  }
+
   .instrument-ring-container {
     width: 220px;
     height: 220px;
+  }
+
+  .speed-sparkline {
+    width: 240px;
+    height: 40px;
+  }
+
+  .phase-steps {
+    gap: var(--space-xs);
+  }
+
+  .phase-step {
+    padding: var(--space-xs) var(--space-sm);
+    font-size: 0.75rem;
   }
 }

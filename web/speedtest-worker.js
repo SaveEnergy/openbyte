@@ -46,8 +46,10 @@ async function runSpeedTest({ direction, config }) {
       new AbortController().signal,
       {
         config,
-        onPhase: (stage) => post("phase", { stage }),
-        onMeasureStart: () => post("measureStart"),
+        onPhase: (stage, streams, info) =>
+          post("phase", { stage, streams, ...info }),
+        onMeasureStart: (streams, duration) =>
+          post("measureStart", { streams, duration }),
       },
     );
     post("result", { mbps });

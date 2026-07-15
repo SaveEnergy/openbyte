@@ -33,6 +33,7 @@
     />
     <link rel="stylesheet" href="base.css" />
     <link rel="stylesheet" href="speed.css" />
+    <link rel="stylesheet" href="speed-results.css" />
     <link rel="stylesheet" href="results.css" />
     <link rel="stylesheet" href="toast.css" />
     <link rel="stylesheet" href="motion.css" />
@@ -46,19 +47,35 @@
           <div class="logo">open<span class="logo-accent">Byte</span></div>
           <div class="server-name" id="serverName">openByte Server</div>
         </div>
-        <div class="server-info" id="serverInfo">
-          <span class="server-dot"></span>
-          <span class="server-text">Connecting...</span>
+        <div class="header-tools">
+          <div class="server-info" id="serverInfo">
+            <span class="server-dot"></span>
+            <span class="server-text">Connecting...</span>
+          </div>
+          <button
+            class="theme-toggle"
+            id="themeToggle"
+            type="button"
+            aria-label="Switch theme"
+          >
+            ◐
+          </button>
         </div>
       </header>
 
       <!-- Main Speed Display -->
       <main class="main" id="mainContent">
+        <h1 class="visually-hidden">openByte internet speed test</h1>
         <!-- Idle State: Start Button -->
         <section class="speed-section" id="idleState">
-          <button class="start-btn" id="startBtn" aria-label="Start speed test">
+          <button
+            class="start-btn"
+            id="startBtn"
+            aria-label="Start speed test"
+            disabled
+          >
             <span class="start-btn-text">GO</span>
-            <span class="start-btn-hint">Click to test your speed</span>
+            <span class="start-btn-hint">Connecting…</span>
           </button>
           <section class="public-ip" aria-labelledby="publicIpTitle">
             <h2 class="public-ip-title" id="publicIpTitle">Your public IP</h2>
@@ -90,34 +107,79 @@
           id="testingState"
           aria-busy="false"
         >
-          <div class="speed-display">
-            <div class="speed-number" id="speedNumber">0</div>
-            <div class="speed-unit" id="speedUnit">Mbps</div>
+          <div class="instrument-cluster">
+            <div class="speed-display">
+              <div class="speed-number" id="speedNumber">0</div>
+              <div class="speed-unit" id="speedUnit">Mbps</div>
+            </div>
+            <div class="test-type" id="testType" aria-live="polite">
+              ↔ Ping
+            </div>
+            <div class="instrument-ring-container">
+              <progress
+                class="visually-hidden"
+                id="progressMeter"
+                max="100"
+                aria-label="Network measurement in progress"
+              >
+                Measuring network
+              </progress>
+              <svg
+                class="instrument-ring"
+                id="progressRingSvg"
+                viewBox="0 0 200 200"
+                aria-hidden="true"
+              >
+                <circle class="instrument-ring-bg" cx="100" cy="100" r="90" />
+                <circle class="instrument-ring-grid" cx="100" cy="100" r="73" />
+                <circle class="instrument-ring-pulse" cx="100" cy="100" r="90" />
+                <circle class="instrument-ring-spark" cx="100" cy="100" r="82" />
+                <circle
+                  class="instrument-ring-arc"
+                  id="progressRing"
+                  cx="100"
+                  cy="100"
+                  r="90"
+                />
+              </svg>
+            </div>
           </div>
-          <div class="test-type" id="testType" aria-live="polite">↔ Ping</div>
-          <div class="instrument-ring-container">
-            <progress
-              class="visually-hidden"
-              id="progressMeter"
-              max="100"
-              aria-label="Network measurement in progress"
-            >
-              Measuring network
-            </progress>
-            <svg
-              class="instrument-ring"
-              viewBox="0 0 200 200"
-              aria-hidden="true"
-            >
-              <circle class="instrument-ring-bg" cx="100" cy="100" r="90" />
-              <circle class="instrument-ring-arc" cx="100" cy="100" r="90" />
-            </svg>
-          </div>
+          <canvas
+            class="speed-sparkline"
+            id="speedSparkline"
+            width="280"
+            height="44"
+            aria-hidden="true"
+          ></canvas>
+          <ol class="phase-steps" id="phaseSteps" aria-label="Test phases">
+            <li class="phase-step" id="phaseStepPing" data-status="pending">
+              <span class="phase-step-name">Ping</span>
+              <span class="phase-step-value" id="phaseValuePing"></span>
+            </li>
+            <li class="phase-step" id="phaseStepDownload" data-status="pending">
+              <span class="phase-step-name">Download</span>
+              <span class="phase-step-value" id="phaseValueDownload"></span>
+            </li>
+            <li class="phase-step" id="phaseStepUpload" data-status="pending">
+              <span class="phase-step-name">Upload</span>
+              <span class="phase-step-value" id="phaseValueUpload"></span>
+            </li>
+          </ol>
           <button class="cancel-btn" id="cancelBtn">Cancel</button>
         </section>
 
         <!-- Results State -->
         <section class="speed-section hidden" id="resultsState">
+          <h2 class="visually-hidden">Results</h2>
+          <p
+            class="visually-hidden"
+            id="resultsAnnouncement"
+            aria-live="polite"
+          ></p>
+          <div class="partial-notice hidden" id="partialNotice">
+            Test cancelled early — upload was not measured.
+          </div>
+          <p class="results-verdict" id="resultsVerdict"></p>
           <div class="results-main">
             <div class="result-card result-primary">
               <div class="result-icon">↓</div>
@@ -147,10 +209,14 @@
             </div>
             <div class="extra-stat">
               <span class="extra-label">Bufferbloat</span>
-              <span class="extra-value" id="bufferbloatResult">-</span>
+              <span class="extra-value bb-badge" id="bufferbloatResult">-</span>
             </div>
           </div>
-          <div class="results-details">
+          <details class="stats-help">
+            <summary>What do these numbers mean?</summary>
+            <dl class="stats-help-list" id="statsHelpList"></dl>
+          </details>
+          <div class="results-details" id="resultsDetails">
             <div class="detail-section">
               <h3 class="detail-title">Public IP at test time</h3>
               <div class="detail-grid">
@@ -163,6 +229,10 @@
                   <span class="detail-value" id="networkIPv6">-</span>
                 </div>
               </div>
+            </div>
+            <div class="detail-section hidden" id="historySection">
+              <h3 class="detail-title">Recent Tests on This Device</h3>
+              <ol class="history-list" id="historyList"></ol>
             </div>
           </div>
           <div class="results-actions">
@@ -207,6 +277,8 @@
       </output>
     </div>
 
+    <script type="module" src="theme.js"></script>
+    <script type="module" src="stats-help.js"></script>
     <script type="module" src="openbyte.js"></script>
   </body>
 </html>

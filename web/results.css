@@ -22,7 +22,8 @@
   background: var(--bg-card);
   border-radius: 16px;
   min-width: 160px;
-  border: 1px solid transparent;
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
   animation: slideUp var(--motion-duration-slow) var(--ease-out) backwards;
 }
 
@@ -83,9 +84,10 @@
 }
 
 .results-extra {
-  display: flex;
-  gap: var(--space-2xl);
-  margin-bottom: var(--space-2xl);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-lg) var(--space-2xl);
+  margin-bottom: var(--space-lg);
   animation: slideUp var(--motion-duration-slow) var(--ease-out)
     var(--motion-delay-3) backwards;
 }
@@ -245,8 +247,8 @@
   }
 
   .results-extra {
-    flex-direction: column;
-    gap: var(--space-md);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-md) var(--space-lg);
   }
 
   .results-details {

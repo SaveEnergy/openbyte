@@ -67,6 +67,10 @@
   --download-color: #00d4aa;
 
   --error: #ff6b6b;
+  --warning: #feca57;
+
+  --card-border: rgba(255, 255, 255, 0.06);
+  --card-shadow: none;
 
   --font-display: "JetBrains Mono", "SF Mono", monospace;
   --font-body: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
@@ -94,7 +98,7 @@
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme="dark"]) {
     --bg-primary: #f6f8fb;
     --bg-secondary: #ffffff;
     --bg-card: #ffffff;
@@ -102,11 +106,40 @@
 
     --text-primary: #111827;
     --text-secondary: #334155;
-    --text-muted: #64748b;
+    --text-muted: #617187;
 
-    --accent-glow: rgba(0, 212, 170, 0.22);
+    --accent-primary: #00796b;
+    --accent-secondary: #006f61;
+    --accent-glow: rgba(0, 121, 107, 0.22);
+    --download-color: #00796b;
     --error: #dc2626;
+    --warning: #b45309;
+
+    --card-border: rgba(15, 23, 42, 0.1);
+    --card-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
   }
+}
+
+/* Manual theme override (theme.js sets data-theme on <html>). */
+:root[data-theme="light"] {
+  --bg-primary: #f6f8fb;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #e8edf5;
+
+  --text-primary: #111827;
+  --text-secondary: #334155;
+  --text-muted: #617187;
+
+  --accent-primary: #00796b;
+  --accent-secondary: #006f61;
+  --accent-glow: rgba(0, 121, 107, 0.22);
+  --download-color: #00796b;
+  --error: #dc2626;
+  --warning: #b45309;
+
+  --card-border: rgba(15, 23, 42, 0.1);
+  --card-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
 }
 
 *,
@@ -229,12 +262,43 @@ body::before {
   color: var(--accent-primary);
 }
 
+.header-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
 .server-info {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
   font-size: 0.875rem;
   color: var(--text-secondary);
+}
+
+.theme-toggle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--bg-hover);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color var(--motion-duration-base) ease,
+    border-color var(--motion-duration-base) ease;
+}
+
+.theme-toggle:hover {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
 }
 
 .server-dot {

@@ -2,6 +2,7 @@
 
 import { getApiBase, state, TEST_CONFIG } from "./state.js";
 import {
+  updateProgress,
   updateSpeed,
   showState,
   resetProgress,
@@ -10,6 +11,9 @@ import {
 import { resolveAdaptiveConfig } from "./speedtest-adaptive.js";
 import { fetchWithTimeout } from "./utils.js";
 import { getNextHopProtocol, updateNetworkDisplay } from "./network.js";
+
+/** Portion of a direction phase's progress allotted to the ramp-up stage. */
+const RAMP_PROGRESS_PORTION = 0.45;
 
 function setTestPhase(phase, label, className) {
   state.phase = phase;
@@ -21,9 +25,69 @@ function setTestPhase(phase, label, className) {
   updateTestType(label, className);
 }
 
-function adaptivePhaseLabel(direction, stage) {
+function adaptivePhaseLabel(direction, stage, streams) {
   const icon = direction === "download" ? "↓" : "↑";
-  return `${icon} ${stage}`;
+  const streamsSuffix =
+    Number.isFinite(streams) && streams > 1 ? ` ×${streams}` : "";
+  return `${icon} ${stage}${streamsSuffix}`;
+}
+
+function createDirectionProgressModel() {
+  const now = performance.now();
+  return {
+    windowIndex: 0,
+    maxWindows: 1,
+    windowStartedAt: now,
+    rampDurationMs: TEST_CONFIG.ADAPTIVE_RAMP_SECONDS * 1000,
+    measureStartedAt: 0,
+    measureDurationMs: 0,
+    highWaterMark: 0,
+  };
+}
+
+function noteRampWindow(model, info) {
+  if (!info) return;
+  if (Number.isFinite(info.windowIndex)) model.windowIndex = info.windowIndex;
+  if (Number.isFinite(info.maxWindows) && info.maxWindows >= 1) {
+    model.maxWindows = info.maxWindows;
+  }
+  if (Number.isFinite(info.rampDuration) && info.rampDuration > 0) {
+    model.rampDurationMs = info.rampDuration * 1000;
+  }
+  model.windowStartedAt = performance.now();
+}
+
+function noteMeasureStart(model, duration) {
+  model.measureStartedAt = performance.now();
+  model.measureDurationMs =
+    Number.isFinite(duration) && duration > 0 ? duration * 1000 : 0;
+}
+
+/**
+ * Progress estimate for a direction phase: the ramp stage advances by
+ * completed windows (bounded by maxWindows), the measure stage by elapsed
+ * time over its known duration. Monotonic so early ramp exit jumps forward.
+ */
+function directionProgressPercent(model) {
+  const now = performance.now();
+  let progress;
+  if (model.measureStartedAt > 0 && model.measureDurationMs > 0) {
+    const measured = Math.min(
+      (now - model.measureStartedAt) / model.measureDurationMs,
+      1,
+    );
+    progress = RAMP_PROGRESS_PORTION + (1 - RAMP_PROGRESS_PORTION) * measured;
+  } else {
+    const windowElapsed = Math.min(
+      (now - model.windowStartedAt) / model.rampDurationMs,
+      1,
+    );
+    progress =
+      RAMP_PROGRESS_PORTION *
+      Math.min((model.windowIndex + windowElapsed) / model.maxWindows, 1);
+  }
+  model.highWaterMark = Math.max(model.highWaterMark, Math.min(progress, 1));
+  return model.highWaterMark * 100;
 }
 
 function nextFrame() {
@@ -94,9 +158,9 @@ function runWorkerSpeedTest(direction, onProgress, signal, callbacks) {
       if (message.type === "progress") {
         onProgress(message.bytes || 0);
       } else if (message.type === "phase") {
-        callbacks.onPhase?.(message.stage);
+        callbacks.onPhase?.(message.stage, message.streams, message);
       } else if (message.type === "measureStart") {
-        callbacks.onMeasureStart?.();
+        callbacks.onMeasureStart?.(message.streams, message.duration);
       } else if (message.type === "result") {
         settle(resolve, Math.max(message.mbps || 0, 0));
       } else if (message.type === "error") {
@@ -135,6 +199,12 @@ async function runTest(direction, signal) {
   let ewmaSpeed = 0;
   const ewmaAlpha = TEST_CONFIG.EWMA_ALPHA;
 
+  const progressModel = createDirectionProgressModel();
+  const progressTick = setInterval(() => {
+    if (signal.aborted) return;
+    updateProgress(directionProgressPercent(progressModel));
+  }, TEST_CONFIG.PROGRESS_TICK_MS);
+
   const onProgress = (bytes) => {
     const now = performance.now();
     const intervalMs = now - lastUpdate;
@@ -169,21 +239,34 @@ async function runTest(direction, signal) {
   let result;
   try {
     result = await runWorkerSpeedTest(direction, onProgress, signal, {
-      onPhase: (stage) =>
+      onPhase: (stage, streams, info) => {
+        noteRampWindow(progressModel, info);
         updateTestType(
-          adaptivePhaseLabel(direction, stage),
+          adaptivePhaseLabel(direction, stage, streams),
           direction === "download" ? "downloading" : "uploading",
-        ),
-      onMeasureStart: startMeasureLatencyProbe,
+        );
+      },
+      onMeasureStart: (streams, duration) => {
+        noteMeasureStart(progressModel, duration);
+        startMeasureLatencyProbe();
+      },
     });
   } finally {
+    clearInterval(progressTick);
     if (latencyProbe) await latencyProbe.stop();
+  }
+  if (signal.aborted || state.abortController?.signal !== signal) {
+    throw makeAbortError();
   }
   const loadedLatency = latencyProbe ? latencyProbe.getMedian() : 0;
   if (direction === "download") {
     state.downloadLatency = loadedLatency;
   } else {
     state.uploadLatency = loadedLatency;
+  }
+
+  if (state.isRunning) {
+    updateProgress(100);
   }
 
   return result;
@@ -200,14 +283,14 @@ function filterOutliersIQR(samples) {
   return samples.filter((s) => s >= lower && s <= upper);
 }
 
-async function captureClientIPIfNeeded(res, capturedRef) {
+async function captureClientIPIfNeeded(res, capturedRef, signal) {
   if (capturedRef.captured || !res.ok) {
     await res.text().catch(() => {});
     return;
   }
   try {
     const data = await res.json();
-    if (data.client_ip) {
+    if (data.client_ip && state.abortController?.signal === signal) {
       state.networkInfo[data.ipv6 ? "ipv6" : "ipv4"] = data.client_ip;
       updateNetworkDisplay();
       capturedRef.captured = true;
@@ -321,16 +404,18 @@ export async function measureLatency(signal) {
       });
       const rtt = performance.now() - start;
 
-      await captureClientIPIfNeeded(res, capturedRef);
+      await captureClientIPIfNeeded(res, capturedRef, signal);
+      if (signal.aborted || state.abortController?.signal !== signal) break;
 
       rawSamples.push(rtt);
+      updateProgress((i / numSamples) * 100);
       updateSpeed(rtt, "latency");
     } catch (e) {
       if (e.name === "AbortError") break;
     }
   }
 
-  if (rawSamples.length === 0) return null;
+  if (rawSamples.length === 0) return { value: null, jitter: null };
 
   const samples =
     rawSamples.length > warmUpPings
@@ -338,8 +423,8 @@ export async function measureLatency(signal) {
       : rawSamples;
 
   const filtered = filterOutliersIQR(samples);
-  state.jitterResult = computeJitter(filtered);
+  const jitter = computeJitter(filtered);
 
   filtered.sort((a, b) => a - b);
-  return filtered[Math.floor(filtered.length / 2)];
+  return { value: filtered[Math.floor(filtered.length / 2)], jitter };
 }

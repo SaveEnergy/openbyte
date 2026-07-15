@@ -33,6 +33,7 @@
     />
     <link rel="stylesheet" href="/base.css" />
     <link rel="stylesheet" href="/speed.css" />
+    <link rel="stylesheet" href="/speed-results.css" />
     <link rel="stylesheet" href="/results.css" />
     <link rel="stylesheet" href="/motion.css" />
   </head>
@@ -48,10 +49,21 @@
           >
           <div class="server-name" id="serverName">Shared Result</div>
         </div>
+        <div class="header-tools">
+          <button
+            class="theme-toggle"
+            id="themeToggle"
+            type="button"
+            aria-label="Switch theme"
+          >
+            ◐
+          </button>
+        </div>
       </header>
 
       <main class="main" id="mainContent">
         <section class="speed-section" id="resultView">
+          <p class="results-verdict hidden" id="resultsVerdict"></p>
           <div class="results-main" id="resultsMain">
             <div class="result-card result-primary">
               <div class="result-icon">↓</div>
@@ -81,9 +93,13 @@
             </div>
             <div class="extra-stat">
               <span class="extra-label">Bufferbloat</span>
-              <span class="extra-value" id="bufferbloatResult">-</span>
+              <span class="extra-value bb-badge" id="bufferbloatResult">-</span>
             </div>
           </div>
+          <details class="stats-help">
+            <summary>What do these numbers mean?</summary>
+            <dl class="stats-help-list" id="statsHelpList"></dl>
+          </details>
           <div class="results-details">
             <div class="detail-section">
               <h3 class="detail-title">Public IP at test time</h3>
@@ -151,6 +167,8 @@
       </footer>
     </div>
 
+    <script type="module" src="/theme.js"></script>
+    <script type="module" src="/stats-help.js"></script>
     <script type="module" src="/results.js"></script>
   </body>
 </html>

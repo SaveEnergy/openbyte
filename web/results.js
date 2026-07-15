@@ -1,6 +1,11 @@
 /** Results page: load shared result by ID, render speed/latency/bufferbloat. */
 
-import { formatSpeed, consumeErrorBody, fetchWithTimeout } from "./utils.js";
+import {
+  computeConnectionVerdict,
+  consumeErrorBody,
+  fetchWithTimeout,
+  formatSpeed,
+} from "./utils.js";
 
 const RESULTS_TIMEOUT_MS = 20000;
 const RESULT_ID_REGEX = /^[0-9a-zA-Z]{8}$/;
@@ -50,6 +55,34 @@ function setText(el, text) {
 
 function formatLatencyValue(v) {
   return typeof v === "number" && v > 0 ? safeFixed(v, 1) + " ms" : "-";
+}
+
+function bufferbloatBadgeClass(grade) {
+  if (grade === "A+" || grade === "A") return "bb-good";
+  if (grade === "B" || grade === "C") return "bb-mid";
+  if (grade === "D" || grade === "F") return "bb-bad";
+  return "";
+}
+
+function renderBufferbloatBadge(el, grade) {
+  if (!el) return;
+  el.classList.remove("bb-good", "bb-mid", "bb-bad");
+  el.textContent = typeof grade === "string" && grade ? grade : "-";
+  const badgeClass = bufferbloatBadgeClass(grade);
+  if (badgeClass) el.classList.add(badgeClass);
+}
+
+function renderVerdict(d) {
+  const el = document.getElementById("resultsVerdict");
+  if (!el) return;
+  const verdict = computeConnectionVerdict({
+    download: d.download_mbps,
+    upload: d.upload_mbps,
+    idleLatency: d.latency_ms,
+    loadedLatency: d.loaded_latency_ms,
+  });
+  el.textContent = verdict;
+  el.classList.toggle("hidden", verdict === "");
 }
 
 function updateServerDetails(d, refs) {
@@ -119,12 +152,8 @@ function renderResult(d) {
     setText(latencyEl, formatLatencyValue(d.latency_ms));
     setText(jitterEl, formatLatencyValue(d.jitter_ms));
     setText(loadedLatencyEl, formatLatencyValue(d.loaded_latency_ms));
-    if (bufferbloatEl) {
-      bufferbloatEl.textContent =
-        typeof d.bufferbloat_grade === "string" && d.bufferbloat_grade
-          ? d.bufferbloat_grade
-          : "-";
-    }
+    renderBufferbloatBadge(bufferbloatEl, d.bufferbloat_grade);
+    renderVerdict(d);
 
     setText(ipv4El, d.ipv4 || "-");
     setText(ipv6El, d.ipv6 || "-");
