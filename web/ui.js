@@ -3,14 +3,11 @@
 import { state, elements, TEST_CONFIG, toast } from "./state.js";
 import { formatNumber, onLocaleChange, t } from "./i18n.js";
 import {
-  formatConnectionVerdict,
   formatLatency,
   formatSpeed,
   formatSpeedText as localizedSpeedText,
 } from "./presentation.js";
-import { computeBufferbloatGrade } from "./utils.js";
-import { updateNetworkDisplay } from "./network.js";
-import { renderHistory } from "./history.js";
+import { enterResults } from "./ui-results.js";
 
 /** Circumference of the progress ring arc (r=90 in the 200x200 viewBox). */
 const RING_CIRCUMFERENCE = 2 * Math.PI * 90;
@@ -273,13 +270,12 @@ function renderTestType() {
   const current = state.testType;
   if (!current) return;
   const phase = t(current.key);
-  const streamsSuffix = current.streams > 1 ? ` ×${current.streams}` : "";
-  const text = `${current.icon || ""}${phase}${streamsSuffix}`;
+  const text = `${current.icon || ""}${phase}`;
   elements.testType.textContent = text;
   if (elements.progressMeter) {
     elements.progressMeter.setAttribute(
       "aria-label",
-      t("test.phaseInProgress", { phase: `${phase}${streamsSuffix}` }),
+      t("test.phaseInProgress", { phase }),
     );
     elements.progressMeter.textContent = text;
   }
@@ -291,7 +287,6 @@ export function updateTestType(key, className, options = {}) {
     key,
     className,
     icon: options.icon ? `${options.icon} ` : "",
-    streams: Number.isFinite(options.streams) ? options.streams : 0,
   };
   renderTestType();
 
@@ -344,120 +339,10 @@ export function showState(stateName) {
   focusStateAction(stateName);
 }
 
-/* ---- Results ---- */
-
-function bufferbloatBadgeClass(grade) {
-  if (grade === "A+" || grade === "A") return "bb-good";
-  if (grade === "B" || grade === "C") return "bb-mid";
-  if (grade === "D" || grade === "F") return "bb-bad";
-  return "";
-}
-
-function renderBufferbloat(grade) {
-  const el = elements.bufferbloatResult;
-  if (!el) return;
-  el.classList.remove("bb-good", "bb-mid", "bb-bad");
-  el.textContent = grade || "-";
-  const badgeClass = bufferbloatBadgeClass(grade);
-  if (badgeClass) el.classList.add(badgeClass);
-}
-
-function renderVerdict(partial, loadedLatency) {
-  if (!elements.resultsVerdict) return;
-  const verdict = formatConnectionVerdict({
-    download: state.downloadResult,
-    upload: state.uploadResult,
-    idleLatency: state.latencyResult,
-    loadedLatency,
-    partial,
-  });
-  elements.resultsVerdict.textContent = verdict;
-  elements.resultsVerdict.classList.toggle("hidden", verdict === "");
-}
-
-function announceResults(partial, grade) {
-  if (!elements.resultsAnnouncement) return;
-  const download = formatSpeedText(state.downloadResult);
-  let key = partial ? "announcement.partial" : "announcement.complete";
-  if (grade) key += "WithGrade";
-  elements.resultsAnnouncement.textContent = t(key, {
-    download,
-    upload: formatSpeedText(state.uploadResult),
-    latency: formatLatencyMs(state.latencyResult),
-    grade,
-  });
-}
-
-function renderShareButton() {
-  if (!elements.shareBtn) return;
-  elements.shareBtn.textContent = t(
-    elements.shareBtn.disabled ? "share.preparing" : "action.share",
-  );
-}
-
-function renderResultsContent() {
-  const partial = state.lastResultPartial;
-  if (
-    !elements.downloadResult ||
-    !elements.uploadResult ||
-    !elements.latencyResult ||
-    !elements.jitterResult
-  ) {
-    return;
-  }
-
-  const download = formatSpeed(state.downloadResult);
-
-  elements.downloadResult.textContent = download.value;
-
-  const downloadUnit = document.querySelector(".result-primary .result-unit");
-  const uploadUnit = document.querySelector(".result-secondary .result-unit");
-  if (downloadUnit) downloadUnit.textContent = download.unit;
-
-  if (partial) {
-    elements.uploadResult.textContent = "—";
-    if (uploadUnit) uploadUnit.textContent = t("result.notMeasured");
-  } else {
-    const upload = formatSpeed(state.uploadResult);
-    elements.uploadResult.textContent = upload.value;
-    if (uploadUnit) uploadUnit.textContent = upload.unit;
-  }
-
-  elements.latencyResult.textContent = formatLatencyMs(state.latencyResult);
-  elements.jitterResult.textContent = formatLatencyMs(state.jitterResult);
-
-  const loadedLatency = Math.max(state.downloadLatency, state.uploadLatency);
-  if (elements.loadedLatencyResult) {
-    elements.loadedLatencyResult.textContent = formatLatencyMs(loadedLatency);
-  }
-
-  const grade = computeBufferbloatGrade(state.latencyResult, loadedLatency);
-  renderBufferbloat(grade);
-  renderVerdict(partial, loadedLatency);
-  announceResults(partial, grade);
-
-  if (elements.partialNotice) {
-    elements.partialNotice.classList.toggle("hidden", !partial);
-  }
-
-  updateNetworkDisplay();
-  renderHistory(elements.historyList, elements.historySection);
-  renderShareButton();
-}
-
 export function showResults(options = {}) {
   const partial = options.partial === true;
-  state.lastResultPartial = partial;
   showState("results");
-
-  state.resultId = null;
-  state.shareSavePromise = null;
-  if (elements.shareBtn) {
-    // Partial runs have no upload figure, so a saved share would be misleading.
-    elements.shareBtn.classList.toggle("hidden", partial);
-    elements.shareBtn.disabled = false;
-  }
-  renderResultsContent();
+  enterResults(partial);
 }
 
 function renderToast() {
@@ -488,6 +373,5 @@ export function hideError() {
 onLocaleChange(() => {
   renderTestType();
   renderCompletedPhaseValues();
-  if (state.phase === "results") renderResultsContent();
   renderToast();
 });

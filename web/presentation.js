@@ -42,7 +42,10 @@ export function formatLatency(value) {
 export function formatConnectionVerdict(values) {
   const verdict = computeConnectionVerdict(values);
   if (!verdict) return "";
-  const parts = [t(verdict.key)];
-  if (verdict.warningKey) parts.push(t(verdict.warningKey));
-  return parts.join(" ");
+  return t(verdict.key);
+}
+
+export function formatConnectionAdvisory(values) {
+  const verdict = computeConnectionVerdict(values);
+  return verdict?.warningKey ? t(verdict.warningKey) : "";
 }

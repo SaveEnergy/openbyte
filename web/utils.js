@@ -18,7 +18,8 @@ export function computeBufferbloatGrade(idleLatency, loadedLatency) {
 
 /**
  * One-sentence plain-language interpretation of the measured results.
- * Partial runs (no upload figure) grade on download and latency only.
+ * Partial runs interpret the measured download without assigning a generic
+ * under-load grade from download-only latency.
  */
 export function computeConnectionVerdict({
   download,
@@ -54,7 +55,8 @@ export function computeConnectionVerdict({
     key = "verdict.complete.slow";
   }
 
-  const grade = computeBufferbloatGrade(idleLatency, loadedLatency);
+  const grade =
+    partial === true ? null : computeBufferbloatGrade(idleLatency, loadedLatency);
   const warningKey =
     grade === "C" || grade === "D" || grade === "F"
       ? "verdict.bufferbloatWarning"

@@ -5,17 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      data-i18n-content="meta.home.description"
       content="Open-source internet speed test. Measure download, upload, latency, jitter, and bufferbloat."
     />
     <meta
       property="og:title"
-      data-i18n-content="meta.home.ogTitle"
       content="openByte — Speed Test"
     />
     <meta
       property="og:description"
-      data-i18n-content="meta.home.description"
       content="Open-source internet speed test. Measure download, upload, latency, jitter, and bufferbloat."
     />
     <meta property="og:type" content="website" />
@@ -38,6 +35,7 @@
       crossorigin
     />
     <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="preferences.css" />
     <link rel="stylesheet" href="speed.css" />
     <link rel="stylesheet" href="speed-results.css" />
     <link rel="stylesheet" href="results.css" />
@@ -60,31 +58,33 @@
             <span class="server-dot"></span>
             <span class="server-text">Connecting...</span>
           </div>
-          <label
-            class="visually-hidden"
-            for="languageSelect"
-            data-i18n="language.label"
-            >Choose language</label
-          >
-          <select
-            class="language-select"
-            id="languageSelect"
-            data-i18n-aria-label="language.label"
-            aria-label="Choose language"
-          >
-            <option value="auto" data-i18n="language.auto">Auto</option>
-            <option value="en" lang="en">English</option>
-            <option value="de" lang="de">Deutsch</option>
-          </select>
-          <button
-            class="theme-toggle"
-            id="themeToggle"
-            type="button"
-            data-i18n-aria-label="theme.switch"
-            aria-label="Switch theme"
-          >
-            ◐
-          </button>
+          <div class="preference-controls">
+            <label
+              class="visually-hidden"
+              for="languageSelect"
+              data-i18n="language.label"
+              >Choose language</label
+            >
+            <select
+              class="language-select"
+              id="languageSelect"
+              data-i18n-aria-label="language.label"
+              aria-label="Choose language"
+            >
+              <option value="auto">System · EN</option>
+              <option value="en" lang="en">English</option>
+              <option value="de" lang="de">Deutsch</option>
+            </select>
+            <button
+              class="theme-toggle"
+              id="themeToggle"
+              type="button"
+              data-i18n-aria-label="theme.switch"
+              aria-label="Switch theme"
+            >
+              ◐
+            </button>
+          </div>
         </div>
       </header>
 
@@ -111,7 +111,7 @@
               id="publicIpTitle"
               data-i18n="network.publicIp"
             >
-              Your public IP
+              Public IP addresses
             </h2>
             <dl
               class="public-ip-grid"
@@ -218,7 +218,7 @@
 
         <!-- Results State -->
         <section class="speed-section hidden" id="resultsState">
-          <h2 class="visually-hidden" data-i18n="result.heading">Results</h2>
+          <h2 class="visually-hidden" data-i18n="result.heading">Result</h2>
           <p
             class="visually-hidden"
             id="resultsAnnouncement"
@@ -229,9 +229,8 @@
             id="partialNotice"
             data-i18n="result.partialNotice"
           >
-            Test cancelled early — upload was not measured.
+            Partial result — upload was not measured.
           </div>
-          <p class="results-verdict" id="resultsVerdict"></p>
           <div class="results-main">
             <div class="result-card result-primary">
               <div class="result-icon">↓</div>
@@ -248,10 +247,11 @@
               <div class="result-unit">Mbps</div>
             </div>
           </div>
+          <p class="results-verdict" id="resultsVerdict"></p>
           <div class="results-extra">
             <div class="extra-stat">
               <span class="extra-label" data-i18n="metric.idleLatency"
-                >Idle Latency</span
+                >Idle</span
               >
               <span class="extra-value" id="latencyResult">0 ms</span>
             </div>
@@ -260,18 +260,22 @@
               <span class="extra-value" id="jitterResult">0 ms</span>
             </div>
             <div class="extra-stat">
-              <span class="extra-label" data-i18n="metric.loadedLatency"
-                >Loaded Latency</span
+              <span
+                class="extra-label"
+                id="loadedLatencyLabel"
+                data-i18n="metric.loadedLatency"
+                >Under load</span
               >
               <span class="extra-value" id="loadedLatencyResult">0 ms</span>
             </div>
-            <div class="extra-stat">
+            <div class="extra-stat" id="bufferbloatStat">
               <span class="extra-label" data-i18n="metric.bufferbloat"
                 >Bufferbloat</span
               >
               <span class="extra-value bb-badge" id="bufferbloatResult">-</span>
             </div>
           </div>
+          <p class="results-advisory hidden" id="resultsAdvisory"></p>
           <details class="stats-help">
             <summary data-i18n="metric.helpSummary">
               What do these numbers mean?
@@ -281,7 +285,7 @@
           <div class="results-details" id="resultsDetails">
             <div class="detail-section">
               <h3 class="detail-title" data-i18n="network.publicIpAtTest">
-                Public IP at test time
+                Public IP addresses for this test
               </h3>
               <div class="detail-grid">
                 <div class="detail-item">
@@ -296,7 +300,7 @@
             </div>
             <div class="detail-section hidden" id="historySection">
               <h3 class="detail-title" data-i18n="history.heading">
-                Recent Tests on This Device
+                Recent tests
               </h3>
               <ol class="history-list" id="historyList"></ol>
             </div>
@@ -307,7 +311,7 @@
               id="restartBtn"
               data-i18n="action.testAgain"
             >
-              Test Again
+              Test again
             </button>
             <button class="share-btn hidden" id="shareBtn">Share</button>
           </div>

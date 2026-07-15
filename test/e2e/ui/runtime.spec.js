@@ -25,7 +25,7 @@ test.describe("browser speed-test runtime", () => {
     await expect(page.locator("#idleNetworkIPv4")).toHaveText(
       "198.51.100.42",
     );
-    await expect(page.locator("#idleNetworkIPv6")).toHaveText("Not detected");
+    await expect(page.locator("#idleNetworkIPv6")).toHaveText("Not available");
     await expect(page.locator("#idleNetworkInfo")).toHaveAttribute(
       "aria-busy",
       "false",
@@ -108,8 +108,8 @@ test.describe("browser speed-test runtime", () => {
     await page.locator("#startBtn").click();
 
     await expect(page.locator("#errorToast")).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator("#errorMessage")).toContainText(
-      /worker boot failed|worker failed/i,
+    await expect(page.locator("#errorMessage")).toHaveText(
+      "The speed test stopped. Please try again.",
     );
     await expect(page.locator("#idleState")).toBeVisible();
     await expect(page.locator("#startBtn")).toBeFocused();

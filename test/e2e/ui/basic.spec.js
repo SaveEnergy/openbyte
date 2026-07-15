@@ -135,7 +135,7 @@ test.describe("openByte UI", () => {
       /[\d.]+/,
     );
     await expect(page.locator("#testType")).toContainText(
-      /Ping|Saturating|Measuring/,
+      /Ping|Download|Upload/,
     );
     await expect(page.locator("#cancelBtn")).toBeFocused();
 
@@ -291,7 +291,9 @@ test.describe("openByte UI", () => {
     await expect(page.locator("#uploadResult")).toContainText("67.9");
     await expect(page.locator("#loadedLatencyResult")).toHaveText("18.4 ms");
     await expect(page.locator("#bufferbloatResult")).toHaveText("A");
-    await expect(page.getByText("Public IP at test time")).toBeVisible();
+    await expect(
+      page.getByText("Public IP addresses for this test"),
+    ).toBeVisible();
     await expect(page.locator("#networkIPv4")).toHaveText("192.0.2.1");
     await expect(page.locator("#networkIPv6")).toHaveText("2001:db8::1");
     await expect(page.locator("#serverValue")).toContainText(
@@ -348,6 +350,7 @@ test.describe("openByte UI", () => {
     await expect(page.locator("#errorView .error-message")).toContainText(
       /not found|expired/i,
     );
+    await expect(page.locator("#errorCode")).toBeVisible();
   });
 
   test("shows server-error message when results API returns 500", async ({
@@ -367,6 +370,7 @@ test.describe("openByte UI", () => {
     await expect(page.locator("#errorView .error-message")).toContainText(
       /server error/i,
     );
+    await expect(page.locator("#errorCode")).toBeHidden();
   });
 
   test("shows timeout message when results API hangs", async ({ page }) => {

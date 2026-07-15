@@ -1,7 +1,7 @@
 /* Result interpretation, metric help, and local history. */
 
 .results-verdict {
-  max-width: 560px;
+  max-width: 520px;
   margin-bottom: var(--space-xl);
   font-size: 1.05rem;
   line-height: 1.5;
@@ -14,15 +14,32 @@
 }
 
 .partial-notice {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  width: min(100%, 440px);
   margin-bottom: var(--space-lg);
-  padding: var(--space-xs) var(--space-md);
+  padding: var(--space-sm) var(--space-md);
   border: 1px solid var(--warning);
-  border-radius: 999px;
+  border-radius: 8px;
   color: var(--warning);
   font-size: 0.85rem;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.results-advisory {
+  max-width: 520px;
+  margin-bottom: var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  border-left: 3px solid var(--warning);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.results-advisory.hidden {
+  display: none;
 }
 
 .bb-badge {
@@ -135,6 +152,10 @@
 }
 
 @media (max-width: 600px) {
+  .results-verdict {
+    font-size: 0.95rem;
+  }
+
   .history-item {
     flex-direction: column;
     align-items: center;

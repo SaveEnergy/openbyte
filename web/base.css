@@ -59,8 +59,12 @@
   --text-secondary: #8888a0;
   --text-muted: #8888a0;
 
-  --accent-primary: #00d4aa;
-  --accent-secondary: #00b894;
+  --brand-primary: #00d4aa;
+  --brand-secondary: #00b894;
+  --on-brand: #04231c;
+
+  --accent-primary: var(--brand-primary);
+  --accent-secondary: var(--brand-secondary);
   --accent-glow: rgba(0, 212, 170, 0.3);
 
   --upload-color: #667eea;
@@ -71,6 +75,7 @@
 
   --card-border: rgba(255, 255, 255, 0.06);
   --card-shadow: none;
+  --control-border: #606078;
 
   --font-display: "JetBrains Mono", "SF Mono", monospace;
   --font-body: "DM Sans", -apple-system, BlinkMacSystemFont, sans-serif;
@@ -110,13 +115,14 @@
 
     --accent-primary: #00796b;
     --accent-secondary: #006f61;
-    --accent-glow: rgba(0, 121, 107, 0.22);
+    --accent-glow: rgba(0, 212, 170, 0.22);
     --download-color: #00796b;
     --error: #dc2626;
     --warning: #b45309;
 
     --card-border: rgba(15, 23, 42, 0.1);
     --card-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    --control-border: #7c899a;
   }
 }
 
@@ -133,13 +139,14 @@
 
   --accent-primary: #00796b;
   --accent-secondary: #006f61;
-  --accent-glow: rgba(0, 121, 107, 0.22);
+  --accent-glow: rgba(0, 212, 170, 0.22);
   --download-color: #00796b;
   --error: #dc2626;
   --warning: #b45309;
 
   --card-border: rgba(15, 23, 42, 0.1);
   --card-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --control-border: #7c899a;
 }
 
 *,
@@ -152,6 +159,7 @@
 
 html {
   font-size: 100%;
+  font-synthesis: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -165,13 +173,20 @@ body {
   overflow-x: hidden;
 }
 
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 .skip-link {
   position: absolute;
   left: var(--space-md);
   top: -120px;
   z-index: 1000;
-  background: var(--accent-primary);
-  color: var(--bg-primary);
+  background: var(--brand-primary);
+  color: var(--on-brand);
   text-decoration: none;
   font-weight: 700;
   border-radius: 6px;
@@ -246,7 +261,7 @@ body::before {
 .logo {
   font-family: var(--font-display);
   font-size: 1.5rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--text-primary);
 }
@@ -259,8 +274,7 @@ body::before {
   font-family: var(--font-display);
   font-size: 0.95rem;
   color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.02em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -268,12 +282,7 @@ body::before {
 
 .logo-accent {
   color: var(--accent-primary);
-}
-
-.header-tools {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
+  box-shadow: inset 0 -0.13em var(--brand-primary);
 }
 
 .server-info {
@@ -282,57 +291,6 @@ body::before {
   gap: var(--space-sm);
   font-size: 0.875rem;
   color: var(--text-secondary);
-}
-
-.theme-toggle {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 1px solid var(--bg-hover);
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  font-size: 1.05rem;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    color var(--motion-duration-base) ease,
-    border-color var(--motion-duration-base) ease;
-}
-
-.language-select {
-  min-width: 108px;
-  height: 44px;
-  padding: 0 var(--space-sm);
-  border: 1px solid var(--bg-hover);
-  border-radius: 8px;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  font-family: var(--font-body);
-  font-size: 0.8125rem;
-  cursor: pointer;
-  transition:
-    color var(--motion-duration-base) ease,
-    border-color var(--motion-duration-base) ease;
-}
-
-.language-select:hover {
-  color: var(--accent-primary);
-  border-color: var(--accent-primary);
-}
-
-.language-select:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
-}
-
-.theme-toggle:hover {
-  color: var(--accent-primary);
-  border-color: var(--accent-primary);
-}
-
-.theme-toggle:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
 }
 
 .server-dot {
@@ -416,33 +374,5 @@ body::before {
 
   .logo {
     font-size: 1.25rem;
-  }
-}
-
-@media (max-width: 420px) {
-  .header {
-    gap: var(--space-sm);
-  }
-
-  .brand {
-    max-width: calc(100% - 148px);
-  }
-
-  .server-name {
-    display: none;
-  }
-
-  .header-tools {
-    flex-shrink: 0;
-    gap: var(--space-sm);
-  }
-
-  .server-info {
-    display: none;
-  }
-
-  .language-select {
-    min-width: 88px;
-    width: 88px;
   }
 }

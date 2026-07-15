@@ -8,16 +8,16 @@ in Git history and pull requests, not release notes.
 ### Added
 
 - **English and German UI**: the speed test and shared-result pages now detect
-  the browser language, provide a persistent language selector, localize
-  accessible status text, and format results and history for the chosen locale.
+  the browser language, provide a persistent language selector that exposes
+  the resolved system language, localize accessible status text, and format
+  results and history for the chosen locale.
 - **Test legibility**: the testing screen now shows a determinate progress ring
   (ramp windows + measure countdown reported by the worker), a phase stepper
   (Ping → Download → Upload) that keeps completed phase results visible as
   chips, and a live throughput sparkline under the speed number.
-- **Result interpretation**: a plain-language verdict line above the result
-  cards, a colored bufferbloat grade badge, and a "What do these numbers
-  mean?" disclosure explaining latency, jitter, loaded latency, and
-  bufferbloat.
+- **Result interpretation**: a concise verdict after the primary speed cards,
+  a separate loaded-latency advisory, a colored bufferbloat grade badge, and a
+  "What do these numbers mean?" disclosure explaining the secondary metrics.
 - **Recent tests**: the last runs are stored in `localStorage` and listed on
   the results screen (`web/history.js`).
 - **Manual theme toggle**: header button cycles system → light → dark and
@@ -38,7 +38,11 @@ in Git history and pull requests, not release notes.
 - **Light theme & toast polish**: light mode gains card borders/shadows, and
   toasts use fixed high-contrast colors in both themes.
 - **Mobile results layout**: the four secondary stats render as a 2×2 grid on
-  small screens instead of one long column.
+  small screens, while download and upload remain side by side.
+- **Brand and localization polish**: restored mint as the stable openByte brand
+  color without reusing it for low-contrast light-theme text, grouped language
+  and theme preferences into one compact control, shortened German copy, and
+  stopped exposing adaptive-stream jargon in the test UI.
 - **Shared result page**: aligned with the live results view — verdict line,
   colored bufferbloat badge, metric explanations, and the theme toggle now
   appear on `/results/{id}` too. The explanations live in a shared
@@ -52,6 +56,10 @@ in Git history and pull requests, not release notes.
 
 ### Fixed
 
+- Prevented browsers from synthesizing unavailable display-font weights and
+  made native form controls inherit the bundled DM Sans font.
+- Partial results now label download latency explicitly and omit the generic
+  bufferbloat grade and warning because upload was not measured.
 - Required `MAX_TEST_DURATION` to be whole seconds of at least `1s`, and bounded
   an omitted download duration by the configured maximum.
 
