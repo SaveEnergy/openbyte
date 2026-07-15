@@ -65,14 +65,15 @@ mkdir -p /opt/openbyte
 cat >/opt/openbyte/.env <<'EOF'
 SERVER_NAME="Frankfurt 25G"
 TRAEFIK_HOST_RULE="Host(`speedtest.example.com`) || Host(`v4.speedtest.example.com`) || Host(`v6.speedtest.example.com`)"
-TRUST_PROXY_HEADERS=true
-TRUSTED_PROXY_CIDRS="172.16.0.0/12"
 EOF
 ```
 
 Both CI and release call `scripts/deploy/deploy.sh`. It validates the host key,
 streams the compose bundle and its checksum manifest over one SSH connection,
 verifies every remote checksum, pulls the immutable image tag, and deploys.
+The host script inspects the active `traefik` network and overrides
+`TRUST_PROXY_HEADERS` plus `TRUSTED_PROXY_CIDRS` with its exact IPv4/IPv6 IPAM
+subnets. Deployment fails before replacing the application if no subnet exists.
 
 The health gate requires both openByte and Traefik to be running and healthy.
 Before replacement, the current openByte image is pinned under a temporary
@@ -93,8 +94,11 @@ When proxy headers are enabled, restrict trust to the proxy network:
 
 ```bash
 TRUST_PROXY_HEADERS=true
-TRUSTED_PROXY_CIDRS="172.16.0.0/12"
+TRUSTED_PROXY_CIDRS="172.18.0.0/16"
 ```
+
+For Docker, obtain that exact subnet with `docker network inspect traefik`
+instead of trusting a blanket private range.
 
 Minimal Nginx example:
 
@@ -142,8 +146,9 @@ curl -4 https://v4.speedtest.example.com/api/v1/ping
 curl -6 https://v6.speedtest.example.com/api/v1/ping
 ```
 
-A failed single-stack probe displays `-` for that family without preventing the
-speed test. Make sure HTTP/HTTPS firewall rules permit both IPv4 and IPv6.
+A failed single-stack probe displays `Not detected` for that family without
+preventing the speed test. Make sure HTTP/HTTPS firewall rules permit both IPv4
+and IPv6.
 
 ## Bare-metal service
 

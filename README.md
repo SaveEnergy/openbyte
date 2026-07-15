@@ -120,7 +120,7 @@ The web UI displays both client IPv4 and IPv6 addresses using dedicated single-s
 2. Add a DNS **AAAA-only** record for `v6.<your-domain>` → server IPv6 (no A).
 3. Include both in your Traefik host rule or reverse proxy config.
 
-See [Deployment Guide](DEPLOYMENT.md#ipv4ipv6-detection) for details.
+See [Deployment Guide](DEPLOYMENT.md#ipv4-and-ipv6-discovery) for details.
 
 ## Testing
 
