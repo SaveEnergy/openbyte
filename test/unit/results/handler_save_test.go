@@ -174,7 +174,7 @@ func TestHandlerSaveBodyTooLarge(t *testing.T) {
 	}
 }
 
-func TestSaveAcceptsOptionalDiagnostics(t *testing.T) {
+func TestSaveRejectsRemovedDiagnostics(t *testing.T) {
 	tempDir := t.TempDir()
 	dbPath := filepath.Join(tempDir, resultsDBName)
 	store, err := results.New(dbPath, 100)
@@ -201,8 +201,8 @@ func TestSaveAcceptsOptionalDiagnostics(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusCreated {
-		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusCreated)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusBadRequest)
 	}
 }
 

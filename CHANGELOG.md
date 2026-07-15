@@ -34,6 +34,8 @@ in Git history and pull requests, not release notes.
 - Removed the full `openbyte client`, its YAML configuration, terminal output
   formats, Docker target, and CLI throughput harness. Use the browser, HTTP API,
   Go SDK, or `openbyte check --json`.
+- Removed the compatibility-only `diagnostics` field from result creation;
+  result sharing and persisted result fields are unchanged.
 - Removed unused `PUBLIC_HOST`, nonfunctional `LOG_LEVEL`, periodic runtime
   statistics, and `/debug/runtime-metrics`; loopback pprof remains available.
 - Removed the unwired metrics collectors, always-zero legacy CLI JSON fields,
