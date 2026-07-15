@@ -6,10 +6,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/saveenergy/openbyte/internal/api"
+	"github.com/saveenergy/openbyte/internal/config"
 )
 
 // Loopback throughput floors are deliberately conservative: they exist to
@@ -30,10 +34,18 @@ func throughputMbps(totalBytes int64, elapsed time.Duration) float64 {
 	return float64(totalBytes*8) / elapsed.Seconds() / 1e6
 }
 
+func newThroughputServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("skipping heavy e2e test in short mode")
+	}
+	server := httptest.NewServer(api.NewRouter(config.DefaultConfig(), nil).SetupRoutes())
+	t.Cleanup(server.Close)
+	return server
+}
+
 func TestLoopbackDownloadThroughputFloor(t *testing.T) {
-	skipIfShort(t)
-	ts := NewTestServer(t)
-	defer ts.Close()
+	ts := newThroughputServer(t)
 
 	var total int64
 	var wg sync.WaitGroup
@@ -43,7 +55,7 @@ func TestLoopbackDownloadThroughputFloor(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			url := fmt.Sprintf("%s/api/v1/download?duration=%d&chunk=1048576",
-				ts.baseURL, throughputSeconds)
+				ts.URL, throughputSeconds)
 			resp, err := http.Get(url)
 			if err != nil {
 				t.Errorf("download request failed: %v", err)
@@ -74,9 +86,7 @@ func TestLoopbackDownloadThroughputFloor(t *testing.T) {
 }
 
 func TestLoopbackUploadThroughputFloor(t *testing.T) {
-	skipIfShort(t)
-	ts := NewTestServer(t)
-	defer ts.Close()
+	ts := newThroughputServer(t)
 
 	payload := make([]byte, uploadPayloadBytes)
 	if _, err := rand.Read(payload); err != nil {
@@ -92,7 +102,7 @@ func TestLoopbackUploadThroughputFloor(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for time.Now().Before(deadline) {
-				resp, err := http.Post(ts.baseURL+"/api/v1/upload",
+				resp, err := http.Post(ts.URL+"/api/v1/upload",
 					"application/octet-stream", bytes.NewReader(payload))
 				if err != nil {
 					t.Errorf("upload request failed: %v", err)

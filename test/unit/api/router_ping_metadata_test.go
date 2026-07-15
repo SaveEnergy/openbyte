@@ -46,6 +46,33 @@ func TestPlainPingOmitsServerName(t *testing.T) {
 	}
 }
 
+func TestCrossOriginAccessIsLimitedToPing(t *testing.T) {
+	handler := api.NewRouter(config.DefaultConfig(), nil).SetupRoutes()
+	tests := []struct {
+		path       string
+		wantStatus int
+		wantOrigin string
+	}{
+		{path: pingAPIPath, wantStatus: http.StatusOK, wantOrigin: "*"},
+		{path: healthRoutePath, wantStatus: http.StatusOK},
+		{path: apiUnknownPath, wantStatus: http.StatusNotFound},
+	}
+
+	for _, tt := range tests {
+		req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+		req.Header.Set("Origin", "https://example.com")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != tt.wantStatus {
+			t.Errorf("%s: status = %d, want %d", tt.path, rec.Code, tt.wantStatus)
+		}
+		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != tt.wantOrigin {
+			t.Errorf("%s: Access-Control-Allow-Origin = %q, want %q", tt.path, got, tt.wantOrigin)
+		}
+	}
+}
+
 func TestVersionEndpointIsRemoved(t *testing.T) {
 	handler := api.NewRouter(config.DefaultConfig(), nil).SetupRoutes()
 	req := httptest.NewRequest(http.MethodGet, versionAPIPath, nil)

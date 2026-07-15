@@ -66,21 +66,3 @@ func (rl *RateLimiter) ClientIP(r *http.Request) string {
 	}
 	return ipString(parseRemoteIP(r.RemoteAddr))
 }
-
-// SetCleanupPolicy overrides cleanup interval and TTL (mainly for tests).
-func (rl *RateLimiter) SetCleanupPolicy(cleanupInterval, ipLimitTTL time.Duration) {
-	rl.ipMu.Lock()
-	defer rl.ipMu.Unlock()
-	rl.cleanupInterval = cleanupInterval
-	rl.ipLimitTTL = ipLimitTTL
-	rl.lastCleanup = time.Now()
-}
-
-// SetMaxIPEntries overrides the per-IP cardinality cap (mainly for tests).
-func (rl *RateLimiter) SetMaxIPEntries(limit int) {
-	rl.ipMu.Lock()
-	defer rl.ipMu.Unlock()
-	if limit > 0 {
-		rl.maxIPEntries = limit
-	}
-}

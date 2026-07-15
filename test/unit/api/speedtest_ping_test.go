@@ -52,19 +52,6 @@ func TestSpeedTestHandlerPingResponseShape(t *testing.T) {
 	}
 }
 
-func TestSpeedTestHandlerPingAllowsCrossOriginDiscovery(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10, 300)
-	req := httptest.NewRequest(http.MethodGet, pingEndpoint, nil)
-	req.Header.Set("Origin", "https://speed.example.com")
-	rec := httptest.NewRecorder()
-
-	handler.Ping(rec, req)
-
-	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
-		t.Fatalf("allow origin = %q, want *", got)
-	}
-}
-
 func TestSpeedTestHandlerPingNilResolverFallback(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 	req := httptest.NewRequest(http.MethodGet, pingEndpoint, nil)
