@@ -18,7 +18,6 @@ func TestOpenAPIRouteContract(t *testing.T) {
 		"GET /api/v1/ping":         {},
 		"GET /api/v1/download":     {},
 		"POST /api/v1/upload":      {},
-		"GET /api/v1/version":      {},
 		"POST /api/v1/results":     {},
 		"GET /api/v1/results/{id}": {},
 	}

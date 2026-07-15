@@ -14,7 +14,7 @@ import (
 )
 
 func TestRouterStaticServesFrontendModules(t *testing.T) {
-	router := api.NewRouter(config.DefaultConfig(), "", nil)
+	router := api.NewRouter(config.DefaultConfig(), nil)
 	h := router.SetupRoutes()
 
 	var assets []string
@@ -52,7 +52,7 @@ func TestRouterStaticFileServerAllowlist(t *testing.T) {
 	}
 	cfg := config.DefaultConfig()
 	cfg.WebRoot = webRoot
-	router := api.NewRouter(cfg, "", nil)
+	router := api.NewRouter(cfg, nil)
 
 	h := router.SetupRoutes()
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/embed.go", nil)
@@ -77,7 +77,7 @@ func TestRouterStaticFileServerAllowlistServesFontsFromWebRoot(t *testing.T) {
 	}
 	cfg := config.DefaultConfig()
 	cfg.WebRoot = webRoot
-	router := api.NewRouter(cfg, "", nil)
+	router := api.NewRouter(cfg, nil)
 
 	h := router.SetupRoutes()
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/fonts/dm-sans-latin.woff2", nil)
@@ -89,7 +89,7 @@ func TestRouterStaticFileServerAllowlistServesFontsFromWebRoot(t *testing.T) {
 }
 
 func TestCriticalRoutesRespondOK(t *testing.T) {
-	router := api.NewRouter(config.DefaultConfig(), "", nil)
+	router := api.NewRouter(config.DefaultConfig(), nil)
 	h := router.SetupRoutes()
 
 	tests := []struct {
@@ -98,7 +98,6 @@ func TestCriticalRoutesRespondOK(t *testing.T) {
 		path   string
 	}{
 		{name: "health", method: http.MethodGet, path: healthRoutePath},
-		{name: "version", method: http.MethodGet, path: versionAPIPath},
 		{name: "ping", method: http.MethodGet, path: pingAPIPath},
 	}
 
@@ -111,5 +110,17 @@ func TestCriticalRoutesRespondOK(t *testing.T) {
 				t.Fatalf("%s %s "+statusWantFmt, tt.method, tt.path, rec.Code, http.StatusOK)
 			}
 		})
+	}
+}
+
+func TestRemovedBrowserAPIPagesReturnNotFound(t *testing.T) {
+	handler := api.NewRouter(config.DefaultConfig(), nil).SetupRoutes()
+	for _, path := range []string{"/api", "/api.html", "/api.css"} {
+		req := httptest.NewRequest(http.MethodGet, exampleBaseURL+path, nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("%s: "+statusWantFmt, path, rec.Code, http.StatusNotFound)
+		}
 	}
 }

@@ -54,7 +54,7 @@ func Run(args []string, version string) int {
 		resources.stopAll(pprofServer)
 	}()
 
-	muxRouter, err := setupRuntimeResources(cfg, version, resources)
+	muxRouter, err := setupRuntimeResources(cfg, resources)
 	if err != nil {
 		return exitFailure
 	}

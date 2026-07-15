@@ -45,14 +45,9 @@ func skipIfShort(t *testing.T) {
 }
 
 func NewTestServer(t *testing.T) *TestServer {
-	return NewTestServerWithOrigins(t, nil)
-}
-
-func NewTestServerWithOrigins(t *testing.T, allowedOrigins []string) *TestServer {
 	cfg := config.DefaultConfig()
 	cfg.BindAddress = "127.0.0.1"
 	cfg.Port = "0"
-	cfg.AllowedOrigins = allowedOrigins
 
 	resultsStore, err := results.New(t.TempDir()+"/results.db", 1000)
 	if err != nil {
@@ -67,7 +62,7 @@ func NewTestServerWithOrigins(t *testing.T, allowedOrigins []string) *TestServer
 		t.Fatalf(absPathErrFmt, err)
 	}
 	cfg.WebRoot = absWebDir
-	router := api.NewRouter(cfg, "", resultsStore)
+	router := api.NewRouter(cfg, resultsStore)
 
 	listener, err := net.Listen("tcp", ":0")
 	if err != nil {

@@ -89,17 +89,33 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SpeedTestHandler) Ping(w http.ResponseWriter, r *http.Request) {
+	h.ping(w, r, "")
+}
+
+type pingResponse struct {
+	Pong       bool   `json:"pong"`
+	Timestamp  int64  `json:"timestamp"`
+	ClientIP   string `json:"client_ip"`
+	IPv6       bool   `json:"ipv6"`
+	ServerName string `json:"server_name,omitempty"`
+}
+
+func (h *SpeedTestHandler) ping(w http.ResponseWriter, r *http.Request, serverName string) {
 	clientIP := h.resolveClientIP(r)
 	isIPv6 := strings.IndexByte(clientIP, ':') >= 0
 
 	w.Header().Set(headerContentType, contentTypeJSON)
 	w.Header().Set(headerCacheControl, valueNoStore)
+	if r.Header.Get("Origin") != "" {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+	}
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(map[string]any{
-		"pong":      true,
-		"timestamp": time.Now().UnixMilli(),
-		"client_ip": clientIP,
-		"ipv6":      isIPv6,
+	if err := json.NewEncoder(w).Encode(pingResponse{
+		Pong:       true,
+		Timestamp:  time.Now().UnixMilli(),
+		ClientIP:   clientIP,
+		IPv6:       isIPv6,
+		ServerName: serverName,
 	}); err != nil {
 		logging.Warn("speedtest: encode ping response", logging.Field{Key: "error", Value: err})
 	}

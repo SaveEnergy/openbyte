@@ -6,7 +6,6 @@ services:
       - "8080:8080" # API + Web UI
     environment:
       - SERVER_NAME=${SERVER_NAME:-openByte Server}
-      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
       - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
       - CAPACITY_GBPS=${CAPACITY_GBPS:-25}

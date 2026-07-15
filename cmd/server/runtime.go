@@ -26,7 +26,7 @@ func (r *serverResources) stopAll(pprofServer *http.Server) {
 	shutdownPprofServer(pprofServer, 5*time.Second)
 }
 
-func setupRuntimeResources(cfg *config.Config, version string, resources *serverResources) (http.Handler, error) {
+func setupRuntimeResources(cfg *config.Config, resources *serverResources) (http.Handler, error) {
 	if err := os.MkdirAll(cfg.DataDir, 0755); err != nil {
 		logging.Error("Failed to create data directory", logging.Field{Key: "error", Value: err})
 		return nil, err
@@ -41,7 +41,7 @@ func setupRuntimeResources(cfg *config.Config, version string, resources *server
 		logging.Field{Key: "path", Value: cfg.DataDir + "/results.db"},
 		logging.Field{Key: "max_results", Value: cfg.MaxStoredResults})
 
-	router := api.NewRouter(cfg, version, resources.resultsStore)
+	router := api.NewRouter(cfg, resources.resultsStore)
 	return router.SetupRoutes(), nil
 }
 

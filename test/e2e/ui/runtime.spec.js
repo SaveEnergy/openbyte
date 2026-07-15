@@ -2,14 +2,9 @@ const { test, expect } = require("@playwright/test");
 const http = require("node:http");
 
 test.describe("browser speed-test runtime", () => {
-  test("shows the client IP eagerly when version metadata fails", async ({
-    page,
-  }) => {
+  test("shows the client IP eagerly from bootstrap ping", async ({ page }) => {
     let pingRequests = 0;
-    await page.route("**/api/v1/version", async (route) => {
-      await route.fulfill({ status: 429, body: "rate limited" });
-    });
-    await page.route("**/api/v1/ping", async (route) => {
+    await page.route("**/api/v1/ping*", async (route) => {
       pingRequests += 1;
       await route.fulfill({
         status: 200,
@@ -18,6 +13,7 @@ test.describe("browser speed-test runtime", () => {
           pong: true,
           client_ip: "198.51.100.42",
           ipv6: false,
+          server_name: "Playwright Server",
         }),
       });
     });
@@ -35,6 +31,7 @@ test.describe("browser speed-test runtime", () => {
       "false",
     );
     await expect(page.locator("#serverInfo")).toContainText("Ready");
+    await expect(page.locator("#serverName")).toHaveText("Playwright Server");
     expect(pingRequests).toBeGreaterThan(0);
   });
 

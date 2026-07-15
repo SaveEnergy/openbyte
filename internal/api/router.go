@@ -12,18 +12,15 @@ import (
 )
 
 type Router struct {
-	version          string
 	serverName       string
 	speedtest        *SpeedTestHandler
 	resultsHandler   *resultHandler
 	limiter          *RateLimiter
-	allowedOrigins   []string
-	corsAllowAll     bool
 	clientIPResolver *ClientIPResolver
 	webFS            http.FileSystem
 }
 
-func NewRouter(cfg *config.Config, version string, resultsStore *results.Store) *Router {
+func NewRouter(cfg *config.Config, resultsStore *results.Store) *Router {
 	if cfg == nil {
 		cfg = config.DefaultConfig()
 	}
@@ -35,9 +32,6 @@ func NewRouter(cfg *config.Config, version string, resultsStore *results.Store) 
 	speedtest.SetMaxConcurrentPerIP(cfg.MaxConcurrentPerIP)
 	speedtest.SetClientIPResolver(resolver)
 
-	if version == "" {
-		version = "dev"
-	}
 	serverName := strings.TrimSpace(cfg.ServerName)
 	if serverName == "" {
 		serverName = config.DefaultServerName
@@ -46,15 +40,11 @@ func NewRouter(cfg *config.Config, version string, resultsStore *results.Store) 
 	if cfg.WebRoot != "" {
 		webFS = http.Dir(cfg.WebRoot)
 	}
-	allowedOrigins, corsAllowAll := normalizeAllowedOrigins(cfg.AllowedOrigins)
 	return &Router{
-		version:          version,
 		serverName:       serverName,
 		speedtest:        speedtest,
 		resultsHandler:   newResultHandler(resultsStore),
 		limiter:          newRateLimiter(cfg, resolver),
-		allowedOrigins:   allowedOrigins,
-		corsAllowAll:     corsAllowAll,
 		clientIPResolver: resolver,
 		webFS:            webFS,
 	}
@@ -65,11 +55,10 @@ func (r *Router) SetupRoutes() http.Handler {
 	webFS := r.resolveWebFS()
 	rateLimitedV1 := r.newRateLimitedV1Registrar(mux)
 
-	rateLimitedV1("GET", "/version", r.GetVersion)
 	r.registerResultsAPIRoutes(rateLimitedV1)
 	mux.HandleFunc("GET "+apiV1Prefix+"/download", r.speedtest.Download)
 	mux.HandleFunc("POST "+apiV1Prefix+"/upload", r.speedtest.Upload)
-	mux.HandleFunc("GET "+apiV1Prefix+"/ping", r.speedtest.Ping)
+	mux.HandleFunc("GET "+apiV1Prefix+"/ping", r.ping)
 
 	mux.HandleFunc("GET /health", r.HealthCheck)
 	mux.HandleFunc("/api/v1/", func(w http.ResponseWriter, req *http.Request) {
@@ -84,34 +73,20 @@ func (r *Router) SetupRoutes() http.Handler {
 	return r.wrapMiddlewares(mux)
 }
 
+func (r *Router) ping(w http.ResponseWriter, req *http.Request) {
+	serverName := ""
+	if req.URL.RawQuery != "" && req.URL.Query().Get("meta") == "1" {
+		serverName = r.serverName
+	}
+	r.speedtest.ping(w, req, serverName)
+}
+
 func (r *Router) HealthCheck(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
 		logging.Warn("health: write response", logging.Field{Key: "error", Value: err})
 	}
-}
-
-func normalizeAllowedOrigins(origins []string) ([]string, bool) {
-	if len(origins) == 0 {
-		return nil, false
-	}
-	out := make([]string, 0, len(origins))
-	allowAll := false
-	for _, o := range origins {
-		t := strings.TrimSpace(o)
-		if t == "" {
-			continue
-		}
-		out = append(out, t)
-		if t == "*" {
-			allowAll = true
-		}
-	}
-	if len(out) == 0 {
-		return nil, false
-	}
-	return out, allowAll
 }
 
 // resolveWebFS returns the web file system to use for static assets.

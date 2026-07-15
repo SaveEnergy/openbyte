@@ -46,7 +46,6 @@ func (r *Router) registerResultsPageRoute(mux *http.ServeMux, webFS http.FileSys
 }
 
 func (r *Router) wrapMiddlewares(handler http.Handler) http.Handler {
-	handler = r.CORSMiddleware(handler)
 	handler = rejectBodylessRequestBodies(handler)
 	handler = SecurityHeadersMiddleware(handler)
 	handler = r.LoggingMiddleware(handler)

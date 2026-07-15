@@ -1,13 +1,16 @@
 package api_test
 
+import (
+	"testing"
+
+	"github.com/saveenergy/openbyte/internal/results"
+)
+
 const (
 	statusWantFmt             = "status = %d, want %d"
 	exampleBaseURL            = "http://example.com"
-	allowedOriginKey          = "Access-Control-Allow-Origin"
 	cacheControlKey           = "Cache-Control"
 	noStoreHeader             = "no-store"
-	fooOrigin                 = "https://foo.example.com"
-	fooOriginWithPort         = "https://foo.example.com:8443"
 	resultsDBPath             = "/results.db"
 	resultsNewErrFmt          = "results.New: %v"
 	resultsPagePath           = "/results/abc12345"
@@ -17,19 +20,14 @@ const (
 	downloadAPIPath           = "/api/v1/download"
 	uploadAPIPath             = "/api/v1/upload"
 	healthRoutePath           = "/health"
-	evilOrigin                = "https://evilexample.com"
 	routerOctetStreamType     = "application/octet-stream"
 	routerContentTypeKey      = "Content-Type"
-	routerAllowOriginFmt      = "allow origin = %q, want %q"
 	routerContentTypeJSON     = "application/json"
 	routerContentTypeHTML     = "text/html"
 	routerCacheRootFmt        = "cache-control for / = %q, want %q"
 	routerCacheHTMLFmt        = "cache-control for html = %q, want %q"
-	routerFirstVersionReq     = "first version request "
 	routerFirstResultsReq     = "first results page "
 	routerSecondResultsReq    = "second results page "
-	routerEvilBypassFmt       = "evilexample.com should be rejected, got Allow-Origin = %q"
-	routerInvalidIDCalledErr  = "handler should not be called for invalid stream id"
 	routerJSNoStoreErr        = "cache-control for js should not be no-store"
 	routerCSPHeaderMissingErr = "content-security-policy header missing"
 	routerCSPScriptSrcFmt     = "csp missing script-src self: %q"
@@ -47,3 +45,13 @@ const (
 	routerFontServedFmt       = "font should be served, got %d"
 	routerEmbedDeniedFmt      = "embed.go should be denied by allowlist, got %d"
 )
+
+func newTestResultsStore(t *testing.T) *results.Store {
+	t.Helper()
+	store, err := results.New(t.TempDir()+resultsDBPath, 10)
+	if err != nil {
+		t.Fatalf(resultsNewErrFmt, err)
+	}
+	t.Cleanup(store.Close)
+	return store
+}

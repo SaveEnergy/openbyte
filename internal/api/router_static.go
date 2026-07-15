@@ -63,7 +63,7 @@ func (h *staticAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		name = "index.html"
 	}
 	switch name {
-	case "api", "results":
+	case "results":
 		name += ".html"
 	}
 	if strings.Contains(name, "..") || !isAllowedStaticAsset(name) {

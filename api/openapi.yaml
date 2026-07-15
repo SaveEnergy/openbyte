@@ -33,29 +33,21 @@ paths:
                     type: string
                     example: ok
 
-  /api/v1/version:
-    get:
-      summary: Server version and display name
-      operationId: getVersion
-      tags: [Server]
-      responses:
-        "200":
-          description: Version info
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/VersionResponse"
-        "429":
-          $ref: "#/components/responses/RateLimited"
-
   /api/v1/ping:
     get:
       summary: Latency ping and client IP detection
       operationId: ping
       tags: [SpeedTest]
+      parameters:
+        - name: meta
+          in: query
+          schema:
+            type: string
+            enum: ["1"]
+          description: Include the configured server display name when set to `1`. Omit for latency measurements.
       responses:
         "200":
-          description: Pong response with client IP info
+          description: Pong response with client IP info and optional bootstrap metadata.
           content:
             application/json:
               schema:
@@ -246,15 +238,6 @@ components:
         error:
           type: string
 
-    VersionResponse:
-      type: object
-      properties:
-        version:
-          type: string
-        server_name:
-          type: string
-          description: Display name configured for this server.
-
     PingResponse:
       type: object
       properties:
@@ -269,6 +252,9 @@ components:
           type: string
         ipv6:
           type: boolean
+        server_name:
+          type: string
+          description: Display name configured for this server. Present only when `meta=1`.
 
     UploadResponse:
       type: object

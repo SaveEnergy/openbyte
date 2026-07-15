@@ -73,14 +73,13 @@ The browser client implements:
 | Variable              | Default           | Description                                                        |
 | --------------------- | ----------------- | ------------------------------------------------------------------ |
 | `PORT`                | 8080              | HTTP API port                                                      |
-| `SERVER_NAME`         | `openByte Server` | Display name shown in the Web UI and saved results                 |
+| `SERVER_NAME`         | `openByte Server` | Display name in bootstrap ping metadata, the Web UI, and saved results |
 | `CAPACITY_GBPS`       | 25                | Server link capacity; HTTP concurrency limits auto-scale from this |
 | `MAX_CONCURRENT_PER_IP` | 64              | Concurrent speed-test streams allowed per client IP and direction  |
-| `RATE_LIMIT_PER_IP`   | 100               | Per-IP requests/minute for version and result routes                |
-| `GLOBAL_RATE_LIMIT`   | 1000              | Global requests/minute for version and result routes                |
+| `RATE_LIMIT_PER_IP`   | 100               | Per-IP requests/minute for shared-result routes                     |
+| `GLOBAL_RATE_LIMIT`   | 1000              | Global requests/minute for shared-result routes                     |
 | `TRUST_PROXY_HEADERS` | false             | Trust proxy headers for client IP                                  |
 | `TRUSTED_PROXY_CIDRS` | —                 | Comma-separated trusted proxy CIDRs                                |
-| `ALLOWED_ORIGINS`     | `*`               | Comma-separated CORS allowed origins                               |
 | `WEB_ROOT`            | _(embedded)_      | Override path to static web assets (for development)               |
 | `MAX_TEST_DURATION`   | `300s`            | Maximum test duration (whole seconds in Go duration format, at least `1s`) |
 | `DATA_DIR`            | `./data`          | Path to SQLite database directory                                  |
@@ -97,7 +96,8 @@ Notes:
 - If you bind `127.0.0.1` only, open the UI at `http://127.0.0.1:PORT`.
 - Configure public DNS and reverse-proxy routing outside openByte; saved-result URLs are relative.
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
-- Default CORS allows all origins; set `ALLOWED_ORIGINS` to restrict (supports `*` and `*.example.com`).
+- `/api/v1/ping` is the only cross-origin API: it allows any origin so the UI can probe dedicated IPv4/IPv6 hostnames. Other API routes are same-origin.
+- There is no `/api/v1/version` route. The UI requests `/api/v1/ping?meta=1` during bootstrap to load `SERVER_NAME`; measurement and address-discovery pings keep the smaller default response.
 - If running behind a reverse proxy, allow more than the browser's adaptive 64 MiB maximum request payload and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.
 - Server configuration uses environment variables only; `openbyte --help` lists command-only options.
 
@@ -137,10 +137,11 @@ Playwright starts a local server on `127.0.0.1:8080`, or reuses one already runn
 ## Documentation
 
 - [Architecture](ARCHITECTURE.md) — System design and components
-- [`api/openapi.yaml`](api/openapi.yaml) — authoritative API contract
-- Web API quick reference: `/api.html` on any running openByte server
+- [`api/openapi.yaml`](api/openapi.yaml) — canonical API contract
 - [Deployment Guide](DEPLOYMENT.md) — Production deployment
 - [Performance Guide](PERFORMANCE.md) — Profiling, load testing, perf checks
+
+The server does not duplicate the OpenAPI contract as a browser page.
 
 ## Project Structure
 
@@ -152,8 +153,6 @@ internal/
   api/        # REST API + HTTP speed test handlers
   config/     # Configuration
   results/    # SQLite results store
-pkg/
-  types/      # Shared HTTP host helpers
 docker/       # Docker + Compose configurations
 web/          # Web UI (embedded in binary)
   fonts/      # Self-hosted font files
