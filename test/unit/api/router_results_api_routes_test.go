@@ -1,8 +1,11 @@
 package api_test
 
 import (
+	"compress/gzip"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -10,13 +13,14 @@ import (
 	"github.com/saveenergy/openbyte/internal/config"
 )
 
-func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
+func TestResultsPageUsesStaticGzipHandler(t *testing.T) {
 	store := newTestResultsStore(t)
 	router := api.NewRouter(config.DefaultConfig(), store)
 
 	h := router.SetupRoutes()
 
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+resultsPagePath, nil)
+	req.Header.Set("Accept-Encoding", "gzip")
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -29,6 +33,44 @@ func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
 	contentType := rec.Header().Get(contentTypeHeader)
 	if !strings.Contains(contentType, routerContentTypeHTML) {
 		t.Fatalf(routerContentTypeWantFmt, contentType, routerContentTypeHTML)
+	}
+	if got := rec.Header().Get("Content-Encoding"); got != "gzip" {
+		t.Fatalf("content-encoding = %q, want gzip", got)
+	}
+	if got := rec.Header().Get("Vary"); !strings.Contains(got, "Accept-Encoding") {
+		t.Fatalf("vary = %q, want Accept-Encoding", got)
+	}
+	compressedLen := rec.Body.Len()
+	gz, err := gzip.NewReader(rec.Body)
+	if err != nil {
+		t.Fatalf("open gzip response: %v", err)
+	}
+	decompressed, err := io.ReadAll(gz)
+	if err != nil {
+		t.Fatalf("read gzip response: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("close gzip response: %v", err)
+	}
+	if !strings.Contains(string(decompressed), "<!doctype html>") {
+		t.Fatal("gzip response did not contain results HTML")
+	}
+
+	headReq := httptest.NewRequest(http.MethodHead, exampleBaseURL+resultsPagePath, nil)
+	headReq.Header.Set("Accept-Encoding", "gzip")
+	headRec := httptest.NewRecorder()
+	h.ServeHTTP(headRec, headReq)
+	if headRec.Code != http.StatusOK {
+		t.Fatalf("HEAD "+statusWantFmt, headRec.Code, http.StatusOK)
+	}
+	if headRec.Body.Len() != 0 {
+		t.Fatalf("HEAD body length = %d, want 0", headRec.Body.Len())
+	}
+	if got, want := headRec.Header().Get("Content-Length"), strconv.Itoa(compressedLen); got != want {
+		t.Fatalf("HEAD content-length = %q, want %q", got, want)
+	}
+	if got := headRec.Header().Get(cacheControlKey); got != noStoreHeader {
+		t.Fatalf("HEAD "+routerCacheControlFmt, got, noStoreHeader)
 	}
 }
 

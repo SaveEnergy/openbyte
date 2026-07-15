@@ -1,6 +1,12 @@
 /* speed test result and shared result views */
 
 .results-view .speed-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: fadeIn var(--motion-duration-fade) var(--ease-out);
+  position: relative;
   min-height: 0;
   padding-bottom: var(--space-xl);
   width: 100%;

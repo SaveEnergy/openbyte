@@ -15,43 +15,6 @@ function parseIntegerParam(params, name, fallback, min, max) {
   };
 }
 
-function clampInteger(value, fallback, min, max) {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.min(max, Math.max(min, parsed));
-}
-
-function normalizeAdaptiveConfig(config) {
-  return {
-    rampDuration: clampInteger(
-      config?.rampDuration,
-      TEST_CONFIG.ADAPTIVE_RAMP_SECONDS,
-      1,
-      TEST_CONFIG.ADAPTIVE_MAX_RAMP_SECONDS,
-    ),
-    measureDuration: clampInteger(
-      config?.measureDuration,
-      TEST_CONFIG.ADAPTIVE_MEASURE_SECONDS,
-      1,
-      TEST_CONFIG.ADAPTIVE_MAX_MEASURE_SECONDS,
-    ),
-    measureDurationOverridden: config?.measureDurationOverridden === true,
-    maxStreams: clampInteger(
-      config?.maxStreams,
-      TEST_CONFIG.ADAPTIVE_MAX_STREAMS,
-      TEST_CONFIG.ADAPTIVE_MIN_STREAMS,
-      TEST_CONFIG.ADAPTIVE_MAX_STREAMS,
-    ),
-    gainThreshold: Number.isFinite(config?.gainThreshold)
-      ? config.gainThreshold
-      : TEST_CONFIG.ADAPTIVE_GAIN_THRESHOLD,
-    nextHopProtocol:
-      typeof config?.nextHopProtocol === "string"
-        ? config.nextHopProtocol
-        : "",
-  };
-}
-
 function protocolStreamCap(protocol, maxStreams) {
   if (!http1ProtocolNames.has(String(protocol || "").toLowerCase())) {
     return maxStreams;
@@ -141,18 +104,16 @@ export function streamDelayForIndex(index) {
 
 export async function runAdaptiveHTTPTest(options) {
   const { runWindow, onPhase, onMeasureStart, signal } = options;
-  const config = options.config
-    ? normalizeAdaptiveConfig(options.config)
-    : resolveAdaptiveConfig();
+  const config = options.config || resolveAdaptiveConfig();
   const nextHopProtocol =
     config.nextHopProtocol || (await detectNextHopProtocol(signal));
-  config.maxStreams = protocolStreamCap(nextHopProtocol, config.maxStreams);
+  const maxStreams = protocolStreamCap(nextHopProtocol, config.maxStreams);
   let best = { streams: TEST_CONFIG.ADAPTIVE_MIN_STREAMS, mbps: 0 };
   let previousMbps = 0;
   let streams = TEST_CONFIG.ADAPTIVE_MIN_STREAMS;
   // Stream counts double each ramp window, so the window count is bounded;
   // the UI uses this bound to render determinate progress.
-  const maxWindows = Math.ceil(Math.log2(config.maxStreams)) + 1;
+  const maxWindows = Math.ceil(Math.log2(maxStreams)) + 1;
   let windowIndex = 0;
   const phaseInfo = () => ({
     windowIndex,
@@ -177,7 +138,7 @@ export async function runAdaptiveHTTPTest(options) {
     if (mbps > best.mbps) best = { streams, mbps };
     if (shouldStopRamping(previousMbps, mbps, config.gainThreshold)) break;
 
-    const next = nextStreamCount(streams, config.maxStreams);
+    const next = nextStreamCount(streams, maxStreams);
     if (next === streams) break;
     previousMbps = mbps;
     streams = next;

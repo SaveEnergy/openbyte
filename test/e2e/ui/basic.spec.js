@@ -285,6 +285,8 @@ test.describe("openByte UI", () => {
     await expect(page.locator("#resultView")).toBeVisible();
     await expect(page.locator("#downloadResult")).toContainText("123.5");
     await expect(page.locator("#uploadResult")).toContainText("67.9");
+    await expect(page.locator("#loadedLatencyResult")).toHaveText("18.4 ms");
+    await expect(page.locator("#bufferbloatResult")).toHaveText("A");
     await expect(page.getByText("Public IP at test time")).toBeVisible();
     await expect(page.locator("#networkIPv4")).toHaveText("192.0.2.1");
     await expect(page.locator("#networkIPv6")).toHaveText("2001:db8::1");

@@ -290,7 +290,7 @@ test.describe("openByte UI regressions", () => {
     await page.evaluate(async () => {
       const { state } = await import("/state.js");
       const { saveAndEnableShare } = await import(
-        "/speedtest-orchestrator.js"
+        "/openbyte.js"
       );
       state.phase = "results";
       state.runGeneration = 10;
@@ -301,7 +301,7 @@ test.describe("openByte UI regressions", () => {
     await page.evaluate(async () => {
       const { state } = await import("/state.js");
       const { saveAndEnableShare } = await import(
-        "/speedtest-orchestrator.js"
+        "/openbyte.js"
       );
       state.runGeneration = 11;
       state.resultId = null;

@@ -41,6 +41,7 @@ test.describe("browser speed-test runtime", () => {
     const result = await page.evaluate(async () => {
       const { runAdaptiveHTTPTest } = await import("/speedtest-adaptive.js");
       const windows = [];
+      let maxWindows;
       const controller = new AbortController();
       const mbps = await runAdaptiveHTTPTest({
         signal: controller.signal,
@@ -56,6 +57,9 @@ test.describe("browser speed-test runtime", () => {
           windows.push(options);
           return options.streams * 100;
         },
+        onPhase: (_stage, _streams, info) => {
+          maxWindows = info.maxWindows;
+        },
       });
       return {
         mbps,
@@ -63,11 +67,13 @@ test.describe("browser speed-test runtime", () => {
           .filter((window) => window.isRamp)
           .map((window) => window.streams),
         measuredStreams: windows.at(-1).streams,
+        maxWindows,
       };
     });
 
     expect(result.rampStreams).toEqual([1, 2, 4, 6]);
     expect(result.measuredStreams).toBe(6);
+    expect(result.maxWindows).toBe(4);
     expect(result.mbps).toBe(600);
   });
 

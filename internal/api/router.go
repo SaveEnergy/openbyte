@@ -65,9 +65,8 @@ func (r *Router) SetupRoutes() http.Handler {
 		respondJSON(w, map[string]string{"error": errNotFound}, http.StatusNotFound)
 	})
 
-	r.registerResultsPageRoute(mux, webFS)
-
 	staticHandler := staticCacheMiddleware(newStaticAllowlistHandler(webFS))
+	r.registerResultsPageRoute(mux, staticHandler)
 	mux.Handle("/", staticHandler)
 
 	return r.wrapMiddlewares(mux)
