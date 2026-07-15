@@ -1,19 +1,5 @@
 /* Result advisory, metric help, and local history. */
 
-.partial-notice {
-  display: flex;
-  align-items: center;
-  width: min(100%, 440px);
-  margin-bottom: var(--space-lg);
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--warning);
-  border-radius: 8px;
-  color: var(--warning);
-  font-size: 0.85rem;
-  line-height: 1.4;
-  text-align: left;
-}
-
 .results-advisory {
   max-width: 520px;
   margin-bottom: var(--space-lg);

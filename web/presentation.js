@@ -39,12 +39,7 @@ export function formatLatency(value) {
   })} ms`;
 }
 
-export function formatLoadedLatencyAdvisory({
-  idleLatency,
-  loadedLatency,
-  partial,
-}) {
-  if (partial === true) return "";
+export function formatLoadedLatencyAdvisory({ idleLatency, loadedLatency }) {
   const grade = computeBufferbloatGrade(idleLatency, loadedLatency);
   return grade === "C" || grade === "D" || grade === "F"
     ? t("result.loadedLatencyAdvisory")

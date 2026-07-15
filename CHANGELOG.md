@@ -34,9 +34,9 @@ in Git history and pull requests, not release notes.
   goodput without adding an estimated HTTP/1 protocol-overhead multiplier.
 - **One-tap share**: tapping Share now saves the result and copies the link in
   a single gesture (previously it required two taps).
-- **Cancel keeps partial results**: cancelling after the download phase shows
-  latency + download with a "cancelled early" notice instead of discarding
-  everything; sharing is disabled for partial runs.
+- **Cancel behavior**: cancelling aborts the active transfer, discards the
+  incomplete run, and returns to the ready screen without saving history or a
+  shareable result.
 - **Offline handling**: the server health check re-runs every 30 s while idle,
   and an offline server disables the GO button instead of failing on click.
 - **Light theme & toast polish**: light mode gains card borders/shadows, and
@@ -62,8 +62,6 @@ in Git history and pull requests, not release notes.
 
 - Prevented browsers from synthesizing unavailable display-font weights and
   made native form controls inherit the bundled DM Sans font.
-- Partial results now label download latency explicitly and omit the generic
-  bufferbloat grade and warning because upload was not measured.
 - Required `MAX_TEST_DURATION` to be whole seconds of at least `1s`, and bounded
   an omitted download duration by the configured maximum.
 

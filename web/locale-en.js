@@ -38,10 +38,8 @@ export const en = Object.freeze({
   "test.cancel": "Cancel",
 
   "result.heading": "Result",
-  "result.partialNotice": "Partial result — upload was not measured.",
   "result.download": "Download",
   "result.upload": "Upload",
-  "result.notMeasured": "not measured",
   "result.sharedHeading": "Test result",
   "result.server": "Server",
   "result.tested": "Tested at",
@@ -51,7 +49,6 @@ export const en = Object.freeze({
   "metric.idleLatency": "Idle",
   "metric.jitter": "Jitter",
   "metric.loadedLatency": "Under load",
-  "metric.downloadLatency": "During download",
   "metric.bufferbloat": "Bufferbloat",
   "metric.helpSummary": "What do these numbers mean?",
   "metric.idleLatencyDescription":
@@ -81,8 +78,6 @@ export const en = Object.freeze({
     "Speed test complete. Download {download}. Upload {upload}. Latency {latency}.",
   "announcement.completeWithGrade":
     "Speed test complete. Download {download}. Upload {upload}. Latency {latency}. Bufferbloat grade {grade}.",
-  "announcement.partial":
-    "Speed test cancelled early. Download {download}. Latency {latency}.",
   "error.testInProgress": "Test already in progress",
   "error.serverNotReady": "Server is not ready yet",
   "error.testFailed": "Speed test failed. Please try again.",

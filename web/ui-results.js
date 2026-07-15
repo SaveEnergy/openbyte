@@ -28,11 +28,10 @@ function renderBufferbloat(grade) {
   if (badgeClass) el.classList.add(badgeClass);
 }
 
-function renderAdvisory(partial, loadedLatency) {
+function renderAdvisory(loadedLatency) {
   const advisory = formatLoadedLatencyAdvisory({
     idleLatency: state.latencyResult,
     loadedLatency,
-    partial,
   });
   if (elements.resultsAdvisory) {
     elements.resultsAdvisory.textContent = advisory;
@@ -40,11 +39,10 @@ function renderAdvisory(partial, loadedLatency) {
   }
 }
 
-function announceResults(partial, grade) {
+function announceResults(grade) {
   if (!elements.resultsAnnouncement) return;
   const download = formatSpeedText(state.downloadResult);
-  let key = partial ? "announcement.partial" : "announcement.complete";
-  if (grade) key += "WithGrade";
+  const key = grade ? "announcement.completeWithGrade" : "announcement.complete";
   elements.resultsAnnouncement.textContent = t(key, {
     download,
     upload: formatSpeedText(state.uploadResult),
@@ -61,7 +59,6 @@ function renderShareButton() {
 }
 
 export function renderResultsContent() {
-  const partial = state.lastResultPartial;
   if (
     !elements.downloadResult ||
     !elements.uploadResult ||
@@ -78,14 +75,9 @@ export function renderResultsContent() {
   const uploadUnit = document.querySelector(".result-secondary .result-unit");
   if (downloadUnit) downloadUnit.textContent = download.unit;
 
-  if (partial) {
-    elements.uploadResult.textContent = "—";
-    if (uploadUnit) uploadUnit.textContent = t("result.notMeasured");
-  } else {
-    const upload = formatSpeed(state.uploadResult);
-    elements.uploadResult.textContent = upload.value;
-    if (uploadUnit) uploadUnit.textContent = upload.unit;
-  }
+  const upload = formatSpeed(state.uploadResult);
+  elements.uploadResult.textContent = upload.value;
+  if (uploadUnit) uploadUnit.textContent = upload.unit;
 
   elements.latencyResult.textContent = formatLatency(state.latencyResult);
   elements.jitterResult.textContent = formatLatency(state.jitterResult);
@@ -94,34 +86,22 @@ export function renderResultsContent() {
   if (elements.loadedLatencyResult) {
     elements.loadedLatencyResult.textContent = formatLatency(loadedLatency);
   }
-  if (elements.loadedLatencyLabel) {
-    elements.loadedLatencyLabel.textContent = t(
-      partial ? "metric.downloadLatency" : "metric.loadedLatency",
-    );
-  }
 
-  const grade = partial
-    ? null
-    : computeBufferbloatGrade(state.latencyResult, loadedLatency);
-  elements.bufferbloatStat?.classList.toggle("hidden", partial);
-  elements.statsHelp?.classList.toggle("hidden", partial);
+  const grade = computeBufferbloatGrade(state.latencyResult, loadedLatency);
   renderBufferbloat(grade);
-  renderAdvisory(partial, loadedLatency);
-  announceResults(partial, grade);
+  renderAdvisory(loadedLatency);
+  announceResults(grade);
 
-  elements.partialNotice?.classList.toggle("hidden", !partial);
   updateNetworkDisplay();
   renderHistory(elements.historyList, elements.historySection);
   renderShareButton();
 }
 
-export function enterResults(partial) {
-  state.lastResultPartial = partial;
+export function enterResults() {
   state.resultId = null;
   state.shareSavePromise = null;
   if (elements.shareBtn) {
-    // Partial runs have no upload figure, so a saved share would be misleading.
-    elements.shareBtn.classList.toggle("hidden", partial);
+    elements.shareBtn.classList.remove("hidden");
     elements.shareBtn.disabled = false;
   }
   renderResultsContent();
