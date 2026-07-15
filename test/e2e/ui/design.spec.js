@@ -43,8 +43,8 @@ async function showSyntheticResult(page) {
 
 test.describe("brand and localized layout", () => {
   test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
     await page.addInitScript(() => {
-      localStorage.setItem("openbyte-theme", "light");
       localStorage.setItem("openbyte-language", "de");
     });
   });
@@ -71,16 +71,15 @@ test.describe("brand and localized layout", () => {
         instrumentRing: read("#startBtn").boxShadow,
         shareBorder: read("#shareBtn").borderTopColor,
         fontSynthesis: root.fontSynthesis,
-        dark: (() => {
-          document.documentElement.dataset.theme = "dark";
-          const darkRoot = getComputedStyle(document.documentElement);
-          return {
-            background: darkRoot.getPropertyValue("--bg-secondary").trim(),
-            controlBorder: darkRoot
-              .getPropertyValue("--control-border")
-              .trim(),
-          };
-        })(),
+      };
+    });
+
+    await page.emulateMedia({ colorScheme: "dark" });
+    const dark = await page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement);
+      return {
+        background: root.getPropertyValue("--bg-secondary").trim(),
+        controlBorder: root.getPropertyValue("--control-border").trim(),
       };
     });
 
@@ -90,7 +89,7 @@ test.describe("brand and localized layout", () => {
       3,
     );
     expect(
-      contrast(styles.dark.controlBorder, styles.dark.background),
+      contrast(dark.controlBorder, dark.background),
     ).toBeGreaterThanOrEqual(3);
     expect(styles.buttonFont).toContain("DM Sans");
     expect(styles.hintFont).toContain("DM Sans");
@@ -122,7 +121,6 @@ test.describe("brand and localized layout", () => {
           viewportWidth: innerWidth,
           capsule: rect(".preference-controls"),
           select: rect("#languageSelect"),
-          theme: rect("#themeToggle"),
           serverStatus: getComputedStyle(
             document.getElementById("serverInfo"),
           ).display,
@@ -132,7 +130,6 @@ test.describe("brand and localized layout", () => {
       expect(layout.capsule.left).toBeGreaterThanOrEqual(0);
       expect(layout.capsule.right).toBeLessThanOrEqual(layout.viewportWidth);
       expect(layout.select.height).toBeGreaterThanOrEqual(44);
-      expect(layout.theme.height).toBeGreaterThanOrEqual(44);
       expect(layout.serverStatus).toBe("none");
     }
   });
