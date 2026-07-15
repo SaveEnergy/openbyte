@@ -97,6 +97,7 @@ func TestHostDeployRollback(t *testing.T) {
 	}{
 		{name: "success", scenario: "success", wantSuccess: true, wantDeployment: "new"},
 		{name: "first deployment", scenario: "no_previous", wantSuccess: true, wantDeployment: "new"},
+		{name: "missing Traefik subnet", scenario: "missing_proxy_subnet", wantDeployment: "old"},
 		{name: "image mismatch", scenario: "image_mismatch", wantDeployment: "old", wantRollback: true},
 		{name: "unhealthy openbyte", scenario: "app_unhealthy", wantDeployment: "old", wantRollback: true},
 		{
@@ -124,7 +125,8 @@ func TestHostDeployRollback(t *testing.T) {
 			}
 			writeExecutable(t, filepath.Join(binDir, "docker"), fakeDocker)
 			writeExecutable(t, filepath.Join(binDir, "sleep"), "#!/bin/sh\nexit 0\n")
-			if err := os.WriteFile(filepath.Join(stateDir, ".env"), nil, 0o600); err != nil {
+			envContents := "TRUST_PROXY_HEADERS=false\nTRUSTED_PROXY_CIDRS=\"10.0.0.0/8,192.168.0.0/16\"\n"
+			if err := os.WriteFile(filepath.Join(stateDir, ".env"), []byte(envContents), 0o600); err != nil {
 				t.Fatalf("write deployment env: %v", err)
 			}
 
@@ -160,6 +162,19 @@ func TestHostDeployRollback(t *testing.T) {
 				t.Fatalf("read Docker log: %v", err)
 			}
 			logText := string(logContents)
+			if tt.scenario != "missing_proxy_subnet" {
+				wantCIDRs := "172.18.0.0/16,fd00:dead:beef::/64"
+				newDeploy := newDeployCommand(logText)
+				if !strings.Contains(newDeploy, "TRUST_PROXY_HEADERS=true") {
+					t.Fatalf("new deployment does not trust proxy headers:\n%s", logText)
+				}
+				if !strings.Contains(newDeploy, "TRUSTED_PROXY_CIDRS="+wantCIDRs) {
+					t.Fatalf("new deployment trusted proxy CIDRs missing %q:\n%s", wantCIDRs, logText)
+				}
+				if strings.Contains(newDeploy, "10.0.0.0/8") || strings.Contains(newDeploy, "192.168.0.0/16") {
+					t.Fatalf("new deployment retained stale proxy CIDRs:\n%s", logText)
+				}
+			}
 			rollbackCommand := "IMAGE_TAG=rollback-new compose "
 			if got := strings.Contains(logText, rollbackCommand); got != tt.wantRollback {
 				t.Fatalf("rollback command present = %v, want %v\nlog:\n%s", got, tt.wantRollback, logText)
@@ -189,7 +204,8 @@ func newDeployCommand(logText string) string {
 
 const fakeDocker = `#!/bin/sh
 set -eu
-printf 'IMAGE_TAG=%s %s\n' "${IMAGE_TAG:-}" "$*" >> "$FAKE_STATE_DIR/docker.log"
+printf 'IMAGE_TAG=%s %s TRUST_PROXY_HEADERS=%s TRUSTED_PROXY_CIDRS=%s\n' \
+  "${IMAGE_TAG:-}" "$*" "${TRUST_PROXY_HEADERS:-}" "${TRUSTED_PROXY_CIDRS:-}" >> "$FAKE_STATE_DIR/docker.log"
 
 command=$1
 shift
@@ -198,6 +214,13 @@ case "$command" in
     exit 0
     ;;
   network)
+    case "$*" in
+      inspect*--format*)
+        if [ "$FAKE_SCENARIO" != missing_proxy_subnet ]; then
+          printf '172.18.0.0/16,fd00:dead:beef::/64,'
+        fi
+        ;;
+    esac
     exit 0
     ;;
   image)

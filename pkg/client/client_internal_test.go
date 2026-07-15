@@ -4,10 +4,16 @@ import (
 	"context"
 	"io"
 	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
 
 func TestNewClientHasDefaultHTTPTimeout(t *testing.T) {
 	c := New("http://localhost:8080")
@@ -19,23 +25,35 @@ func TestNewClientHasDefaultHTTPTimeout(t *testing.T) {
 	}
 }
 
-func TestUploadMeasuredAllowsFirstResponsePastTargetDuration(t *testing.T) {
-	mux := http.NewServeMux()
-	mux.HandleFunc(pathUpload, func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.Copy(io.Discard, r.Body)
-		time.Sleep(25 * time.Millisecond)
-		w.WriteHeader(http.StatusOK)
-	})
-	srv := httptest.NewServer(mux)
-	defer srv.Close()
+func TestUploadMeasuredUsesResponseGraceDeadline(t *testing.T) {
+	var remaining time.Duration
+	var hasDeadline bool
+	httpClient := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		deadline, ok := req.Context().Deadline()
+		hasDeadline = ok
+		if ok {
+			remaining = time.Until(deadline)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Status:     "200 OK",
+			Body:       io.NopCloser(strings.NewReader("")),
+		}, nil
+	})}
 
-	c := New(srv.URL)
+	c := New("http://example.test", WithHTTPClient(httpClient))
 	mbps, totalBytes, ok := c.uploadMeasured(context.Background(), 0)
 	if !ok {
 		t.Fatalf("uploadMeasured ok = false, mbps=%f totalBytes=%d", mbps, totalBytes)
 	}
 	if totalBytes == 0 {
 		t.Fatal("expected uploadMeasured to count the completed upload")
+	}
+	if !hasDeadline {
+		t.Fatal("upload request context has no deadline")
+	}
+	if remaining < uploadMeasurementGrace-time.Second || remaining > uploadMeasurementGrace+time.Second {
+		t.Fatalf("upload request deadline remaining = %v, want about %v", remaining, uploadMeasurementGrace)
 	}
 }
 
