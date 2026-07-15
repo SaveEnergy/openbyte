@@ -135,7 +135,7 @@ bunx playwright test
 make test-ui
 ```
 
-Playwright starts a local server on `127.0.0.1:8080`, or reuses one already running there.
+Playwright starts and owns a local server on `127.0.0.1:8080`; the port must be free.
 
 ## Documentation
 
@@ -159,7 +159,7 @@ internal/
 docker/       # Docker + Compose configurations
 web/          # Web UI (embedded in binary)
   fonts/      # Self-hosted font files
-test/         # Unit, Go E2E, and Playwright tests
+test/         # Go unit/API and Playwright tests
 ```
 
 ## License

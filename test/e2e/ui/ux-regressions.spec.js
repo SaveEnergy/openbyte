@@ -102,6 +102,7 @@ test.describe("openByte UI regressions", () => {
 
   test("delayed startup probes can finish during the first test", async ({
     page,
+    baseURL,
   }) => {
     await page.route(pingRoute, async (route) => {
       const hostname = new URL(route.request().url()).hostname;
@@ -121,9 +122,12 @@ test.describe("openByte UI regressions", () => {
         }),
       });
     });
-    await page.goto(
-      "http://openbyte.localhost:8080/?maxStreams=1&measureDuration=1&rampDuration=1",
+    const testURL = new URL(
+      "/?maxStreams=1&measureDuration=1&rampDuration=1",
+      baseURL,
     );
+    testURL.hostname = "openbyte.localhost";
+    await page.goto(testURL.href);
     await page.locator("#startBtn").click();
     await expect(page.locator("#testingState")).toBeVisible();
     await expect
@@ -207,6 +211,7 @@ test.describe("openByte UI regressions", () => {
 
   test("one-tap share falls back when gesture-gated APIs reject", async ({
     page,
+    baseURL,
   }) => {
     let saveRequests = 0;
     await page.addInitScript(() => {
@@ -264,7 +269,7 @@ test.describe("openByte UI regressions", () => {
         prompts: [
           {
             message: "Copy this link:",
-            value: "http://127.0.0.1:8080/results/ABCD1234",
+            value: new URL("/results/ABCD1234", baseURL).href,
           },
         ],
       });

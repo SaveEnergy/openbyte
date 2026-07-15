@@ -63,8 +63,8 @@
 - Deploy: **checkout first**, then `scripts/deploy/deploy.sh` validates the host key, streams and checksums the bundle over one SSH connection, and runs `deploy_host.sh`; the previous openByte image is pinned locally for Compose-based rollback.
 - Compose uses a published-image base; local source builds add `docker-compose.local.yaml`. The app healthcheck lives in the Dockerfile.
 - Traefik deploy uses the external `traefik` network and generic HTTP/HTTPS routers only; workflows ensure network presence.
-- **Race matrix**: `ci.yml` on `main`: `go test ./... -race -short -p 1`; `nightly.yml`: full `go test -race ./...` (including E2E once).
-- **Playwright**: `workers` = `2` on `GITHUB_ACTIONS`; optional `PLAYWRIGHT_WORKERS`; trace/reuse unchanged.
+- **Race matrix**: `ci.yml` on `main`: `go test ./... -race -p 1`; `nightly.yml`: `go test -race ./...`.
+- **Playwright**: `workers` = `2` on `GITHUB_ACTIONS`; optional `PLAYWRIGHT_WORKERS`; Playwright owns its local server and requires port 8080 to be free.
 - **CI concurrency**: `cancel-in-progress` only for `pull_request`; `push`/`workflow_dispatch` queue on same `ref` (deploy not mid-aborted).
 - **Nightly**: one full `go test -race ./...` gate. Performance and leak profiling are explicit local investigations, not unattended pass/fail theater.
 - **`make perf-bench`**: runs the curated transfer/gzip/JSON/SQLite suite from **`test/perf/bench_packages.txt`**; explicit experiments save output and use `benchstat` manually. See **`test/perf/README.md`**.
@@ -128,15 +128,14 @@ make build && WEB_ROOT=./web ./bin/openbyte
 | Run server (dev)    | `make run` (or `WEB_ROOT=./web ./bin/openbyte`)        |
 | Lint (Go)           | `make ci-lint`                                         |
 | Lint (OpenAPI)      | `bun run lint:openapi`                                 |
-| Short Go suite      | `go test ./... -short`                                 |
-| E2E tests (Go)      | `make test-e2e`                                        |
+| Go test suite       | `go test ./...`                                        |
 | UI E2E (Playwright) | `make test-ui`                                         |
 | Race detector       | `make test-race`                                       |
 | Benchmarks          | `make perf-bench`                                      |
 
 ### Gotchas
 
-- Playwright UI tests start a server on `127.0.0.1:8080`, or reuse one already running there.
+- Playwright UI tests own a server on `127.0.0.1:8080`; the port must be free.
 - No CGO required; SQLite uses `modernc.org/sqlite` (pure Go).
 - No external databases or services needed to run locally.
 - New web assets matching `web/embed.go` are served automatically; `WEB_ROOT` remains restricted to those embedded paths.

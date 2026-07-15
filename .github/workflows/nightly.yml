@@ -21,6 +21,6 @@ jobs:
           check-latest: true
           cache: true
 
-      # Full race (no -short): complements ci.yml main-branch go test -race -short -p 1.
+      # Run the full race suite without CI's serialized package cap.
       - name: Race tests
         run: go test -race ./...

@@ -1,4 +1,4 @@
-.PHONY: build openbyte test test-ui test-e2e test-race test-coverage clean run help docker docker-up docker-down perf-smoke perf-bench perf-leakcheck ci-lint lint-openapi
+.PHONY: build openbyte test test-ui test-race test-coverage clean run help docker docker-up docker-down perf-smoke perf-bench perf-leakcheck ci-lint lint-openapi
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
@@ -16,7 +16,7 @@ openbyte:
 # Testing
 test:
 	@echo "Running tests..."
-	@go test ./... -short -v
+	@go test ./... -v
 
 test-ui:
 	@echo "Running Playwright UI tests..."
@@ -31,17 +31,13 @@ ci-lint:
 lint-openapi:
 	@bun run lint:openapi
 
-test-e2e:
-	@echo "Running e2e tests..."
-	@go test ./test/e2e -v -timeout 2m
-
 test-race:
 	@echo "Running tests with race detector..."
-	@go test ./... -race -short
+	@go test ./... -race
 
 test-coverage:
 	@echo "Generating test coverage..."
-	@go test ./... -short -coverprofile=coverage.out
+	@go test ./... -coverprofile=coverage.out
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "✓ Coverage report: coverage.html"
 
@@ -106,13 +102,12 @@ help:
 	@echo "Targets:"
 	@echo "  build         - Build openbyte binary"
 	@echo "  openbyte      - Build openbyte binary"
-	@echo "  test          - Run short Go test suite"
+	@echo "  test          - Run Go test suite"
 	@echo "  test-ui       - Run Playwright UI tests"
-	@echo "  test-e2e      - Run full Go E2E tests"
 	@echo "  ci-lint       - Run CI lint checks"
 	@echo "  lint-openapi  - Lint api/openapi.yaml (Bun + devDependencies)"
-	@echo "  test-race     - Run short Go suite with race detector"
-	@echo "  test-coverage - Generate short-suite coverage report"
+	@echo "  test-race     - Run Go suite with race detector"
+	@echo "  test-coverage - Generate Go test coverage report"
 	@echo "  perf-bench    - Run perf benchmarks (stdout; quick count)"
 	@echo "  perf-smoke    - Run perf smoke with pprof capture"
 	@echo "  perf-leakcheck - Run goroutine leak profile smoke (Go 1.26 experiment)"
