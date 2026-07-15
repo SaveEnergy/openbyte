@@ -5,6 +5,10 @@ import { fetchWithTimeout, parseJSONOrThrow } from "./utils.js";
 
 const fallbackServerName = "openByte Server";
 
+function isIdle() {
+  return !state.isRunning && state.phase === "idle";
+}
+
 export function resolveServerName() {
   return normalizeServerName(state.serverName);
 }
@@ -21,12 +25,25 @@ function normalizeServerName(name) {
   return value || fallbackServerName;
 }
 
+function setStartAvailability(online) {
+  state.serverOnline = online;
+  if (elements.startBtn) {
+    elements.startBtn.disabled = !online;
+  }
+  if (elements.startBtnHint) {
+    elements.startBtnHint.textContent = online
+      ? "Click to test your speed"
+      : "Server offline — retrying";
+  }
+}
+
 function setServerOnlineUI() {
   if (elements.serverDot) {
     elements.serverDot.classList.remove("error");
     elements.serverDot.classList.add("connected");
   }
   if (elements.serverText) elements.serverText.textContent = "Ready";
+  setStartAvailability(true);
 }
 
 function setServerOfflineUI() {
@@ -35,6 +52,7 @@ function setServerOfflineUI() {
     elements.serverDot.classList.add("error");
   }
   if (elements.serverText) elements.serverText.textContent = "Offline";
+  setStartAvailability(false);
 }
 
 function startsWithDigit(value) {
@@ -61,7 +79,12 @@ export function updateNetworkDisplay() {
   }
 }
 
-async function discoverAddress(url, options, includeServerName = false) {
+async function discoverAddress(
+  url,
+  options,
+  shouldUpdate = () => true,
+  includeServerName = false,
+) {
   try {
     const response = await fetchWithTimeout(
       url,
@@ -70,7 +93,7 @@ async function discoverAddress(url, options, includeServerName = false) {
     );
     const data = await parseJSONOrThrow(response);
     if (includeServerName) setServerName(data?.server_name);
-    if (data.client_ip) {
+    if (data.client_ip && shouldUpdate()) {
       state.networkInfo[data.ipv6 ? "ipv6" : "ipv4"] = data.client_ip;
       updateNetworkDisplay();
     }
@@ -99,10 +122,27 @@ export function getNextHopProtocol() {
   return "";
 }
 
+/** Periodic idle re-check: probe the same-origin ping and update readiness. */
+export async function checkServer() {
+  const online = await discoverAddress(
+    `${getApiBase()}/ping`,
+    { cache: "no-store" },
+    isIdle,
+  );
+  if (online) setServerOnlineUI();
+  else setServerOfflineUI();
+}
+
 export function detectNetworkInfo() {
+  const discoveryGeneration = state.runGeneration;
+  const canUpdateStartupAddress = () =>
+    state.phase !== "results" &&
+    (state.runGeneration === discoveryGeneration ||
+      (state.runGeneration === discoveryGeneration + 1 && state.isRunning));
   const sameOriginProbe = discoverAddress(
     `${getApiBase()}/ping?meta=1`,
     { cache: "no-store" },
+    canUpdateStartupAddress,
     true,
   );
   void sameOriginProbe.then((ready) => {
@@ -125,8 +165,16 @@ export function detectNetworkInfo() {
 
   if (canProbe) {
     probes.push(
-      discoverAddress(`${proto}//v4.${hostname}/api/v1/ping`, probeOpts),
-      discoverAddress(`${proto}//v6.${hostname}/api/v1/ping`, probeOpts),
+      discoverAddress(
+        `${proto}//v4.${hostname}/api/v1/ping`,
+        probeOpts,
+        canUpdateStartupAddress,
+      ),
+      discoverAddress(
+        `${proto}//v6.${hostname}/api/v1/ping`,
+        probeOpts,
+        canUpdateStartupAddress,
+      ),
     );
   }
 

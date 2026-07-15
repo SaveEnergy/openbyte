@@ -5,8 +5,9 @@
   bottom: var(--space-xl);
   left: 50%;
   transform: translateX(-50%);
-  background: var(--error);
-  color: var(--text-primary);
+  /* Fixed colors: theme text vars would render dark-on-red in light mode. */
+  background: #dc2626;
+  color: #ffffff;
   padding: var(--space-sm) var(--space-lg);
   border-radius: 8px;
   display: flex;
@@ -18,7 +19,8 @@
 }
 
 .toast-success {
-  background: var(--accent-primary);
+  background: #00d4aa;
+  color: #04231c;
 }
 
 .toast-icon {

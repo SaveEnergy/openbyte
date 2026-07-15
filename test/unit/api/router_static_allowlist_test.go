@@ -115,7 +115,7 @@ func TestCriticalRoutesRespondOK(t *testing.T) {
 
 func TestRemovedBrowserAPIPagesReturnNotFound(t *testing.T) {
 	handler := api.NewRouter(config.DefaultConfig(), nil).SetupRoutes()
-	for _, path := range []string{"/api", "/api.html", "/api.css"} {
+	for _, path := range []string{"/api", "/api.html", "/api.css", "/api.js"} {
 		req := httptest.NewRequest(http.MethodGet, exampleBaseURL+path, nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)

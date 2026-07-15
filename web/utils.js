@@ -16,6 +16,58 @@ export function computeBufferbloatGrade(idleLatency, loadedLatency) {
   return "F";
 }
 
+/**
+ * One-sentence plain-language interpretation of the measured results.
+ * Partial runs (no upload figure) grade on download and latency only.
+ */
+export function computeConnectionVerdict({
+  download,
+  upload,
+  idleLatency,
+  loadedLatency,
+  partial,
+}) {
+  if (!Number.isFinite(download) || download <= 0) return "";
+
+  let verdict;
+  if (partial === true) {
+    if (download >= 500) {
+      verdict =
+        "Exceptional download speed — ample for multiple 4K streams and large downloads.";
+    } else if (download >= 100) {
+      verdict =
+        "Excellent download speed — smooth 4K streaming and fast downloads.";
+    } else if (download >= 25) {
+      verdict = "Good download speed — comfortable HD streaming and browsing.";
+    } else if (download >= 10) {
+      verdict = "Modest download speed — fine for browsing and music.";
+    } else {
+      verdict = "Slow download speed — expect buffering and long downloads.";
+    }
+  } else if (download >= 500 && upload >= 100) {
+    verdict =
+      "Exceptional connection — handles 4K streaming, cloud backups, and busy households with ease.";
+  } else if (download >= 100 && upload >= 20) {
+    verdict =
+      "Excellent connection — smooth 4K streaming, video calls, and gaming.";
+  } else if (download >= 25 && upload >= 5) {
+    verdict =
+      "Good connection — comfortable HD streaming and stable video calls.";
+  } else if (download >= 10) {
+    verdict =
+      "Modest connection — fine for browsing and music; large downloads take a while.";
+  } else {
+    verdict = "Slow connection — expect buffering and long download times.";
+  }
+
+  const grade = computeBufferbloatGrade(idleLatency, loadedLatency);
+  if (grade === "C" || grade === "D" || grade === "F") {
+    verdict +=
+      " Latency rises noticeably under load (bufferbloat), which can cause lag in calls and games while the connection is busy.";
+  }
+  return verdict;
+}
+
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function formatSpeed(speed) {

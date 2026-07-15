@@ -7,6 +7,8 @@ export function getApiBase() {
 export const state = {
   phase: "idle",
   isRunning: false,
+  currentSpeed: 0,
+  progress: 0,
   downloadResult: 0,
   uploadResult: 0,
   latencyResult: null,
@@ -14,6 +16,7 @@ export const state = {
   downloadLatency: 0,
   uploadLatency: 0,
   abortController: null,
+  runGeneration: 0,
   networkInfo: {
     ipv4: null,
     ipv6: null,
@@ -22,6 +25,9 @@ export const state = {
   serverName: "openByte Server",
   resultId: null,
   shareSavePromise: null,
+  serverOnline: false,
+  partialCancelRequested: false,
+  lastResultPartial: false,
 };
 
 /** Populated by `initElements()` after the document is ready (module load can precede DOM). */
@@ -36,6 +42,7 @@ export function initElements() {
   elements.speedUnit = document.getElementById("speedUnit");
   elements.testType = document.getElementById("testType");
   elements.progressMeter = document.getElementById("progressMeter");
+  elements.progressRing = document.getElementById("progressRing");
   elements.downloadResult = document.getElementById("downloadResult");
   elements.uploadResult = document.getElementById("uploadResult");
   elements.latencyResult = document.getElementById("latencyResult");
@@ -58,6 +65,25 @@ export function initElements() {
   elements.successToast = document.getElementById("successToast");
   elements.successMessage = document.getElementById("successMessage");
   elements.shareBtn = document.getElementById("shareBtn");
+  elements.speedSparkline = document.getElementById("speedSparkline");
+  elements.phaseSteps = {
+    ping: document.getElementById("phaseStepPing"),
+    download: document.getElementById("phaseStepDownload"),
+    upload: document.getElementById("phaseStepUpload"),
+  };
+  elements.phaseValues = {
+    ping: document.getElementById("phaseValuePing"),
+    download: document.getElementById("phaseValueDownload"),
+    upload: document.getElementById("phaseValueUpload"),
+  };
+  elements.resultsVerdict = document.getElementById("resultsVerdict");
+  elements.partialNotice = document.getElementById("partialNotice");
+  elements.resultsAnnouncement = document.getElementById(
+    "resultsAnnouncement",
+  );
+  elements.historySection = document.getElementById("historySection");
+  elements.historyList = document.getElementById("historyList");
+  elements.startBtnHint = document.querySelector(".start-btn-hint");
 }
 
 export const TEST_CONFIG = {
@@ -96,6 +122,8 @@ export const TEST_CONFIG = {
   WARMUP_MAX_GRACE_MS: 5000,
   TOAST_ERROR_MS: 5000,
   TOAST_SUCCESS_MS: 2000,
+  SERVER_RECHECK_MS: 30000,
+  SPARKLINE_MAX_POINTS: 120,
 };
 
 export const toast = { timer: null };

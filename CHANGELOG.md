@@ -5,6 +5,40 @@ in Git history and pull requests, not release notes.
 
 ## [Unreleased]
 
+### Added
+
+- **Test legibility**: the testing screen now shows a determinate progress ring
+  (ramp windows + measure countdown reported by the worker), a phase stepper
+  (Ping → Download → Upload) that keeps completed phase results visible as
+  chips, and a live throughput sparkline under the speed number.
+- **Result interpretation**: a plain-language verdict line above the result
+  cards, a colored bufferbloat grade badge, and a "What do these numbers
+  mean?" disclosure explaining latency, jitter, loaded latency, and
+  bufferbloat.
+- **Recent tests**: the last runs are stored in `localStorage` and listed on
+  the results screen (`web/history.js`).
+- **Manual theme toggle**: header button cycles system → light → dark and
+  persists per device (`web/theme.js`); applies on the main, shared-result,
+  and shared-result pages.
+
+### Changed
+
+- **One-tap share**: tapping Share now saves the result and copies the link in
+  a single gesture (previously it required two taps).
+- **Cancel keeps partial results**: cancelling after the download phase shows
+  latency + download with a "cancelled early" notice instead of discarding
+  everything; sharing is disabled for partial runs.
+- **Offline handling**: the server health check re-runs every 30 s while idle,
+  and an offline server disables the GO button instead of failing on click.
+- **Light theme & toast polish**: light mode gains card borders/shadows, and
+  toasts use fixed high-contrast colors in both themes.
+- **Mobile results layout**: the four secondary stats render as a 2×2 grid on
+  small screens instead of one long column.
+- **Shared result page**: aligned with the live results view — verdict line,
+  colored bufferbloat badge, metric explanations, and the theme toggle now
+  appear on `/results/{id}` too. The explanations live in a shared
+  `stats-help.js` module used by both pages.
+
 ### Security
 
 - Raised the Go baseline to 1.26.5 for the `crypto/tls` fix tracked as
