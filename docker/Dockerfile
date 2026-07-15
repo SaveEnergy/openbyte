@@ -17,7 +17,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 # Copy source (web/ needed for //go:embed)
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
-COPY pkg/ ./pkg/
 COPY web/ ./web/
 
 # Build openbyte binary

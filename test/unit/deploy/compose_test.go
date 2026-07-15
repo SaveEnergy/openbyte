@@ -46,6 +46,28 @@ func TestTraefikHealthcheckCarriesPingConfiguration(t *testing.T) {
 	}
 }
 
+func TestDockerfileLocalCopySourcesExist(t *testing.T) {
+	t.Parallel()
+
+	root := repositoryRoot(t)
+	contents, err := os.ReadFile(filepath.Join(root, "docker", "Dockerfile"))
+	if err != nil {
+		t.Fatalf("read Dockerfile: %v", err)
+	}
+
+	for lineNumber, line := range strings.Split(string(contents), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 || fields[0] != "COPY" || strings.HasPrefix(fields[1], "--") {
+			continue
+		}
+		for _, source := range fields[1 : len(fields)-1] {
+			if _, err := os.Stat(filepath.Join(root, source)); err != nil {
+				t.Errorf("Dockerfile line %d COPY source %q: %v", lineNumber+1, source, err)
+			}
+		}
+	}
+}
+
 func repositoryRoot(t *testing.T) string {
 	t.Helper()
 
