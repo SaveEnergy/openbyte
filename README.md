@@ -137,7 +137,7 @@ Playwright starts a local server on `127.0.0.1:8080`, or reuses one already runn
 ## Documentation
 
 - [Architecture](ARCHITECTURE.md) — System design and components
-- [API Reference](API.md) — REST API specification
+- [`api/openapi.yaml`](api/openapi.yaml) — authoritative API contract
 - Web API quick reference: `/api.html` on any running openByte server
 - [Deployment Guide](DEPLOYMENT.md) — Production deployment
 - [Performance Guide](PERFORMANCE.md) — Profiling, load testing, perf checks

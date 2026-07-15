@@ -1,5 +1,3 @@
-# Packages included in perf-record / perf-bench (one import path per line).
-# Prefer internal/* benchmarks that call production hot paths (not synthetic loops in test/unit).
+# Production data-path and persistence benchmarks run by make perf-bench.
 ./internal/api
 ./internal/results
-./pkg/types

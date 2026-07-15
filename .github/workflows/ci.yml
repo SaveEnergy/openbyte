@@ -4,8 +4,6 @@ on:
   pull_request:
   push:
     branches: ["main"]
-    tags:
-      - "v*.*.*"
   workflow_dispatch:
     inputs:
       force_build:
@@ -13,7 +11,7 @@ on:
         type: boolean
         default: false
 
-# PRs: cancel superseded runs (save minutes). main/tags/dispatch: do not cancel — avoids
+# PRs: cancel superseded runs (save minutes). main/dispatch: do not cancel — avoids
 # aborting an in-flight deploy when another push lands (next run queues per group).
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -36,7 +34,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           if git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD" \
-            | grep -qE '^(web/|package\.json$|bun\.lock$|playwright\.config\.js$|scripts/run-playwright\.mjs$|test/e2e/)'; then
+            | grep -qE '^(web/|package\.json$|bun\.lock$|playwright\.config\.js$|test/e2e/)'; then
             echo "web=true" >> "$GITHUB_OUTPUT"
           else
             echo "web=false" >> "$GITHUB_OUTPUT"
@@ -66,9 +64,6 @@ jobs:
       - name: OpenAPI lint
         run: bun run lint:openapi
 
-      - name: OpenAPI route contract
-        run: go test ./test/unit/api -run TestOpenAPIRouteContract
-
       - name: Go mod tidy check
         run: |
           go mod tidy
@@ -83,7 +78,7 @@ jobs:
         run: go test ./...
 
       # -short: skip heavy tests (e.g. test/e2e skipIfShort). -p 1: serial packages, cap memory on GHA under race.
-      - name: Race tests (main/tags)
+      - name: Race tests (main)
         if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
         run: go test ./... -race -short -p 1
 
@@ -110,7 +105,7 @@ jobs:
 
       - name: Playwright e2e
         if: github.event_name != 'pull_request' || steps.web-changes.outputs.web == 'true'
-        run: env -u NO_COLOR bunx playwright test
+        run: env -u NO_COLOR bun run test:ui
 
   build-push:
     needs: checks
@@ -184,32 +179,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Validate deploy configuration
-        run: bash scripts/deploy/validate_env.sh
-
-      - name: Sync compose files to server
+      - name: Deploy
         env:
-          SSH_HOST: ${{ env.SSH_HOST }}
-          SSH_HOST_FINGERPRINT: ${{ env.SSH_HOST_FINGERPRINT }}
-          SSH_USER: ${{ env.SSH_USER }}
-          SSH_PORT: ${{ env.SSH_PORT }}
-          REMOTE_DIR: ${{ env.REMOTE_DIR }}
-          SSH_KEY: ${{ env.SSH_KEY }}
-        run: bash scripts/deploy/sync_compose.sh
-
-      - name: Deploy via SSH
-        env:
-          SSH_HOST: ${{ env.SSH_HOST }}
-          SSH_HOST_FINGERPRINT: ${{ env.SSH_HOST_FINGERPRINT }}
-          SSH_USER: ${{ env.SSH_USER }}
-          SSH_PORT: ${{ env.SSH_PORT }}
-          REMOTE_DIR: ${{ env.REMOTE_DIR }}
-          SSH_KEY: ${{ env.SSH_KEY }}
-          GHCR_USERNAME: ${{ env.GHCR_USERNAME }}
-          GHCR_TOKEN: ${{ env.GHCR_TOKEN }}
           DEPLOY_TAG: ${{ github.sha }}
-        run: bash scripts/deploy/deploy_remote.sh
-
-      - name: Cleanup SSH key material
-        if: always()
-        run: rm -f ~/.ssh/id_rsa ~/.ssh/known_hosts ~/.ssh/known_hosts.tmp
+        run: bash scripts/deploy/deploy.sh

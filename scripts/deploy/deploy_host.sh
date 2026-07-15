@@ -1,5 +1,5 @@
 #!/bin/sh
-# Runs on the deployment host. scripts/deploy/deploy_remote.sh streams this file over SSH.
+# Runs on the deployment host after scripts/deploy/deploy.sh verifies and syncs it.
 set -eu
 
 [ -n "${REMOTE_DIR:-}" ] || { echo "REMOTE_DIR not set"; exit 1; }
@@ -39,7 +39,7 @@ run_compose() {
   GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$image_tag" docker compose \
     --env-file "$REMOTE_DIR/.env" \
     -f docker/docker-compose.ghcr.yaml \
-    -f docker/docker-compose.ghcr.traefik.yaml \
+    -f docker/docker-compose.traefik.yaml \
     "$@"
 }
 
