@@ -47,6 +47,8 @@ export const de = Object.freeze({
   "result.server": "Server",
   "result.tested": "Getestet am",
   "result.loading": "Ergebnis wird geladen…",
+  "result.loadedLatencyAdvisory":
+    "Die Latenz steigt unter Last. Anrufe und Spiele können dann stocken.",
   "metric.idleLatency": "Leerlauf",
   "metric.jitter": "Jitter",
   "metric.loadedLatency": "Unter Last",
@@ -76,19 +78,6 @@ export const de = Object.freeze({
   "share.nativeTitle": "openByte-Speedtest-Ergebnis",
   "share.copyPrompt": "Diesen Link kopieren:",
   "nav.speedTest": "Speedtest",
-
-  "verdict.partial.exceptional": "Extrem schneller Download.",
-  "verdict.partial.excellent": "Sehr schneller Download.",
-  "verdict.partial.good": "Gute Downloadgeschwindigkeit.",
-  "verdict.partial.modest": "Genug zum Surfen und Musikhören.",
-  "verdict.partial.slow": "Langsamer Download.",
-  "verdict.complete.exceptional": "Außergewöhnlich schnelle Verbindung.",
-  "verdict.complete.excellent": "Ideal für Streaming und Videoanrufe.",
-  "verdict.complete.good": "Gut für den Alltag.",
-  "verdict.complete.modest": "Genug zum Surfen und Musikhören.",
-  "verdict.complete.slow": "Langsame Verbindung – Unterbrechungen möglich.",
-  "verdict.bufferbloatWarning":
-    "Die Latenz steigt unter Last. Anrufe und Spiele können dann stocken.",
 
   "announcement.complete":
     "Speedtest abgeschlossen. Download {download}. Upload {upload}. Latenz {latency}.",

@@ -1,7 +1,7 @@
-/** Main-thread localized formatting for speed-test values and verdicts. */
+/** Main-thread localized formatting for speed-test values and advisories. */
 
 import { formatNumber, t } from "./i18n.js";
-import { computeConnectionVerdict } from "./utils.js";
+import { computeBufferbloatGrade } from "./utils.js";
 
 export function formatSpeed(speed) {
   const safeSpeed =
@@ -39,13 +39,14 @@ export function formatLatency(value) {
   })} ms`;
 }
 
-export function formatConnectionVerdict(values) {
-  const verdict = computeConnectionVerdict(values);
-  if (!verdict) return "";
-  return t(verdict.key);
-}
-
-export function formatConnectionAdvisory(values) {
-  const verdict = computeConnectionVerdict(values);
-  return verdict?.warningKey ? t(verdict.warningKey) : "";
+export function formatLoadedLatencyAdvisory({
+  idleLatency,
+  loadedLatency,
+  partial,
+}) {
+  if (partial === true) return "";
+  const grade = computeBufferbloatGrade(idleLatency, loadedLatency);
+  return grade === "C" || grade === "D" || grade === "F"
+    ? t("result.loadedLatencyAdvisory")
+    : "";
 }

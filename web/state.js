@@ -78,7 +78,6 @@ export function initElements() {
     download: document.getElementById("phaseValueDownload"),
     upload: document.getElementById("phaseValueUpload"),
   };
-  elements.resultsVerdict = document.getElementById("resultsVerdict");
   elements.resultsAdvisory = document.getElementById("resultsAdvisory");
   elements.loadedLatencyLabel = document.getElementById("loadedLatencyLabel");
   elements.bufferbloatStat = document.getElementById("bufferbloatStat");

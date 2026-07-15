@@ -137,7 +137,7 @@ test.describe("brand and localized layout", () => {
     }
   });
 
-  test("puts German result numbers before concise interpretation", async ({
+  test("puts German result numbers before the loaded-latency advisory", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 320, height: 800 });
@@ -155,7 +155,7 @@ test.describe("brand and localized layout", () => {
         firstCardTop: cards[0].top,
         secondCardTop: cards[1].top,
         cardsBottom: Math.max(cards[0].bottom, cards[1].bottom),
-        verdictTop: bounds("#resultsVerdict").top,
+        metricsTop: bounds(".results-extra").top,
         metricsBottom: bounds(".results-extra").bottom,
         advisoryTop: bounds("#resultsAdvisory").top,
         extraLabelTransform: getComputedStyle(
@@ -166,11 +166,11 @@ test.describe("brand and localized layout", () => {
 
     expect(layout.scrollWidth).toBeLessThanOrEqual(320);
     expect(Math.abs(layout.firstCardTop - layout.secondCardTop)).toBeLessThan(2);
-    expect(layout.verdictTop).toBeGreaterThanOrEqual(layout.cardsBottom);
+    expect(layout.metricsTop).toBeGreaterThanOrEqual(layout.cardsBottom);
     expect(layout.advisoryTop).toBeGreaterThanOrEqual(layout.metricsBottom);
     expect(layout.extraLabelTransform).toBe("none");
-    await expect(page.locator("#resultsVerdict")).toHaveText(
-      "Ideal für Streaming und Videoanrufe.",
+    await expect(page.locator("#resultsAdvisory")).toHaveText(
+      "Die Latenz steigt unter Last. Anrufe und Spiele können dann stocken.",
     );
   });
 

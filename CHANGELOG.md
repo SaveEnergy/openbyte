@@ -16,9 +16,9 @@ in Git history and pull requests, not release notes.
   (ramp windows + measure countdown reported by the worker), a phase stepper
   (Ping → Download → Upload) that keeps completed phase results visible as
   chips, and a live throughput sparkline under the speed number.
-- **Result interpretation**: a concise verdict after the primary speed cards,
-  a separate loaded-latency advisory, a colored bufferbloat grade badge, and a
-  "What do these numbers mean?" disclosure explaining the secondary metrics.
+- **Result context**: a loaded-latency advisory, a colored bufferbloat grade
+  badge, and a "What do these numbers mean?" disclosure explaining the
+  secondary metrics without assigning a subjective connection label.
 - **Recent tests**: the last runs are stored in `localStorage` and listed on
   the results screen (`web/history.js`).
 - **Manual theme toggle**: header button cycles system → light → dark and
@@ -44,9 +44,9 @@ in Git history and pull requests, not release notes.
   color without reusing it for low-contrast light-theme text, grouped language
   and theme preferences into one compact control, shortened German copy, and
   stopped exposing adaptive-stream jargon in the test UI.
-- **Shared result page**: aligned with the live results view — verdict line,
-  colored bufferbloat badge, metric explanations, and the theme toggle now
-  appear on `/results/{id}` too. The explanations live in a shared
+- **Shared result page**: aligned with the live results view — loaded-latency
+  advisory, colored bufferbloat badge, metric explanations, and the theme
+  toggle now appear on `/results/{id}` too. The explanations live in a shared
   `stats-help.js` module used by both pages.
 
 ### Security
