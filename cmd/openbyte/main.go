@@ -1,13 +1,9 @@
 package main
 
-import (
-	"os"
-
-	server "github.com/saveenergy/openbyte/cmd/server"
-)
+import "os"
 
 var version = "dev"
 
 func main() {
-	os.Exit(server.Run(os.Args[1:], version))
+	os.Exit(run(os.Args[1:], version))
 }

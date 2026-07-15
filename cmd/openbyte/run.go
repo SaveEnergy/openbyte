@@ -1,4 +1,4 @@
-package server
+package main
 
 import (
 	"errors"
@@ -20,7 +20,12 @@ var (
 	exitFailure = 1
 )
 
-func Run(args []string, version string) int {
+const (
+	serverReadHeaderTimeout = 15 * time.Second
+	serverIdleTimeout       = 60 * time.Second
+)
+
+func run(args []string, version string) int {
 	versionFlag, err := parseServerArgs(args)
 	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -52,10 +57,8 @@ func Run(args []string, version string) int {
 	srv := &http.Server{
 		Addr:              cfg.BindAddress + ":" + cfg.Port,
 		Handler:           muxRouter,
-		ReadTimeout:       cfg.ReadTimeout,
-		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
-		WriteTimeout:      cfg.WriteTimeout,
-		IdleTimeout:       cfg.IdleTimeout,
+		ReadHeaderTimeout: serverReadHeaderTimeout,
+		IdleTimeout:       serverIdleTimeout,
 		HTTP2:             speedtestHTTP2Config(cfg),
 	}
 	configureHTTPProtocols(cfg, srv)

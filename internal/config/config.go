@@ -11,11 +11,6 @@ type Config struct {
 
 	MaxTestDuration time.Duration
 
-	ReadTimeout       time.Duration
-	ReadHeaderTimeout time.Duration
-	WriteTimeout      time.Duration
-	IdleTimeout       time.Duration
-
 	PprofEnabled bool
 	PprofAddress string
 
@@ -52,10 +47,6 @@ func DefaultConfig() *Config {
 		BindAddress:            "0.0.0.0",
 		ServerName:             DefaultServerName,
 		MaxTestDuration:        300 * time.Second,
-		ReadTimeout:            0,                // disabled; upload handlers manage own body deadline
-		ReadHeaderTimeout:      15 * time.Second, // protects against slowloris
-		WriteTimeout:           0,                // disabled; streaming endpoints manage own duration
-		IdleTimeout:            60 * time.Second,
 		PprofEnabled:           false,
 		PprofAddress:           "127.0.0.1:6060",
 		RateLimitPerIP:         100,
