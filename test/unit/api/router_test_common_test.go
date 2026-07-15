@@ -1,5 +1,11 @@
 package api_test
 
+import (
+	"testing"
+
+	"github.com/saveenergy/openbyte/internal/results"
+)
+
 const (
 	statusWantFmt             = "status = %d, want %d"
 	exampleBaseURL            = "http://example.com"
@@ -39,3 +45,13 @@ const (
 	routerFontServedFmt       = "font should be served, got %d"
 	routerEmbedDeniedFmt      = "embed.go should be denied by allowlist, got %d"
 )
+
+func newTestResultsStore(t *testing.T) *results.Store {
+	t.Helper()
+	store, err := results.New(t.TempDir()+resultsDBPath, 10)
+	if err != nil {
+		t.Fatalf(resultsNewErrFmt, err)
+	}
+	t.Cleanup(store.Close)
+	return store
+}

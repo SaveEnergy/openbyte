@@ -8,15 +8,10 @@ import (
 
 	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/internal/config"
-	"github.com/saveenergy/openbyte/internal/results"
 )
 
 func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
-	store, err := results.New(t.TempDir()+resultsDBPath, 10)
-	if err != nil {
-		t.Fatalf(resultsNewErrFmt, err)
-	}
-	defer store.Close()
+	store := newTestResultsStore(t)
 	router := api.NewRouter(config.DefaultConfig(), store)
 
 	h := router.SetupRoutes()
@@ -38,11 +33,7 @@ func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
 }
 
 func TestResultsPageRouteRejectsInvalidID(t *testing.T) {
-	store, err := results.New(t.TempDir()+resultsDBPath, 10)
-	if err != nil {
-		t.Fatalf(resultsNewErrFmt, err)
-	}
-	defer store.Close()
+	store := newTestResultsStore(t)
 	router := api.NewRouter(config.DefaultConfig(), store)
 
 	h := router.SetupRoutes()
@@ -79,11 +70,7 @@ func TestResultsPageRouteRateLimited(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.GlobalRateLimit = 1
 	cfg.RateLimitPerIP = 1
-	store, err := results.New(t.TempDir()+resultsDBPath, 10)
-	if err != nil {
-		t.Fatalf(resultsNewErrFmt, err)
-	}
-	defer store.Close()
+	store := newTestResultsStore(t)
 	router := api.NewRouter(cfg, store)
 	h := router.SetupRoutes()
 

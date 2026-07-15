@@ -8,7 +8,6 @@ import (
 
 	"github.com/saveenergy/openbyte/internal/api"
 	"github.com/saveenergy/openbyte/internal/config"
-	"github.com/saveenergy/openbyte/internal/results"
 )
 
 func TestStaticHTMLUsesNoStoreCacheControl(t *testing.T) {
@@ -81,11 +80,7 @@ func TestRateLimitSkipPaths(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.GlobalRateLimit = 1
 	cfg.RateLimitPerIP = 1
-	store, err := results.New(t.TempDir()+resultsDBPath, 10)
-	if err != nil {
-		t.Fatalf(resultsNewErrFmt, err)
-	}
-	defer store.Close()
+	store := newTestResultsStore(t)
 	router := api.NewRouter(cfg, store)
 	h := router.SetupRoutes()
 
