@@ -7,7 +7,7 @@ import {
   initElements,
   TEST_CONFIG,
 } from "./state.js";
-import { localizeURL, t } from "./i18n.js";
+import { t } from "./i18n.js";
 import { computeBufferbloatGrade } from "./utils.js";
 import {
   showState,
@@ -31,19 +31,9 @@ import {
 } from "./network.js";
 import { saveHistoryEntry } from "./history.js";
 
-const TEST_ERROR_KEYS = {
-  "worker.unsupported": "error.workerUnsupported",
-  "worker.failed": "error.workerFailed",
-  "worker.unreadable": "error.workerUnreadable",
-  "download.network": "error.downloadNetwork",
-  "upload.network": "error.uploadNetwork",
-  "server.overloaded": "error.serverOverloaded",
-  "download.noStreams": "error.downloadNoStreams",
-  "upload.noStreams": "error.uploadNoStreams",
-};
-
 function testErrorKey(error) {
-  return TEST_ERROR_KEYS[error?.code] || "error.testFailed";
+  const code = error?.code;
+  return typeof code === "string" && t(code) ? code : "error.testFailed";
 }
 
 function clearRunResults() {
@@ -274,9 +264,7 @@ export async function saveAndEnableShare() {
 
 function copyShareUrl(resultId = state.resultId) {
   if (!resultId) return;
-  const url = localizeURL(
-    globalThis.location.origin + "/results/" + resultId,
-  );
+  const url = globalThis.location.origin + "/results/" + resultId;
   if (navigator.clipboard?.writeText) {
     navigator.clipboard
       .writeText(url)

@@ -3,35 +3,21 @@
 import { TEST_CONFIG } from "./state.js";
 import { createCodedError } from "./utils.js";
 
-const TRANSFER_ERROR_MESSAGES = {
-  download: {
-    network: "Network error during download. Please try again.",
-    overload: "Server overloaded during download. Please try again shortly.",
-    noStreams: "Download failed. No stream completed successfully.",
-  },
-  upload: {
-    network: "Network error during upload. Please try again.",
-    overload: "Server overloaded during upload. Please try again shortly.",
-    noStreams: "Upload failed. No stream completed successfully.",
-  },
-};
-
 export function resolveChunkSize() {
   return 1024 * 1024;
 }
 
 export function throwIfZeroBytes(streamState, totalBytes, direction) {
   if (totalBytes > 0) return;
-  const messages = TRANSFER_ERROR_MESSAGES[direction];
-  if (!messages) return;
+  if (direction !== "download" && direction !== "upload") return;
   if (streamState.sawNetworkError) {
-    throw createCodedError(`${direction}.network`, messages.network);
+    throw createCodedError(`${direction}.network`);
   }
   if (streamState.sawOverload) {
-    throw createCodedError("server.overloaded", messages.overload);
+    throw createCodedError("server.overloaded");
   }
   if (streamState.successfulStreams === 0) {
-    throw createCodedError(`${direction}.noStreams`, messages.noStreams);
+    throw createCodedError(`${direction}.noStreams`);
   }
 }
 

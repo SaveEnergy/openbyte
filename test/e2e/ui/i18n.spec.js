@@ -34,6 +34,16 @@ test.describe("English and German localization", () => {
           .sort();
       const enKeys = Object.keys(en).sort();
       const deKeys = Object.keys(de).sort();
+      const semanticErrorKeys = [
+        "worker.unsupported",
+        "worker.failed",
+        "worker.unreadable",
+        "download.network",
+        "upload.network",
+        "server.overloaded",
+        "download.noStreams",
+        "upload.noStreams",
+      ];
       const placeholderMismatches = enKeys.filter(
         (key) =>
           JSON.stringify(placeholders(en[key])) !==
@@ -57,6 +67,9 @@ test.describe("English and German localization", () => {
         blankGerman: deKeys.filter((key) => !de[key].trim()),
         placeholderMismatches,
         missingHTMLKeys: [...htmlKeys].filter((key) => !(key in en)),
+        missingSemanticErrorKeys: semanticErrorKeys.filter(
+          (key) => !(key in en),
+        ),
       };
     });
 
@@ -66,37 +79,52 @@ test.describe("English and German localization", () => {
       blankGerman: [],
       placeholderMismatches: [],
       missingHTMLKeys: [],
+      missingSemanticErrorKeys: [],
     });
   });
 
-  test("query locale wins, manual choice persists, and Auto restores browser locale", async ({
+  test("stored choice wins, reloads on change, and Auto restores browser locale", async ({
     browser,
   }) => {
     const context = await browser.newContext({ locale: "de-DE" });
     const page = await context.newPage();
-    await page.addInitScript(() => {
+    await page.goto("/");
+    await page.evaluate(() => {
       localStorage.setItem("openbyte-language", "en");
     });
 
     await page.goto("/?lang=de&maxStreams=2&measureDuration=1");
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.locator("#languageSelect")).toHaveValue("en");
+
+    await Promise.all([
+      page.waitForEvent("domcontentloaded"),
+      page.locator("#languageSelect").selectOption("de"),
+    ]);
     await expect(page.locator("html")).toHaveAttribute("lang", "de");
     await expect(page.locator("#languageSelect")).toHaveValue("de");
-
-    await page.locator("#languageSelect").focus();
-    await page.locator("#languageSelect").selectOption("en");
-    await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await expect(page.locator("#languageSelect")).toBeFocused();
-    expect(new URL(page.url()).searchParams.get("lang")).toBeNull();
+    expect(
+      await page.evaluate(
+        () => performance.getEntriesByType("navigation")[0]?.type,
+      ),
+    ).toBe("reload");
     expect(new URL(page.url()).searchParams.get("maxStreams")).toBe("2");
     expect(new URL(page.url()).searchParams.get("measureDuration")).toBe("1");
     expect(
       await page.evaluate(() => localStorage.getItem("openbyte-language")),
-    ).toBe("en");
+    ).toBe("de");
 
-    await page.reload();
-    await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await page.locator("#languageSelect").selectOption("auto");
+    await page.evaluate(() => {
+      const url = new URL(globalThis.location.href);
+      url.searchParams.set("lang", "en");
+      history.replaceState(history.state, "", url);
+    });
+    await Promise.all([
+      page.waitForEvent("domcontentloaded"),
+      page.locator("#languageSelect").selectOption("auto"),
+    ]);
     await expect(page.locator("html")).toHaveAttribute("lang", "de");
+    await expect(page.locator("#languageSelect")).toHaveValue("auto");
     await expect(page.locator('#languageSelect option[value="auto"]')).toHaveText(
       "System · DE",
     );
@@ -106,15 +134,25 @@ test.describe("English and German localization", () => {
     await context.close();
   });
 
-  test("System names the browser locale behind an explicit override", async ({
+  test("System names the browser locale behind a stored override", async ({
     page,
   }) => {
-    await page.goto("/?lang=de");
+    await page.goto("/");
+    await page.evaluate(() => {
+      localStorage.setItem("openbyte-language", "de");
+    });
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("lang", "de");
+    await expect(page.locator("#languageSelect")).toHaveValue("de");
     await expect(page.locator('#languageSelect option[value="auto"]')).toHaveText(
       "System · EN",
     );
-    await page.locator("#languageSelect").selectOption("auto");
+    await Promise.all([
+      page.waitForEvent("domcontentloaded"),
+      page.locator("#languageSelect").selectOption("auto"),
+    ]);
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.locator("#languageSelect")).toHaveValue("auto");
   });
 });
 
@@ -169,12 +207,12 @@ test.describe("German UI", () => {
     expect(formatted.verdict).toContain("Außergewöhnlich schnelle Verbindung");
   });
 
-  test("localizes a shared result and preserves explicit locale links", async ({
+  test("localizes a shared result without propagating locale links", async ({
     page,
     request,
   }) => {
     const payload = await createResult(request);
-    await page.goto(`/results/${payload.id}?lang=de`);
+    await page.goto(`/results/${payload.id}`);
 
     await expect(page.locator("html")).toHaveAttribute("lang", "de");
     await expect(page.locator("#resultView")).toBeVisible();
@@ -188,57 +226,14 @@ test.describe("German UI", () => {
     await expect(page.locator("#resultsVerdict")).toContainText(
       "Ideal für Streaming und Videoanrufe.",
     );
-    await expect(page.locator('a[data-locale-link]').first()).toHaveAttribute(
-      "href",
-      /[?&]lang=de(?:&|$)/,
-    );
+    expect(
+      await page.locator('a[href^="/"]').evaluateAll((links) =>
+        links.some((link) => new URL(link.href).searchParams.has("lang")),
+      ),
+    ).toBe(false);
   });
 
-  test("switches an active test live without cancelling its run", async ({
-    page,
-  }) => {
-    await page.goto(
-      "/?lang=en&maxStreams=1&measureDuration=1&rampDuration=1",
-    );
-    await page.locator("#startBtn").click();
-    await expect
-      .poll(() =>
-        page.evaluate(async () => {
-          const { state } = await import("/state.js");
-          return state.phase;
-        }),
-      )
-      .toMatch(/download|upload/);
-
-    const before = await page.evaluate(async () => {
-      const { state } = await import("/state.js");
-      return { generation: state.runGeneration, phase: state.phase };
-    });
-    await expect(page.locator("#phaseValuePing")).toHaveText(/\d+\.\d ms/);
-    await page.locator("#languageSelect").selectOption("de");
-    const after = await page.evaluate(async () => {
-      const { state } = await import("/state.js");
-      return {
-        generation: state.runGeneration,
-        phase: state.phase,
-        aborted: state.abortController?.signal.aborted || false,
-      };
-    });
-
-    expect(after.generation).toBe(before.generation);
-    expect(after.phase).not.toBe("idle");
-    expect(after.aborted).toBe(false);
-    await expect(page.locator("html")).toHaveAttribute("lang", "de");
-    await expect(page.locator("#phaseValuePing")).toHaveText(/\d+,\d ms/);
-    await expect(page.locator("#cancelBtn")).toHaveText("Abbrechen");
-    await expect(page.locator("#resultsState")).toBeVisible({
-      timeout: 60_000,
-    });
-    await expect(page.locator("#restartBtn")).toHaveText("Nochmal testen");
-    await expect(page.locator("#resultsVerdict")).not.toBeEmpty();
-  });
-
-  test("maps worker error codes without exposing raw English prose", async ({
+  test("uses worker error codes directly as catalog keys", async ({
     page,
   }) => {
     await page.route("**/speedtest-worker.js", async (route) => {
@@ -249,8 +244,7 @@ test.describe("German UI", () => {
           globalThis.postMessage({
             type: "error",
             name: "Error",
-            code: "download.network",
-            message: "RAW ENGLISH WORKER DETAIL"
+            code: "download.network"
           });
         }, { once: true });`,
       });
@@ -262,9 +256,6 @@ test.describe("German UI", () => {
     await expect(page.locator("#errorMessage")).toHaveText(
       "Netzwerkfehler während des Downloads. Bitte erneut versuchen.",
     );
-    await expect(page.locator("#errorMessage")).not.toContainText(
-      "RAW ENGLISH",
-    );
   });
 
   test("German controls and toast stay inside a 320px viewport", async ({
@@ -274,7 +265,7 @@ test.describe("German UI", () => {
     await page.goto("/");
     await page.evaluate(async () => {
       const { showError } = await import("/ui.js");
-      showError("error.serverOverloaded");
+      showError("server.overloaded");
     });
     await expect(page.locator("#errorToast")).toBeVisible();
 

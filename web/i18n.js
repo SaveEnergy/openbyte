@@ -15,14 +15,6 @@ function normalizeLocale(value) {
   return SUPPORTED_LOCALES.has(base) ? base : null;
 }
 
-function queryLocale() {
-  try {
-    return normalizeLocale(new URL(globalThis.location.href).searchParams.get("lang"));
-  } catch {
-    return null;
-  }
-}
-
 function storedLocale() {
   try {
     return normalizeLocale(localStorage.getItem(STORAGE_KEY));
@@ -43,23 +35,13 @@ function browserLocale() {
 }
 
 function resolveInitialLocale() {
-  const query = queryLocale();
-  if (query) return { locale: query, preference: query };
   const stored = storedLocale();
   if (stored) return { locale: stored, preference: stored };
   return { locale: browserLocale(), preference: "auto" };
 }
 
-let { locale, preference } = resolveInitialLocale();
+const { locale, preference } = resolveInitialLocale();
 document.documentElement.lang = locale;
-
-export function getLocale() {
-  return locale;
-}
-
-export function getLocalePreference() {
-  return preference;
-}
 
 export function t(key, variables = {}) {
   const template = catalogs[locale]?.[key] ?? en[key];
@@ -76,7 +58,7 @@ export function t(key, variables = {}) {
 }
 
 function cachedFormatter(type, options) {
-  const cacheKey = `${type}:${locale}:${JSON.stringify(options)}`;
+  const cacheKey = `${type}:${JSON.stringify(options)}`;
   if (!formatterCache.has(cacheKey)) {
     const constructors = {
       number: Intl.NumberFormat,
@@ -107,27 +89,10 @@ function translateText(root, selector, attribute) {
   }
 }
 
-function translateAttribute(root, selector, datasetKey, attribute) {
-  for (const element of root.querySelectorAll(selector)) {
-    const key = element.dataset[datasetKey];
-    if (key) element.setAttribute(attribute, t(key));
-  }
-}
-
-function localizedURL(value) {
-  const url = new URL(value, globalThis.location.href);
-  if (preference === "auto") url.searchParams.delete("lang");
-  else url.searchParams.set("lang", locale);
-  return url;
-}
-
-export function localizeURL(value) {
-  return localizedURL(value).toString();
-}
-
-function syncLocalizedLinks(root) {
-  for (const link of root.querySelectorAll("a[data-locale-link]")) {
-    link.href = localizedURL(link.getAttribute("href")).toString();
+function translateAriaLabels(root) {
+  for (const element of root.querySelectorAll("[data-i18n-aria-label]")) {
+    const key = element.dataset.i18nAriaLabel;
+    if (key) element.setAttribute("aria-label", t(key));
   }
 }
 
@@ -143,18 +108,10 @@ function syncLanguageControl(root) {
   control.value = preference;
 }
 
-export function localizeDocument(root = document) {
+function localizeDocument(root = document) {
   document.documentElement.lang = locale;
   translateText(root, "[data-i18n]", "i18n");
-  translateAttribute(
-    root,
-    "[data-i18n-aria-label]",
-    "i18nAriaLabel",
-    "aria-label",
-  );
-  translateAttribute(root, "[data-i18n-title]", "i18nTitle", "title");
-  translateAttribute(root, "[data-i18n-content]", "i18nContent", "content");
-  syncLocalizedLinks(root);
+  translateAriaLabels(root);
   syncLanguageControl(root);
 }
 
@@ -162,41 +119,10 @@ function persistPreference(nextPreference) {
   try {
     if (nextPreference === "auto") localStorage.removeItem(STORAGE_KEY);
     else localStorage.setItem(STORAGE_KEY, nextPreference);
+    return true;
   } catch {
-    // Storage may be blocked; the language still applies to this page.
-  }
-}
-
-function removeQueryOverride() {
-  try {
-    const url = new URL(globalThis.location.href);
-    if (!url.searchParams.has("lang")) return;
-    url.searchParams.delete("lang");
-    history.replaceState(history.state, "", url);
-  } catch {
-    // A malformed/non-browser location should not block language switching.
-  }
-}
-
-export function setLocalePreference(nextPreference) {
-  if (nextPreference !== "auto" && !SUPPORTED_LOCALES.has(nextPreference)) {
     return false;
   }
-  preference = nextPreference;
-  locale = nextPreference === "auto" ? browserLocale() : nextPreference;
-  persistPreference(nextPreference);
-  removeQueryOverride();
-  localizeDocument();
-  document.dispatchEvent(
-    new CustomEvent("openbyte:localechange", { detail: { locale } }),
-  );
-  return true;
-}
-
-export function onLocaleChange(listener) {
-  const handler = (event) => listener(event.detail.locale);
-  document.addEventListener("openbyte:localechange", handler);
-  return () => document.removeEventListener("openbyte:localechange", handler);
 }
 
 function wireLanguageControl() {
@@ -205,7 +131,15 @@ function wireLanguageControl() {
   control.dataset.localeWired = "true";
   control.value = preference;
   control.addEventListener("change", () => {
-    setLocalePreference(control.value);
+    const nextPreference = control.value;
+    if (
+      (nextPreference === "auto" || SUPPORTED_LOCALES.has(nextPreference)) &&
+      persistPreference(nextPreference)
+    ) {
+      globalThis.location.reload();
+      return;
+    }
+    control.value = preference;
   });
 }
 

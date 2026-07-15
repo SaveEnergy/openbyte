@@ -1,7 +1,7 @@
 /** Server health, client IP discovery, and network display. */
 
 import { getApiBase, elements, state, TEST_CONFIG } from "./state.js";
-import { onLocaleChange, t } from "./i18n.js";
+import { t } from "./i18n.js";
 import { fetchWithTimeout, parseJSONOrThrow } from "./utils.js";
 
 const fallbackServerName = "openByte Server";
@@ -96,8 +96,6 @@ export function updateNetworkDisplay() {
     );
   }
 }
-
-onLocaleChange(renderNetworkState);
 
 async function discoverAddress(
   url,

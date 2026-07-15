@@ -1,6 +1,6 @@
 /** Shared metric explanations for the "What do these numbers mean?" panel. */
 
-import { onLocaleChange, t } from "./i18n.js";
+import { t } from "./i18n.js";
 
 const METRIC_EXPLANATIONS = [
   ["metric.idleLatency", "metric.idleLatencyDescription"],
@@ -23,4 +23,3 @@ function renderMetricExplanations() {
 }
 
 renderMetricExplanations();
-onLocaleChange(renderMetricExplanations);

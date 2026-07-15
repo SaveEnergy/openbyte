@@ -4,7 +4,7 @@ import {
   consumeErrorBody,
   fetchWithTimeout,
 } from "./utils.js";
-import { formatDateTime, onLocaleChange, t } from "./i18n.js";
+import { formatDateTime, t } from "./i18n.js";
 import {
   formatConnectionAdvisory,
   formatConnectionVerdict,
@@ -20,8 +20,6 @@ const resultView = document.getElementById("resultView");
 const errorView = document.getElementById("errorView");
 const errorMessage = document.querySelector("#errorView .error-message");
 const errorCode = document.getElementById("errorCode");
-let currentResult = null;
-let currentErrorKey = null;
 
 function trimTrailingSlashes(value) {
   if (typeof value !== "string" || value.length === 0) return value;
@@ -46,7 +44,6 @@ function resultErrorKey(statusCode) {
 }
 
 function showError(key) {
-  currentErrorKey = key;
   if (loadingView) loadingView.classList.add("hidden");
   if (resultView) resultView.classList.add("hidden");
   if (errorMessage) errorMessage.textContent = t(key);
@@ -138,13 +135,10 @@ async function loadResult(resultID) {
 
 function renderResult(d) {
   if (!d || typeof d !== "object") {
-    currentResult = null;
     showError("error.resultInvalidPayload");
     return;
   }
   try {
-    currentResult = d;
-    currentErrorKey = null;
     const downloadEl = document.getElementById("downloadResult");
     const uploadEl = document.getElementById("uploadResult");
     const latencyEl = document.getElementById("latencyResult");
@@ -193,7 +187,6 @@ function renderResult(d) {
       ul.unit;
   } catch (err) {
     console.error("results page: render failed", err);
-    currentResult = null;
     showError("error.resultRender");
   }
 }
@@ -226,10 +219,3 @@ if (!loadingView || !resultView || !errorView) {
     }
   }
 }
-
-onLocaleChange(() => {
-  if (currentResult) renderResult(currentResult);
-  else if (currentErrorKey && errorMessage) {
-    errorMessage.textContent = t(currentErrorKey);
-  }
-});

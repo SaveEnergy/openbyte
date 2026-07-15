@@ -1,7 +1,7 @@
 /** Result-state rendering for the main speed-test page. */
 
 import { state, elements } from "./state.js";
-import { onLocaleChange, t } from "./i18n.js";
+import { t } from "./i18n.js";
 import {
   formatConnectionAdvisory,
   formatConnectionVerdict,
@@ -140,7 +140,3 @@ export function enterResults(partial) {
   }
   renderResultsContent();
 }
-
-onLocaleChange(() => {
-  if (state.phase === "results") renderResultsContent();
-});

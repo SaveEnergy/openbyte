@@ -32,6 +32,7 @@
 
 - HTTP test mode uses `/api/v1/download`, `/api/v1/upload`, and `/api/v1/ping`; never TCP/UDP proxy mode.
 - Self-hosted fonts, motion, loaded-latency measurement, and bufferbloat grading are intentional product features; simplification work must preserve them.
+- English/German localization resolves once per page from the stored choice or browser-language Auto mode; changing it persists the choice and reloads. Navigation/share URLs never carry locale, static metadata stays server-authored English, and worker failures cross into the UI as catalog-key codes without prose.
 - Network probe fetch paths drain non-OK and malformed JSON responses.
 - Server settings UI: no server selector; a single deployed server tests itself.
 - UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.

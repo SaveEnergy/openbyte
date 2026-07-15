@@ -1,6 +1,6 @@
 /** Manual theme override: system -> light -> dark, persisted per device. */
 
-import { onLocaleChange, t } from "./i18n.js";
+import { t } from "./i18n.js";
 
 const STORAGE_KEY = "openbyte-theme";
 const MODES = ["system", "light", "dark"];
@@ -63,10 +63,6 @@ function wireToggle() {
 }
 
 applyMode(currentMode);
-onLocaleChange(() => {
-  const button = document.getElementById("themeToggle");
-  if (button) updateToggle(button, currentMode);
-});
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", wireToggle);
 } else {

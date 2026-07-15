@@ -1,7 +1,7 @@
 /** DOM updates: progress, speed display, state views, toast. */
 
 import { state, elements, TEST_CONFIG, toast } from "./state.js";
-import { formatNumber, onLocaleChange, t } from "./i18n.js";
+import { formatNumber, t } from "./i18n.js";
 import {
   formatLatency,
   formatSpeed,
@@ -193,21 +193,6 @@ export function setPhaseStepValue(phase, text) {
   if (value) value.textContent = text;
 }
 
-function renderCompletedPhaseValues() {
-  const values = {
-    ping: () => formatLatencyMs(state.latencyResult),
-    download: () => formatSpeedText(state.downloadResult),
-    upload: () => formatSpeedText(state.uploadResult),
-  };
-  for (const phase of PHASE_ORDER) {
-    const step = elements.phaseSteps?.[phase];
-    const value = elements.phaseValues?.[phase];
-    if (step?.dataset.status === "done" && value) {
-      value.textContent = values[phase]();
-    }
-  }
-}
-
 /* ---- Speed and progress display ---- */
 
 export function updateSpeed(speed, direction) {
@@ -369,9 +354,3 @@ export function hideError() {
   elements.errorToast?.classList.add("hidden");
   elements.successToast?.classList.add("hidden");
 }
-
-onLocaleChange(() => {
-  renderTestType();
-  renderCompletedPhaseValues();
-  renderToast();
-});

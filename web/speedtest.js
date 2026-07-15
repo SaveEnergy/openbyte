@@ -107,20 +107,14 @@ function makeAbortError() {
 
 function workerMessageError(message) {
   if (message.name === "AbortError") return makeAbortError();
-  const error = createCodedError(
-    message.code || "worker.failed",
-    message.message || "Speed test worker failed",
-  );
+  const error = createCodedError(message.code || "worker.failed");
   error.name = message.name || "Error";
   return error;
 }
 
 function runWorkerSpeedTest(direction, onProgress, signal, callbacks) {
   if (typeof Worker === "undefined") {
-    const error = createCodedError(
-      "worker.unsupported",
-      "This browser does not support Web Workers.",
-    );
+    const error = createCodedError("worker.unsupported");
     error.name = "TypeError";
     throw error;
   }
@@ -171,24 +165,12 @@ function runWorkerSpeedTest(direction, onProgress, signal, callbacks) {
       }
     };
 
-    const onError = (event) => {
-      settle(
-        reject,
-        createCodedError(
-          "worker.failed",
-          event.message || "Speed test worker failed",
-        ),
-      );
+    const onError = () => {
+      settle(reject, createCodedError("worker.failed"));
     };
 
     const onMessageError = () => {
-      settle(
-        reject,
-        createCodedError(
-          "worker.unreadable",
-          "Speed test worker sent an unreadable message",
-        ),
-      );
+      settle(reject, createCodedError("worker.unreadable"));
     };
 
     worker.addEventListener("message", onMessage);
