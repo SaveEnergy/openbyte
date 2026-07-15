@@ -230,4 +230,45 @@ test.describe("visual branding", () => {
     await expect(home).toBeVisible();
     await expect(home.locator(".brand-logo")).toBeVisible();
   });
+
+  test("sizes the high-DPI sparkline from its mobile CSS box", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      viewport: { width: 320, height: 720 },
+      deviceScaleFactor: 2,
+    });
+    const page = await context.newPage();
+
+    try {
+      await page.goto("/");
+      const dimensions = await page.evaluate(async () => {
+        document.getElementById("idleState").classList.add("hidden");
+        document.getElementById("testingState").classList.remove("hidden");
+
+        const { resetSparkline, updateSpeed } = await import("/ui.js");
+        resetSparkline();
+        updateSpeed(10, "download");
+        updateSpeed(20, "download");
+
+        const canvas = document.getElementById("speedSparkline");
+        const box = canvas.getBoundingClientRect();
+        return {
+          box: { width: box.width, height: box.height },
+          backing: { width: canvas.width, height: canvas.height },
+          inline: { width: canvas.style.width, height: canvas.style.height },
+          ratio: devicePixelRatio,
+        };
+      });
+
+      expect(dimensions).toEqual({
+        box: { width: 240, height: 40 },
+        backing: { width: 480, height: 80 },
+        inline: { width: "", height: "" },
+        ratio: 2,
+      });
+    } finally {
+      await context.close();
+    }
+  });
 });

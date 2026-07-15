@@ -89,16 +89,17 @@ function sparklineColorFor(direction, element) {
 }
 
 function ensureSparklineScale(canvas) {
-  if (canvas.dataset.scaled) return;
-  canvas.dataset.scaled = "1";
   const ratio = globalThis.devicePixelRatio || 1;
-  if (ratio === 1) return;
-  const cssWidth = canvas.width;
-  const cssHeight = canvas.height;
-  canvas.style.width = `${cssWidth}px`;
-  canvas.style.height = `${cssHeight}px`;
-  canvas.width = Math.round(cssWidth * ratio);
-  canvas.height = Math.round(cssHeight * ratio);
+  const cssWidth = canvas.clientWidth;
+  const cssHeight = canvas.clientHeight;
+  if (cssWidth <= 0 || cssHeight <= 0) return;
+
+  const width = Math.round(cssWidth * ratio);
+  const height = Math.round(cssHeight * ratio);
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
 }
 
 function drawSparkline() {
