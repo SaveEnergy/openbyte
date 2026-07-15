@@ -63,6 +63,7 @@ function cachedFormatter(type, options) {
     const constructors = {
       number: Intl.NumberFormat,
       date: Intl.DateTimeFormat,
+      relative: Intl.RelativeTimeFormat,
     };
     formatterCache.set(cacheKey, new constructors[type](locale, options));
   }
@@ -75,6 +76,10 @@ export function formatNumber(value, options = {}) {
 
 export function formatDateTime(value, options = {}) {
   return cachedFormatter("date", options).format(value);
+}
+
+export function formatRelativeTime(value, unit, options = {}) {
+  return cachedFormatter("relative", options).format(value, unit);
 }
 
 function translateText(root, selector, attribute) {

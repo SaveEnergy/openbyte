@@ -10,6 +10,7 @@ import {
 } from "./presentation.js";
 import { computeBufferbloatGrade } from "./utils.js";
 import { updateNetworkDisplay } from "./network.js";
+import { renderHistory } from "./history.js";
 
 function bufferbloatBadgeClass(grade) {
   if (grade === "A+" || grade === "A") return "bb-good";
@@ -92,6 +93,7 @@ export function renderResultsContent() {
   announceResults(grade);
 
   updateNetworkDisplay();
+  renderHistory(elements.historyList, elements.historySection);
   renderShareButton();
 }
 
