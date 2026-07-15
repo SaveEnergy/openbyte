@@ -9,13 +9,13 @@ import (
 	"time"
 )
 
-func TestNewClientHasDefaultHTTPTimeout(t *testing.T) {
+func TestNewClientHasNoGlobalHTTPTimeout(t *testing.T) {
 	c := New("http://localhost:8080")
 	if c.httpClient == nil {
 		t.Fatal("http client should be initialized")
 	}
-	if c.httpClient.Timeout != defaultHTTPTimeout {
-		t.Fatalf("default http client timeout = %v, want %v", c.httpClient.Timeout, defaultHTTPTimeout)
+	if c.httpClient.Timeout != 0 {
+		t.Fatalf("default http client timeout = %v, want no global timeout", c.httpClient.Timeout)
 	}
 }
 

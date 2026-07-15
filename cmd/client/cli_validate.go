@@ -34,6 +34,12 @@ func validateNumericConfig(config *Config) error {
 			"Use: openbyte client -t 30  (for 30 seconds)\n"+
 			helpHintSuffix, config.Duration)
 	}
+	if config.WarmUp < 0 || config.WarmUp >= config.Duration {
+		return fmt.Errorf("invalid warm-up: %d\n\n"+
+			"Warm-up must be at least 0 and shorter than the %d-second test duration.\n"+
+			"Use: openbyte client -t %d --warmup %d\n"+
+			helpHintSuffix, config.WarmUp, config.Duration, config.Duration, max(config.Duration-1, 0))
+	}
 	if config.Streams < 1 || config.Streams > 64 {
 		return fmt.Errorf("invalid streams: %d\n\n"+
 			"Streams must be between 1 and 64.\n"+

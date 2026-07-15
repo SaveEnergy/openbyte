@@ -50,7 +50,7 @@ Returns latency probe metadata:
 
 Streams `application/octet-stream` for up to `duration` seconds.
 
-- `duration`: `1..MAX_TEST_DURATION` seconds, default `10` (server maximum defaults to `300s`)
+- `duration`: `1..MAX_TEST_DURATION` seconds, default `min(10, MAX_TEST_DURATION)` (server maximum defaults to `300s`)
 - `chunk`: `65536..4194304`, default `1048576`
 
 ### `POST /api/v1/upload`

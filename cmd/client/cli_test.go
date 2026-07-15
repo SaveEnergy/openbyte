@@ -1,6 +1,9 @@
 package client
 
-import "testing"
+import (
+	"strconv"
+	"testing"
+)
 
 func TestClientRejectsExtraPositionalArgs(t *testing.T) {
 	_, _, code, err := parseFlags([]string{"https://example.com", "https://example.org"}, "test")
@@ -73,6 +76,69 @@ func TestClientRejectsBidirectionalDirection(t *testing.T) {
 	if err := validateConfig(cfg); err == nil {
 		t.Fatal("expected bidirectional direction to be rejected")
 	}
+}
+
+func TestClientReducesImplicitWarmUpForShortDurations(t *testing.T) {
+	tests := []struct {
+		duration int
+		want     int
+	}{
+		{duration: 1, want: 0},
+		{duration: 2, want: 1},
+		{duration: 3, want: defaultWarmUp},
+	}
+
+	for _, tt := range tests {
+		t.Run(strconv.Itoa(tt.duration)+"s", func(t *testing.T) {
+			cfg := mergedCLIConfig(t, "--duration", strconv.Itoa(tt.duration))
+			if cfg.WarmUp != tt.want {
+				t.Fatalf("warm-up = %d, want %d", cfg.WarmUp, tt.want)
+			}
+			if err := validateConfig(cfg); err != nil {
+				t.Fatalf("short duration should remain valid: %v", err)
+			}
+		})
+	}
+}
+
+func TestClientValidatesExplicitWarmUpAgainstDuration(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr bool
+	}{
+		{name: "one second no warm-up", args: []string{"--duration", "1", "--warmup", "0"}},
+		{name: "two seconds one second warm-up", args: []string{"--duration", "2", "--warmup", "1"}},
+		{name: "negative warm-up", args: []string{"--duration", "2", "--warmup", "-1"}, wantErr: true},
+		{name: "warm-up equals duration", args: []string{"--duration", "2", "--warmup", "2"}, wantErr: true},
+		{name: "warm-up exceeds duration", args: []string{"--duration", "2", "--warmup", "3"}, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := mergedCLIConfig(t, tt.args...)
+			err := validateConfig(cfg)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("validateConfig() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestClientRejectsExplicitZeroDuration(t *testing.T) {
+	cfg := mergedCLIConfig(t, "--duration", "0")
+	if err := validateConfig(cfg); err == nil {
+		t.Fatal("expected explicit zero duration to be rejected")
+	}
+}
+
+func mergedCLIConfig(t *testing.T, args ...string) *Config {
+	t.Helper()
+	flagConfig, flagsSet, _, err := parseFlags(args, "test")
+	if err != nil {
+		t.Fatalf("parseFlags(%v): %v", args, err)
+	}
+	return mergeConfig(flagConfig, nil, flagsSet)
 }
 
 func TestConfigFileRejectsRemovedTCPUDPProtocol(t *testing.T) {

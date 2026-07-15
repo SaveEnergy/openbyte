@@ -33,7 +33,7 @@ Flags:
   --server-url string     Override server URL
 
 Measurement:
-  --warmup int            Warm-up seconds before measurement (default: 2)
+  --warmup int            Warm-up seconds before measurement (default: 2; 0/1 for 1s/2s tests)
 
 Configuration file: ~/.config/openbyte/config.yaml
 

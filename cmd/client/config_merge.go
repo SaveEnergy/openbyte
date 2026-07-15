@@ -15,8 +15,16 @@ func mergeConfig(flagConfig *Config, configFile *ConfigFile, flagsSet map[string
 	}
 
 	applyFlagOverrides(result, flagConfig, flagsSet)
+	adjustDefaultWarmUp(result, flagsSet["warmup"])
 
 	return result
+}
+
+func adjustDefaultWarmUp(config *Config, explicitlySet bool) {
+	if explicitlySet || config.Duration > defaultWarmUp {
+		return
+	}
+	config.WarmUp = max(config.Duration-1, 0)
 }
 
 func applyDefaults(result *Config) {
@@ -62,7 +70,7 @@ func applyConfigFileDefaults(result *Config, configFile *ConfigFile) {
 func applyFlagOverrides(result, flagConfig *Config, flagsSet map[string]bool) {
 	applyStringOverride(flagsSet, "server-url", flagConfig.ServerURL, func(v string) { result.ServerURL = v })
 	applyStringOverride(flagsSet, "direction", flagConfig.Direction, func(v string) { result.Direction = v })
-	applyPositiveIntOverride(flagsSet, "duration", flagConfig.Duration, func(v int) { result.Duration = v })
+	applyIntOverride(flagsSet, "duration", flagConfig.Duration, func(v int) { result.Duration = v })
 	applyPositiveIntOverride(flagsSet, "streams", flagConfig.Streams, func(v int) { result.Streams = v })
 	applyPositiveIntOverride(flagsSet, "chunk-size", flagConfig.ChunkSize, func(v int) { result.ChunkSize = v })
 	applyPositiveIntOverride(flagsSet, "timeout", flagConfig.Timeout, func(v int) { result.Timeout = v })

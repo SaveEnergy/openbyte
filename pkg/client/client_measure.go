@@ -10,9 +10,13 @@ import (
 )
 
 const uploadMeasurementGrace = 10 * time.Second
+const latencyMeasurementTimeout = 10 * time.Second
 
 func (c *Client) measureLatency(ctx context.Context, samples int) (avgMs, jitterMs float64, ok bool) {
-	latencies := c.collectLatencySamples(ctx, samples)
+	latencyCtx, cancel := context.WithTimeout(ctx, latencyMeasurementTimeout)
+	defer cancel()
+
+	latencies := c.collectLatencySamples(latencyCtx, samples)
 	if len(latencies) < 2 {
 		return 0, 0, false
 	}

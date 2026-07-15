@@ -39,7 +39,7 @@ func parseFlags(args []string, version string) (*Config, map[string]bool, int, e
 	flagSet.StringVar(&config.ServerURL, flagServerURL, "", "Server URL (override)")
 	flagSet.IntVar(&config.Timeout, "timeout", 0, "Request timeout in seconds")
 
-	flagSet.IntVar(&config.WarmUp, "warmup", 2, "Warm-up seconds before measurement")
+	flagSet.IntVar(&config.WarmUp, "warmup", 2, "Warm-up seconds before measurement (reduced for short tests)")
 
 	versionFlag := flagSet.Bool("version", false, "Print version")
 	help := flagSet.Bool("help", false, "Show help")

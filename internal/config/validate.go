@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func (c *Config) validatePorts() error {
@@ -26,8 +27,8 @@ func (c *Config) validateLimits() error {
 	if len(c.ServerName) > 200 {
 		return fmt.Errorf("server name must be <= 200 bytes")
 	}
-	if c.MaxTestDuration <= 0 {
-		return fmt.Errorf("max test duration must be > 0")
+	if c.MaxTestDuration < time.Second || c.MaxTestDuration%time.Second != 0 {
+		return fmt.Errorf("max test duration must be a whole number of seconds >= 1s")
 	}
 	if c.CapacityGbps <= 0 {
 		return fmt.Errorf("capacity gbps must be > 0")

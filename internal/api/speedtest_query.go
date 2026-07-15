@@ -9,7 +9,7 @@ import (
 
 func parseDownloadParams(r *http.Request, maxDurationSec int) (time.Duration, int, error) {
 	query := r.URL.Query()
-	duration := 10 * time.Second
+	duration := time.Duration(min(10, maxDurationSec)) * time.Second
 	durationRaw := query.Get("duration")
 	if d, ok, err := parseOptionalIntInRange(durationRaw, 1, maxDurationSec, "duration must be 1-"+strconv.Itoa(maxDurationSec)); err != nil {
 		return 0, 0, err

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/logging"
@@ -26,10 +27,9 @@ type Router struct {
 var validResultID = regexp.MustCompile(`^[0-9a-zA-Z]{8}$`)
 
 func NewRouter(handler *Handler, cfg *config.Config) *Router {
-	maxDur := 300
-	if cfg.MaxTestDuration > 0 {
-		maxDur = int(cfg.MaxTestDuration.Seconds())
-	}
+	// Config validation requires whole seconds. Clamp invalid direct callers to
+	// the safest usable limit rather than broadening a truncated value to 300s.
+	maxDur := max(1, int(cfg.MaxTestDuration/time.Second))
 	speedtest := NewSpeedTestHandler(cfg.MaxConcurrentHTTP(), maxDur)
 	speedtest.SetMaxConcurrentPerIP(cfg.MaxConcurrentPerIP)
 	return &Router{

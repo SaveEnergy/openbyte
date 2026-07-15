@@ -70,7 +70,7 @@ Open `http://localhost:8080` — minimal fast.com-inspired UI with adaptive stre
 
 Current clients implement:
 
-- Adaptive Web Worker stream ramping plus dynamic warm-up with throughput stabilization detection (web UI); fixed warm-up via `--warmup` (CLI)
+- Adaptive Web Worker stream ramping plus dynamic warm-up with throughput stabilization detection (web UI); fixed warm-up via `--warmup` (CLI, default 2s and reduced to 0s/1s for 1s/2s tests)
 - Baseline latency measurement before each test
 - Metrics reset after warm-up for accurate results
 - Statistical reporting with P50, P95, P99 percentiles
@@ -92,7 +92,7 @@ Current clients implement:
 | `TRUSTED_PROXY_CIDRS` | —                 | Comma-separated trusted proxy CIDRs                                |
 | `ALLOWED_ORIGINS`     | `*`               | Comma-separated CORS allowed origins                               |
 | `WEB_ROOT`            | _(embedded)_      | Override path to static web assets (for development)               |
-| `MAX_TEST_DURATION`   | `300s`            | Maximum test duration (Go duration format)                         |
+| `MAX_TEST_DURATION`   | `300s`            | Maximum test duration (Go duration format; whole seconds, at least `1s`) |
 | `DATA_DIR`            | `./data`          | Path to SQLite database directory                                  |
 | `MAX_STORED_RESULTS`  | 10000             | Maximum stored results; results older than 90 days are also purged  |
 | `BIND_ADDRESS`        | `0.0.0.0`         | Address to bind listeners                                          |
