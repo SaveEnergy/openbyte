@@ -3,6 +3,7 @@ package deploy_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -54,17 +55,74 @@ func TestComposeSeparatesPublishedImageFromLocalBuild(t *testing.T) {
 	rejectText(t, local, "ports:", "environment:", "volumes:", "restart:", "healthcheck:")
 }
 
-func TestComposePassesBrandingConfigAndMountsAssetsReadOnly(t *testing.T) {
+func TestComposeUsesCanonicalContainerContract(t *testing.T) {
 	t.Parallel()
 
 	compose := readRepositoryFile(t, "docker", "docker-compose.yaml")
 	requireText(t, compose,
-		"BRAND_PRIMARY_COLOR_DARK=${BRAND_PRIMARY_COLOR_DARK:-}",
-		"BRAND_PRIMARY_COLOR_LIGHT=${BRAND_PRIMARY_COLOR_LIGHT:-}",
-		"BRAND_SECONDARY_COLOR_DARK=${BRAND_SECONDARY_COLOR_DARK:-}",
-		"BRAND_SECONDARY_COLOR_LIGHT=${BRAND_SECONDARY_COLOR_LIGHT:-}",
-		"BRAND_LOGO_PATH=${BRAND_LOGO_PATH:-}",
+		`- "8080:8080"`,
+		"openbyte-data:/app/data",
 		"${BRAND_ASSETS_DIR:-../branding}:/app/branding:ro",
+	)
+	rejectText(t, compose,
+		"DATA_DIR=",
+		"TLS_CERT_FILE",
+		"TLS_KEY_FILE",
+		"TLS_AUTO_GEN",
+		"HTTP2_ENABLED",
+		"PPROF_ENABLED",
+		"PPROF_ADDR",
+	)
+
+	wantEnvironment := []string{
+		"SERVER_NAME",
+		"BRAND_PRIMARY_COLOR_DARK",
+		"BRAND_PRIMARY_COLOR_LIGHT",
+		"BRAND_SECONDARY_COLOR_DARK",
+		"BRAND_SECONDARY_COLOR_LIGHT",
+		"BRAND_LOGO_PATH",
+		"TRUST_PROXY_HEADERS",
+		"TRUSTED_PROXY_CIDRS",
+		"MAX_CONCURRENT_TRANSFERS",
+		"MAX_CONCURRENT_PER_IP",
+		"RATE_LIMIT_PER_IP",
+		"GLOBAL_RATE_LIMIT",
+		"MAX_TEST_DURATION",
+		"MAX_STORED_RESULTS",
+	}
+	if got := composeEnvironmentEntries(t, compose); !slices.Equal(got, wantEnvironment) {
+		t.Fatalf("Compose environment = %q, want explicit overrides %q", got, wantEnvironment)
+	}
+}
+
+func TestExampleEnvDefersRuntimeDefaultsToBinary(t *testing.T) {
+	t.Parallel()
+
+	example := readRepositoryFile(t, ".env.example")
+	requireText(t, example,
+		"GHCR_OWNER=saveenergy",
+		"SERVER_NAME=",
+		"BRAND_ASSETS_DIR=../branding",
+		"TRAEFIK_HOST_RULE=",
+		"TRUST_PROXY_HEADERS=false",
+		"README.md's environment-variable table",
+	)
+	rejectText(t, example,
+		"\nPORT=",
+		"\nBIND_ADDRESS=",
+		"\nMAX_CONCURRENT_TRANSFERS=",
+		"\nMAX_CONCURRENT_PER_IP=",
+		"\nRATE_LIMIT_PER_IP=",
+		"\nGLOBAL_RATE_LIMIT=",
+		"\nMAX_TEST_DURATION=",
+		"\nMAX_STORED_RESULTS=",
+		"\nDATA_DIR=",
+		"\nTLS_CERT_FILE=",
+		"\nTLS_KEY_FILE=",
+		"\nTLS_AUTO_GEN=",
+		"\nHTTP2_ENABLED=",
+		"\nPPROF_ENABLED=",
+		"\nPPROF_ADDR=",
 	)
 }
 
@@ -95,8 +153,22 @@ func TestDockerfileBuildInputsAndHealthcheck(t *testing.T) {
 
 	root := repositoryRoot(t)
 	dockerfile := readRepositoryFile(t, "docker", "Dockerfile")
-	if !strings.Contains(dockerfile, "HEALTHCHECK") || !strings.Contains(dockerfile, "/health") {
-		t.Fatal("Dockerfile does not own the openByte healthcheck")
+	requireText(t, dockerfile,
+		"VOLUME /app/data",
+		"EXPOSE 8080",
+		"ENV DATA_DIR=/app/data",
+		"HEALTHCHECK",
+		"http://localhost:8080/health",
+	)
+
+	var environmentInstructions []string
+	for line := range strings.SplitSeq(dockerfile, "\n") {
+		if strings.HasPrefix(line, "ENV ") {
+			environmentInstructions = append(environmentInstructions, line)
+		}
+	}
+	if want := []string{"ENV DATA_DIR=/app/data"}; !slices.Equal(environmentInstructions, want) {
+		t.Fatalf("Dockerfile ENV instructions = %q, want %q", environmentInstructions, want)
 	}
 
 	for lineNumber, line := range strings.Split(dockerfile, "\n") {
@@ -110,6 +182,31 @@ func TestDockerfileBuildInputsAndHealthcheck(t *testing.T) {
 			}
 		}
 	}
+}
+
+func composeEnvironmentEntries(t *testing.T, compose string) []string {
+	t.Helper()
+
+	const section = "    environment:"
+	lines := strings.Split(compose, "\n")
+	for index, line := range lines {
+		if line != section {
+			continue
+		}
+
+		var entries []string
+		for _, entry := range lines[index+1:] {
+			const prefix = "      - "
+			if !strings.HasPrefix(entry, prefix) {
+				break
+			}
+			entries = append(entries, strings.TrimPrefix(entry, prefix))
+		}
+		return entries
+	}
+
+	t.Fatal("Compose environment section not found")
+	return nil
 }
 
 func readRepositoryFile(t *testing.T, path ...string) string {

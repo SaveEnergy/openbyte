@@ -47,6 +47,12 @@ cd docker && docker compose -f docker-compose.yaml -f docker-compose.local.yaml 
 cd docker && docker compose -f docker-compose.yaml -f docker-compose.traefik.yaml up -d
 ```
 
+The official image serves plain HTTP on container port `8080` and stores its
+SQLite files under `/app/data`. Change the published host port in the Compose
+port mapping, not the internal listener. The Go binary owns all other runtime
+defaults; bundled Compose forwards only explicitly configured server,
+branding, proxy, transfer-limit, and result-retention overrides.
+
 ### Web Interface
 
 Open `http://localhost:8080` — minimal fast.com-inspired UI with adaptive stream ramping, Web Worker transfer loops, and real-time speed visualization.
@@ -73,6 +79,11 @@ The browser client implements:
 
 ### Server Environment Variables
 
+These variables configure the binary. The official container fixes its
+internal listener at plain HTTP `:8080` and its data path at `/app/data`;
+listener, direct-TLS, and pprof changes require a custom container invocation
+or Compose overlay.
+
 | Variable              | Default           | Description                                                        |
 | --------------------- | ----------------- | ------------------------------------------------------------------ |
 | `PORT`                | 8080              | HTTP API port                                                      |
@@ -88,7 +99,7 @@ The browser client implements:
 | `TRUSTED_PROXY_CIDRS` | —                 | Comma-separated trusted proxy CIDRs                                |
 | `WEB_ROOT`            | _(embedded)_      | Override path to static web assets (for development)               |
 | `MAX_TEST_DURATION`   | `300s`            | Maximum test duration (whole seconds in Go duration format, at least `1s`) |
-| `DATA_DIR`            | `./data`          | Path to SQLite database directory                                  |
+| `DATA_DIR`            | `./data`          | Path to SQLite database directory (official image: `/app/data`)    |
 | `MAX_STORED_RESULTS`  | 10000             | Maximum stored results; results older than 90 days are also purged  |
 | `BIND_ADDRESS`        | `0.0.0.0`         | Address to bind listeners                                          |
 | `PPROF_ENABLED`       | false             | Enable pprof profiling server                                      |
@@ -106,6 +117,8 @@ Notes:
 - There is no `/api/v1/version` route. A ping returns `client_ip`, and the UI infers its address family from the canonical address; `/api/v1/ping?meta=1` also returns `server_name` during bootstrap.
 - If running behind a reverse proxy, allow more than the browser's adaptive 64 MiB maximum request payload and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.
 - Server configuration uses environment variables only; `openbyte --help` lists command-only options.
+- Direct TLS, HTTP/2 policy, and pprof remain available to the binary, but the
+  bundled Compose service deliberately does not expose or forward them.
 - During alpha, the inferred capacity setting was removed. Migrate its old value
   with `MAX_CONCURRENT_TRANSFERS=max(old*8, 50)`.
 
@@ -138,9 +151,12 @@ docker run --rm -p 8080:8080 \
   -e BRAND_SECONDARY_COLOR_LIGHT="#9A4D00" \
   ghcr.io/saveenergy/openbyte:latest
 
-# Docker Compose reads the same values from docker/.env and mounts
-# BRAND_ASSETS_DIR read-only at /app/branding.
 ```
+
+Bundled Compose reads supported explicit overrides from `docker/.env` and
+mounts `BRAND_ASSETS_DIR` read-only at `/app/branding`. It does not forward
+listener, data-path, direct-TLS, HTTP/2, or pprof variables; declare those in a
+custom overlay when intentionally departing from the official image contract.
 
 ### IPv4/IPv6 Detection
 

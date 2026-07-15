@@ -23,6 +23,10 @@ in Git history and pull requests, not release notes.
   secondary metrics without assigning a subjective connection label.
 ### Changed
 
+- **Official container contract**: the published image and bundled Compose now
+  use plain HTTP on internal port `8080` and persist only at `/app/data`, while
+  runtime defaults come from the binary. Custom data-path, direct-TLS, HTTP/2,
+  and pprof deployments now require an explicit container override.
 - **Transfer concurrency**: replaced the inferred capacity heuristic with the
   explicit `MAX_CONCURRENT_TRANSFERS` limit, defaulting to the same 200
   download streams and 200 upload streams. Migrate a previous capacity value
