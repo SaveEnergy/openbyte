@@ -12,7 +12,6 @@ import (
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 )
 
 const (
@@ -40,22 +39,20 @@ type Client struct {
 // Option configures the Client.
 type Option func(*Client)
 
-// WithHTTPClient overrides the default http.Client.
+// WithHTTPClient overrides the default http.Client. A custom non-zero Timeout
+// also applies to streaming response-body reads.
 func WithHTTPClient(hc *http.Client) Option {
 	return func(c *Client) { c.httpClient = hc }
 }
 
-const defaultHTTPTimeout = 60 * time.Second
-
 // New creates a new openByte client targeting the given server URL.
 // Returned client should be treated as immutable after construction.
-// Default http.Client has a 60s timeout to avoid indefinite hangs on stalled connections.
+// Request contexts bound each operation; the default http.Client intentionally has
+// no global timeout so 1-300 second streaming tests are not cut short.
 func New(serverURL string, opts ...Option) *Client {
 	c := &Client{
-		serverURL: strings.TrimRight(serverURL, "/"),
-		httpClient: &http.Client{
-			Timeout: defaultHTTPTimeout,
-		},
+		serverURL:  strings.TrimRight(serverURL, "/"),
+		httpClient: &http.Client{},
 	}
 	for _, opt := range opts {
 		opt(c)

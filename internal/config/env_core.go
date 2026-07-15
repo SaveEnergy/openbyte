@@ -41,8 +41,8 @@ func (c *Config) loadCoreEnvCapacityAndLimits() error {
 	}
 	if durRaw := os.Getenv("MAX_TEST_DURATION"); durRaw != "" {
 		d, err := time.ParseDuration(durRaw)
-		if err != nil || d <= 0 {
-			return fmt.Errorf("invalid MAX_TEST_DURATION %q: must be a positive duration (e.g. 300s)", durRaw)
+		if err != nil || d < time.Second || d%time.Second != 0 {
+			return fmt.Errorf("invalid MAX_TEST_DURATION %q: must be a whole number of seconds >= 1s (e.g. 300s)", durRaw)
 		}
 		c.MaxTestDuration = d
 	}

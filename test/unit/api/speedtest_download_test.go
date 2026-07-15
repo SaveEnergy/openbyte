@@ -205,7 +205,7 @@ func TestDownloadValidationDoesNotReadUnexpectedBody(t *testing.T) {
 }
 
 func TestDownloadRespectsMaxDuration(t *testing.T) {
-	// maxDurationSec=5: duration=5 should work, duration=10 should be clamped to default
+	// maxDurationSec=5: duration=5 should work, duration=10 should be rejected.
 	handler := api.NewSpeedTestHandler(10, 5)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)

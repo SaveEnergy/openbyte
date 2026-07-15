@@ -82,7 +82,7 @@ The browser client implements:
 | `TRUSTED_PROXY_CIDRS` | —                 | Comma-separated trusted proxy CIDRs                                |
 | `ALLOWED_ORIGINS`     | `*`               | Comma-separated CORS allowed origins                               |
 | `WEB_ROOT`            | _(embedded)_      | Override path to static web assets (for development)               |
-| `MAX_TEST_DURATION`   | `300s`            | Maximum test duration (Go duration format)                         |
+| `MAX_TEST_DURATION`   | `300s`            | Maximum test duration (whole seconds in Go duration format, at least `1s`) |
 | `DATA_DIR`            | `./data`          | Path to SQLite database directory                                  |
 | `MAX_STORED_RESULTS`  | 10000             | Maximum stored results; results older than 90 days are also purged  |
 | `BIND_ADDRESS`        | `0.0.0.0`         | Address to bind listeners                                          |

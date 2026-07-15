@@ -11,6 +11,14 @@ in Git history and pull requests, not release notes.
   GO-2026-5856; CI follows the latest 1.26.x patch and Dependabot watches Docker
   base images.
 
+### Fixed
+
+- Removed the Go SDK's 60-second global HTTP timeout so long speed-test streams
+  use caller and operation contexts; health and the full latency phase are each
+  bounded to 10 seconds.
+- Required `MAX_TEST_DURATION` to be whole seconds of at least `1s`, and bounded
+  an omitted download duration by the configured maximum.
+
 ### Changed
 
 - Simplified the browser transfer state machines, one-shot worker protocol, and

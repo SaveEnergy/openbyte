@@ -29,11 +29,37 @@ func TestConfigValidateGlobalRateLimitLessThanPerIP(t *testing.T) {
 }
 
 func TestConfigValidateMaxTestDuration(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.MaxTestDuration = 0
+	for _, duration := range []time.Duration{0, -time.Second, 500 * time.Millisecond, 1500 * time.Millisecond} {
+		cfg := config.DefaultConfig()
+		cfg.MaxTestDuration = duration
+		if cfg.Validate() == nil {
+			t.Fatalf("expected error for max test duration %v", duration)
+		}
+	}
+}
 
-	if cfg.Validate() == nil {
-		t.Fatalf("expected error for max test duration <= 0")
+func TestConfigLoadRejectsFractionalMaxTestDuration(t *testing.T) {
+	for _, raw := range []string{"500ms", "1500ms"} {
+		t.Run(raw, func(t *testing.T) {
+			t.Setenv("MAX_TEST_DURATION", raw)
+
+			cfg := config.DefaultConfig()
+			if err := cfg.LoadFromEnv(); err == nil {
+				t.Fatalf("expected MAX_TEST_DURATION=%s to be rejected", raw)
+			}
+		})
+	}
+}
+
+func TestConfigLoadAcceptsWholeSecondMaxTestDuration(t *testing.T) {
+	t.Setenv("MAX_TEST_DURATION", "2s")
+
+	cfg := config.DefaultConfig()
+	if err := cfg.LoadFromEnv(); err != nil {
+		t.Fatalf("load MAX_TEST_DURATION: %v", err)
+	}
+	if cfg.MaxTestDuration != 2*time.Second {
+		t.Fatalf("max test duration = %v, want 2s", cfg.MaxTestDuration)
 	}
 }
 
@@ -82,11 +108,12 @@ func TestConfigLoadGlobalRateLimitEnvNonPositive(t *testing.T) {
 }
 
 func TestConfigValidateMaxTestDurationPositive(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.MaxTestDuration = 10 * time.Second
-
-	if err := cfg.Validate(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	for _, duration := range []time.Duration{time.Second, 10 * time.Second, 300 * time.Second} {
+		cfg := config.DefaultConfig()
+		cfg.MaxTestDuration = duration
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("duration %v: unexpected error: %v", duration, err)
+		}
 	}
 }
 

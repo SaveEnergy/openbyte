@@ -5,10 +5,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
+const healthRequestTimeout = 10 * time.Second
+
 func (c *Client) healthCheck(ctx context.Context) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.serverURL+pathHealth, nil)
+	healthCtx, cancel := context.WithTimeout(ctx, healthRequestTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(healthCtx, http.MethodGet, c.serverURL+pathHealth, nil)
 	if err != nil {
 		return fmt.Errorf("server unreachable: %w", err)
 	}
