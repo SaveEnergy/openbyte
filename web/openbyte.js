@@ -16,6 +16,11 @@ import {
   hideError,
   resetProgress,
   updateTestType,
+  resetPhaseSteps,
+  setActivePhaseStep,
+  setPhaseStepValue,
+  formatLatencyMs,
+  formatSpeedText,
 } from "./ui.js";
 import { measureLatency, runDirectionPhase } from "./speedtest.js";
 import {
@@ -77,6 +82,8 @@ export async function startTest() {
   try {
     state.phase = "latency";
     resetProgress();
+    resetPhaseSteps();
+    setActivePhaseStep("ping");
     updateTestType("test.phase.ping", "measuring", { icon: "↔" });
     showState("testing");
     const latency = await measureLatency(signal);
@@ -89,6 +96,8 @@ export async function startTest() {
     state.latencyResult = latency.value;
     state.jitterResult = latency.jitter;
 
+    setPhaseStepValue("ping", formatLatencyMs(state.latencyResult));
+    setActivePhaseStep("download");
     const downloadResult = await runDirectionPhase(
       signal,
       "download",
@@ -104,6 +113,8 @@ export async function startTest() {
     }
     state.downloadResult = downloadResult;
 
+    setPhaseStepValue("download", formatSpeedText(state.downloadResult));
+    setActivePhaseStep("upload");
     const uploadResult = await runDirectionPhase(
       signal,
       "upload",
@@ -119,6 +130,7 @@ export async function startTest() {
     }
     state.uploadResult = uploadResult;
 
+    setPhaseStepValue("upload", formatSpeedText(state.uploadResult));
     state.phase = "results";
     recordRunInHistory();
     showResults();

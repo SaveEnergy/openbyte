@@ -16,8 +16,9 @@ in Git history and pull requests, not release notes.
   results and history for the chosen locale. Language preferences stay on the
   device instead of being propagated through navigation and share links.
 - **Test legibility**: the testing screen now shows a determinate progress ring
-  (ramp windows + measure countdown reported by the worker), a localized live
-  phase label, and the current latency or throughput reading.
+  (ramp windows + measure countdown reported by the worker), a phase stepper
+  (Ping → Download → Upload) that keeps completed phase results visible as
+  chips, and a live throughput sparkline under the speed number.
 - **Result context**: a loaded-latency advisory, a colored bufferbloat grade
   badge, and a "What do these numbers mean?" disclosure explaining the
   secondary metrics without assigning a subjective connection label.

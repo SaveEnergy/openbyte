@@ -62,14 +62,17 @@ test.describe("openByte UI", () => {
     ).toBeTruthy();
   });
 
-  test("shows live phase status during test with history after", async ({
+  test("shows phase stepper during test with history after", async ({
     page,
   }) => {
     await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
 
     await page.locator("#startBtn").click();
-    await expect(page.locator("#testType")).toBeVisible();
-    await expect(page.locator("#progressRing")).toBeVisible();
+    await expect(page.locator("#phaseSteps")).toBeVisible();
+    await expect(page.locator("#phaseStepPing")).toHaveAttribute(
+      "data-status",
+      /active|done/,
+    );
 
     await expect(page.locator("#resultsState")).toBeVisible({
       timeout: 60_000,

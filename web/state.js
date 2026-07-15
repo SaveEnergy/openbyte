@@ -65,6 +65,17 @@ export function initElements() {
   elements.successToast = document.getElementById("successToast");
   elements.successMessage = document.getElementById("successMessage");
   elements.shareBtn = document.getElementById("shareBtn");
+  elements.speedSparkline = document.getElementById("speedSparkline");
+  elements.phaseSteps = {
+    ping: document.getElementById("phaseStepPing"),
+    download: document.getElementById("phaseStepDownload"),
+    upload: document.getElementById("phaseStepUpload"),
+  };
+  elements.phaseValues = {
+    ping: document.getElementById("phaseValuePing"),
+    download: document.getElementById("phaseValueDownload"),
+    upload: document.getElementById("phaseValueUpload"),
+  };
   elements.resultsAdvisory = document.getElementById("resultsAdvisory");
   elements.resultsAnnouncement = document.getElementById(
     "resultsAnnouncement",
@@ -111,6 +122,7 @@ export const TEST_CONFIG = {
   TOAST_ERROR_MS: 5000,
   TOAST_SUCCESS_MS: 2000,
   SERVER_RECHECK_MS: 30000,
+  SPARKLINE_MAX_POINTS: 120,
 };
 
 export const toast = {
