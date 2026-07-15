@@ -64,7 +64,7 @@ The browser client implements:
 - Adaptive Web Worker stream ramping plus dynamic warm-up with throughput stabilization detection
 - Baseline latency measurement before each test
 - Metrics reset after warm-up for accurate results
-- Statistical reporting with P50, P95, P99 percentiles
+- Median latency reporting with IQR outlier filtering
 
 ## Configuration
 
