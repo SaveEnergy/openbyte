@@ -1,12 +1,12 @@
 package api
 
 import (
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/config"
-	"github.com/saveenergy/openbyte/internal/logging"
 	"github.com/saveenergy/openbyte/internal/results"
 	"github.com/saveenergy/openbyte/web"
 )
@@ -28,9 +28,7 @@ func NewRouter(cfg *config.Config, resultsStore *results.Store) *Router {
 	// safest usable limit instead of widening a truncated value to 300 seconds.
 	maxDur := max(1, int(cfg.MaxTestDuration/time.Second))
 	resolver := NewClientIPResolver(cfg)
-	speedtest := NewSpeedTestHandler(cfg.MaxConcurrentHTTP(), maxDur)
-	speedtest.SetMaxConcurrentPerIP(cfg.MaxConcurrentPerIP)
-	speedtest.SetClientIPResolver(resolver)
+	speedtest := NewSpeedTestHandlerWithPolicy(cfg.MaxConcurrentHTTP(), maxDur, cfg.MaxConcurrentPerIP, resolver)
 
 	serverName := strings.TrimSpace(cfg.ServerName)
 	if serverName == "" {
@@ -84,7 +82,7 @@ func (r *Router) HealthCheck(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
-		logging.Warn("health: write response", logging.Field{Key: "error", Value: err})
+		slog.Warn("health: write response", "error", err)
 	}
 }
 

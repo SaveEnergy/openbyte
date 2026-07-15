@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/config"
-	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 var (
@@ -26,7 +26,7 @@ func Run(args []string, version string) int {
 		if errors.Is(err, flag.ErrHelp) {
 			return exitSuccess
 		}
-		logging.Error("Invalid flags", logging.Field{Key: "error", Value: err})
+		slog.Error("Invalid flags", "error", err)
 		return exitFailure
 	}
 	if versionFlag {
@@ -35,29 +35,19 @@ func Run(args []string, version string) int {
 	}
 	cfg := config.DefaultConfig()
 	if err := cfg.LoadFromEnv(); err != nil {
-		logging.Error("Failed to load config", logging.Field{Key: "error", Value: err})
+		slog.Error("Failed to load config", "error", err)
 		return exitFailure
 	}
 	if err := cfg.Validate(); err != nil {
-		logging.Error("Invalid configuration", logging.Field{Key: "error", Value: err})
+		slog.Error("Invalid configuration", "error", err)
 		return exitFailure
 	}
 
-	pprofServer := startPprofServer(cfg)
-	cleanupOnError := true
-
-	resources := &serverResources{}
-	defer func() {
-		if !cleanupOnError {
-			return
-		}
-		resources.stopAll(pprofServer)
-	}()
-
-	muxRouter, err := setupRuntimeResources(cfg, resources)
+	muxRouter, resultsStore, err := setupRuntimeResources(cfg)
 	if err != nil {
 		return exitFailure
 	}
+	pprofServer := startPprofServer(cfg)
 
 	srv := &http.Server{
 		Addr:              cfg.BindAddress + ":" + cfg.Port,
@@ -77,10 +67,9 @@ func Run(args []string, version string) int {
 	exitCode := waitForShutdown(quit, srvErrCh)
 	shutdownHTTPServer(srv, 30*time.Second)
 
-	resources.stopAll(pprofServer)
-	cleanupOnError = false
-
-	logging.Info("Server stopped")
+	resultsStore.Close()
+	shutdownPprofServer(pprofServer, 5*time.Second)
+	slog.Info("Server stopped")
 	return exitCode
 }
 

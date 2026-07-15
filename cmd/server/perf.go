@@ -3,12 +3,12 @@ package server
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	_ "net/http/pprof" // Registers pprof handlers on DefaultServeMux.
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/config"
-	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 func startPprofServer(cfg *config.Config) *http.Server {
@@ -22,9 +22,9 @@ func startPprofServer(cfg *config.Config) *http.Server {
 	}
 
 	go func() {
-		logging.Info("pprof server starting", logging.Field{Key: "address", Value: cfg.PprofAddress})
+		slog.Info("pprof server starting", "address", cfg.PprofAddress)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logging.Error("pprof server failed", logging.Field{Key: "error", Value: err})
+			slog.Error("pprof server failed", "error", err)
 		}
 	}()
 
@@ -38,6 +38,6 @@ func shutdownPprofServer(srv *http.Server, timeout time.Duration) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		logging.Warn("pprof server shutdown error", logging.Field{Key: "error", Value: err})
+		slog.Warn("pprof server shutdown error", "error", err)
 	}
 }

@@ -2,19 +2,18 @@ package api
 
 import (
 	"crypto/rand"
+	"log/slog"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 type SpeedTestHandler struct {
 	activeDownloads    int64
 	activeUploads      int64
 	maxConcurrent      int64
-	maxConcurrentPerIP atomic.Int64
+	maxConcurrentPerIP int
 	maxDurationSec     int
 	clientIPResolver   *ClientIPResolver
 	randomData         []byte
@@ -44,15 +43,27 @@ const (
 )
 
 func NewSpeedTestHandler(maxConcurrent, maxDurationSec int) *SpeedTestHandler {
+	return NewSpeedTestHandlerWithPolicy(maxConcurrent, maxDurationSec, 0, nil)
+}
+
+func NewSpeedTestHandlerWithPolicy(maxConcurrent, maxDurationSec, maxConcurrentPerIP int, resolver *ClientIPResolver) *SpeedTestHandler {
 	if maxDurationSec <= 0 {
 		maxDurationSec = 300
 	}
+	if maxConcurrentPerIP < 0 {
+		maxConcurrentPerIP = 0
+	}
+	if resolver == nil {
+		resolver = NewClientIPResolver(nil)
+	}
 	const fallbackRandomSize = 64 * 1024
 	handler := &SpeedTestHandler{
-		maxConcurrent:  int64(maxConcurrent),
-		maxDurationSec: maxDurationSec,
-		randomData:     make([]byte, speedtestRandomSize),
-		activeByIP:     make(map[string]*speedtestIPCounts),
+		maxConcurrent:      int64(maxConcurrent),
+		maxConcurrentPerIP: maxConcurrentPerIP,
+		maxDurationSec:     maxDurationSec,
+		clientIPResolver:   resolver,
+		randomData:         make([]byte, speedtestRandomSize),
+		activeByIP:         make(map[string]*speedtestIPCounts),
 		uploadBufPool: sync.Pool{
 			New: func() any { return newUploadBuffer() },
 		},
@@ -61,8 +72,7 @@ func NewSpeedTestHandler(maxConcurrent, maxDurationSec int) *SpeedTestHandler {
 		},
 	}
 	if _, err := rand.Read(handler.randomData); err != nil {
-		logging.Warn("speedtest: random data init failed, using per-request random",
-			logging.Field{Key: "error", Value: err})
+		slog.Warn("speedtest: random data init failed, using per-request random", "error", err)
 		handler.randomData = nil
 	}
 	return handler
@@ -77,21 +87,7 @@ func newSpeedtestBuffer(size int) *[]byte {
 	return &buf
 }
 
-func (h *SpeedTestHandler) SetClientIPResolver(resolver *ClientIPResolver) {
-	h.clientIPResolver = resolver
-}
-
-func (h *SpeedTestHandler) SetMaxConcurrentPerIP(limit int) {
-	if limit < 0 {
-		limit = 0
-	}
-	h.maxConcurrentPerIP.Store(int64(limit))
-}
-
 func (h *SpeedTestHandler) resolveClientIP(r *http.Request) string {
-	if h.clientIPResolver == nil {
-		return ipString(parseRemoteIP(r.RemoteAddr))
-	}
 	return h.clientIPResolver.FromRequest(r)
 }
 
@@ -124,15 +120,11 @@ func (h *SpeedTestHandler) tryAcquirePerIP(clientIP string, isDownload bool) boo
 	if clientIP == "" {
 		return true
 	}
-	if h.maxConcurrentPerIP.Load() <= 0 {
+	if h.maxConcurrentPerIP <= 0 {
 		return true
 	}
 	h.ipMu.Lock()
 	defer h.ipMu.Unlock()
-	limit := int(h.maxConcurrentPerIP.Load())
-	if limit <= 0 {
-		return true
-	}
 	counts := h.activeByIP[clientIP]
 	if counts == nil {
 		counts = &speedtestIPCounts{}
@@ -141,7 +133,7 @@ func (h *SpeedTestHandler) tryAcquirePerIP(clientIP string, isDownload bool) boo
 	if isDownload {
 		current = counts.downloads
 	}
-	if current >= limit {
+	if current >= h.maxConcurrentPerIP {
 		return false
 	}
 	if h.activeByIP[clientIP] == nil {

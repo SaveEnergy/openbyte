@@ -4,20 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/httpbody"
-	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 func respondSpeedtestError(w http.ResponseWriter, msg string, code int) {
 	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(map[string]string{"error": msg}); err != nil {
-		logging.Warn("speedtest: encode error response", logging.Field{Key: "error", Value: err})
+		slog.Warn("speedtest: encode error response", "error", err)
 	}
 }
 
@@ -117,6 +117,6 @@ func (h *SpeedTestHandler) ping(w http.ResponseWriter, r *http.Request, serverNa
 		IPv6:       isIPv6,
 		ServerName: serverName,
 	}); err != nil {
-		logging.Warn("speedtest: encode ping response", logging.Field{Key: "error", Value: err})
+		slog.Warn("speedtest: encode ping response", "error", err)
 	}
 }

@@ -4,12 +4,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
 	_ "modernc.org/sqlite" // Registers sqlite driver used by sql.Open("sqlite", ...).
-
-	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 var ErrStoreRetryable = errors.New("results store retryable")
@@ -79,7 +78,7 @@ func (s *Store) Close() {
 		close(s.stopCh)
 		s.wg.Wait()
 		if err := s.db.Close(); err != nil {
-			logging.Warn("results store: close failed", logging.Field{Key: "error", Value: err})
+			slog.Warn("results store: close failed", "error", err)
 		}
 	})
 }

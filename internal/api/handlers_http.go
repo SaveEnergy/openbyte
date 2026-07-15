@@ -3,10 +3,9 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"sync"
-
-	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 var jsonBufPool = sync.Pool{
@@ -36,8 +35,7 @@ func respondJSON(w http.ResponseWriter, data any, statusCode int) {
 	encoder := json.NewEncoder(buf)
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(data); err != nil {
-		logging.Warn("JSON response marshal failed",
-			logging.Field{Key: "error", Value: err})
+		slog.Warn("JSON response marshal failed", "error", err)
 		statusCode = http.StatusInternalServerError
 		buf.Reset()
 		buf.WriteString(`{"error":"internal error"}`)
@@ -47,7 +45,6 @@ func respondJSON(w http.ResponseWriter, data any, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	if _, err := w.Write(buf.Bytes()); err != nil {
-		logging.Warn("JSON response write failed",
-			logging.Field{Key: "error", Value: err})
+		slog.Warn("JSON response write failed", "error", err)
 	}
 }

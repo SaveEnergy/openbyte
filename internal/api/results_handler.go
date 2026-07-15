@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"math"
 	"net/http"
 
 	"github.com/saveenergy/openbyte/internal/httpbody"
-	"github.com/saveenergy/openbyte/internal/logging"
 	"github.com/saveenergy/openbyte/internal/results"
 )
 
@@ -97,7 +97,7 @@ func (h *resultHandler) save(w http.ResponseWriter, r *http.Request) {
 		ServerName:       req.ServerName,
 	})
 	if err != nil {
-		logging.Warn("results: save failed", logging.Field{Key: "error", Value: err})
+		slog.Warn("results: save failed", "error", err)
 		msg, code := mapSaveStoreError(err)
 		respondResultError(w, msg, code)
 		return

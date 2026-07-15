@@ -139,8 +139,7 @@ func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 }
 
 func TestUploadPerIPLimitRejectsSameIPAllowsDifferentIP(t *testing.T) {
-	handler := api.NewSpeedTestHandler(4, 300)
-	handler.SetMaxConcurrentPerIP(2)
+	handler := api.NewSpeedTestHandlerWithPolicy(4, 300, 2, nil)
 
 	sameIP := "203.0.113.10:1234"
 	otherIP := "203.0.113.11:1234"

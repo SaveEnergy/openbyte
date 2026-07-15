@@ -28,6 +28,17 @@ func TestResolveRandomSourceFallback(t *testing.T) {
 	}
 }
 
+func TestNewSpeedTestHandlerNormalizesImmutablePolicy(t *testing.T) {
+	handler := NewSpeedTestHandlerWithPolicy(2, 60, -1, nil)
+
+	if handler.maxConcurrentPerIP != 0 {
+		t.Fatalf("max concurrent per IP = %d, want 0", handler.maxConcurrentPerIP)
+	}
+	if handler.clientIPResolver == nil {
+		t.Fatal("expected default client IP resolver")
+	}
+}
+
 func TestUploadReadDeadline(t *testing.T) {
 	start := time.Date(2026, 2, 15, 7, 0, 0, 0, time.UTC)
 

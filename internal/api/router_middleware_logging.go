@@ -3,11 +3,10 @@ package api
 import (
 	"bufio"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"time"
-
-	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 const uploadRequestLogMinDuration = time.Second
@@ -84,12 +83,12 @@ func (r *Router) LoggingMiddleware(next http.Handler) http.Handler {
 
 			duration := time.Since(start)
 			if shouldLogRequest(path, rw.statusCode, duration) {
-				logging.Info("HTTP request",
-					logging.Field{Key: "method", Value: req.Method},
-					logging.Field{Key: "path", Value: path},
-					logging.Field{Key: "status", Value: rw.statusCode},
-					logging.Field{Key: "duration_ms", Value: float64(duration.Microseconds()) / 1000},
-					logging.Field{Key: "ip", Value: r.resolveClientIP(req)},
+				slog.Info("HTTP request",
+					"method", req.Method,
+					"path", path,
+					"status", rw.statusCode,
+					"duration_ms", float64(duration.Microseconds())/1000,
+					"ip", r.resolveClientIP(req),
 				)
 			}
 		} else {
