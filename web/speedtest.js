@@ -255,6 +255,9 @@ async function runTest(direction, signal) {
     clearInterval(progressTick);
     if (latencyProbe) await latencyProbe.stop();
   }
+  if (signal.aborted || state.abortController?.signal !== signal) {
+    throw makeAbortError();
+  }
   const loadedLatency = latencyProbe ? latencyProbe.getMedian() : 0;
   if (direction === "download") {
     state.downloadLatency = loadedLatency;
@@ -402,6 +405,7 @@ export async function measureLatency(signal) {
       const rtt = performance.now() - start;
 
       await captureClientIPIfNeeded(res, capturedRef, signal);
+      if (signal.aborted || state.abortController?.signal !== signal) break;
 
       rawSamples.push(rtt);
       updateProgress((i / numSamples) * 100);

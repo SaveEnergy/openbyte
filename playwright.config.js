@@ -39,7 +39,7 @@ module.exports = defineConfig({
   },
   webServer: {
     command:
-      "BIND_ADDRESS=127.0.0.1 PORT=8080 ALLOWED_ORIGINS=* go run ./cmd/openbyte server",
+      "BIND_ADDRESS=127.0.0.1 PORT=8080 ALLOWED_ORIGINS=* go run ./cmd/openbyte",
     url: "http://127.0.0.1:8080/health",
     timeout: 120_000,
     reuseExistingServer: true,

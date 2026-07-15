@@ -72,8 +72,7 @@ paths:
           schema:
             type: integer
             minimum: 1
-            default: 10
-          description: Duration in seconds. The configured MAX_TEST_DURATION is the upper bound (300 seconds by default).
+          description: Duration in seconds. The configured whole-second MAX_TEST_DURATION is the upper bound (300 seconds by default); when that bound is below 10, an omitted duration uses the bound.
         - name: chunk
           in: query
           schema:

@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
 	"sync"
 
@@ -22,14 +21,6 @@ const (
 func isJSONContentType(r *http.Request) bool {
 	ct := r.Header.Get("Content-Type")
 	return len(ct) >= jsonContentTypePrefixLen && ct[:jsonContentTypePrefixLen] == jsonContentTypePrefix
-}
-
-func drainRequestBody(r *http.Request) {
-	if r == nil || r.Body == nil {
-		return
-	}
-	_, _ = io.Copy(io.Discard, r.Body)
-	_ = r.Body.Close()
 }
 
 func respondJSON(w http.ResponseWriter, data any, statusCode int) {

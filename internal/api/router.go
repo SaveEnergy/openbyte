@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/saveenergy/openbyte/internal/config"
 	"github.com/saveenergy/openbyte/internal/logging"
@@ -26,10 +27,9 @@ func NewRouter(cfg *config.Config, version string, resultsStore *results.Store) 
 	if cfg == nil {
 		cfg = config.DefaultConfig()
 	}
-	maxDur := 300
-	if cfg.MaxTestDuration > 0 {
-		maxDur = int(cfg.MaxTestDuration.Seconds())
-	}
+	// Valid configuration is whole seconds. Invalid direct callers get the
+	// safest usable limit instead of widening a truncated value to 300 seconds.
+	maxDur := max(1, int(cfg.MaxTestDuration/time.Second))
 	resolver := NewClientIPResolver(cfg)
 	speedtest := NewSpeedTestHandler(cfg.MaxConcurrentHTTP(), maxDur)
 	speedtest.SetMaxConcurrentPerIP(cfg.MaxConcurrentPerIP)

@@ -5,10 +5,10 @@ openByte is a browser-first HTTP speed test server. The product deliberately sta
 ## Runtime shape
 
 ```text
-Browser / check / agent
-        │
-        ▼
-openbyte server (:8080)
+Browser / HTTP client
+         │
+         ▼
+openbyte (:8080)
   ├─ Web UI + static assets
   ├─ HTTP speed APIs: ping, download, upload
   ├─ Version/API docs/results APIs

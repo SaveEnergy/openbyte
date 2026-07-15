@@ -136,11 +136,14 @@
 
 @media (max-width: 600px) {
   .history-item {
+    flex-direction: column;
+    align-items: center;
     gap: var(--space-sm);
   }
 
   .history-when,
   .history-meta {
     min-width: 0;
+    text-align: center;
   }
 }

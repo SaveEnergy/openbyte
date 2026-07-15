@@ -142,16 +142,20 @@ export async function checkServer() {
     { cache: "no-store" },
     isIdle,
   );
-  if (!isIdle()) return;
   if (online) setServerOnlineUI();
   else setServerOfflineUI();
 }
 
 export function detectNetworkInfo() {
+  const discoveryGeneration = state.runGeneration;
+  const canUpdateStartupAddress = () =>
+    state.phase !== "results" &&
+    (state.runGeneration === discoveryGeneration ||
+      (state.runGeneration === discoveryGeneration + 1 && state.isRunning));
   const sameOriginProbe = discoverAddress(
     `${getApiBase()}/ping`,
     { cache: "no-store" },
-    isIdle,
+    canUpdateStartupAddress,
   );
   void sameOriginProbe.then((ready) => {
     if (ready) setServerOnlineUI();
@@ -176,12 +180,12 @@ export function detectNetworkInfo() {
       discoverAddress(
         `${proto}//v4.${hostname}/api/v1/ping`,
         probeOpts,
-        isIdle,
+        canUpdateStartupAddress,
       ),
       discoverAddress(
         `${proto}//v6.${hostname}/api/v1/ping`,
         probeOpts,
-        isIdle,
+        canUpdateStartupAddress,
       ),
     );
   }

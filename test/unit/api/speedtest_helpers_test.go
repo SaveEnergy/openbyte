@@ -37,8 +37,6 @@ const (
 	speedtestContentTypeKey            = "Content-Type"
 	speedtestCacheControlKey           = "Cache-Control"
 	speedtestDecodeRespFmt             = "decode response: %v"
-	speedtestExpectBodyDrained         = "expected body to be drained"
-	speedtestExpectBodyClosed          = "expected body to be closed"
 	speedtestExpectReqBodyDrained503   = "expected request body to be drained before returning 503"
 	speedtestExpectReqBodyClosed       = "expected request body to be closed"
 	speedtestWaitDownloadStartTimeout  = "timed out waiting for download goroutine to start"
@@ -46,8 +44,6 @@ const (
 	speedtestExpected503AtLimitFmt     = "expected 503 when at limit, got %d"
 	speedtestExpected200AfterCancelFmt = "expected 200 after cancel freed slots, got %d"
 	speedtestURLStatusFmt              = "url=%s status = %d, want %d"
-	speedtestURLBodyDrainedFmt         = "url=%s expected body to be drained"
-	speedtestURLBodyClosedFmt          = "url=%s expected body to be closed"
 	speedtestDurationTooHighFmt        = "duration=10 with max=5: status = %d, want 400"
 	speedtestChunkABCFmt               = "chunk=abc: status = %d, want 400"
 )
@@ -58,6 +54,20 @@ type signalWriter struct {
 	*httptest.ResponseRecorder
 	started chan struct{}
 	once    sync.Once
+}
+
+type deadlineRecorder struct {
+	*httptest.ResponseRecorder
+	readDeadlines []time.Time
+}
+
+func newDeadlineRecorder() *deadlineRecorder {
+	return &deadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
+}
+
+func (w *deadlineRecorder) SetReadDeadline(deadline time.Time) error {
+	w.readDeadlines = append(w.readDeadlines, deadline)
+	return nil
 }
 
 func (sw *signalWriter) Write(b []byte) (int, error) {

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/saveenergy/openbyte/internal/httpbody"
 	"github.com/saveenergy/openbyte/internal/logging"
 )
 
@@ -23,7 +24,6 @@ func respondSpeedtestError(w http.ResponseWriter, msg string, code int) {
 func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 	clientIP := h.resolveClientIP(r)
 	if !h.tryAcquireSpeedtestSlot(clientIP, true) {
-		drainRequestBody(r)
 		respondSpeedtestError(w, "too many concurrent downloads", http.StatusServiceUnavailable)
 		return
 	}
@@ -31,7 +31,6 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 
 	duration, chunkSize, parseErr := parseDownloadParams(r, h.maxDurationSec)
 	if parseErr != nil {
-		drainRequestBody(r)
 		respondSpeedtestError(w, parseErr.Error(), http.StatusBadRequest)
 		return
 	}
@@ -41,7 +40,6 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 
 	randomSource, release, err := h.resolveRandomSource()
 	if err != nil {
-		drainRequestBody(r)
 		respondSpeedtestError(w, "failed to generate random data", http.StatusInternalServerError)
 		return
 	}
@@ -51,10 +49,9 @@ func (h *SpeedTestHandler) Download(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
-	defer drainRequestBody(r)
-
 	clientIP := h.resolveClientIP(r)
 	if !h.tryAcquireSpeedtestSlot(clientIP, false) {
+		httpbody.DrainAndClose(w, r)
 		respondSpeedtestError(w, "too many concurrent uploads", http.StatusServiceUnavailable)
 		return
 	}
@@ -78,15 +75,20 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	totalBytes, readFailed := readUploadBody(readCtx, r.Body, controller, deadline, &h.uploadBufPool)
 	if readFailed {
+		httpbody.Abort(w, r)
 		respondSpeedtestError(w, "upload failed", http.StatusInternalServerError)
 		return
+	}
+	if readCtx.Err() != nil || !time.Now().Before(deadline) {
+		httpbody.Abort(w, r)
+	} else {
+		_ = r.Body.Close()
 	}
 
 	writeUploadResponse(w, controller, totalBytes, startTime)
 }
 
 func (h *SpeedTestHandler) Ping(w http.ResponseWriter, r *http.Request) {
-	drainRequestBody(r)
 	clientIP := h.resolveClientIP(r)
 	isIPv6 := strings.IndexByte(clientIP, ':') >= 0
 

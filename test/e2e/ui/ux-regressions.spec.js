@@ -56,6 +56,83 @@ test.describe("openByte UI regressions", () => {
     });
   });
 
+  test("an in-flight readiness probe can disable the next run", async ({
+    page,
+  }) => {
+    let probeStarted = false;
+    let releaseProbe;
+    const probeGate = new Promise((resolve) => {
+      releaseProbe = resolve;
+    });
+    await page.goto("/");
+    await page.route("**/api/v1/ping", async (route) => {
+      probeStarted = true;
+      await probeGate;
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "offline" }),
+      });
+    });
+
+    await page.evaluate(async () => {
+      const { state } = await import("/state.js");
+      const { checkServer } = await import("/network.js");
+      state.phase = "idle";
+      state.isRunning = false;
+      globalThis.__inFlightReadiness = checkServer();
+    });
+    await expect.poll(() => probeStarted).toBe(true);
+    await page.evaluate(async () => {
+      const { state } = await import("/state.js");
+      state.phase = "latency";
+      state.isRunning = true;
+    });
+    releaseProbe();
+    await page.evaluate(() => globalThis.__inFlightReadiness);
+
+    const readiness = await page.evaluate(async () => {
+      const { state } = await import("/state.js");
+      return state.serverOnline;
+    });
+    expect(readiness).toBe(false);
+    await expect(page.locator("#startBtn")).toBeDisabled();
+  });
+
+  test("delayed startup probes can finish during the first test", async ({
+    page,
+  }) => {
+    await page.route("**/api/v1/ping", async (route) => {
+      const hostname = new URL(route.request().url()).hostname;
+      const isCrossProbe = hostname.startsWith("v4.") || hostname.startsWith("v6.");
+      if (isCrossProbe) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+      await route.fulfill({
+        status: 200,
+        headers: { "Access-Control-Allow-Origin": "*" },
+        contentType: "application/json",
+        body: JSON.stringify({
+          client_ip: hostname.startsWith("v6.")
+            ? "2001:db8::99"
+            : "198.51.100.99",
+          ipv6: hostname.startsWith("v6."),
+        }),
+      });
+    });
+    await page.goto(
+      "http://openbyte.localhost:8080/?maxStreams=1&measureDuration=1&rampDuration=1",
+    );
+    await page.locator("#startBtn").click();
+    await expect(page.locator("#testingState")).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(async () => (await import("/state.js")).state.networkInfo.ipv6),
+      )
+      .toBe("2001:db8::99");
+    await page.locator("#cancelBtn").click();
+  });
+
   test("theme toggle cycles when storage is unavailable", async ({ page }) => {
     await page.addInitScript(() => {
       for (const method of ["getItem", "setItem", "removeItem"]) {
@@ -309,6 +386,7 @@ test.describe("openByte UI regressions", () => {
   test("light-theme labels and controls meet contrast and target sizes", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
     await page.goto("/");
     const audit = await page.evaluate(() => {
       const rgb = (value) => value.match(/[\d.]+/g).slice(0, 3).map(Number);
@@ -346,8 +424,13 @@ test.describe("openByte UI regressions", () => {
       const summaryRect = document
         .querySelector(".stats-help summary")
         .getBoundingClientRect();
+      const historyItem = document.createElement("li");
+      historyItem.className = "history-item";
+      historyItem.append("just now", "100 Mbps", "10 ms · A");
+      document.getElementById("historyList").append(historyItem);
       return {
         badgeContrast: contrast(getComputedStyle(badge).color, background),
+        historyDirection: getComputedStyle(historyItem).flexDirection,
         partialContrast: contrast(getComputedStyle(partial).color, background),
         summaryHeight: summaryRect.height,
         themeHeight: themeRect.height,
@@ -356,6 +439,7 @@ test.describe("openByte UI regressions", () => {
     });
 
     expect(audit.badgeContrast).toBeGreaterThanOrEqual(4.5);
+    expect(audit.historyDirection).toBe("column");
     expect(audit.partialContrast).toBeGreaterThanOrEqual(4.5);
     expect(audit.summaryHeight).toBeGreaterThanOrEqual(44);
     expect(audit.themeHeight).toBeGreaterThanOrEqual(44);

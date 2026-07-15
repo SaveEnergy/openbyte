@@ -28,10 +28,10 @@ High-performance browser-first network speed test server for multi-gigabit links
 
 ```bash
 make build
-./bin/openbyte server
+./bin/openbyte
 
 # Server configuration is environment-only
-SERVER_NAME="Frankfurt 25G" ./bin/openbyte server
+SERVER_NAME="Frankfurt 25G" ./bin/openbyte
 ```
 
 ### Docker
@@ -50,12 +50,12 @@ Open `http://localhost:8080` — minimal fast.com-inspired UI with adaptive stre
 
 ## Features
 
-- **Protocols**: HTTP streaming for the Web UI, API, and SDK
+- **Protocols**: HTTP streaming for the Web UI and API
 - **Test Types**: Download, Upload
 - **Metrics**: Throughput, idle latency, jitter, loaded latency, bufferbloat
 - **Public IP**: IPv4 and IPv6 discovery shown immediately, before a speed test
 - **Adaptive web test**: Browser UI ramps parallel HTTP streams automatically, then measures with the stream count that saturated the path; transfer loops run in a Web Worker to keep the UI responsive
-- **Automation**: OpenAPI-documented HTTP API, Go SDK, and `check --json`
+- **Automation**: OpenAPI-documented HTTP API
 
 ## Measurement Methodology
 
@@ -82,7 +82,7 @@ The browser client implements:
 | `TRUSTED_PROXY_CIDRS` | —                 | Comma-separated trusted proxy CIDRs                                |
 | `ALLOWED_ORIGINS`     | `*`               | Comma-separated CORS allowed origins                               |
 | `WEB_ROOT`            | _(embedded)_      | Override path to static web assets (for development)               |
-| `MAX_TEST_DURATION`   | `300s`            | Maximum test duration (Go duration format)                         |
+| `MAX_TEST_DURATION`   | `300s`            | Maximum test duration (whole seconds in Go duration format, at least `1s`) |
 | `DATA_DIR`            | `./data`          | Path to SQLite database directory                                  |
 | `MAX_STORED_RESULTS`  | 10000             | Maximum stored results; results older than 90 days are also purged  |
 | `BIND_ADDRESS`        | `0.0.0.0`         | Address to bind listeners                                          |
@@ -99,7 +99,7 @@ Notes:
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
 - Default CORS allows all origins; set `ALLOWED_ORIGINS` to restrict (supports `*` and `*.example.com`).
 - If running behind a reverse proxy, allow more than the browser's adaptive 64 MiB maximum request payload and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.
-- Server configuration uses environment variables only; `openbyte server --help` lists command-only options.
+- Server configuration uses environment variables only; `openbyte --help` lists command-only options.
 
 ### Deployment With Environment Variables
 
@@ -146,8 +146,7 @@ Playwright starts a local server on `127.0.0.1:8080`, or reuses one already runn
 
 ```
 cmd/
-  openbyte/   # Unified binary entry point
-  check/      # Quick connectivity command
+  openbyte/   # Server binary entry point
   server/     # Server implementation
 internal/
   api/        # REST API + HTTP speed test handlers
