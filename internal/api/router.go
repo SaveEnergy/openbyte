@@ -56,10 +56,11 @@ func NewRouter(cfg *config.Config, resultsStore *results.Store) *Router {
 
 func (r *Router) SetupRoutes() http.Handler {
 	mux := http.NewServeMux()
-	webFS := r.resolveWebFS()
-	rateLimitedV1 := r.newRateLimitedV1Registrar(mux)
 
-	r.registerResultsAPIRoutes(rateLimitedV1)
+	if r.resultsHandler != nil {
+		mux.HandleFunc("POST "+apiV1Prefix+"/results", applyRateLimit(r.limiter, r.resultsHandler.save))
+		mux.HandleFunc("GET "+apiV1Prefix+"/results/{id}", applyRateLimit(r.limiter, r.resultsHandler.get))
+	}
 	mux.HandleFunc("GET "+apiV1Prefix+"/download", r.speedtest.Download)
 	mux.HandleFunc("POST "+apiV1Prefix+"/upload", r.speedtest.Upload)
 	mux.HandleFunc("GET "+apiV1Prefix+"/ping", r.ping)
@@ -71,11 +72,28 @@ func (r *Router) SetupRoutes() http.Handler {
 		respondJSON(w, map[string]string{"error": errNotFound}, http.StatusNotFound)
 	})
 
-	staticHandler := staticCacheMiddleware(newStaticAllowlistHandler(webFS))
-	r.registerResultsPageRoute(mux, staticHandler)
+	staticHandler := staticCacheMiddleware(newStaticAllowlistHandler(r.webFS))
+	if r.resultsHandler != nil {
+		resultsPageHandler := func(w http.ResponseWriter, req *http.Request) {
+			if !validResultID(req.PathValue("id")) {
+				http.NotFound(w, req)
+				return
+			}
+			staticReq := req.Clone(req.Context())
+			staticReq.URL.Path = "/" + resultsHTML
+			staticReq.URL.RawPath = ""
+			staticHandler.ServeHTTP(w, staticReq)
+		}
+		if r.limiter != nil {
+			resultsPageHandler = applyRateLimit(r.limiter, resultsPageHandler)
+		}
+		mux.HandleFunc("GET /results/{id}", resultsPageHandler)
+	}
 	mux.Handle("/", staticHandler)
 
-	return r.wrapMiddlewares(mux)
+	handler := rejectBodylessRequestBodies(mux)
+	handler = SecurityHeadersMiddleware(handler)
+	return r.LoggingMiddleware(handler)
 }
 
 func (r *Router) ping(w http.ResponseWriter, req *http.Request) {
@@ -92,16 +110,6 @@ func (r *Router) HealthCheck(w http.ResponseWriter, req *http.Request) {
 	if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
 		slog.Warn("health: write response", "error", err)
 	}
-}
-
-// resolveWebFS returns the web file system to use for static assets.
-// If a disk override is configured, it takes precedence.
-// Otherwise, the embedded assets from the web package are used.
-func (r *Router) resolveWebFS() http.FileSystem {
-	if r.webFS != nil {
-		return r.webFS
-	}
-	return http.FS(web.Assets)
 }
 
 func (r *Router) resolveClientIP(req *http.Request) string {

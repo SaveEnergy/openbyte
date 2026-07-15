@@ -108,6 +108,69 @@ func TestUnknownAPIRouteReturnsJSONNotFound(t *testing.T) {
 	}
 }
 
+func TestResultsRoutesAbsentWithoutStore(t *testing.T) {
+	h := api.NewRouter(config.DefaultConfig(), nil).SetupRoutes()
+	for _, test := range []struct {
+		method string
+		path   string
+	}{
+		{method: http.MethodPost, path: "/api/v1/results"},
+		{method: http.MethodGet, path: "/api/v1/results/abc12345"},
+		{method: http.MethodGet, path: resultsPagePath},
+		{method: http.MethodHead, path: resultsPagePath},
+	} {
+		t.Run(test.method+" "+test.path, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(test.method, exampleBaseURL+test.path, nil))
+			if rec.Code != http.StatusNotFound {
+				t.Fatalf(statusWantFmt, rec.Code, http.StatusNotFound)
+			}
+		})
+	}
+}
+
+func TestResultsAPIRoutesRateLimited(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		method      string
+		path        string
+		body        string
+		firstStatus int
+	}{
+		{name: "save", method: http.MethodPost, path: "/api/v1/results", body: `{}`, firstStatus: http.StatusCreated},
+		{name: "get", method: http.MethodGet, path: "/api/v1/results/abc12345", firstStatus: http.StatusNotFound},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := config.DefaultConfig()
+			cfg.GlobalRateLimit = 1
+			cfg.RateLimitPerIP = 1
+			h := api.NewRouter(cfg, newTestResultsStore(t)).SetupRoutes()
+
+			request := func() *http.Request {
+				req := httptest.NewRequest(test.method, exampleBaseURL+test.path, strings.NewReader(test.body))
+				if test.method == http.MethodPost {
+					req.Header.Set(contentTypeHeader, routerContentTypeJSON)
+				}
+				return req
+			}
+			first := httptest.NewRecorder()
+			h.ServeHTTP(first, request())
+			if first.Code != test.firstStatus {
+				t.Fatalf("first request "+statusWantFmt, first.Code, test.firstStatus)
+			}
+
+			second := httptest.NewRecorder()
+			h.ServeHTTP(second, request())
+			if second.Code != http.StatusTooManyRequests {
+				t.Fatalf("second request "+statusWantFmt, second.Code, http.StatusTooManyRequests)
+			}
+			if got := second.Header().Get("Retry-After"); got != "60" {
+				t.Fatalf("retry-after = %q, want 60", got)
+			}
+		})
+	}
+}
+
 func TestResultsPageRouteRateLimited(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.GlobalRateLimit = 1
