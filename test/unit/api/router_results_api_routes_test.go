@@ -17,7 +17,7 @@ func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
 		t.Fatalf(resultsNewErrFmt, err)
 	}
 	defer store.Close()
-	router := api.NewRouter(config.DefaultConfig(), "", store)
+	router := api.NewRouter(config.DefaultConfig(), store)
 
 	h := router.SetupRoutes()
 
@@ -43,7 +43,7 @@ func TestResultsPageRouteRejectsInvalidID(t *testing.T) {
 		t.Fatalf(resultsNewErrFmt, err)
 	}
 	defer store.Close()
-	router := api.NewRouter(config.DefaultConfig(), "", store)
+	router := api.NewRouter(config.DefaultConfig(), store)
 
 	h := router.SetupRoutes()
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/results/not-valid-id", nil)
@@ -56,7 +56,7 @@ func TestResultsPageRouteRejectsInvalidID(t *testing.T) {
 }
 
 func TestUnknownAPIRouteReturnsJSONNotFound(t *testing.T) {
-	router := api.NewRouter(config.DefaultConfig(), "", nil)
+	router := api.NewRouter(config.DefaultConfig(), nil)
 	h := router.SetupRoutes()
 
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+apiUnknownPath, nil)
@@ -84,7 +84,7 @@ func TestResultsPageRouteRateLimited(t *testing.T) {
 		t.Fatalf(resultsNewErrFmt, err)
 	}
 	defer store.Close()
-	router := api.NewRouter(cfg, "", store)
+	router := api.NewRouter(cfg, store)
 	h := router.SetupRoutes()
 
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+resultsPagePath, nil)

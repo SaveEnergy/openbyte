@@ -103,5 +103,5 @@ func (tb *trackingBody) Close() error {
 }
 
 func newResultsAPI(store *results.Store) http.Handler {
-	return api.NewRouter(config.DefaultConfig(), "test", store).SetupRoutes()
+	return api.NewRouter(config.DefaultConfig(), store).SetupRoutes()
 }

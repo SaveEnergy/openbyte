@@ -4,7 +4,6 @@ package api
 const (
 	errNotFound          = "not found"
 	errRateLimitExceeded = "rate limit exceeded"
-	errOriginNotAllowed  = "origin not allowed"
 	apiV1Prefix          = "/api/v1"
 
 	headerCacheControl = "Cache-Control"

@@ -27,7 +27,6 @@ type Config struct {
 
 	TrustProxyHeaders bool
 	TrustedProxyCIDRs []string
-	AllowedOrigins    []string
 
 	WebRoot          string
 	DataDir          string
@@ -58,7 +57,6 @@ func DefaultConfig() *Config {
 		GlobalRateLimit:    1000,
 		TrustProxyHeaders:  false,
 		TrustedProxyCIDRs:  nil,
-		AllowedOrigins:     []string{"*"},
 		WebRoot:            "",
 		DataDir:            "./data",
 		MaxStoredResults:   10000,

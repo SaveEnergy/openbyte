@@ -10,12 +10,14 @@ test.describe("openByte UI", () => {
   });
 
   test("renders configured server name", async ({ page }) => {
-    await page.route("**/api/v1/version", async (route) => {
+    await page.route(/\/api\/v1\/ping\?meta=1$/, async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          version: "test",
+          pong: true,
+          client_ip: "198.51.100.10",
+          ipv6: false,
           server_name: "Frankfurt 10G",
         }),
       });
@@ -24,16 +26,6 @@ test.describe("openByte UI", () => {
     await page.goto("/");
 
     await expect(page.locator("#serverName")).toHaveText("Frankfurt 10G");
-  });
-
-  test("API page gives agents HTTP endpoints", async ({ page }) => {
-    await page.goto("/api.html");
-
-    await expect(page.locator("h1")).toHaveText(/Agent quick reference/i);
-    await expect(page.locator("body")).toContainText("/api/v1/ping");
-    await expect(page.locator("body")).toContainText("/api/v1/download");
-    await expect(page.locator("body")).toContainText("/api/v1/upload");
-    await expect(page.locator("body")).toContainText("/api/v1/results");
   });
 
   test("runs a short adaptive test flow", async ({ page }) => {

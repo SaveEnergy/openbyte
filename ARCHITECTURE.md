@@ -11,7 +11,7 @@ Browser / HTTP client
 openbyte (:8080)
   ├─ Web UI + static assets
   ├─ HTTP speed APIs: ping, download, upload
-  ├─ Version/API docs/results APIs
+  ├─ Shared-results API
   └─ SQLite results store
 ```
 
@@ -19,9 +19,10 @@ There are no separate TCP/UDP test ports and no websocket stream API. Those pre-
 
 ## Public API
 
-The human quick reference is served at `/api.html`. The authoritative,
-machine-readable contract is [`api/openapi.yaml`](api/openapi.yaml); endpoint
-tables are not duplicated here.
+[`api/openapi.yaml`](api/openapi.yaml) is the canonical API contract; the server
+does not duplicate it as a browser page. There is no `/api/v1/version` route:
+the UI obtains the configured server name from its same-origin
+`/api/v1/ping?meta=1` bootstrap request.
 
 ## Frontend
 
@@ -29,6 +30,7 @@ tables are not duplicated here.
 - Speed tests use HTTP `/api/v1/download`, `/api/v1/upload`, and `/api/v1/ping` only.
 - Browser tests run in a module Web Worker where supported.
 - Adaptive ramping saturates the link, then measures using the selected stream count.
+- Client IP discovery stays eager on page load. `/api/v1/ping` alone allows cross-origin reads so the UI can probe dedicated IPv4/IPv6 hostnames; all other API routes are same-origin.
 - Static serving derives its allowed paths from `web/embed.go`; `WEB_ROOT` can override those files but cannot expose additional paths.
 
 ## Backend
@@ -42,4 +44,4 @@ tables are not duplicated here.
 
 - Docker exposes only port `8080`.
 - Traefik deployments route HTTP(S) to internal port `8080`, keep dedicated upload routers unbuffered, and default openByte HTTPS ALPN to HTTP/1.1.
-- `SERVER_NAME` controls the server display name returned by `/api/v1/version` and shown in the UI.
+- `SERVER_NAME` controls the server display name returned by bootstrap ping metadata and shown in the UI.

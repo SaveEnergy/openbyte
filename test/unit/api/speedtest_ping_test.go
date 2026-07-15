@@ -27,6 +27,9 @@ func TestSpeedTestHandlerPingResponseShape(t *testing.T) {
 	if got := rec.Header().Get(speedtestCacheControlKey); got != noStoreCacheControl {
 		t.Fatalf("cache-control = %q, want %q", got, noStoreCacheControl)
 	}
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("allow origin = %q, want empty without Origin request header", got)
+	}
 
 	var resp map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
@@ -43,6 +46,22 @@ func TestSpeedTestHandlerPingResponseShape(t *testing.T) {
 	}
 	if ipv6, ok := resp[pingIPv6Key].(bool); !ok || ipv6 {
 		t.Fatalf(pingIPv6FalseMsg, resp[pingIPv6Key])
+	}
+	if _, exists := resp["server_name"]; exists {
+		t.Fatalf("plain ping unexpectedly included server_name: %s", rec.Body.String())
+	}
+}
+
+func TestSpeedTestHandlerPingAllowsCrossOriginDiscovery(t *testing.T) {
+	handler := api.NewSpeedTestHandler(10, 300)
+	req := httptest.NewRequest(http.MethodGet, pingEndpoint, nil)
+	req.Header.Set("Origin", "https://speed.example.com")
+	rec := httptest.NewRecorder()
+
+	handler.Ping(rec, req)
+
+	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+		t.Fatalf("allow origin = %q, want *", got)
 	}
 }
 

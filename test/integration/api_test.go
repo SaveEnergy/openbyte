@@ -13,15 +13,12 @@ import (
 )
 
 const (
-	integrationGetMethod   = "GET"
-	integrationPostMethod  = "POST"
-	integrationOptionsVerb = "OPTIONS"
-	integrationJSONType    = "application/json"
-	integrationOrigin      = "https://example.com"
-	integrationStatusFmt   = "Status code = %d, want %d"
-	resultsPath            = "/api/v1/results"
-	noStoreValue           = "no-store"
-	resultsDBSuffix        = "/results.db"
+	integrationJSONType  = "application/json"
+	integrationOrigin    = "https://example.com"
+	integrationStatusFmt = "Status code = %d, want %d"
+	resultsPath          = "/api/v1/results"
+	noStoreValue         = "no-store"
+	resultsDBSuffix      = "/results.db"
 )
 
 func testConfig() *config.Config {
@@ -41,35 +38,30 @@ func mustStringField(t *testing.T, m map[string]any, key string) string {
 	return s
 }
 
-func TestCORSAllowedOrigin(t *testing.T) {
-	cfg := testConfig()
-	cfg.AllowedOrigins = []string{integrationOrigin}
-	router := api.NewRouter(cfg, "", nil)
-
-	req := httptest.NewRequest(integrationGetMethod, "/health", nil)
-	req.Header.Set("Origin", integrationOrigin)
-	w := httptest.NewRecorder()
-
-	router.SetupRoutes().ServeHTTP(w, req)
-
-	if w.Header().Get("Access-Control-Allow-Origin") != integrationOrigin {
-		t.Errorf("Access-Control-Allow-Origin = %s, want %s", w.Header().Get("Access-Control-Allow-Origin"), integrationOrigin)
+func TestCrossOriginAccessIsLimitedToPing(t *testing.T) {
+	handler := api.NewRouter(testConfig(), nil).SetupRoutes()
+	tests := []struct {
+		path       string
+		wantStatus int
+		wantOrigin string
+	}{
+		{path: "/api/v1/ping", wantStatus: http.StatusOK, wantOrigin: "*"},
+		{path: "/health", wantStatus: http.StatusOK},
+		{path: "/api/v1/nonexistent", wantStatus: http.StatusNotFound},
 	}
-}
 
-func TestCORSBlockedOrigin(t *testing.T) {
-	cfg := testConfig()
-	cfg.AllowedOrigins = []string{integrationOrigin}
-	router := api.NewRouter(cfg, "", nil)
+	for _, tt := range tests {
+		req := httptest.NewRequest(http.MethodGet, tt.path, nil)
+		req.Header.Set("Origin", integrationOrigin)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
 
-	req := httptest.NewRequest(integrationOptionsVerb, "/health", nil)
-	req.Header.Set("Origin", "https://evil.example")
-	w := httptest.NewRecorder()
-
-	router.SetupRoutes().ServeHTTP(w, req)
-
-	if w.Code != http.StatusForbidden {
-		t.Errorf(integrationStatusFmt, w.Code, http.StatusForbidden)
+		if rec.Code != tt.wantStatus {
+			t.Errorf("%s: "+integrationStatusFmt, tt.path, rec.Code, tt.wantStatus)
+		}
+		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != tt.wantOrigin {
+			t.Errorf("%s: Access-Control-Allow-Origin = %q, want %q", tt.path, got, tt.wantOrigin)
+		}
 	}
 }
 
@@ -79,7 +71,7 @@ func TestAPIResultsSaveAndGet(t *testing.T) {
 		t.Fatalf("results.New: %v", err)
 	}
 	defer store.Close()
-	router := api.NewRouter(testConfig(), "", store)
+	router := api.NewRouter(testConfig(), store)
 
 	h := router.SetupRoutes()
 

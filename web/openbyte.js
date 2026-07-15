@@ -6,7 +6,7 @@ import {
   resetToIdle,
   handleShare,
 } from "./speedtest-orchestrator.js";
-import { detectNetworkInfo, loadServerInfo } from "./network.js";
+import { detectNetworkInfo } from "./network.js";
 
 function bindEvents() {
   if (!elements.startBtn || !elements.restartBtn) {
@@ -21,7 +21,6 @@ function bindEvents() {
 
 function init() {
   initElements();
-  loadServerInfo();
   bindEvents();
   detectNetworkInfo();
 }
