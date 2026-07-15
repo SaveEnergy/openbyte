@@ -10,6 +10,7 @@ import (
 
 	"github.com/saveenergy/openbyte/internal/api"
 	pkgclient "github.com/saveenergy/openbyte/pkg/client"
+	"github.com/saveenergy/openbyte/pkg/diagnostic"
 )
 
 // TestCheckQuick_HealthyServer verifies Check returns results against a real httptest server.
@@ -83,24 +84,11 @@ func TestCheckQuickUnhealthyServer(t *testing.T) {
 
 // TestCheckQuick_JSONSerializable verifies the result can be marshaled to JSON.
 func TestCheckQuickJSONSerializable(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10, 300)
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"status":"ok"}`))
-	})
-	mux.HandleFunc("GET /api/v1/ping", handler.Ping)
-	mux.HandleFunc("GET /api/v1/download", handler.Download)
-	mux.HandleFunc("POST /api/v1/upload", handler.Upload)
-	server := httptest.NewServer(mux)
-	t.Cleanup(server.Close)
-
-	c := pkgclient.New(server.URL)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	result, err := c.Check(ctx)
-	if err != nil {
-		t.Fatalf("Check failed: %v", err)
+	result := &pkgclient.CheckResult{
+		Status:         "ok",
+		ServerURL:      "https://speed.example.com",
+		LatencyMs:      12,
+		Interpretation: diagnostic.Interpret(diagnostic.Params{LatencyMs: 12}),
 	}
 
 	data, err := json.Marshal(result)
