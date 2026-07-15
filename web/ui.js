@@ -48,32 +48,10 @@ function formatLatencyMs(val) {
   return "-";
 }
 
-function setInstrumentActivity(speed, direction) {
-  if (!elements.testingState) return;
-
-  const normalized =
-    direction === "latency"
-      ? Math.max(0.1, Math.min(1, 1 - speed / 180))
-      : Math.max(0.08, Math.min(1, Math.log10(speed + 1) / 3));
-
-  const glowSize = 18 + normalized * 34;
-  elements.testingState.style.setProperty(
-    "--instrument-glow-size",
-    `${glowSize.toFixed(0)}px`,
-  );
-  elements.testingState.style.setProperty(
-    "--instrument-opacity",
-    (0.32 + normalized * 0.3).toFixed(2),
-  );
-}
-
 export function updateSpeed(speed, direction) {
   if (typeof speed !== "number" || !Number.isFinite(speed) || speed < 0)
     speed = 0;
   if (!elements.speedNumber || !elements.speedUnit) return;
-  state.currentSpeed = speed;
-  setInstrumentActivity(speed, direction);
-
   let displaySpeed, unit;
 
   if (direction === "latency") {
@@ -98,32 +76,17 @@ export function updateSpeed(speed, direction) {
   elements.speedUnit.textContent = unit;
 }
 
-export function updateProgress(progress) {
-  const clamped = Math.min(100, Math.max(0, progress));
-  state.progress = clamped;
-
-  if (elements.progressMeter) {
-    elements.progressMeter.removeAttribute("value");
-  }
-}
-
 export function resetProgress() {
   if (!elements.speedNumber) return;
-  state.progress = 0;
   if (elements.progressMeter) {
     elements.progressMeter.removeAttribute("value");
     elements.progressMeter.textContent = "Measuring network";
-  }
-  if (elements.testingState) {
-    elements.testingState.style.removeProperty("--instrument-glow-size");
-    elements.testingState.style.removeProperty("--instrument-opacity");
   }
   elements.speedNumber.textContent = "0";
 }
 
 export function updateTestType(text, className) {
-  if (!elements.testType || !elements.progressRing || !elements.speedNumber)
-    return;
+  if (!elements.testType || !elements.speedNumber) return;
   elements.testType.textContent = text;
   elements.speedNumber.textContent = "0";
   if (elements.speedUnit) {
@@ -136,10 +99,6 @@ export function updateTestType(text, className) {
   if (elements.testingState) {
     elements.testingState.dataset.phase = className;
   }
-  elements.progressRing.setAttribute(
-    "class",
-    "instrument-ring-arc " + className,
-  );
   elements.speedNumber.className = "speed-number " + className;
 }
 

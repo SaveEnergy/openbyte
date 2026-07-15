@@ -160,31 +160,18 @@
   border-radius: 50%;
   background: var(--instrument-color, var(--accent-primary));
   box-shadow: 0 0 14px var(--instrument-color, var(--accent-primary));
-  animation: instrumentStatusPulse 1.4s ease-in-out infinite;
 }
 
 #testingState {
   --instrument-color: var(--accent-primary);
-  --instrument-soft-color: rgba(0, 212, 170, 0.2);
-  --instrument-glow-size: 28px;
-  --instrument-opacity: 0.44;
-  --instrument-orbit-duration: 2s;
 }
 
 #testingState[data-phase="downloading"] {
   --instrument-color: var(--download-color);
-  --instrument-soft-color: rgba(0, 212, 170, 0.24);
-  --instrument-orbit-duration: 1.45s;
 }
 
 #testingState[data-phase="uploading"] {
   --instrument-color: var(--upload-color);
-  --instrument-soft-color: rgba(102, 126, 234, 0.25);
-  --instrument-orbit-duration: 1.7s;
-}
-
-#testingState[data-phase="measuring"] {
-  --instrument-orbit-duration: 2.25s;
 }
 
 #testingState[data-phase="downloading"] .test-type,
@@ -202,21 +189,6 @@
   z-index: 1;
 }
 
-.instrument-ring-container::before {
-  content: "";
-  position: absolute;
-  inset: 8%;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    var(--instrument-soft-color) 0%,
-    transparent 68%
-  );
-  filter: blur(22px);
-  opacity: var(--instrument-opacity);
-  animation: instrumentBreath 2.8s ease-in-out infinite;
-}
-
 .instrument-ring {
   position: relative;
   width: 100%;
@@ -225,9 +197,6 @@
 }
 
 .instrument-ring-bg,
-.instrument-ring-grid,
-.instrument-ring-pulse,
-.instrument-ring-spark,
 .instrument-ring-arc {
   fill: none;
 }
@@ -235,33 +204,7 @@
 .instrument-ring-bg {
   stroke: var(--bg-card);
   stroke-width: 4;
-}
-
-.instrument-ring-grid {
-  stroke: var(--bg-hover);
-  stroke-width: 1;
-  stroke-dasharray: 2 14;
-  opacity: 0.9;
-  transform-origin: 100px 100px;
-  animation: instrumentGridDrift 8s linear infinite;
-}
-
-.instrument-ring-pulse {
-  stroke: var(--instrument-color);
-  stroke-width: 18;
-  opacity: 0.08;
-  transform-origin: 100px 100px;
-  animation: instrumentPulse 2s ease-in-out infinite;
-}
-
-.instrument-ring-spark {
-  stroke: var(--instrument-color);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-dasharray: 18 497;
-  opacity: 0.55;
-  transform-origin: 100px 100px;
-  animation: instrumentOrbit 3.2s linear infinite reverse;
+  opacity: 0.75;
 }
 
 .instrument-ring-arc {
@@ -271,13 +214,9 @@
   stroke-dasharray: 96 470;
   stroke-dashoffset: 0;
   transform-origin: 100px 100px;
-  filter: drop-shadow(0 0 var(--instrument-glow-size) var(--instrument-color));
-  transition:
-    stroke var(--motion-duration-medium) ease,
-    filter var(--motion-duration-medium) ease;
-  animation:
-    instrumentOrbit var(--instrument-orbit-duration) linear infinite,
-    instrumentArcBreathe 1.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 10px var(--instrument-color));
+  transition: stroke var(--motion-duration-medium) ease;
+  animation: instrumentOrbit 2s linear infinite;
 }
 
 .results-main {

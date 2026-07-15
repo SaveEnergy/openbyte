@@ -15,23 +15,19 @@ func TestStaticPathIsRootOrHTML_matchesHasSuffix(t *testing.T) {
 	}
 }
 
-func TestIsAllowedStaticAsset_fonts(t *testing.T) {
+func TestIsAllowedStaticAsset_matchesEmbeddedFiles(t *testing.T) {
 	t.Parallel()
-	allowed := map[string]bool{"index.html": true}
 
-	if !isAllowedStaticAsset("fonts/inter.woff2", allowed) {
-		t.Fatal("expected fonts/*.woff2 allowed")
+	if !isAllowedStaticAsset("openbyte.js") {
+		t.Fatal("expected embedded module allowed")
 	}
-	if !isAllowedStaticAsset("fonts/inter.woff", allowed) {
-		t.Fatal("expected fonts/*.woff allowed")
+	if !isAllowedStaticAsset("fonts/dm-sans-latin.woff2") {
+		t.Fatal("expected embedded font allowed")
 	}
-	if isAllowedStaticAsset("fonts/inter.ttf", allowed) {
-		t.Fatal("expected fonts/*.ttf rejected")
+	if isAllowedStaticAsset("fonts/unbundled.woff2") {
+		t.Fatal("expected unbundled font rejected")
 	}
-	if isAllowedStaticAsset("fonts/inter.woff2.backup", allowed) {
-		t.Fatal("expected non-suffix path rejected")
-	}
-	if isAllowedStaticAsset("static/fonts/x.woff2", allowed) {
-		t.Fatal("expected only fonts/ at root of name")
+	if isAllowedStaticAsset("embed.go") {
+		t.Fatal("expected source file rejected")
 	}
 }

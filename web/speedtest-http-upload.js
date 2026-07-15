@@ -82,83 +82,6 @@ function resolveUploadPayloadSize(chunkSize, duration, adaptive) {
   );
 }
 
-function recordUploadProgress(
-  metricsState,
-  warmUp,
-  byteCount,
-  requestStart,
-  now,
-  onProgress,
-  extra,
-) {
-  metricsState.successfulStreams += 1;
-  applyHttpMeasureIntervalTick(
-    metricsState,
-    warmUp,
-    byteCount,
-    requestStart,
-    now,
-    onProgress,
-    extra,
-  );
-}
-
-function handleUploadNonOkResponse(res, metricsState, retryAfterFn) {
-  if (res.status === 503 || res.status === 429) {
-    metricsState.sawOverload = true;
-    return { action: "overload_break", retryAfter: retryAfterFn(res, 500) };
-  }
-  return { action: "retry_or_break" };
-}
-
-function handleUploadCatchError(
-  e,
-  metricsState,
-  consecutiveErrors,
-  maxRetries,
-) {
-  if (e.name === "AbortError") return { action: "break" };
-  if (isNetworkError(e)) {
-    metricsState.sawNetworkError = true;
-    const next = consecutiveErrors + 1;
-    return next <= maxRetries ? { action: "retry", next } : { action: "throw" };
-  }
-  return { action: "throw" };
-}
-
-async function processUploadResponse(res, options) {
-  const {
-    blob,
-    requestStart,
-    metricsState,
-    retryAfterFn,
-    warmUp,
-    onProgress,
-    extra,
-  } = options;
-  if (res.ok) {
-    const uploadedBytes = await readUploadResponseBytes(res, blob.size);
-    const now = performance.now();
-    recordUploadProgress(
-      metricsState,
-      warmUp,
-      uploadedBytes,
-      requestStart,
-      now,
-      onProgress,
-      extra,
-    );
-    return { ok: true };
-  }
-  await res.text().catch(() => {});
-  const hr = handleUploadNonOkResponse(res, metricsState, retryAfterFn);
-  if (hr.action === "overload_break") {
-    await sleep(hr.retryAfter);
-    return { ok: false, overload: true };
-  }
-  return { ok: false, retry: true };
-}
-
 async function readUploadResponseBytes(res, fallbackBytes) {
   const text = await res.text().catch(() => "");
   if (!text) return fallbackBytes;
@@ -174,103 +97,57 @@ async function readUploadResponseBytes(res, fallbackBytes) {
   return fallbackBytes;
 }
 
-async function continueUploadAfterResponse(
-  response,
-  context,
-  consecutiveErrors,
-  maxNetworkRetries,
-  retryDelayMs,
-) {
-  const pr = await processUploadResponse(response, context);
-  if (pr.ok) {
-    return { breakLoop: false, nextErrors: 0 };
-  }
-  if (pr.overload) {
-    return { breakLoop: true, nextErrors: consecutiveErrors };
-  }
-  const nextErrors = consecutiveErrors + 1;
-  if (nextErrors > maxNetworkRetries) {
-    return { breakLoop: true, nextErrors };
-  }
-  await sleep(retryDelayMs);
-  return { breakLoop: false, nextErrors };
-}
-
-async function continueUploadAfterCatch(
-  error,
-  metricsState,
-  consecutiveErrors,
-  maxNetworkRetries,
-  retryDelayMs,
-) {
-  const hc = handleUploadCatchError(
-    error,
-    metricsState,
-    consecutiveErrors,
-    maxNetworkRetries,
-  );
-  if (hc.action === "break") {
-    return { breakLoop: true, nextErrors: consecutiveErrors };
-  }
-  if (hc.action === "retry") {
-    await sleep(retryDelayMs);
-    return { breakLoop: false, nextErrors: hc.next };
-  }
-  throw error;
-}
-
-async function runSingleUploadStream(options) {
+async function runSingleUploadStream(index, options) {
   const {
-    delay,
     blob,
     endTimeRef,
     duration,
     signal,
-    maxNetworkRetries,
-    retryDelayMs,
     warmUp,
     metricsState,
     onProgress,
-    extra,
+    measureContext,
   } = options;
-  await new Promise((r) => setTimeout(r, delay));
+  await sleep(streamDelayForIndex(index));
 
   let consecutiveErrors = 0;
   while (performance.now() < endTimeRef.value && !signal.aborted) {
     try {
       const requestStart = performance.now();
       const res = await sendUploadRequest(blob, duration, signal);
-      const responseState = await continueUploadAfterResponse(
-        res,
-        {
-          blob,
-          requestStart,
+      if (res.ok) {
+        const uploadedBytes = await readUploadResponseBytes(res, blob.size);
+        metricsState.successfulStreams += 1;
+        applyHttpMeasureIntervalTick(
           metricsState,
-          retryAfterFn: retryAfterMs,
           warmUp,
+          uploadedBytes,
+          requestStart,
+          performance.now(),
           onProgress,
-          extra,
-        },
-        consecutiveErrors,
-        maxNetworkRetries,
-        retryDelayMs,
-      );
-      consecutiveErrors = responseState.nextErrors;
-      if (responseState.breakLoop) {
+          measureContext,
+        );
+        consecutiveErrors = 0;
+        continue;
+      }
+
+      await res.text().catch(() => {});
+      if (res.status === 503 || res.status === 429) {
+        metricsState.sawOverload = true;
+        await sleep(retryAfterMs(res, 500));
         break;
       }
-    } catch (e) {
-      const catchState = await continueUploadAfterCatch(
-        e,
-        metricsState,
-        consecutiveErrors,
-        maxNetworkRetries,
-        retryDelayMs,
-      );
-      consecutiveErrors = catchState.nextErrors;
-      if (catchState.breakLoop) {
-        break;
-      }
+
+      consecutiveErrors += 1;
+      if (consecutiveErrors > TEST_CONFIG.MAX_NETWORK_RETRIES) break;
+      await sleep(TEST_CONFIG.NETWORK_RETRY_DELAY_MS);
+    } catch (error) {
+      if (error.name === "AbortError") break;
+      if (!isNetworkError(error)) throw error;
+      metricsState.sawNetworkError = true;
+      consecutiveErrors += 1;
+      if (consecutiveErrors > TEST_CONFIG.MAX_NETWORK_RETRIES) throw error;
+      await sleep(TEST_CONFIG.NETWORK_RETRY_DELAY_MS);
     }
   }
 }
@@ -285,11 +162,8 @@ async function runUploadWindow(options) {
     adaptive,
   } = options;
   const startTime = performance.now();
-  const numStreams = streams;
   const chunkSize = resolveChunkSize();
   const blobSize = resolveUploadPayloadSize(chunkSize, duration, adaptive);
-  const maxNetworkRetries = TEST_CONFIG.MAX_NETWORK_RETRIES;
-  const retryDelayMs = TEST_CONFIG.NETWORK_RETRY_DELAY_MS;
   const metricsState = {
     totalBytes: 0,
     allBytes: 0,
@@ -302,26 +176,22 @@ async function runUploadWindow(options) {
   const warmUp = createWarmUpDetector(duration * 1000);
   const earlyStop = createEarlyStopDetector(() => warmUp.settled());
   const endTimeRef = { value: startTime + duration * 1000 };
-  const extra = { earlyStop, endTimeRef };
+  const measureContext = { earlyStop, endTimeRef };
   const blob = getUploadPayloadBlob(blobSize);
+  const streamContext = {
+    blob,
+    endTimeRef,
+    duration,
+    signal,
+    warmUp,
+    metricsState,
+    onProgress,
+    measureContext,
+  };
 
   const streamPromises = [];
-  for (let i = 0; i < numStreams; i++) {
-    streamPromises.push(
-      runSingleUploadStream({
-        delay: streamDelayForIndex(i),
-        blob,
-        endTimeRef,
-        duration,
-        signal,
-        maxNetworkRetries,
-        retryDelayMs,
-        warmUp,
-        metricsState,
-        onProgress,
-        extra,
-      }),
-    );
+  for (let i = 0; i < streams; i++) {
+    streamPromises.push(runSingleUploadStream(i, streamContext));
   }
   await Promise.all(streamPromises);
 
@@ -352,7 +222,6 @@ async function runUploadWindow(options) {
 
 export async function runUploadTest(onProgress, signal, options = {}) {
   return runAdaptiveHTTPTest({
-    direction: "upload",
     signal,
     config: options.config,
     onPhase: options.onPhase,

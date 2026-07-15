@@ -56,13 +56,12 @@ export async function startTest() {
     showResults();
   } catch (e) {
     console.error("Test failed:", e);
-    if (e.name !== "AbortError") {
-      const message = e.message || "Test failed";
-      showError(message);
-    }
+    const errorMessage =
+      e.name === "AbortError" ? "" : e.message || "Test failed";
     if (state.abortController?.signal === signal) {
       resetToIdle();
     }
+    if (errorMessage) showError(errorMessage);
   } finally {
     if (state.abortController?.signal === signal) {
       state.isRunning = false;
@@ -82,8 +81,6 @@ export function resetToIdle() {
   cancelTest();
 
   state.phase = "idle";
-  state.currentSpeed = 0;
-  state.progress = 0;
   state.downloadResult = 0;
   state.uploadResult = 0;
   state.latencyResult = null;
