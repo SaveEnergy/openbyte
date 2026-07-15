@@ -16,15 +16,15 @@ func (rl *RateLimiter) refillGlobalTokens(now time.Time) {
 	if elapsed < time.Second {
 		return
 	}
-	tokensToAdd := int(elapsed.Seconds() * float64(rl.config.GlobalRateLimit) / 60.0)
+	tokensToAdd := int(elapsed.Seconds() * float64(rl.globalRateLimit) / 60.0)
 	if tokensToAdd <= 0 {
 		return
 	}
 	rl.globalTokens += tokensToAdd
-	if rl.globalTokens > rl.config.GlobalRateLimit {
-		rl.globalTokens = rl.config.GlobalRateLimit
+	if rl.globalTokens > rl.globalRateLimit {
+		rl.globalTokens = rl.globalRateLimit
 	}
-	consumed := time.Duration(float64(tokensToAdd) / float64(rl.config.GlobalRateLimit) * 60.0 * float64(time.Second))
+	consumed := time.Duration(float64(tokensToAdd) / float64(rl.globalRateLimit) * 60.0 * float64(time.Second))
 	rl.globalLastRefill = rl.globalLastRefill.Add(consumed)
 }
 
@@ -39,7 +39,7 @@ func (rl *RateLimiter) consumeGlobalToken() bool {
 func (rl *RateLimiter) refundGlobal() {
 	rl.globalMu.Lock()
 	defer rl.globalMu.Unlock()
-	if rl.globalTokens < rl.config.GlobalRateLimit {
+	if rl.globalTokens < rl.globalRateLimit {
 		rl.globalTokens++
 	}
 }

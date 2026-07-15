@@ -10,7 +10,6 @@ import (
 const (
 	envTrue  = "true"
 	envOne   = "1"
-	EnvDebug = "debug" // exported for cmd/server
 	envFalse = "false"
 	envZero  = "0"
 )

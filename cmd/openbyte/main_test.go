@@ -3,9 +3,9 @@ package main
 import "testing"
 
 func TestRunDispatch(t *testing.T) {
-	oldServer, oldClient, oldCheck := runServer, runClient, runCheck
+	oldServer, oldCheck := runServer, runCheck
 	t.Cleanup(func() {
-		runServer, runClient, runCheck = oldServer, oldClient, oldCheck
+		runServer, runCheck = oldServer, oldCheck
 	})
 
 	var got struct {
@@ -17,11 +17,6 @@ func TestRunDispatch(t *testing.T) {
 		got.target = "server"
 		got.args = append([]string(nil), args...)
 		return 11
-	}
-	runClient = func(args []string, _ string) int {
-		got.target = "client"
-		got.args = append([]string(nil), args...)
-		return 12
 	}
 	runCheck = func(args []string, _ string) int {
 		got.target = "check"
@@ -37,7 +32,6 @@ func TestRunDispatch(t *testing.T) {
 	}{
 		{name: "default server", args: nil, wantTarget: "server", wantExit: 11},
 		{name: "server subcommand", args: []string{"server", "--x"}, wantTarget: "server", wantExit: 11},
-		{name: "client subcommand", args: []string{"client", "--y"}, wantTarget: "client", wantExit: 12},
 		{name: "check subcommand", args: []string{"check", "--json"}, wantTarget: "check", wantExit: 13},
 	}
 
@@ -68,6 +62,9 @@ func TestRunHelpVersionAndUnknown(t *testing.T) {
 	}
 	if code := run([]string{"unknown-cmd"}, "test"); code != 2 {
 		t.Fatalf("unknown exit code = %d, want 2", code)
+	}
+	if code := run([]string{"client"}, "test"); code != 2 {
+		t.Fatalf("removed client command exit code = %d, want 2", code)
 	}
 	if code := run([]string{"--unknown-flag"}, "test"); code != 2 {
 		t.Fatalf("unknown top-level flag exit code = %d, want 2", code)

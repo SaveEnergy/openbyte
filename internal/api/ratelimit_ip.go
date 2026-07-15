@@ -39,7 +39,7 @@ func (rl *RateLimiter) getOrCreateIPLimit(ip string, now time.Time) (*IPLimit, b
 			return nil, shouldCleanup, false
 		}
 		limit = &IPLimit{
-			tokens:     rl.config.RateLimitPerIP,
+			tokens:     rl.rateLimitPerIP,
 			lastRefill: now,
 		}
 		rl.ipLimits[ip] = limit
@@ -53,15 +53,15 @@ func (rl *RateLimiter) refillIPTokens(limit *IPLimit, now time.Time) {
 	if elapsed < time.Second {
 		return
 	}
-	tokensToAdd := int(elapsed.Seconds() * float64(rl.config.RateLimitPerIP) / 60.0)
+	tokensToAdd := int(elapsed.Seconds() * float64(rl.rateLimitPerIP) / 60.0)
 	if tokensToAdd <= 0 {
 		return
 	}
 	limit.tokens += tokensToAdd
-	if limit.tokens > rl.config.RateLimitPerIP {
-		limit.tokens = rl.config.RateLimitPerIP
+	if limit.tokens > rl.rateLimitPerIP {
+		limit.tokens = rl.rateLimitPerIP
 	}
-	consumed := time.Duration(float64(tokensToAdd) / float64(rl.config.RateLimitPerIP) * 60.0 * float64(time.Second))
+	consumed := time.Duration(float64(tokensToAdd) / float64(rl.rateLimitPerIP) * 60.0 * float64(time.Second))
 	limit.lastRefill = limit.lastRefill.Add(consumed)
 }
 

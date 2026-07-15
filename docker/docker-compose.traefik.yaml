@@ -57,7 +57,6 @@ services:
     container_name: openbyte
     # Traefik reaches openByte on the internal Docker network.
     environment:
-      - PUBLIC_HOST=${PUBLIC_HOST:-}
       - SERVER_NAME=${SERVER_NAME:-openByte Server}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
@@ -73,11 +72,8 @@ services:
       - TLS_KEY_FILE=${TLS_KEY_FILE:-}
       - TLS_AUTO_GEN=${TLS_AUTO_GEN:-false}
       - HTTP2_ENABLED=${HTTP2_ENABLED:-true}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
       - PPROF_ENABLED=${PPROF_ENABLED:-false}
       - PPROF_ADDR=${PPROF_ADDR:-127.0.0.1:6060}
-      - PERF_STATS_INTERVAL=${PERF_STATS_INTERVAL:-}
-      - RUNTIME_METRICS_ENABLED=${RUNTIME_METRICS_ENABLED:-false}
     volumes:
       - openbyte-data:/app/data
     labels:

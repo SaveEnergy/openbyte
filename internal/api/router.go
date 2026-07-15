@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/saveenergy/openbyte/internal/config"
@@ -12,72 +11,67 @@ import (
 )
 
 type Router struct {
-	handler          *Handler
+	version          string
+	serverName       string
 	speedtest        *SpeedTestHandler
-	resultsHandler   *results.Handler
+	resultsHandler   *resultHandler
 	limiter          *RateLimiter
 	allowedOrigins   []string
-	corsAllowAll     bool // true when allowedOrigins contains "*"; set in SetAllowedOrigins
+	corsAllowAll     bool
 	clientIPResolver *ClientIPResolver
 	webFS            http.FileSystem
-	runtimeMetrics   http.HandlerFunc
 }
 
-var validResultID = regexp.MustCompile(`^[0-9a-zA-Z]{8}$`)
-
-func NewRouter(handler *Handler, cfg *config.Config) *Router {
+func NewRouter(cfg *config.Config, version string, resultsStore *results.Store) *Router {
+	if cfg == nil {
+		cfg = config.DefaultConfig()
+	}
 	maxDur := 300
 	if cfg.MaxTestDuration > 0 {
 		maxDur = int(cfg.MaxTestDuration.Seconds())
 	}
+	resolver := NewClientIPResolver(cfg)
 	speedtest := NewSpeedTestHandler(cfg.MaxConcurrentHTTP(), maxDur)
 	speedtest.SetMaxConcurrentPerIP(cfg.MaxConcurrentPerIP)
+	speedtest.SetClientIPResolver(resolver)
+
+	if version == "" {
+		version = "dev"
+	}
+	serverName := strings.TrimSpace(cfg.ServerName)
+	if serverName == "" {
+		serverName = config.DefaultServerName
+	}
+	webFS := http.FileSystem(http.FS(web.Assets))
+	if cfg.WebRoot != "" {
+		webFS = http.Dir(cfg.WebRoot)
+	}
+	allowedOrigins, corsAllowAll := normalizeAllowedOrigins(cfg.AllowedOrigins)
 	return &Router{
-		handler:   handler,
-		speedtest: speedtest,
+		version:          version,
+		serverName:       serverName,
+		speedtest:        speedtest,
+		resultsHandler:   newResultHandler(resultsStore),
+		limiter:          newRateLimiter(cfg, resolver),
+		allowedOrigins:   allowedOrigins,
+		corsAllowAll:     corsAllowAll,
+		clientIPResolver: resolver,
+		webFS:            webFS,
 	}
-}
-
-func (r *Router) SetRateLimiter(cfg *config.Config) {
-	r.limiter = NewRateLimiter(cfg)
-}
-
-func (r *Router) SetClientIPResolver(resolver *ClientIPResolver) {
-	r.clientIPResolver = resolver
-	if r.speedtest != nil {
-		r.speedtest.SetClientIPResolver(resolver)
-	}
-}
-
-func (r *Router) SetResultsHandler(h *results.Handler) {
-	r.resultsHandler = h
-}
-
-// SetWebRoot overrides the embedded web assets with a directory on disk.
-// Use this for development so you can edit HTML/CSS/JS without rebuilding.
-// If webRootDir is empty, the embedded assets are used.
-func (r *Router) SetWebRoot(webRootDir string) {
-	if webRootDir != "" {
-		r.webFS = http.Dir(webRootDir)
-	}
-}
-
-func (r *Router) SetRuntimeMetricsHandler(handler http.HandlerFunc) {
-	r.runtimeMetrics = handler
 }
 
 func (r *Router) SetupRoutes() http.Handler {
 	mux := http.NewServeMux()
 	webFS := r.resolveWebFS()
-	v1 := r.newV1Registrar(mux)
+	rateLimitedV1 := r.newRateLimitedV1Registrar(mux)
 
-	r.registerCoreV1Routes(v1)
-	r.registerResultsAPIRoutes(v1)
+	rateLimitedV1("GET", "/version", r.GetVersion)
+	r.registerResultsAPIRoutes(rateLimitedV1)
+	mux.HandleFunc("GET "+apiV1Prefix+"/download", r.speedtest.Download)
+	mux.HandleFunc("POST "+apiV1Prefix+"/upload", r.speedtest.Upload)
+	mux.HandleFunc("GET "+apiV1Prefix+"/ping", r.speedtest.Ping)
 
 	mux.HandleFunc("GET /health", r.HealthCheck)
-	if r.runtimeMetrics != nil {
-		mux.HandleFunc("GET /debug/runtime-metrics", r.runtimeMetrics)
-	}
 	mux.HandleFunc("/api/v1/", func(w http.ResponseWriter, req *http.Request) {
 		respondJSON(w, map[string]string{"error": errNotFound}, http.StatusNotFound)
 	})
@@ -98,13 +92,12 @@ func (r *Router) HealthCheck(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func (r *Router) SetAllowedOrigins(origins []string) {
-	r.corsAllowAll = false
+func normalizeAllowedOrigins(origins []string) ([]string, bool) {
 	if len(origins) == 0 {
-		r.allowedOrigins = nil
-		return
+		return nil, false
 	}
 	out := make([]string, 0, len(origins))
+	allowAll := false
 	for _, o := range origins {
 		t := strings.TrimSpace(o)
 		if t == "" {
@@ -112,18 +105,17 @@ func (r *Router) SetAllowedOrigins(origins []string) {
 		}
 		out = append(out, t)
 		if t == "*" {
-			r.corsAllowAll = true
+			allowAll = true
 		}
 	}
 	if len(out) == 0 {
-		r.allowedOrigins = nil
-		return
+		return nil, false
 	}
-	r.allowedOrigins = out
+	return out, allowAll
 }
 
 // resolveWebFS returns the web file system to use for static assets.
-// If a disk override is set (via SetWebRoot), it takes precedence.
+// If a disk override is configured, it takes precedence.
 // Otherwise, the embedded assets from the web package are used.
 func (r *Router) resolveWebFS() http.FileSystem {
 	if r.webFS != nil {
