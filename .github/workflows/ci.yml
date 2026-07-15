@@ -64,18 +64,13 @@ jobs:
           go mod tidy
           git diff --exit-code go.mod go.sum
 
-      - name: Test (PR fast path)
-        if: github.event_name == 'pull_request'
-        run: go test -short ./...
-
-      - name: Test (main)
-        if: github.event_name != 'pull_request'
+      - name: Test
         run: go test ./...
 
-      # -short: skip heavy tests (e.g. test/e2e skipIfShort). -p 1: serial packages, cap memory on GHA under race.
+      # Serial packages cap memory on GHA under race.
       - name: Race tests (main)
         if: github.ref == 'refs/heads/main'
-        run: go test ./... -race -short -p 1
+        run: go test ./... -race -p 1
 
       - name: Get Playwright version
         if: github.event_name != 'pull_request' || steps.web-changes.outputs.web == 'true'

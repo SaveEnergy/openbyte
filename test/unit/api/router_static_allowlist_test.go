@@ -14,7 +14,7 @@ import (
 	"github.com/saveenergy/openbyte/web"
 )
 
-func TestRouterStaticServesFrontendModules(t *testing.T) {
+func TestRouterStaticServesEmbeddedAssets(t *testing.T) {
 	router := api.NewRouter(config.DefaultConfig(), nil)
 	h := router.SetupRoutes()
 

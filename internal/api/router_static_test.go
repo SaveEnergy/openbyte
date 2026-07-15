@@ -15,23 +15,9 @@ func TestStaticPathIsRootOrHTML_matchesHasSuffix(t *testing.T) {
 	}
 }
 
-func TestIsAllowedStaticAsset_matchesEmbeddedFiles(t *testing.T) {
+func TestIsAllowedStaticAssetRejectsUnbundledFiles(t *testing.T) {
 	t.Parallel()
 
-	for _, asset := range []string{
-		"openbyte.js",
-		"i18n.js",
-		"locale-en.js",
-		"locale-de.js",
-		"presentation.js",
-	} {
-		if !isAllowedStaticAsset(asset) {
-			t.Fatalf("expected embedded module %q allowed", asset)
-		}
-	}
-	if !isAllowedStaticAsset("fonts/dm-sans-latin.woff2") {
-		t.Fatal("expected embedded font allowed")
-	}
 	if isAllowedStaticAsset("fonts/unbundled.woff2") {
 		t.Fatal("expected unbundled font rejected")
 	}
