@@ -5,6 +5,10 @@ import { fetchWithTimeout, parseJSONOrThrow } from "./utils.js";
 
 const fallbackServerName = "openByte Server";
 
+function isIdle() {
+  return !state.isRunning && state.phase === "idle";
+}
+
 export function resolveServerName() {
   return normalizeServerName(state.serverName);
 }
@@ -94,7 +98,7 @@ export function updateNetworkDisplay() {
   }
 }
 
-async function discoverAddress(url, options) {
+async function discoverAddress(url, options, shouldUpdate = () => true) {
   try {
     const response = await fetchWithTimeout(
       url,
@@ -102,7 +106,7 @@ async function discoverAddress(url, options) {
       TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
     );
     const data = await parseJSONOrThrow(response);
-    if (data.client_ip) {
+    if (data.client_ip && shouldUpdate()) {
       state.networkInfo[data.ipv6 ? "ipv6" : "ipv4"] = data.client_ip;
       updateNetworkDisplay();
     }
@@ -133,17 +137,22 @@ export function getNextHopProtocol() {
 
 /** Periodic idle re-check: probe the same-origin ping and update readiness. */
 export async function checkServer() {
-  const online = await discoverAddress(`${getApiBase()}/ping`, {
-    cache: "no-store",
-  });
+  const online = await discoverAddress(
+    `${getApiBase()}/ping`,
+    { cache: "no-store" },
+    isIdle,
+  );
+  if (!isIdle()) return;
   if (online) setServerOnlineUI();
   else setServerOfflineUI();
 }
 
 export function detectNetworkInfo() {
-  const sameOriginProbe = discoverAddress(`${getApiBase()}/ping`, {
-    cache: "no-store",
-  });
+  const sameOriginProbe = discoverAddress(
+    `${getApiBase()}/ping`,
+    { cache: "no-store" },
+    isIdle,
+  );
   void sameOriginProbe.then((ready) => {
     if (ready) setServerOnlineUI();
     else setServerOfflineUI();
@@ -164,8 +173,16 @@ export function detectNetworkInfo() {
 
   if (canProbe) {
     probes.push(
-      discoverAddress(`${proto}//v4.${hostname}/api/v1/ping`, probeOpts),
-      discoverAddress(`${proto}//v6.${hostname}/api/v1/ping`, probeOpts),
+      discoverAddress(
+        `${proto}//v4.${hostname}/api/v1/ping`,
+        probeOpts,
+        isIdle,
+      ),
+      discoverAddress(
+        `${proto}//v6.${hostname}/api/v1/ping`,
+        probeOpts,
+        isIdle,
+      ),
     );
   }
 

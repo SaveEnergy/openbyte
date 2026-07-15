@@ -280,14 +280,14 @@ function filterOutliersIQR(samples) {
   return samples.filter((s) => s >= lower && s <= upper);
 }
 
-async function captureClientIPIfNeeded(res, capturedRef) {
+async function captureClientIPIfNeeded(res, capturedRef, signal) {
   if (capturedRef.captured || !res.ok) {
     await res.text().catch(() => {});
     return;
   }
   try {
     const data = await res.json();
-    if (data.client_ip) {
+    if (data.client_ip && state.abortController?.signal === signal) {
       state.networkInfo[data.ipv6 ? "ipv6" : "ipv4"] = data.client_ip;
       updateNetworkDisplay();
       capturedRef.captured = true;
@@ -401,7 +401,7 @@ export async function measureLatency(signal) {
       });
       const rtt = performance.now() - start;
 
-      await captureClientIPIfNeeded(res, capturedRef);
+      await captureClientIPIfNeeded(res, capturedRef, signal);
 
       rawSamples.push(rtt);
       updateProgress((i / numSamples) * 100);
@@ -411,7 +411,7 @@ export async function measureLatency(signal) {
     }
   }
 
-  if (rawSamples.length === 0) return null;
+  if (rawSamples.length === 0) return { value: null, jitter: null };
 
   const samples =
     rawSamples.length > warmUpPings
@@ -419,8 +419,8 @@ export async function measureLatency(signal) {
       : rawSamples;
 
   const filtered = filterOutliersIQR(samples);
-  state.jitterResult = computeJitter(filtered);
+  const jitter = computeJitter(filtered);
 
   filtered.sort((a, b) => a - b);
-  return filtered[Math.floor(filtered.length / 2)];
+  return { value: filtered[Math.floor(filtered.length / 2)], jitter };
 }

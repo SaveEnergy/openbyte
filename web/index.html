@@ -33,6 +33,7 @@
     />
     <link rel="stylesheet" href="base.css" />
     <link rel="stylesheet" href="speed.css" />
+    <link rel="stylesheet" href="speed-results.css" />
     <link rel="stylesheet" href="results.css" />
     <link rel="stylesheet" href="toast.css" />
     <link rel="stylesheet" href="motion.css" />
@@ -67,9 +68,14 @@
         <h1 class="visually-hidden">openByte internet speed test</h1>
         <!-- Idle State: Start Button -->
         <section class="speed-section" id="idleState">
-          <button class="start-btn" id="startBtn" aria-label="Start speed test">
+          <button
+            class="start-btn"
+            id="startBtn"
+            aria-label="Start speed test"
+            disabled
+          >
             <span class="start-btn-text">GO</span>
-            <span class="start-btn-hint">Click to test your speed</span>
+            <span class="start-btn-hint">Connecting…</span>
           </button>
           <section class="public-ip" aria-labelledby="publicIpTitle">
             <h2 class="public-ip-title" id="publicIpTitle">Your public IP</h2>

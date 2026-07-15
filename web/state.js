@@ -16,6 +16,7 @@ export const state = {
   downloadLatency: 0,
   uploadLatency: 0,
   abortController: null,
+  runGeneration: 0,
   networkInfo: {
     ipv4: null,
     ipv6: null,
@@ -24,7 +25,7 @@ export const state = {
   serverName: "openByte Server",
   resultId: null,
   shareSavePromise: null,
-  serverOnline: true,
+  serverOnline: false,
   partialCancelRequested: false,
   lastResultPartial: false,
 };

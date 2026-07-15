@@ -106,11 +106,14 @@
 
     --text-primary: #111827;
     --text-secondary: #334155;
-    --text-muted: #64748b;
+    --text-muted: #617187;
 
-    --accent-glow: rgba(0, 212, 170, 0.22);
+    --accent-primary: #00796b;
+    --accent-secondary: #006f61;
+    --accent-glow: rgba(0, 121, 107, 0.22);
+    --download-color: #00796b;
     --error: #dc2626;
-    --warning: #d97706;
+    --warning: #b45309;
 
     --card-border: rgba(15, 23, 42, 0.1);
     --card-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
@@ -126,11 +129,14 @@
 
   --text-primary: #111827;
   --text-secondary: #334155;
-  --text-muted: #64748b;
+  --text-muted: #617187;
 
-  --accent-glow: rgba(0, 212, 170, 0.22);
+  --accent-primary: #00796b;
+  --accent-secondary: #006f61;
+  --accent-glow: rgba(0, 121, 107, 0.22);
+  --download-color: #00796b;
   --error: #dc2626;
-  --warning: #d97706;
+  --warning: #b45309;
 
   --card-border: rgba(15, 23, 42, 0.1);
   --card-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
@@ -271,8 +277,8 @@ body::before {
 }
 
 .theme-toggle {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid var(--bg-hover);
   background: var(--bg-secondary);

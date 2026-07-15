@@ -152,7 +152,7 @@ export async function runAdaptiveHTTPTest(options) {
   let streams = TEST_CONFIG.ADAPTIVE_MIN_STREAMS;
   // Stream counts double each ramp window, so the window count is bounded;
   // the UI uses this bound to render determinate progress.
-  const maxWindows = Math.floor(Math.log2(config.maxStreams)) + 1;
+  const maxWindows = Math.ceil(Math.log2(config.maxStreams)) + 1;
   let windowIndex = 0;
   const phaseInfo = () => ({
     windowIndex,

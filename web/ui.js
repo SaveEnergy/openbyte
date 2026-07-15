@@ -281,10 +281,12 @@ export function updateTestType(text, className) {
     if (elements.testingState) {
       elements.testingState.dataset.phase = className;
     }
-    elements.progressRing.setAttribute(
-      "class",
-      "instrument-ring-arc " + className,
-    );
+    if (elements.progressRing) {
+      elements.progressRing.setAttribute(
+        "class",
+        "instrument-ring-arc " + className,
+      );
+    }
     elements.speedNumber.className = "speed-number " + className;
   }
 }

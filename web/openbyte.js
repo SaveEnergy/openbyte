@@ -26,7 +26,7 @@ function init() {
   bindEvents();
   detectNetworkInfo();
   setInterval(() => {
-    if (!state.isRunning) checkServer();
+    if (!state.isRunning && state.phase === "idle") checkServer();
   }, TEST_CONFIG.SERVER_RECHECK_MS);
 }
 

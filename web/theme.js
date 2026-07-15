@@ -48,9 +48,11 @@ function updateToggle(button, mode) {
 function wireToggle() {
   const button = document.getElementById("themeToggle");
   if (!button) return;
-  updateToggle(button, storedMode());
+  let currentMode = storedMode();
+  updateToggle(button, currentMode);
   button.addEventListener("click", () => {
-    const next = MODES[(MODES.indexOf(storedMode()) + 1) % MODES.length];
+    const next = MODES[(MODES.indexOf(currentMode) + 1) % MODES.length];
+    currentMode = next;
     persistMode(next);
     applyMode(next);
     updateToggle(button, next);

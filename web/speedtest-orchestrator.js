@@ -30,7 +30,12 @@ function clearRunResults() {
   state.lastResultPartial = false;
 }
 
-function finishAbortedRun() {
+function isCurrentRun(signal) {
+  return state.abortController?.signal === signal;
+}
+
+function finishAbortedRun(signal) {
+  if (!isCurrentRun(signal)) return;
   if (state.partialCancelRequested && state.downloadResult > 0) {
     state.partialCancelRequested = false;
     state.phase = "results";
@@ -59,10 +64,15 @@ export async function startTest() {
     showError("Test already in progress");
     return;
   }
+  if (!state.serverOnline) {
+    showError("Server is not ready yet");
+    return;
+  }
 
   state.isRunning = true;
   state.abortController = new AbortController();
   const signal = state.abortController.signal;
+  state.runGeneration += 1;
   clearRunResults();
 
   try {
@@ -72,16 +82,19 @@ export async function startTest() {
     setActivePhaseStep("ping");
     updateTestType("↔ Ping", "measuring");
     showState("testing");
-    state.latencyResult = await measureLatency(signal);
+    const latency = await measureLatency(signal);
 
+    if (!isCurrentRun(signal)) return;
     if (signal.aborted) {
-      finishAbortedRun();
+      finishAbortedRun(signal);
       return;
     }
+    state.latencyResult = latency.value;
+    state.jitterResult = latency.jitter;
 
     setPhaseStepValue("ping", formatLatencyMs(state.latencyResult));
     setActivePhaseStep("download");
-    state.downloadResult = await runDirectionPhase(
+    const downloadResult = await runDirectionPhase(
       signal,
       "download",
       "↓ Download",
@@ -89,14 +102,16 @@ export async function startTest() {
       "download",
     );
 
+    if (!isCurrentRun(signal)) return;
     if (signal.aborted) {
-      finishAbortedRun();
+      finishAbortedRun(signal);
       return;
     }
+    state.downloadResult = downloadResult;
 
     setPhaseStepValue("download", formatSpeedText(state.downloadResult));
     setActivePhaseStep("upload");
-    state.uploadResult = await runDirectionPhase(
+    const uploadResult = await runDirectionPhase(
       signal,
       "upload",
       "↑ Upload",
@@ -104,18 +119,21 @@ export async function startTest() {
       "upload",
     );
 
+    if (!isCurrentRun(signal)) return;
     if (signal.aborted) {
-      finishAbortedRun();
+      finishAbortedRun(signal);
       return;
     }
+    state.uploadResult = uploadResult;
 
     setPhaseStepValue("upload", formatSpeedText(state.uploadResult));
     state.phase = "results";
     recordRunInHistory();
     showResults();
   } catch (e) {
+    if (!isCurrentRun(signal)) return;
     if (e.name === "AbortError") {
-      finishAbortedRun();
+      finishAbortedRun(signal);
     } else {
       console.error("Test failed:", e);
       // Reset first: resetToIdle clears toasts, so the error must be shown after.
@@ -154,7 +172,9 @@ export function handleCancel() {
 
 export function resetToIdle() {
   cancelTest();
+  state.abortController = null;
 
+  state.runGeneration += 1;
   state.phase = "idle";
   state.currentSpeed = 0;
   state.progress = 0;
@@ -179,10 +199,11 @@ export async function saveAndEnableShare() {
   if (state.resultId) return state.resultId;
   if (state.shareSavePromise) return state.shareSavePromise;
 
+  const generation = state.runGeneration;
   const loadedLat = Math.max(state.downloadLatency, state.uploadLatency);
   const bbGrade = computeBufferbloatGrade(state.latencyResult, loadedLat) || "";
 
-  state.shareSavePromise = (async () => {
+  const savePromise = (async () => {
     const res = await fetch(`${getApiBase()}/results`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -203,24 +224,29 @@ export async function saveAndEnableShare() {
       throw new Error(`share save failed: HTTP ${res.status}`);
     }
     const data = await res.json();
-    if (state.phase !== "results") return null;
+    if (state.phase !== "results" || state.runGeneration !== generation) {
+      return null;
+    }
     if (typeof data?.id !== "string" || data.id.length === 0) {
       throw new Error("share save failed: invalid response");
     }
     state.resultId = data.id;
     return state.resultId;
   })();
+  state.shareSavePromise = savePromise;
 
   try {
-    return await state.shareSavePromise;
+    return await savePromise;
   } finally {
-    state.shareSavePromise = null;
+    if (state.shareSavePromise === savePromise) {
+      state.shareSavePromise = null;
+    }
   }
 }
 
-function copyShareUrl() {
-  if (!state.resultId) return;
-  const url = globalThis.location.origin + "/results/" + state.resultId;
+function copyShareUrl(resultId = state.resultId) {
+  if (!resultId) return;
+  const url = globalThis.location.origin + "/results/" + resultId;
   if (navigator.clipboard?.writeText) {
     navigator.clipboard
       .writeText(url)
@@ -239,6 +265,7 @@ function copyShareUrl() {
 export async function handleShare() {
   if (state.phase !== "results" || state.lastResultPartial) return;
 
+  const generation = state.runGeneration;
   if (state.resultId) {
     copyShareUrl();
     return;
@@ -249,15 +276,25 @@ export async function handleShare() {
     elements.shareBtn.textContent = "Preparing...";
   }
   try {
-    await saveAndEnableShare();
-    if (state.phase === "results") {
-      copyShareUrl();
+    const resultId = await saveAndEnableShare();
+    if (
+      resultId &&
+      state.phase === "results" &&
+      state.runGeneration === generation
+    ) {
+      copyShareUrl(resultId);
     }
   } catch (err) {
     console.debug("Share save unavailable:", err);
-    showError("Unable to create share link right now");
+    if (state.phase === "results" && state.runGeneration === generation) {
+      showError("Unable to create share link right now");
+    }
   } finally {
-    if (elements.shareBtn && state.phase === "results") {
+    if (
+      elements.shareBtn &&
+      state.phase === "results" &&
+      state.runGeneration === generation
+    ) {
       elements.shareBtn.disabled = false;
       elements.shareBtn.textContent = "Share";
     }
@@ -268,7 +305,11 @@ export function promptShareUrl(url) {
   if (navigator.share) {
     navigator
       .share({ title: "openByte Speed Test Result", url })
-      .catch(() => {});
+      .catch((err) => {
+        if (err?.name !== "AbortError") {
+          globalThis.prompt("Copy this link:", url);
+        }
+      });
   } else {
     globalThis.prompt("Copy this link:", url);
   }
