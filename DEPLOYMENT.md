@@ -33,6 +33,42 @@ The overlay terminates TLS, forwards requests without a buffering middleware,
 and defaults the openByte router to the measured-faster `openbyte-h1@file` ALPN policy. Set
 `TRAEFIK_TLS_OPTIONS=openbyte-h2@file` only for an intentional comparison.
 
+## Visual branding
+
+The header logo and primary/secondary test colors can be supplied without
+rebuilding the image. For a manual Compose deployment, run these commands from
+the repository root. Put a PNG or JPEG logo in the repository-root branding
+directory and create `docker/.env` on first setup:
+
+```bash
+mkdir -p branding
+install -m 0644 /path/to/company-logo.png branding/logo.png
+test -f docker/.env || cp .env.example docker/.env
+```
+
+Then add the branding values to `docker/.env`:
+
+```dotenv
+BRAND_ASSETS_DIR=../branding
+BRAND_LOGO_PATH=/app/branding/logo.png
+BRAND_PRIMARY_COLOR_DARK="#66E3FF"
+BRAND_PRIMARY_COLOR_LIGHT="#00677A"
+BRAND_SECONDARY_COLOR_DARK="#FFB45C"
+BRAND_SECONDARY_COLOR_LIGHT="#9A4D00"
+```
+
+Compose resolves the default `../branding` source relative to
+`docker/docker-compose.yaml` and mounts it read-only at `/app/branding`.
+Automated deployment instead reads `$REMOTE_DIR/.env`; it leaves
+`$REMOTE_DIR/branding` in place but does not upload operator-provided logos.
+Color values must be exact `#RRGGBB`; dark and light values are required as a
+pair and are contrast-checked at startup. Logos are read once at startup, so
+restart the service after replacing one; use artwork that stays legible in both
+light and dark themes.
+
+This is visual branding rather than removal of all openByte identity: the
+favicon, metadata, translated product copy, and GitHub attribution remain.
+
 ## Automated GHCR deployment
 
 Pushes to `main` publish `edge` and commit-SHA images. SemVer tags publish

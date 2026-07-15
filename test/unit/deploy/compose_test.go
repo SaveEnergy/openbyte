@@ -54,6 +54,20 @@ func TestComposeSeparatesPublishedImageFromLocalBuild(t *testing.T) {
 	rejectText(t, local, "ports:", "environment:", "volumes:", "restart:", "healthcheck:")
 }
 
+func TestComposePassesBrandingConfigAndMountsAssetsReadOnly(t *testing.T) {
+	t.Parallel()
+
+	compose := readRepositoryFile(t, "docker", "docker-compose.yaml")
+	requireText(t, compose,
+		"BRAND_PRIMARY_COLOR_DARK=${BRAND_PRIMARY_COLOR_DARK:-}",
+		"BRAND_PRIMARY_COLOR_LIGHT=${BRAND_PRIMARY_COLOR_LIGHT:-}",
+		"BRAND_SECONDARY_COLOR_DARK=${BRAND_SECONDARY_COLOR_DARK:-}",
+		"BRAND_SECONDARY_COLOR_LIGHT=${BRAND_SECONDARY_COLOR_LIGHT:-}",
+		"BRAND_LOGO_PATH=${BRAND_LOGO_PATH:-}",
+		"${BRAND_ASSETS_DIR:-../branding}:/app/branding:ro",
+	)
+}
+
 func TestTraefikComposeKeepsOnlyApplicationRouters(t *testing.T) {
 	t.Parallel()
 

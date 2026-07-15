@@ -32,6 +32,14 @@ type Config struct {
 	DataDir          string
 	MaxStoredResults int
 
+	BrandPrimaryColorDark    string
+	BrandPrimaryColorLight   string
+	BrandSecondaryColorDark  string
+	BrandSecondaryColorLight string
+	BrandLogoPath            string
+	brandLogoData            []byte
+	brandLogoContentType     string
+
 	TLSCertFile string
 	TLSKeyFile  string
 	TLSAutoGen  bool // Auto-generate a self-signed cert for dev when explicitly enabled.
@@ -79,7 +87,7 @@ func (c *Config) LoadFromEnv() error {
 		return err
 	}
 	c.loadTLSEnv()
-	return nil
+	return c.loadBrandingEnv()
 }
 
 func (c *Config) Validate() error {
@@ -95,7 +103,7 @@ func (c *Config) Validate() error {
 	if err := c.validateTLS(); err != nil {
 		return err
 	}
-	return nil
+	return c.validateBranding()
 }
 
 // MaxConcurrentHTTP returns the concurrent download/upload limit for

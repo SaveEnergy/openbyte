@@ -39,6 +39,9 @@ Thumbs.db
 # ENV
 .env
 
+# Operator-provided visual branding
+branding/
+
 # Build artifacts
 /tmp/
 

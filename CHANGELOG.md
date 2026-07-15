@@ -7,6 +7,9 @@ in Git history and pull requests, not release notes.
 
 ### Added
 
+- **Environment-driven visual branding**: operators can provide accessible
+  dark/light primary and secondary colors plus a bounded local header logo;
+  both the speed-test and shared-result pages apply the branding before paint.
 - **English and German UI**: the speed test and shared-result pages now detect
   the browser language, provide a persistent reload-based selector that exposes
   the resolved system language, localize accessible status text, and format

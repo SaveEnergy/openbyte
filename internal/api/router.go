@@ -13,6 +13,8 @@ import (
 
 type Router struct {
 	serverName       string
+	brandingCSS      []byte
+	brandLogo        config.BrandLogo
 	speedtest        *SpeedTestHandler
 	resultsHandler   *resultHandler
 	limiter          *RateLimiter
@@ -38,8 +40,12 @@ func NewRouter(cfg *config.Config, resultsStore *results.Store) *Router {
 	if cfg.WebRoot != "" {
 		webFS = http.Dir(cfg.WebRoot)
 	}
+	palette, brandingConfigured := cfg.BrandPalette()
+	brandLogo := cfg.BrandLogo()
 	return &Router{
 		serverName:       serverName,
+		brandingCSS:      renderBrandingCSS(palette, brandingConfigured, len(brandLogo.Data) > 0),
+		brandLogo:        brandLogo,
 		speedtest:        speedtest,
 		resultsHandler:   newResultHandler(resultsStore),
 		limiter:          newRateLimiter(cfg, resolver),
@@ -59,6 +65,8 @@ func (r *Router) SetupRoutes() http.Handler {
 	mux.HandleFunc("GET "+apiV1Prefix+"/ping", r.ping)
 
 	mux.HandleFunc("GET /health", r.HealthCheck)
+	mux.HandleFunc("GET "+brandingCSSPath, r.serveBrandingCSS)
+	mux.HandleFunc("GET "+brandingLogoPath, r.serveBrandLogo)
 	mux.HandleFunc("/api/v1/", func(w http.ResponseWriter, req *http.Request) {
 		respondJSON(w, map[string]string{"error": errNotFound}, http.StatusNotFound)
 	})

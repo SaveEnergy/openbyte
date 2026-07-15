@@ -80,10 +80,12 @@ function setInstrumentActivity(speed, direction) {
 
 /* ---- Live sparkline ---- */
 
-const sparkline = { samples: [], color: "#00d4aa" };
+const sparkline = { samples: [], direction: "download" };
 
-function sparklineColorFor(direction) {
-  return direction === "upload" ? "#667eea" : "#00d4aa";
+function sparklineColorFor(direction, element) {
+  const property =
+    direction === "upload" ? "--upload-color" : "--download-color";
+  return getComputedStyle(element).getPropertyValue(property).trim();
 }
 
 function ensureSparklineScale(canvas) {
@@ -114,6 +116,7 @@ function drawSparkline() {
   if (samples.length < 2) return;
   const max = Math.max(...samples);
   if (max <= 0) return;
+  const color = sparklineColorFor(sparkline.direction, canvas);
 
   const padding = 2 * ratio;
   const stepX = (width - 2 * padding) / (samples.length - 1);
@@ -129,7 +132,7 @@ function drawSparkline() {
       ctx.lineTo(x, y);
     }
   }
-  ctx.strokeStyle = sparkline.color;
+  ctx.strokeStyle = color;
   ctx.lineWidth = 2 * ratio;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
@@ -139,7 +142,7 @@ function drawSparkline() {
   ctx.lineTo(padding, height);
   ctx.closePath();
   ctx.globalAlpha = 0.12;
-  ctx.fillStyle = sparkline.color;
+  ctx.fillStyle = color;
   ctx.fill();
   ctx.globalAlpha = 1;
 }
@@ -151,7 +154,7 @@ export function resetSparkline() {
 
 function recordSparklinePoint(speed, direction) {
   if (direction !== "download" && direction !== "upload") return;
-  sparkline.color = sparklineColorFor(direction);
+  sparkline.direction = direction;
   sparkline.samples.push(speed);
   if (sparkline.samples.length > TEST_CONFIG.SPARKLINE_MAX_POINTS) {
     sparkline.samples.shift();
