@@ -413,13 +413,8 @@ test.describe("openByte UI regressions", () => {
       const summaryRect = document
         .querySelector(".stats-help summary")
         .getBoundingClientRect();
-      const historyItem = document.createElement("li");
-      historyItem.className = "history-item";
-      historyItem.append("just now", "100 Mbps", "10 ms · A");
-      document.getElementById("historyList").append(historyItem);
       return {
         badgeContrast: contrast(getComputedStyle(badge).color, background),
-        historyDirection: getComputedStyle(historyItem).flexDirection,
         summaryHeight: summaryRect.height,
         themeHeight: themeRect.height,
         themeWidth: themeRect.width,
@@ -427,7 +422,6 @@ test.describe("openByte UI regressions", () => {
     });
 
     expect(audit.badgeContrast).toBeGreaterThanOrEqual(4.5);
-    expect(audit.historyDirection).toBe("column");
     expect(audit.summaryHeight).toBeGreaterThanOrEqual(44);
     expect(audit.themeHeight).toBeGreaterThanOrEqual(44);
     expect(audit.themeWidth).toBeGreaterThanOrEqual(44);

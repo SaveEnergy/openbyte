@@ -62,9 +62,7 @@ test.describe("openByte UI", () => {
     ).toBeTruthy();
   });
 
-  test("shows live phase status during test with history after", async ({
-    page,
-  }) => {
+  test("shows live phase status during test", async ({ page }) => {
     await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
 
     await page.locator("#startBtn").click();
@@ -74,8 +72,6 @@ test.describe("openByte UI", () => {
     await expect(page.locator("#resultsState")).toBeVisible({
       timeout: 60_000,
     });
-    await expect(page.locator("#historySection")).toBeVisible();
-    await expect(page.locator("#historyList .history-item")).toHaveCount(1);
   });
 
   test("theme toggle cycles system, light, dark", async ({ page }) => {
@@ -271,7 +267,6 @@ test.describe("openByte UI", () => {
         jitter: state.jitterResult,
         downloadLatency: state.downloadLatency,
         uploadLatency: state.uploadLatency,
-        history: JSON.parse(localStorage.getItem("openbyte-history") || "[]"),
       };
     });
     expect(cancelled).toEqual({
@@ -284,7 +279,6 @@ test.describe("openByte UI", () => {
       jitter: null,
       downloadLatency: 0,
       uploadLatency: 0,
-      history: [],
     });
 
     await page.locator("#startBtn").click();
@@ -296,7 +290,6 @@ test.describe("openByte UI", () => {
       /^(A\+|A|B|C|D|F)$/,
     );
     await expect(page.locator(".stats-help")).toBeVisible();
-    await expect(page.locator("#historyList .history-item")).toHaveCount(1);
     await expect(page.locator("#shareBtn")).toBeVisible();
   });
 

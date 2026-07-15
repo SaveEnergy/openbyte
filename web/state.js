@@ -69,8 +69,6 @@ export function initElements() {
   elements.resultsAnnouncement = document.getElementById(
     "resultsAnnouncement",
   );
-  elements.historySection = document.getElementById("historySection");
-  elements.historyList = document.getElementById("historyList");
   elements.startBtnHint = document.querySelector(".start-btn-hint");
 }
 

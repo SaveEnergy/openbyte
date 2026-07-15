@@ -60,8 +60,6 @@ export const de = Object.freeze({
   "metric.bufferbloatDescription":
     "Anstieg der Latenz unter Last, bewertet von A+ bis F. Niedrige Noten bedeuten mehr Verzögerung.",
   "network.publicIpAtTest": "Öffentliche IP-Adressen beim Test",
-  "history.heading": "Letzte Tests",
-  "history.justNow": "gerade eben",
 
   "action.testAgain": "Nochmal testen",
   "action.share": "Teilen",

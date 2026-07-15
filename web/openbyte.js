@@ -24,7 +24,6 @@ import {
   checkServer,
   renderNetworkState,
 } from "./network.js";
-import { saveHistoryEntry } from "./history.js";
 
 function testErrorKey(error) {
   const code = error?.code;
@@ -42,20 +41,6 @@ function clearRunResults() {
 
 function isCurrentRun(signal) {
   return state.abortController?.signal === signal;
-}
-
-function recordRunInHistory() {
-  saveHistoryEntry({
-    ts: Date.now(),
-    down: state.downloadResult,
-    up: state.uploadResult,
-    latency: Number.isFinite(state.latencyResult) ? state.latencyResult : 0,
-    grade:
-      computeBufferbloatGrade(
-        state.latencyResult,
-        Math.max(state.downloadLatency, state.uploadLatency),
-      ) || "",
-  });
 }
 
 export async function startTest() {
@@ -120,7 +105,6 @@ export async function startTest() {
     state.uploadResult = uploadResult;
 
     state.phase = "results";
-    recordRunInHistory();
     showResults();
   } catch (e) {
     if (!isCurrentRun(signal)) return;
