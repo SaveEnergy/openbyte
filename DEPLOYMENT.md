@@ -210,8 +210,8 @@ sudo systemctl status openbyte
 # Health check
 curl http://localhost:8080/health
 
-# Test from client
-./bin/openbyte client -d download -t 10 https://speedtest.example.com
+# Verify the public endpoint
+./bin/openbyte check --json https://speedtest.example.com
 ```
 
 ## Reverse Proxy (Nginx)
