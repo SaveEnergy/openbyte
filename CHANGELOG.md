@@ -26,6 +26,8 @@ in Git history and pull requests, not release notes.
 
 ### Changed
 
+- **Throughput reporting**: download and upload now report measured payload
+  goodput without adding an estimated HTTP/1 protocol-overhead multiplier.
 - **One-tap share**: tapping Share now saves the result and copies the link in
   a single gesture (previously it required two taps).
 - **Cancel keeps partial results**: cancelling after the download phase shows

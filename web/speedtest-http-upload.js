@@ -14,7 +14,6 @@ import {
 } from "./utils.js";
 import {
   resolveChunkSize,
-  detectOverheadFactor,
   throwIfZeroBytes,
   applyHttpMeasureIntervalTick,
   createWarmUpDetector,
@@ -201,7 +200,6 @@ async function runUploadWindow(options) {
   }
   await Promise.all(streamPromises);
 
-  const overheadFactor = detectOverheadFactor();
   const endNow = Math.min(performance.now(), endTimeRef.value);
   const actualMeasureStart =
     metricsState.measureStartTime > 0
@@ -211,8 +209,7 @@ async function runUploadWindow(options) {
     TEST_CONFIG.MIN_MEASURE_SECONDS,
     (endNow - actualMeasureStart) / 1000,
   );
-  const avgSpeed =
-    (metricsState.totalBytes * 8 * overheadFactor) / measureTime / 1_000_000;
+  const avgSpeed = (metricsState.totalBytes * 8) / measureTime / 1_000_000;
 
   throwIfZeroBytes(metricsState, metricsState.totalBytes, "upload");
   if (isRamp && metricsState.sawOverload) {

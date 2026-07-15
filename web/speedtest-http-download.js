@@ -14,7 +14,6 @@ import {
 } from "./utils.js";
 import {
   resolveChunkSize,
-  detectOverheadFactor,
   throwIfZeroBytes,
   applyHttpMeasureTick,
   createWarmUpDetector,
@@ -179,7 +178,6 @@ async function runDownloadWindow(options) {
 
   await Promise.all(streamPromises);
 
-  const overheadFactor = detectOverheadFactor();
   const endNow = Math.min(performance.now(), endTimeRef.value);
   const { totalBytes } = readState;
   const actualMeasureStart =
@@ -188,7 +186,7 @@ async function runDownloadWindow(options) {
     TEST_CONFIG.MIN_MEASURE_SECONDS,
     (endNow - actualMeasureStart) / 1000,
   );
-  const avgSpeed = (totalBytes * 8 * overheadFactor) / measureTime / 1_000_000;
+  const avgSpeed = (totalBytes * 8) / measureTime / 1_000_000;
 
   throwIfZeroBytes(streamState, totalBytes, "download");
   if (isRamp && streamState.sawOverload) {
