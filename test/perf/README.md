@@ -14,7 +14,7 @@ outputs with `benchstat` manually when an experiment has an explicit baseline.
 
 ```bash
 make build
-WEB_ROOT=./web ./bin/openbyte server
+WEB_ROOT=./web ./bin/openbyte
 
 # Real adaptive UI test with JSON output and median summaries.
 RUNS=5 scripts/perf/browser_throughput.mjs ui
@@ -29,10 +29,10 @@ MODE=upload-shards SHARDS=1,2,4 scripts/perf/browser_throughput.mjs
 For direct TLS protocol comparisons:
 
 ```bash
-PORT=8444 BIND_ADDRESS=127.0.0.1 TLS_AUTO_GEN=1 WEB_ROOT=./web ./bin/openbyte server
+PORT=8444 BIND_ADDRESS=127.0.0.1 TLS_AUTO_GEN=1 WEB_ROOT=./web ./bin/openbyte
 URL=https://localhost:8444/ IGNORE_HTTPS_ERRORS=1 RUNS=5 scripts/perf/browser_throughput.mjs ui
 
-PORT=8445 BIND_ADDRESS=127.0.0.1 TLS_AUTO_GEN=1 HTTP2_ENABLED=false WEB_ROOT=./web ./bin/openbyte server
+PORT=8445 BIND_ADDRESS=127.0.0.1 TLS_AUTO_GEN=1 HTTP2_ENABLED=false WEB_ROOT=./web ./bin/openbyte
 URL=https://localhost:8445/ IGNORE_HTTPS_ERRORS=1 RUNS=5 scripts/perf/browser_throughput.mjs ui
 ```
 

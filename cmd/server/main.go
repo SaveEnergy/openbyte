@@ -85,10 +85,10 @@ func Run(args []string, version string) int {
 }
 
 func parseServerArgs(args []string) (bool, error) {
-	fs := flag.NewFlagSet("openbyte server", flag.ContinueOnError)
+	fs := flag.NewFlagSet("openbyte", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stdout, "Usage: openbyte server [--version]")
+		fmt.Fprintln(os.Stdout, "Usage: openbyte [--version]")
 		fmt.Fprintln(os.Stdout, "\nServer configuration is environment-only; see README.md for variables.")
 	}
 	version := fs.Bool("version", false, "Print version")
@@ -96,7 +96,7 @@ func parseServerArgs(args []string) (bool, error) {
 		return false, err
 	}
 	if fs.NArg() != 0 {
-		return false, fmt.Errorf("unexpected server argument %q", fs.Arg(0))
+		return false, fmt.Errorf("unexpected argument %q", fs.Arg(0))
 	}
 	return *version, nil
 }

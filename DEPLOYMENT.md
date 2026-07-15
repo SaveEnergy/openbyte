@@ -161,7 +161,7 @@ After=network-online.target
 User=openbyte
 Group=openbyte
 WorkingDirectory=/opt/openbyte
-ExecStart=/opt/openbyte/openbyte server
+ExecStart=/opt/openbyte/openbyte
 Environment="PORT=8080"
 Environment="CAPACITY_GBPS=25"
 Environment="DATA_DIR=/opt/openbyte/data"
