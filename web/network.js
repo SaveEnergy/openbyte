@@ -13,25 +13,6 @@ export function resolveServerName() {
   return normalizeServerName(state.serverName);
 }
 
-export async function loadServerInfo() {
-  try {
-    const response = await fetchWithTimeout(
-      `${getApiBase()}/version`,
-      { cache: "no-store" },
-      TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
-    );
-    if (!response.ok) {
-      await response.text().catch(() => {});
-      throw new Error(`version endpoint returned ${response.status}`);
-    }
-    const data = await response.json();
-    setServerName(data?.server_name);
-  } catch (e) {
-    console.debug("Server info load failed:", e);
-    setServerName(state.serverName);
-  }
-}
-
 function setServerName(name) {
   state.serverName = normalizeServerName(name);
   if (elements.serverName) {
@@ -98,7 +79,12 @@ export function updateNetworkDisplay() {
   }
 }
 
-async function discoverAddress(url, options, shouldUpdate = () => true) {
+async function discoverAddress(
+  url,
+  options,
+  shouldUpdate = () => true,
+  includeServerName = false,
+) {
   try {
     const response = await fetchWithTimeout(
       url,
@@ -106,6 +92,7 @@ async function discoverAddress(url, options, shouldUpdate = () => true) {
       TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
     );
     const data = await parseJSONOrThrow(response);
+    if (includeServerName) setServerName(data?.server_name);
     if (data.client_ip && shouldUpdate()) {
       state.networkInfo[data.ipv6 ? "ipv6" : "ipv4"] = data.client_ip;
       updateNetworkDisplay();
@@ -153,9 +140,10 @@ export function detectNetworkInfo() {
     (state.runGeneration === discoveryGeneration ||
       (state.runGeneration === discoveryGeneration + 1 && state.isRunning));
   const sameOriginProbe = discoverAddress(
-    `${getApiBase()}/ping`,
+    `${getApiBase()}/ping?meta=1`,
     { cache: "no-store" },
     canUpdateStartupAddress,
+    true,
   );
   void sameOriginProbe.then((ready) => {
     if (ready) setServerOnlineUI();

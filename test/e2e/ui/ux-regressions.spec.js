@@ -1,8 +1,9 @@
 const { test, expect } = require("@playwright/test");
+const pingRoute = /\/api\/v1\/ping(?:\?.*)?$/;
 
 test.describe("openByte UI regressions", () => {
   test("keeps GO disabled until the server probe succeeds", async ({ page }) => {
-    await page.route("**/api/v1/ping", async (route) => {
+    await page.route(pingRoute, async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 500));
       await route.fulfill({
         status: 503,
@@ -27,7 +28,7 @@ test.describe("openByte UI regressions", () => {
 
   test("does not refresh a completed result's public IP", async ({ page }) => {
     await page.goto("/");
-    await page.route("**/api/v1/ping", async (route) => {
+    await page.route(pingRoute, async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -65,7 +66,7 @@ test.describe("openByte UI regressions", () => {
       releaseProbe = resolve;
     });
     await page.goto("/");
-    await page.route("**/api/v1/ping", async (route) => {
+    await page.route(pingRoute, async (route) => {
       probeStarted = true;
       await probeGate;
       await route.fulfill({
@@ -102,7 +103,7 @@ test.describe("openByte UI regressions", () => {
   test("delayed startup probes can finish during the first test", async ({
     page,
   }) => {
-    await page.route("**/api/v1/ping", async (route) => {
+    await page.route(pingRoute, async (route) => {
       const hostname = new URL(route.request().url()).hostname;
       const isCrossProbe = hostname.startsWith("v4.") || hostname.startsWith("v6.");
       if (isCrossProbe) {

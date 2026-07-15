@@ -148,7 +148,8 @@ curl -6 https://v6.speedtest.example.com/api/v1/ping
 
 A failed single-stack probe displays `Not detected` for that family without
 preventing the speed test. Make sure HTTP/HTTPS firewall rules permit both IPv4
-and IPv6.
+and IPv6. `/api/v1/ping` is the only API route that allows cross-origin reads;
+openByte does not expose configurable generic CORS for the remaining routes.
 
 ## Bare-metal service
 
@@ -193,7 +194,11 @@ The committed performance harness and prior protocol evidence are documented in
 
 ```bash
 curl -f http://127.0.0.1:8080/health
-curl -f http://127.0.0.1:8080/api/v1/version
+curl -f 'http://127.0.0.1:8080/api/v1/ping?meta=1'
 sudo journalctl -u openbyte -f   # bare metal
 docker compose ps               # containers
 ```
+
+The metadata ping is the UI bootstrap request and includes the configured
+server name. The removed `/api/v1/version` route is not a readiness check;
+`/health` remains authoritative for deployment health.

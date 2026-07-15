@@ -7,7 +7,8 @@ import {
   handleCancel,
   handleShare,
 } from "./speedtest-orchestrator.js";
-import { checkServer, detectNetworkInfo, loadServerInfo } from "./network.js";
+import { detectNetworkInfo } from "./network.js";
+import { checkServer } from "./network.js";
 
 function bindEvents() {
   if (!elements.startBtn || !elements.restartBtn) {
@@ -22,7 +23,6 @@ function bindEvents() {
 
 function init() {
   initElements();
-  loadServerInfo();
   bindEvents();
   detectNetworkInfo();
   setInterval(() => {

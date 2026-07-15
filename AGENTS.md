@@ -23,7 +23,7 @@
 
 ### Security & Validation
 
-- CORS wildcard matching enforces safe dot-boundary behavior.
+- Generic CORS is absent. `/api/v1/ping` alone sends wildcard CORS so eager IPv4/IPv6 discovery can read dedicated probe hosts; all other API routes are same-origin.
 - CSP is strict (`script-src 'self'`, `worker-src 'self'`), with JS moved to external files only.
 - The results POST handler enforces a 4096-byte limit, rejects unknown fields, and decodes exactly one JSON object in `internal/api/results_handler.go`.
 - Config validation includes trusted CIDR parsing and strict positive limits.
@@ -31,10 +31,11 @@
 ### Frontend Behavior
 
 - HTTP test mode uses `/api/v1/download`, `/api/v1/upload`, and `/api/v1/ping`; never TCP/UDP proxy mode.
-- Network and version probe fetch paths drain non-OK and malformed JSON responses.
+- Self-hosted fonts, motion, loaded-latency measurement, and bufferbloat grading are intentional product features; simplification work must preserve them.
+- Network probe fetch paths drain non-OK and malformed JSON responses.
 - Server settings UI: no server selector; a single deployed server tests itself.
 - UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.
-- Speed test: **`speedtest-orchestrator.js`** owns lifecycle/share/partial-cancel; **`speedtest.js`** owns latency, the determinate progress model, and bridges UI state to the one-shot **`speedtest-worker.js`**; **`speedtest-adaptive.js`** chooses stream count/duration and reports ramp-window/measure progress; **`speedtest-http-{shared,download,upload}.js`** owns warm-up, progress, and transfer loops. Thin **`openbyte.js`** owns init/events; **`network.js`** owns readiness and idle address probes (offline disables the start button); **`theme.js`** owns the manual light/dark override; **`history.js`** owns the localStorage recent-results list; **`stats-help.js`** injects the shared metric explanations on both `index.html` and `results.html`. Client IP discovery is a user-facing feature: same-origin and IPv4/IPv6 probes stay eager on page load, never deferred until **GO**, but stop mutating address state once a test starts so completed results retain the test-time IP. API docs are **`api.html`** + **`api.css`** + **`api.js`** (fills in the concrete base URL). Static serving derives its safe path set from assets embedded by **`web/embed.go`**; **`WEB_ROOT`** may override file contents but cannot expose additional paths.
+- Speed test: **`speedtest-orchestrator.js`** owns lifecycle/share/partial-cancel; **`speedtest.js`** owns latency, the determinate progress model, and bridges UI state to the one-shot **`speedtest-worker.js`**; **`speedtest-adaptive.js`** chooses stream count/duration and reports ramp-window/measure progress; **`speedtest-http-{shared,download,upload}.js`** owns warm-up, progress, and transfer loops. Thin **`openbyte.js`** owns init/events; **`network.js`** owns readiness and idle address probes (offline disables the start button); **`theme.js`** owns the manual light/dark override; **`history.js`** owns the localStorage recent-results list; **`stats-help.js`** injects the shared metric explanations on both `index.html` and `results.html`. Client IP discovery is a user-facing feature: same-origin and IPv4/IPv6 probes stay eager on page load, never deferred until **GO**; startup probes may finish during the first run but never overwrite completed results, and periodic probes mutate addresses only while idle. The same-origin bootstrap ping requests metadata to populate the configured server name; measurement, readiness, and address pings remain lean. Static serving derives its safe path set from assets embedded by **`web/embed.go`**; **`WEB_ROOT`** may override file contents but cannot expose additional paths.
 
 ### Storage
 
@@ -50,7 +51,7 @@
 - CLI speed-test clients and the Go SDK were removed during alpha; use the browser UI or HTTP API.
 - The server-side TCP/UDP stream stack, `/api/v1/stream/*`, websocket stream API, `cmd/loadtest`, and direct test ports were removed pre-1.0.
 - The unwired `internal/metrics` package, `pkg/types` RTT/NetworkInfo/CLI metric collectors, and the multi-server compose example were removed post-0.10.
-- OpenAPI spec lives at `api/openapi.yaml`; CI/release lint it.
+- `api/openapi.yaml` is the canonical API contract; CI/release lint it, and the server has no duplicate browser API page. `/api/v1/version` was removed during alpha; bootstrap ping metadata supplies the server name.
 
 ### Build / CI / Deploy
 

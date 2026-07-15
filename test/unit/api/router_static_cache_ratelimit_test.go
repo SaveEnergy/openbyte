@@ -11,7 +11,7 @@ import (
 )
 
 func TestStaticHTMLUsesNoStoreCacheControl(t *testing.T) {
-	router := api.NewRouter(config.DefaultConfig(), "", nil)
+	router := api.NewRouter(config.DefaultConfig(), nil)
 
 	h := router.SetupRoutes()
 
@@ -23,7 +23,7 @@ func TestStaticHTMLUsesNoStoreCacheControl(t *testing.T) {
 		t.Fatalf(routerCacheRootFmt, got, noStoreHeader)
 	}
 
-	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+"/api.html", nil)
+	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+"/results.html", nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -33,7 +33,7 @@ func TestStaticHTMLUsesNoStoreCacheControl(t *testing.T) {
 }
 
 func TestStaticJSDoesNotForceNoStore(t *testing.T) {
-	router := api.NewRouter(config.DefaultConfig(), "", nil)
+	router := api.NewRouter(config.DefaultConfig(), nil)
 
 	h := router.SetupRoutes()
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/openbyte.js", nil)
@@ -80,14 +80,15 @@ func TestRateLimitSkipPaths(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.GlobalRateLimit = 1
 	cfg.RateLimitPerIP = 1
-	router := api.NewRouter(cfg, "", nil)
+	store := newTestResultsStore(t)
+	router := api.NewRouter(cfg, store)
 	h := router.SetupRoutes()
 
-	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+versionAPIPath, nil)
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+resultsPagePath, nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf(routerFirstVersionReq+statusWantFmt, rec.Code, http.StatusOK)
+		t.Fatalf(routerFirstResultsReq+statusWantFmt, rec.Code, http.StatusOK)
 	}
 
 	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+pingAPIPath, nil)

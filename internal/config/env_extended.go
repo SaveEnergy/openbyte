@@ -31,9 +31,6 @@ func (c *Config) loadLimitsAndNetworkEnv() error {
 	if cidrs := envCSV("TRUSTED_PROXY_CIDRS"); cidrs != nil {
 		c.TrustedProxyCIDRs = cidrs
 	}
-	if origins := envCSV("ALLOWED_ORIGINS"); origins != nil {
-		c.AllowedOrigins = origins
-	}
 	if webRoot := os.Getenv("WEB_ROOT"); webRoot != "" {
 		c.WebRoot = webRoot
 	}

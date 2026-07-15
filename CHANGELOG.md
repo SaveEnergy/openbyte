@@ -19,7 +19,7 @@ in Git history and pull requests, not release notes.
   the results screen (`web/history.js`).
 - **Manual theme toggle**: header button cycles system → light → dark and
   persists per device (`web/theme.js`); applies on the main, shared-result,
-  and API docs pages.
+  and shared-result pages.
 
 ### Changed
 
@@ -34,10 +34,6 @@ in Git history and pull requests, not release notes.
   toasts use fixed high-contrast colors in both themes.
 - **Mobile results layout**: the four secondary stats render as a 2×2 grid on
   small screens instead of one long column.
-- **API docs page**: the Base URL chip now shows the actual server origin
-  (filled in by `web/api.js`) instead of the literal text
-  `window.location.origin`, and the Agent notes list regained its bullet
-  indentation and spacing lost to the global CSS reset.
 - **Shared result page**: aligned with the live results view — verdict line,
   colored bufferbloat badge, metric explanations, and the theme toggle now
   appear on `/results/{id}` too. The explanations live in a shared
@@ -60,7 +56,8 @@ in Git history and pull requests, not release notes.
   instrument animation while retaining adaptive streams, result sharing, and
   eager same-origin/IPv4/IPv6 address discovery.
 - Made discovered public IPv4/IPv6 addresses visible before starting a test;
-  ping readiness remains authoritative if version metadata is rate-limited.
+  the same-origin bootstrap ping now supplies server-name metadata while
+  measurement and address-discovery pings retain their lean response.
 - Made server configuration environment-only, replaced the custom logger with
   `log/slog`, and consolidated router/result HTTP setup without changing the
   persisted result schema or share URLs.
@@ -76,6 +73,9 @@ in Git history and pull requests, not release notes.
 
 ### Removed
 
+- Removed the browser API quick reference, configurable generic CORS, and
+  `/api/v1/version`. `api/openapi.yaml` is the canonical contract, and only the
+  ping route permits cross-origin discovery requests.
 - Removed the CLI speed-test clients, Go SDK, diagnostics package, and shared
   client transfer helpers. The `openbyte` binary now runs only the server; use
   the browser or HTTP API for tests and automation.
