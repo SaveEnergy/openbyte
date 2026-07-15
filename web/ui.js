@@ -1,11 +1,14 @@
 /** DOM updates: progress, speed display, state views, toast. */
 
 import { state, elements, TEST_CONFIG, toast } from "./state.js";
+import { formatNumber, onLocaleChange, t } from "./i18n.js";
 import {
-  computeBufferbloatGrade,
-  computeConnectionVerdict,
+  formatConnectionVerdict,
+  formatLatency,
   formatSpeed,
-} from "./utils.js";
+  formatSpeedText as localizedSpeedText,
+} from "./presentation.js";
+import { computeBufferbloatGrade } from "./utils.js";
 import { updateNetworkDisplay } from "./network.js";
 import { renderHistory } from "./history.js";
 
@@ -52,15 +55,11 @@ function getToastElements(isError) {
 }
 
 export function formatLatencyMs(val) {
-  if (typeof val === "number" && Number.isFinite(val) && val > 0) {
-    return `${val.toFixed(1)} ms`;
-  }
-  return "-";
+  return formatLatency(val);
 }
 
 export function formatSpeedText(mbps) {
-  const formatted = formatSpeed(mbps);
-  return `${formatted.value} ${formatted.unit}`;
+  return localizedSpeedText(mbps);
 }
 
 function setInstrumentActivity(speed, direction) {
@@ -197,6 +196,21 @@ export function setPhaseStepValue(phase, text) {
   if (value) value.textContent = text;
 }
 
+function renderCompletedPhaseValues() {
+  const values = {
+    ping: () => formatLatencyMs(state.latencyResult),
+    download: () => formatSpeedText(state.downloadResult),
+    upload: () => formatSpeedText(state.uploadResult),
+  };
+  for (const phase of PHASE_ORDER) {
+    const step = elements.phaseSteps?.[phase];
+    const value = elements.phaseValues?.[phase];
+    if (step?.dataset.status === "done" && value) {
+      value.textContent = values[phase]();
+    }
+  }
+}
+
 /* ---- Speed and progress display ---- */
 
 export function updateSpeed(speed, direction) {
@@ -210,18 +224,11 @@ export function updateSpeed(speed, direction) {
   let displaySpeed, unit;
 
   if (direction === "latency") {
-    displaySpeed = speed.toFixed(0);
+    displaySpeed = formatNumber(speed, { maximumFractionDigits: 0 });
     unit = "ms";
     elements.speedNumber.className = "speed-number measuring";
-  } else if (speed >= 1000) {
-    displaySpeed = (speed / 1000).toFixed(2);
-    unit = "Gbps";
-    elements.speedNumber.className =
-      "speed-number " +
-      (direction === "download" ? "downloading" : "uploading");
   } else {
-    displaySpeed = speed.toFixed(1);
-    unit = "Mbps";
+    ({ value: displaySpeed, unit } = formatSpeed(speed));
     elements.speedNumber.className =
       "speed-number " +
       (direction === "download" ? "downloading" : "uploading");
@@ -248,7 +255,8 @@ export function resetProgress() {
   if (!elements.speedNumber) return;
   if (elements.progressMeter) {
     elements.progressMeter.value = 0;
-    elements.progressMeter.textContent = "Measuring network";
+    elements.progressMeter.textContent = t("test.progressText");
+    elements.progressMeter.setAttribute("aria-label", t("test.progressAria"));
   }
   if (elements.progressRing) {
     elements.progressRing.style.strokeDasharray = `0 ${RING_CIRCUMFERENCE.toFixed(1)}`;
@@ -260,13 +268,32 @@ export function resetProgress() {
   elements.speedNumber.textContent = "0";
 }
 
-export function updateTestType(text, className) {
+function renderTestType() {
   if (!elements.testType || !elements.speedNumber) return;
+  const current = state.testType;
+  if (!current) return;
+  const phase = t(current.key);
+  const streamsSuffix = current.streams > 1 ? ` ×${current.streams}` : "";
+  const text = `${current.icon || ""}${phase}${streamsSuffix}`;
   elements.testType.textContent = text;
   if (elements.progressMeter) {
-    elements.progressMeter.setAttribute("aria-label", `${text} in progress`);
+    elements.progressMeter.setAttribute(
+      "aria-label",
+      t("test.phaseInProgress", { phase: `${phase}${streamsSuffix}` }),
+    );
     elements.progressMeter.textContent = text;
   }
+}
+
+export function updateTestType(key, className, options = {}) {
+  if (!elements.testType || !elements.speedNumber) return;
+  state.testType = {
+    key,
+    className,
+    icon: options.icon ? `${options.icon} ` : "",
+    streams: Number.isFinite(options.streams) ? options.streams : 0,
+  };
+  renderTestType();
 
   const phaseChanged = elements.testingState?.dataset.phase !== className;
   if (phaseChanged) {
@@ -337,7 +364,7 @@ function renderBufferbloat(grade) {
 
 function renderVerdict(partial, loadedLatency) {
   if (!elements.resultsVerdict) return;
-  const verdict = computeConnectionVerdict({
+  const verdict = formatConnectionVerdict({
     download: state.downloadResult,
     upload: state.uploadResult,
     idleLatency: state.latencyResult,
@@ -351,20 +378,25 @@ function renderVerdict(partial, loadedLatency) {
 function announceResults(partial, grade) {
   if (!elements.resultsAnnouncement) return;
   const download = formatSpeedText(state.downloadResult);
-  const parts = [`Speed test ${partial ? "cancelled early" : "complete"}.`];
-  parts.push(`Download ${download}.`);
-  if (!partial) {
-    parts.push(`Upload ${formatSpeedText(state.uploadResult)}.`);
-  }
-  parts.push(`Latency ${formatLatencyMs(state.latencyResult)}.`);
-  if (grade) {
-    parts.push(`Bufferbloat grade ${grade}.`);
-  }
-  elements.resultsAnnouncement.textContent = parts.join(" ");
+  let key = partial ? "announcement.partial" : "announcement.complete";
+  if (grade) key += "WithGrade";
+  elements.resultsAnnouncement.textContent = t(key, {
+    download,
+    upload: formatSpeedText(state.uploadResult),
+    latency: formatLatencyMs(state.latencyResult),
+    grade,
+  });
 }
 
-export function showResults(options = {}) {
-  const partial = options.partial === true;
+function renderShareButton() {
+  if (!elements.shareBtn) return;
+  elements.shareBtn.textContent = t(
+    elements.shareBtn.disabled ? "share.preparing" : "action.share",
+  );
+}
+
+function renderResultsContent() {
+  const partial = state.lastResultPartial;
   if (
     !elements.downloadResult ||
     !elements.uploadResult ||
@@ -373,8 +405,6 @@ export function showResults(options = {}) {
   ) {
     return;
   }
-  state.lastResultPartial = partial;
-  showState("results");
 
   const download = formatSpeed(state.downloadResult);
 
@@ -386,7 +416,7 @@ export function showResults(options = {}) {
 
   if (partial) {
     elements.uploadResult.textContent = "—";
-    if (uploadUnit) uploadUnit.textContent = "not measured";
+    if (uploadUnit) uploadUnit.textContent = t("result.notMeasured");
   } else {
     const upload = formatSpeed(state.uploadResult);
     elements.uploadResult.textContent = upload.value;
@@ -412,6 +442,13 @@ export function showResults(options = {}) {
 
   updateNetworkDisplay();
   renderHistory(elements.historyList, elements.historySection);
+  renderShareButton();
+}
+
+export function showResults(options = {}) {
+  const partial = options.partial === true;
+  state.lastResultPartial = partial;
+  showState("results");
 
   state.resultId = null;
   state.shareSavePromise = null;
@@ -419,16 +456,25 @@ export function showResults(options = {}) {
     // Partial runs have no upload figure, so a saved share would be misleading.
     elements.shareBtn.classList.toggle("hidden", partial);
     elements.shareBtn.disabled = false;
-    elements.shareBtn.textContent = "Share";
   }
+  renderResultsContent();
 }
 
-export function showError(message, isError = true) {
+function renderToast() {
+  if (!toast.key) return;
+  const { messageEl } = getToastElements(toast.isError);
+  if (messageEl) messageEl.textContent = t(toast.key, toast.variables);
+}
+
+export function showError(key, isError = true, variables = {}) {
   const { toastEl, messageEl, duration } = getToastElements(isError);
   if (!toastEl || !messageEl) return;
   clearToastTimer();
   hideError();
-  messageEl.textContent = message;
+  toast.key = key;
+  toast.variables = variables;
+  toast.isError = isError;
+  renderToast();
   toastEl.classList.remove("hidden");
   toast.timer = setTimeout(hideError, duration);
 }
@@ -438,3 +484,10 @@ export function hideError() {
   elements.errorToast?.classList.add("hidden");
   elements.successToast?.classList.add("hidden");
 }
+
+onLocaleChange(() => {
+  renderTestType();
+  renderCompletedPhaseValues();
+  if (state.phase === "results") renderResultsContent();
+  renderToast();
+});

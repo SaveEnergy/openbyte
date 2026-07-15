@@ -240,6 +240,7 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  min-width: 0;
 }
 
 .logo {
@@ -260,6 +261,9 @@ body::before {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .logo-accent {
@@ -293,6 +297,32 @@ body::before {
   transition:
     color var(--motion-duration-base) ease,
     border-color var(--motion-duration-base) ease;
+}
+
+.language-select {
+  min-width: 108px;
+  height: 44px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--bg-hover);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition:
+    color var(--motion-duration-base) ease,
+    border-color var(--motion-duration-base) ease;
+}
+
+.language-select:hover {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.language-select:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
 }
 
 .theme-toggle:hover {
@@ -386,5 +416,33 @@ body::before {
 
   .logo {
     font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .header {
+    gap: var(--space-sm);
+  }
+
+  .brand {
+    max-width: calc(100% - 148px);
+  }
+
+  .server-name {
+    display: none;
+  }
+
+  .header-tools {
+    flex-shrink: 0;
+    gap: var(--space-sm);
+  }
+
+  .server-info {
+    display: none;
+  }
+
+  .language-select {
+    min-width: 88px;
+    width: 88px;
   }
 }

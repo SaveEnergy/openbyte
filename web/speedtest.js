@@ -9,27 +9,22 @@ import {
   updateTestType,
 } from "./ui.js";
 import { resolveAdaptiveConfig } from "./speedtest-adaptive.js";
-import { fetchWithTimeout } from "./utils.js";
+import { createCodedError, fetchWithTimeout } from "./utils.js";
 import { getNextHopProtocol, updateNetworkDisplay } from "./network.js";
 
 /** Portion of a direction phase's progress allotted to the ramp-up stage. */
 const RAMP_PROGRESS_PORTION = 0.45;
 
-function setTestPhase(phase, label, className) {
+function setTestPhase(phase, labelKey, className, direction) {
   state.phase = phase;
   if (phase === "latency") {
     showState("testing");
   } else {
     resetProgress();
   }
-  updateTestType(label, className);
-}
-
-function adaptivePhaseLabel(direction, stage, streams) {
-  const icon = direction === "download" ? "↓" : "↑";
-  const streamsSuffix =
-    Number.isFinite(streams) && streams > 1 ? ` ×${streams}` : "";
-  return `${icon} ${stage}${streamsSuffix}`;
+  updateTestType(labelKey, className, {
+    icon: direction === "download" ? "↓" : "↑",
+  });
 }
 
 function createDirectionProgressModel() {
@@ -97,11 +92,11 @@ function nextFrame() {
 export async function runDirectionPhase(
   signal,
   phase,
-  label,
+  labelKey,
   className,
   direction,
 ) {
-  setTestPhase(phase, label, className);
+  setTestPhase(phase, labelKey, className, direction);
   await nextFrame();
   return runTest(direction, signal);
 }
@@ -112,14 +107,22 @@ function makeAbortError() {
 
 function workerMessageError(message) {
   if (message.name === "AbortError") return makeAbortError();
-  const error = new Error(message.message || "Speed test worker failed");
+  const error = createCodedError(
+    message.code || "worker.failed",
+    message.message || "Speed test worker failed",
+  );
   error.name = message.name || "Error";
   return error;
 }
 
 function runWorkerSpeedTest(direction, onProgress, signal, callbacks) {
   if (typeof Worker === "undefined") {
-    throw new TypeError("This browser does not support Web Workers.");
+    const error = createCodedError(
+      "worker.unsupported",
+      "This browser does not support Web Workers.",
+    );
+    error.name = "TypeError";
+    throw error;
   }
 
   const worker = new Worker(new URL("./speedtest-worker.js", import.meta.url), {
@@ -169,11 +172,23 @@ function runWorkerSpeedTest(direction, onProgress, signal, callbacks) {
     };
 
     const onError = (event) => {
-      settle(reject, new Error(event.message || "Speed test worker failed"));
+      settle(
+        reject,
+        createCodedError(
+          "worker.failed",
+          event.message || "Speed test worker failed",
+        ),
+      );
     };
 
     const onMessageError = () => {
-      settle(reject, new Error("Speed test worker sent an unreadable message"));
+      settle(
+        reject,
+        createCodedError(
+          "worker.unreadable",
+          "Speed test worker sent an unreadable message",
+        ),
+      );
     };
 
     worker.addEventListener("message", onMessage);
@@ -242,8 +257,12 @@ async function runTest(direction, signal) {
       onPhase: (stage, streams, info) => {
         noteRampWindow(progressModel, info);
         updateTestType(
-          adaptivePhaseLabel(direction, stage, streams),
+          `test.stage.${stage}`,
           direction === "download" ? "downloading" : "uploading",
+          {
+            icon: direction === "download" ? "↓" : "↑",
+            streams,
+          },
         );
       },
       onMeasureStart: (streams, duration) => {

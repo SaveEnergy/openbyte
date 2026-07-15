@@ -50,8 +50,10 @@ test.describe("openByte UI", () => {
     await expect(page.locator("#resultsState")).toBeVisible({
       timeout: 60_000,
     });
-    const downloadText = await page.locator("#downloadResult").textContent();
-    const downloadMbps = Number.parseFloat(downloadText || "0");
+    const downloadMbps = await page.evaluate(async () => {
+      const { state } = await import("/state.js");
+      return state.downloadResult;
+    });
     expect(Number.isFinite(downloadMbps)).toBeTruthy();
     expect(downloadMbps).toBeGreaterThanOrEqual(0);
     const workerUrls = await page.evaluate(
@@ -253,8 +255,10 @@ test.describe("openByte UI", () => {
     await expect(page.locator("#resultsState")).toBeVisible({
       timeout: 60_000,
     });
-    const downloadText = await page.locator("#downloadResult").textContent();
-    const downloadMbps = Number.parseFloat(downloadText || "0");
+    const downloadMbps = await page.evaluate(async () => {
+      const { state } = await import("/state.js");
+      return state.downloadResult;
+    });
     expect(Number.isFinite(downloadMbps)).toBeTruthy();
     expect(downloadMbps).toBeGreaterThanOrEqual(0);
   });

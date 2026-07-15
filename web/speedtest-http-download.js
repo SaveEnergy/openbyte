@@ -10,6 +10,7 @@ import {
   retryAfterMs,
   isNetworkError,
   fetchWithTimeout,
+  createCodedError,
 } from "./utils.js";
 import {
   resolveChunkSize,
@@ -189,13 +190,12 @@ async function runDownloadWindow(options) {
   );
   const avgSpeed = (totalBytes * 8 * overheadFactor) / measureTime / 1_000_000;
 
-  throwIfZeroBytes(streamState, totalBytes, {
-    network: "Network error during download. Try again or change server.",
-    overload: "Server overloaded. Try again in a moment or change server.",
-    noStreams: "Download failed. No stream completed successfully.",
-  });
+  throwIfZeroBytes(streamState, totalBytes, "download");
   if (isRamp && streamState.sawOverload) {
-    throw new Error("Server overloaded during adaptive download ramp");
+    throw createCodedError(
+      "server.overloaded",
+      "Server overloaded during adaptive download ramp",
+    );
   }
 
   return Math.max(avgSpeed, 0);

@@ -1,13 +1,16 @@
 /** Manual theme override: system -> light -> dark, persisted per device. */
 
+import { onLocaleChange, t } from "./i18n.js";
+
 const STORAGE_KEY = "openbyte-theme";
 const MODES = ["system", "light", "dark"];
 const MODE_ICONS = { system: "◐", light: "☀", dark: "☾" };
-const MODE_LABELS = {
-  system: "Theme follows system preference. Activate for light theme.",
-  light: "Light theme active. Activate for dark theme.",
-  dark: "Dark theme active. Activate to follow system preference.",
+const MODE_LABEL_KEYS = {
+  system: "theme.systemNextLight",
+  light: "theme.lightNextDark",
+  dark: "theme.darkNextSystem",
 };
+let currentMode = storedMode();
 
 function storedMode() {
   try {
@@ -40,15 +43,15 @@ function applyMode(mode) {
 }
 
 function updateToggle(button, mode) {
+  const label = t(MODE_LABEL_KEYS[mode]);
   button.textContent = MODE_ICONS[mode];
-  button.setAttribute("aria-label", MODE_LABELS[mode]);
-  button.title = MODE_LABELS[mode];
+  button.setAttribute("aria-label", label);
+  button.title = label;
 }
 
 function wireToggle() {
   const button = document.getElementById("themeToggle");
   if (!button) return;
-  let currentMode = storedMode();
   updateToggle(button, currentMode);
   button.addEventListener("click", () => {
     const next = MODES[(MODES.indexOf(currentMode) + 1) % MODES.length];
@@ -59,7 +62,11 @@ function wireToggle() {
   });
 }
 
-applyMode(storedMode());
+applyMode(currentMode);
+onLocaleChange(() => {
+  const button = document.getElementById("themeToggle");
+  if (button) updateToggle(button, currentMode);
+});
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", wireToggle);
 } else {

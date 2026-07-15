@@ -7,6 +7,7 @@ import {
   initElements,
   TEST_CONFIG,
 } from "./state.js";
+import { localizeURL, t } from "./i18n.js";
 import { computeBufferbloatGrade } from "./utils.js";
 import {
   showState,
@@ -26,8 +27,24 @@ import {
   detectNetworkInfo,
   resolveServerName,
   checkServer,
+  renderNetworkState,
 } from "./network.js";
 import { saveHistoryEntry } from "./history.js";
+
+const TEST_ERROR_KEYS = {
+  "worker.unsupported": "error.workerUnsupported",
+  "worker.failed": "error.workerFailed",
+  "worker.unreadable": "error.workerUnreadable",
+  "download.network": "error.downloadNetwork",
+  "upload.network": "error.uploadNetwork",
+  "server.overloaded": "error.serverOverloaded",
+  "download.noStreams": "error.downloadNoStreams",
+  "upload.noStreams": "error.uploadNoStreams",
+};
+
+function testErrorKey(error) {
+  return TEST_ERROR_KEYS[error?.code] || "error.testFailed";
+}
 
 function clearRunResults() {
   state.downloadResult = 0;
@@ -71,11 +88,11 @@ function recordRunInHistory() {
 
 export async function startTest() {
   if (state.isRunning) {
-    showError("Test already in progress");
+    showError("error.testInProgress");
     return;
   }
   if (!state.serverOnline) {
-    showError("Server is not ready yet");
+    showError("error.serverNotReady");
     return;
   }
 
@@ -90,7 +107,7 @@ export async function startTest() {
     resetProgress();
     resetPhaseSteps();
     setActivePhaseStep("ping");
-    updateTestType("↔ Ping", "measuring");
+    updateTestType("test.phase.ping", "measuring", { icon: "↔" });
     showState("testing");
     const latency = await measureLatency(signal);
 
@@ -107,7 +124,7 @@ export async function startTest() {
     const downloadResult = await runDirectionPhase(
       signal,
       "download",
-      "↓ Download",
+      "test.phase.download",
       "downloading",
       "download",
     );
@@ -124,7 +141,7 @@ export async function startTest() {
     const uploadResult = await runDirectionPhase(
       signal,
       "upload",
-      "↑ Upload",
+      "test.phase.upload",
       "uploading",
       "upload",
     );
@@ -150,7 +167,7 @@ export async function startTest() {
       if (state.abortController?.signal === signal) {
         resetToIdle();
       }
-      showError(e.message || "Test failed");
+      showError(testErrorKey(e));
     }
   } finally {
     if (state.abortController?.signal === signal) {
@@ -190,11 +207,12 @@ export function resetToIdle() {
   state.progress = 0;
   state.resultId = null;
   state.shareSavePromise = null;
+  state.testType = null;
   clearRunResults();
   if (elements.shareBtn) {
     elements.shareBtn.classList.add("hidden");
     elements.shareBtn.disabled = false;
-    elements.shareBtn.textContent = "Share";
+    elements.shareBtn.textContent = t("action.share");
   }
   if (elements.partialNotice) {
     elements.partialNotice.classList.add("hidden");
@@ -256,12 +274,14 @@ export async function saveAndEnableShare() {
 
 function copyShareUrl(resultId = state.resultId) {
   if (!resultId) return;
-  const url = globalThis.location.origin + "/results/" + resultId;
+  const url = localizeURL(
+    globalThis.location.origin + "/results/" + resultId,
+  );
   if (navigator.clipboard?.writeText) {
     navigator.clipboard
       .writeText(url)
       .then(() => {
-        showError("Link copied to clipboard", false);
+        showError("share.copied", false);
       })
       .catch(() => {
         promptShareUrl(url);
@@ -283,7 +303,7 @@ export async function handleShare() {
 
   if (elements.shareBtn) {
     elements.shareBtn.disabled = true;
-    elements.shareBtn.textContent = "Preparing...";
+    elements.shareBtn.textContent = t("share.preparing");
   }
   try {
     const resultId = await saveAndEnableShare();
@@ -297,7 +317,7 @@ export async function handleShare() {
   } catch (err) {
     console.debug("Share save unavailable:", err);
     if (state.phase === "results" && state.runGeneration === generation) {
-      showError("Unable to create share link right now");
+      showError("share.unavailable");
     }
   } finally {
     if (
@@ -306,7 +326,7 @@ export async function handleShare() {
       state.runGeneration === generation
     ) {
       elements.shareBtn.disabled = false;
-      elements.shareBtn.textContent = "Share";
+      elements.shareBtn.textContent = t("action.share");
     }
   }
 }
@@ -314,14 +334,14 @@ export async function handleShare() {
 export function promptShareUrl(url) {
   if (navigator.share) {
     navigator
-      .share({ title: "openByte Speed Test Result", url })
+      .share({ title: t("share.nativeTitle"), url })
       .catch((err) => {
         if (err?.name !== "AbortError") {
-          globalThis.prompt("Copy this link:", url);
+          globalThis.prompt(t("share.copyPrompt"), url);
         }
       });
   } else {
-    globalThis.prompt("Copy this link:", url);
+    globalThis.prompt(t("share.copyPrompt"), url);
   }
 }
 
@@ -338,6 +358,7 @@ function bindEvents() {
 
 function init() {
   initElements();
+  renderNetworkState();
   bindEvents();
   detectNetworkInfo();
   setInterval(() => {

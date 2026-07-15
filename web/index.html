@@ -5,11 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
+      data-i18n-content="meta.home.description"
       content="Open-source internet speed test. Measure download, upload, latency, jitter, and bufferbloat."
     />
-    <meta property="og:title" content="openByte — Speed Test" />
+    <meta
+      property="og:title"
+      data-i18n-content="meta.home.ogTitle"
+      content="openByte — Speed Test"
+    />
     <meta
       property="og:description"
+      data-i18n-content="meta.home.description"
       content="Open-source internet speed test. Measure download, upload, latency, jitter, and bufferbloat."
     />
     <meta property="og:type" content="website" />
@@ -39,7 +45,9 @@
     <link rel="stylesheet" href="motion.css" />
   </head>
   <body>
-    <a class="skip-link" href="#mainContent">Skip to main content</a>
+    <a class="skip-link" href="#mainContent" data-i18n="common.skipToMain"
+      >Skip to main content</a
+    >
     <div class="app">
       <!-- Minimal Header -->
       <header class="header">
@@ -52,10 +60,27 @@
             <span class="server-dot"></span>
             <span class="server-text">Connecting...</span>
           </div>
+          <label
+            class="visually-hidden"
+            for="languageSelect"
+            data-i18n="language.label"
+            >Choose language</label
+          >
+          <select
+            class="language-select"
+            id="languageSelect"
+            data-i18n-aria-label="language.label"
+            aria-label="Choose language"
+          >
+            <option value="auto" data-i18n="language.auto">Auto</option>
+            <option value="en" lang="en">English</option>
+            <option value="de" lang="de">Deutsch</option>
+          </select>
           <button
             class="theme-toggle"
             id="themeToggle"
             type="button"
+            data-i18n-aria-label="theme.switch"
             aria-label="Switch theme"
           >
             ◐
@@ -65,20 +90,29 @@
 
       <!-- Main Speed Display -->
       <main class="main" id="mainContent">
-        <h1 class="visually-hidden">openByte internet speed test</h1>
+        <h1 class="visually-hidden" data-i18n="test.heading">
+          openByte internet speed test
+        </h1>
         <!-- Idle State: Start Button -->
         <section class="speed-section" id="idleState">
           <button
             class="start-btn"
             id="startBtn"
-            aria-label="Start speed test"
+            data-i18n-aria-label="test.startAria"
+            aria-label="GO — Start speed test"
             disabled
           >
-            <span class="start-btn-text">GO</span>
+            <span class="start-btn-text" data-i18n="test.startShort">GO</span>
             <span class="start-btn-hint">Connecting…</span>
           </button>
           <section class="public-ip" aria-labelledby="publicIpTitle">
-            <h2 class="public-ip-title" id="publicIpTitle">Your public IP</h2>
+            <h2
+              class="public-ip-title"
+              id="publicIpTitle"
+              data-i18n="network.publicIp"
+            >
+              Your public IP
+            </h2>
             <dl
               class="public-ip-grid"
               id="idleNetworkInfo"
@@ -120,6 +154,7 @@
                 class="visually-hidden"
                 id="progressMeter"
                 max="100"
+                data-i18n-aria-label="test.progressAria"
                 aria-label="Network measurement in progress"
               >
                 Measuring network
@@ -151,32 +186,49 @@
             height="44"
             aria-hidden="true"
           ></canvas>
-          <ol class="phase-steps" id="phaseSteps" aria-label="Test phases">
+          <ol
+            class="phase-steps"
+            id="phaseSteps"
+            data-i18n-aria-label="test.phasesAria"
+            aria-label="Test phases"
+          >
             <li class="phase-step" id="phaseStepPing" data-status="pending">
-              <span class="phase-step-name">Ping</span>
+              <span class="phase-step-name" data-i18n="test.phase.ping"
+                >Ping</span
+              >
               <span class="phase-step-value" id="phaseValuePing"></span>
             </li>
             <li class="phase-step" id="phaseStepDownload" data-status="pending">
-              <span class="phase-step-name">Download</span>
+              <span class="phase-step-name" data-i18n="test.phase.download"
+                >Download</span
+              >
               <span class="phase-step-value" id="phaseValueDownload"></span>
             </li>
             <li class="phase-step" id="phaseStepUpload" data-status="pending">
-              <span class="phase-step-name">Upload</span>
+              <span class="phase-step-name" data-i18n="test.phase.upload"
+                >Upload</span
+              >
               <span class="phase-step-value" id="phaseValueUpload"></span>
             </li>
           </ol>
-          <button class="cancel-btn" id="cancelBtn">Cancel</button>
+          <button class="cancel-btn" id="cancelBtn" data-i18n="test.cancel">
+            Cancel
+          </button>
         </section>
 
         <!-- Results State -->
         <section class="speed-section hidden" id="resultsState">
-          <h2 class="visually-hidden">Results</h2>
+          <h2 class="visually-hidden" data-i18n="result.heading">Results</h2>
           <p
             class="visually-hidden"
             id="resultsAnnouncement"
             aria-live="polite"
           ></p>
-          <div class="partial-notice hidden" id="partialNotice">
+          <div
+            class="partial-notice hidden"
+            id="partialNotice"
+            data-i18n="result.partialNotice"
+          >
             Test cancelled early — upload was not measured.
           </div>
           <p class="results-verdict" id="resultsVerdict"></p>
@@ -184,41 +236,53 @@
             <div class="result-card result-primary">
               <div class="result-icon">↓</div>
               <div class="result-value" id="downloadResult">0</div>
-              <div class="result-label">Download</div>
+              <div class="result-label" data-i18n="result.download">
+                Download
+              </div>
               <div class="result-unit">Mbps</div>
             </div>
             <div class="result-card result-secondary">
               <div class="result-icon">↑</div>
               <div class="result-value" id="uploadResult">0</div>
-              <div class="result-label">Upload</div>
+              <div class="result-label" data-i18n="result.upload">Upload</div>
               <div class="result-unit">Mbps</div>
             </div>
           </div>
           <div class="results-extra">
             <div class="extra-stat">
-              <span class="extra-label">Idle Latency</span>
+              <span class="extra-label" data-i18n="metric.idleLatency"
+                >Idle Latency</span
+              >
               <span class="extra-value" id="latencyResult">0 ms</span>
             </div>
             <div class="extra-stat">
-              <span class="extra-label">Jitter</span>
+              <span class="extra-label" data-i18n="metric.jitter">Jitter</span>
               <span class="extra-value" id="jitterResult">0 ms</span>
             </div>
             <div class="extra-stat">
-              <span class="extra-label">Loaded Latency</span>
+              <span class="extra-label" data-i18n="metric.loadedLatency"
+                >Loaded Latency</span
+              >
               <span class="extra-value" id="loadedLatencyResult">0 ms</span>
             </div>
             <div class="extra-stat">
-              <span class="extra-label">Bufferbloat</span>
+              <span class="extra-label" data-i18n="metric.bufferbloat"
+                >Bufferbloat</span
+              >
               <span class="extra-value bb-badge" id="bufferbloatResult">-</span>
             </div>
           </div>
           <details class="stats-help">
-            <summary>What do these numbers mean?</summary>
+            <summary data-i18n="metric.helpSummary">
+              What do these numbers mean?
+            </summary>
             <dl class="stats-help-list" id="statsHelpList"></dl>
           </details>
           <div class="results-details" id="resultsDetails">
             <div class="detail-section">
-              <h3 class="detail-title">Public IP at test time</h3>
+              <h3 class="detail-title" data-i18n="network.publicIpAtTest">
+                Public IP at test time
+              </h3>
               <div class="detail-grid">
                 <div class="detail-item">
                   <span class="detail-label">IPv4</span>
@@ -231,12 +295,20 @@
               </div>
             </div>
             <div class="detail-section hidden" id="historySection">
-              <h3 class="detail-title">Recent Tests on This Device</h3>
+              <h3 class="detail-title" data-i18n="history.heading">
+                Recent Tests on This Device
+              </h3>
               <ol class="history-list" id="historyList"></ol>
             </div>
           </div>
           <div class="results-actions">
-            <button class="restart-btn" id="restartBtn">Test Again</button>
+            <button
+              class="restart-btn"
+              id="restartBtn"
+              data-i18n="action.testAgain"
+            >
+              Test Again
+            </button>
             <button class="share-btn hidden" id="shareBtn">Share</button>
           </div>
         </section>
@@ -245,7 +317,13 @@
       <!-- Minimal Footer -->
       <footer class="footer">
         <div class="footer-links">
-          <a class="footer-link" href="/">Speed Test</a>
+          <a
+            class="footer-link"
+            href="/"
+            data-locale-link
+            data-i18n="nav.speedTest"
+            >Speed Test</a
+          >
           <span class="footer-divider">·</span>
           <a
             class="footer-link"
@@ -265,7 +343,9 @@
         aria-live="assertive"
       >
         <span class="toast-icon">⚠</span>
-        <span class="toast-message" id="errorMessage">Error</span>
+        <span class="toast-message" id="errorMessage" data-i18n="common.error"
+          >Error</span
+        >
       </div>
       <output
         class="toast toast-success hidden"
@@ -273,7 +353,12 @@
         aria-live="polite"
       >
         <span class="toast-icon">✓</span>
-        <span class="toast-message" id="successMessage">Success</span>
+        <span
+          class="toast-message"
+          id="successMessage"
+          data-i18n="common.success"
+          >Success</span
+        >
       </output>
     </div>
 

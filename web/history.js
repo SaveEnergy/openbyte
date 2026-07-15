@@ -1,6 +1,7 @@
 /** Recent-results history stored locally on this device. */
 
-import { formatSpeed } from "./utils.js";
+import { formatDateTime, formatRelativeTime, t } from "./i18n.js";
+import { formatLatency, formatSpeed } from "./presentation.js";
 
 const STORAGE_KEY = "openbyte-history";
 const MAX_STORED_ENTRIES = 10;
@@ -37,11 +38,15 @@ export function saveHistoryEntry(entry) {
 
 function formatWhen(ts) {
   const minutes = Math.round((Date.now() - ts) / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 1) return t("history.justNow");
+  if (minutes < 60) {
+    return formatRelativeTime(-minutes, "minute", { numeric: "always" });
+  }
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  return new Date(ts).toLocaleDateString();
+  if (hours < 24) {
+    return formatRelativeTime(-hours, "hour", { numeric: "always" });
+  }
+  return formatDateTime(new Date(ts), { dateStyle: "medium" });
 }
 
 function speedText(mbps) {
@@ -71,10 +76,8 @@ export function renderHistory(listEl, sectionEl) {
 
     const meta = document.createElement("span");
     meta.className = "history-meta";
-    const latency =
-      Number.isFinite(entry.latency) && entry.latency > 0
-        ? `${entry.latency.toFixed(1)} ms`
-        : "—";
+    const formattedLatency = formatLatency(entry.latency);
+    const latency = formattedLatency === "-" ? "—" : formattedLatency;
     meta.textContent = entry.grade ? `${latency} · ${entry.grade}` : latency;
 
     item.append(when, speeds, meta);

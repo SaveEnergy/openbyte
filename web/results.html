@@ -5,17 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
+      data-i18n-content="meta.shared.description"
       content="openByte speed test result — download, upload, latency, and bufferbloat."
     />
-    <meta property="og:title" content="openByte — Speed Test Result" />
+    <meta
+      property="og:title"
+      data-i18n-content="meta.shared.ogTitle"
+      content="openByte — Speed Test Result"
+    />
     <meta
       property="og:description"
+      data-i18n-content="meta.shared.ogDescription"
       content="See this internet speed test result on openByte."
     />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="/favicon.svg" />
     <meta name="theme-color" content="#0a0a0f" />
-    <title>openByte — Shared Result</title>
+    <title data-i18n="meta.shared.title">openByte — Shared Result</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link
       rel="preload"
@@ -37,22 +43,47 @@
     <link rel="stylesheet" href="/motion.css" />
   </head>
   <body class="results-view">
-    <a class="skip-link" href="#mainContent">Skip to main content</a>
+    <a class="skip-link" href="#mainContent" data-i18n="common.skipToMain"
+      >Skip to main content</a
+    >
     <div class="app">
       <header class="header">
         <div class="brand">
-          <a href="/" class="link-plain"
+          <a href="/" class="link-plain" data-locale-link
             ><div class="logo">
               open<span class="logo-accent">Byte</span>
             </div></a
           >
-          <div class="server-name" id="serverName">Shared Result</div>
+          <div
+            class="server-name"
+            id="serverName"
+            data-i18n="result.sharedHeading"
+          >
+            Shared Result
+          </div>
         </div>
         <div class="header-tools">
+          <label
+            class="visually-hidden"
+            for="languageSelect"
+            data-i18n="language.label"
+            >Choose language</label
+          >
+          <select
+            class="language-select"
+            id="languageSelect"
+            data-i18n-aria-label="language.label"
+            aria-label="Choose language"
+          >
+            <option value="auto" data-i18n="language.auto">Auto</option>
+            <option value="en" lang="en">English</option>
+            <option value="de" lang="de">Deutsch</option>
+          </select>
           <button
             class="theme-toggle"
             id="themeToggle"
             type="button"
+            data-i18n-aria-label="theme.switch"
             aria-label="Switch theme"
           >
             ◐
@@ -67,41 +98,53 @@
             <div class="result-card result-primary">
               <div class="result-icon">↓</div>
               <div class="result-value" id="downloadResult">-</div>
-              <div class="result-label">Download</div>
+              <div class="result-label" data-i18n="result.download">
+                Download
+              </div>
               <div class="result-unit">Mbps</div>
             </div>
             <div class="result-card result-secondary">
               <div class="result-icon">↑</div>
               <div class="result-value" id="uploadResult">-</div>
-              <div class="result-label">Upload</div>
+              <div class="result-label" data-i18n="result.upload">Upload</div>
               <div class="result-unit">Mbps</div>
             </div>
           </div>
           <div class="results-extra">
             <div class="extra-stat">
-              <span class="extra-label">Idle Latency</span>
+              <span class="extra-label" data-i18n="metric.idleLatency"
+                >Idle Latency</span
+              >
               <span class="extra-value" id="latencyResult">-</span>
             </div>
             <div class="extra-stat">
-              <span class="extra-label">Jitter</span>
+              <span class="extra-label" data-i18n="metric.jitter">Jitter</span>
               <span class="extra-value" id="jitterResult">-</span>
             </div>
             <div class="extra-stat">
-              <span class="extra-label">Loaded Latency</span>
+              <span class="extra-label" data-i18n="metric.loadedLatency"
+                >Loaded Latency</span
+              >
               <span class="extra-value" id="loadedLatencyResult">-</span>
             </div>
             <div class="extra-stat">
-              <span class="extra-label">Bufferbloat</span>
+              <span class="extra-label" data-i18n="metric.bufferbloat"
+                >Bufferbloat</span
+              >
               <span class="extra-value bb-badge" id="bufferbloatResult">-</span>
             </div>
           </div>
           <details class="stats-help">
-            <summary>What do these numbers mean?</summary>
+            <summary data-i18n="metric.helpSummary">
+              What do these numbers mean?
+            </summary>
             <dl class="stats-help-list" id="statsHelpList"></dl>
           </details>
           <div class="results-details">
             <div class="detail-section">
-              <h3 class="detail-title">Public IP at test time</h3>
+              <h3 class="detail-title" data-i18n="network.publicIpAtTest">
+                Public IP at test time
+              </h3>
               <div class="detail-grid">
                 <div class="detail-item">
                   <span class="detail-label">IPv4</span>
@@ -114,7 +157,13 @@
               </div>
             </div>
             <div class="detail-section">
-              <h3 class="detail-title hidden" id="serverLabel">Server</h3>
+              <h3
+                class="detail-title hidden"
+                id="serverLabel"
+                data-i18n="result.server"
+              >
+                Server
+              </h3>
               <div class="detail-grid">
                 <div class="detail-item hidden" id="serverItem">
                   <span class="detail-value" id="serverValue">-</span>
@@ -124,22 +173,38 @@
             <div class="detail-section">
               <div class="detail-grid">
                 <div class="detail-item">
-                  <span class="detail-label">Tested</span>
+                  <span class="detail-label" data-i18n="result.tested"
+                    >Tested</span
+                  >
                   <span class="detail-value" id="testedAt">-</span>
                 </div>
               </div>
             </div>
           </div>
           <div class="results-actions">
-            <a href="/" class="restart-btn btn-link">Run Your Own Test</a>
+            <a
+              href="/"
+              class="restart-btn btn-link"
+              data-locale-link
+              data-i18n="action.runOwnTest"
+              >Run Your Own Test</a
+            >
           </div>
         </section>
 
         <section class="speed-section hidden" id="errorView">
           <div class="error-view">
             <div class="error-code">404</div>
-            <div class="error-message">Result not found or has expired.</div>
-            <a href="/" class="restart-btn btn-link">Run a Speed Test</a>
+            <div class="error-message" data-i18n="error.resultNotFound">
+              Result not found or has expired.
+            </div>
+            <a
+              href="/"
+              class="restart-btn btn-link"
+              data-locale-link
+              data-i18n="action.runSpeedTest"
+              >Run a Speed Test</a
+            >
           </div>
         </section>
 
@@ -147,13 +212,19 @@
           class="speed-section hidden loading loading-text"
           id="loadingView"
         >
-          Loading result...
+          <span data-i18n="result.loading">Loading result…</span>
         </output>
       </main>
 
       <footer class="footer">
         <div class="footer-links">
-          <a class="footer-link" href="/">Speed Test</a>
+          <a
+            class="footer-link"
+            href="/"
+            data-locale-link
+            data-i18n="nav.speedTest"
+            >Speed Test</a
+          >
           <span class="footer-divider">&middot;</span>
           <a
             class="footer-link"

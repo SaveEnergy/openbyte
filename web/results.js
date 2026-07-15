@@ -1,11 +1,15 @@
 /** Results page: load shared result by ID, render speed/latency/bufferbloat. */
 
 import {
-  computeConnectionVerdict,
   consumeErrorBody,
   fetchWithTimeout,
-  formatSpeed,
 } from "./utils.js";
+import { formatDateTime, onLocaleChange, t } from "./i18n.js";
+import {
+  formatConnectionVerdict,
+  formatLatency,
+  formatSpeed,
+} from "./presentation.js";
 
 const RESULTS_TIMEOUT_MS = 20000;
 const RESULT_ID_REGEX = /^[0-9a-zA-Z]{8}$/;
@@ -14,6 +18,8 @@ const loadingView = document.getElementById("loadingView");
 const resultView = document.getElementById("resultView");
 const errorView = document.getElementById("errorView");
 const errorMessage = document.querySelector("#errorView .error-message");
+let currentResult = null;
+let currentErrorKey = null;
 
 function trimTrailingSlashes(value) {
   if (typeof value !== "string" || value.length === 0) return value;
@@ -24,29 +30,25 @@ function trimTrailingSlashes(value) {
   return value.slice(0, end);
 }
 
-function userError(message) {
-  const err = new Error(message);
+function userError(key) {
+  const err = new Error(key);
   err.userSafe = true;
+  err.userKey = key;
   return err;
 }
 
-function resultErrorMessage(statusCode) {
-  if (statusCode === 404) return "Result not found or has expired.";
-  if (statusCode >= 500) return "Server error while loading result.";
-  return "Unable to load result.";
+function resultErrorKey(statusCode) {
+  if (statusCode === 404) return "error.resultNotFound";
+  if (statusCode >= 500) return "error.resultServer";
+  return "error.resultUnavailable";
 }
 
-function showError(message) {
+function showError(key) {
+  currentErrorKey = key;
   if (loadingView) loadingView.classList.add("hidden");
   if (resultView) resultView.classList.add("hidden");
-  if (errorMessage && typeof message === "string" && message.trim() !== "") {
-    errorMessage.textContent = message;
-  }
+  if (errorMessage) errorMessage.textContent = t(key);
   if (errorView) errorView.classList.remove("hidden");
-}
-
-function safeFixed(v, digits) {
-  return typeof v === "number" && Number.isFinite(v) ? v.toFixed(digits) : "-";
 }
 
 function setText(el, text) {
@@ -54,7 +56,7 @@ function setText(el, text) {
 }
 
 function formatLatencyValue(v) {
-  return typeof v === "number" && v > 0 ? safeFixed(v, 1) + " ms" : "-";
+  return formatLatency(v);
 }
 
 function bufferbloatBadgeClass(grade) {
@@ -75,7 +77,7 @@ function renderBufferbloatBadge(el, grade) {
 function renderVerdict(d) {
   const el = document.getElementById("resultsVerdict");
   if (!el) return;
-  const verdict = computeConnectionVerdict({
+  const verdict = formatConnectionVerdict({
     download: d.download_mbps,
     upload: d.upload_mbps,
     idleLatency: d.latency_ms,
@@ -100,7 +102,10 @@ function updateCreatedAt(createdAt, testedAtEl) {
   try {
     const date = new Date(createdAt);
     if (Number.isFinite(date.getTime())) {
-      testedAtEl.textContent = date.toLocaleString();
+      testedAtEl.textContent = formatDateTime(date, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
     }
   } catch (err) {
     console.debug("results page: failed to parse created_at", err);
@@ -112,17 +117,20 @@ async function loadResult(resultID) {
   const res = await fetchWithTimeout(url, {}, RESULTS_TIMEOUT_MS);
   if (!res.ok) {
     await consumeErrorBody(res);
-    throw userError(resultErrorMessage(res.status));
+    throw userError(resultErrorKey(res.status));
   }
   return res.json();
 }
 
 function renderResult(d) {
   if (!d || typeof d !== "object") {
-    showError("Invalid result payload.");
+    currentResult = null;
+    showError("error.resultInvalidPayload");
     return;
   }
   try {
+    currentResult = d;
+    currentErrorKey = null;
     const downloadEl = document.getElementById("downloadResult");
     const uploadEl = document.getElementById("uploadResult");
     const latencyEl = document.getElementById("latencyResult");
@@ -171,7 +179,8 @@ function renderResult(d) {
       ul.unit;
   } catch (err) {
     console.error("results page: render failed", err);
-    showError("Failed to render result.");
+    currentResult = null;
+    showError("error.resultRender");
   }
 }
 
@@ -182,7 +191,7 @@ if (!loadingView || !resultView || !errorView) {
   const parts = normalizedPath.split("/").filter(Boolean);
   const id = parts.at(-1);
   if (!id || !RESULT_ID_REGEX.test(id)) {
-    showError("Result ID format is invalid.");
+    showError("error.resultInvalidId");
   } else {
     loadingView.classList.remove("hidden");
     resultView.classList.add("hidden");
@@ -194,12 +203,19 @@ if (!loadingView || !resultView || !errorView) {
     } catch (err) {
       console.error("Results fetch failed:", err);
       if (err?.name === "AbortError") {
-        showError("Request timed out. Please try again.");
-      } else if (err?.userSafe && err?.message) {
-        showError(err.message);
+        showError("error.resultTimeout");
+      } else if (err?.userSafe && err?.userKey) {
+        showError(err.userKey);
       } else {
-        showError("Unable to load result.");
+        showError("error.resultUnavailable");
       }
     }
   }
 }
+
+onLocaleChange(() => {
+  if (currentResult) renderResult(currentResult);
+  else if (currentErrorKey && errorMessage) {
+    errorMessage.textContent = t(currentErrorKey);
+  }
+});

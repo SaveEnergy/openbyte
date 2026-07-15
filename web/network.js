@@ -1,6 +1,7 @@
 /** Server health, client IP discovery, and network display. */
 
 import { getApiBase, elements, state, TEST_CONFIG } from "./state.js";
+import { onLocaleChange, t } from "./i18n.js";
 import { fetchWithTimeout, parseJSONOrThrow } from "./utils.js";
 
 const fallbackServerName = "openByte Server";
@@ -31,28 +32,43 @@ function setStartAvailability(online) {
     elements.startBtn.disabled = !online;
   }
   if (elements.startBtnHint) {
-    elements.startBtnHint.textContent = online
-      ? "Click to test your speed"
-      : "Server offline — retrying";
+    elements.startBtnHint.textContent = t(
+      online ? "test.readyHint" : "test.offlineHint",
+    );
   }
 }
 
+export function renderNetworkState() {
+  if (elements.serverText) {
+    elements.serverText.textContent = t(`server.${state.serverStatus}`);
+  }
+  if (state.serverStatus === "connecting") {
+    if (elements.startBtn) elements.startBtn.disabled = true;
+    if (elements.startBtnHint) {
+      elements.startBtnHint.textContent = t("test.connecting");
+    }
+  } else {
+    setStartAvailability(state.serverStatus === "ready");
+  }
+  updateNetworkDisplay();
+}
+
 function setServerOnlineUI() {
+  state.serverStatus = "ready";
   if (elements.serverDot) {
     elements.serverDot.classList.remove("error");
     elements.serverDot.classList.add("connected");
   }
-  if (elements.serverText) elements.serverText.textContent = "Ready";
-  setStartAvailability(true);
+  renderNetworkState();
 }
 
 function setServerOfflineUI() {
+  state.serverStatus = "offline";
   if (elements.serverDot) {
     elements.serverDot.classList.remove("connected");
     elements.serverDot.classList.add("error");
   }
-  if (elements.serverText) elements.serverText.textContent = "Offline";
-  setStartAvailability(false);
+  renderNetworkState();
 }
 
 function startsWithDigit(value) {
@@ -62,7 +78,9 @@ function startsWithDigit(value) {
 }
 
 export function updateNetworkDisplay() {
-  const pending = state.networkInfo.complete ? "Not detected" : "Detecting…";
+  const pending = t(
+    state.networkInfo.complete ? "network.notDetected" : "network.detecting",
+  );
   const ipv4 = state.networkInfo.ipv4 || pending;
   const ipv6 = state.networkInfo.ipv6 || pending;
   for (const element of [elements.idleNetworkIPv4, elements.networkIPv4]) {
@@ -78,6 +96,8 @@ export function updateNetworkDisplay() {
     );
   }
 }
+
+onLocaleChange(renderNetworkState);
 
 async function discoverAddress(
   url,

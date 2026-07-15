@@ -26,8 +26,10 @@ export const state = {
   resultId: null,
   shareSavePromise: null,
   serverOnline: false,
+  serverStatus: "connecting",
   partialCancelRequested: false,
   lastResultPartial: false,
+  testType: null,
 };
 
 /** Populated by `initElements()` after the document is ready (module load can precede DOM). */
@@ -126,4 +128,9 @@ export const TEST_CONFIG = {
   SPARKLINE_MAX_POINTS: 120,
 };
 
-export const toast = { timer: null };
+export const toast = {
+  timer: null,
+  key: null,
+  variables: {},
+  isError: true,
+};
