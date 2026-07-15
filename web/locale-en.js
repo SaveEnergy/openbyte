@@ -30,7 +30,6 @@ export const en = Object.freeze({
   "network.notDetected": "Not available",
   "test.progressAria": "Network measurement in progress",
   "test.progressText": "Measuring network",
-  "test.phasesAria": "Test phases",
   "test.phase.ping": "Ping",
   "test.phase.download": "Download",
   "test.phase.upload": "Upload",
