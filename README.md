@@ -53,7 +53,7 @@ Open `http://localhost:8080` — minimal fast.com-inspired UI with adaptive stre
 - **Protocols**: HTTP streaming for the Web UI, API, and SDK
 - **Test Types**: Download, Upload
 - **Metrics**: Throughput, idle latency, jitter, loaded latency, bufferbloat
-- **Network Info**: Client IP and IPv6 detection
+- **Public IP**: IPv4 and IPv6 discovery shown immediately, before a speed test
 - **Adaptive web test**: Browser UI ramps parallel HTTP streams automatically, then measures with the stream count that saturated the path; transfer loops run in a Web Worker to keep the UI responsive
 - **Automation**: OpenAPI-documented HTTP API, Go SDK, and `check --json`
 

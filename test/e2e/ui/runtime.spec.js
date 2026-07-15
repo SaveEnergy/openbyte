@@ -1,8 +1,13 @@
 const { test, expect } = require("@playwright/test");
 
 test.describe("browser speed-test runtime", () => {
-  test("discovers the client IP eagerly", async ({ page }) => {
+  test("shows the client IP eagerly when version metadata fails", async ({
+    page,
+  }) => {
     let pingRequests = 0;
+    await page.route("**/api/v1/version", async (route) => {
+      await route.fulfill({ status: 429, body: "rate limited" });
+    });
     await page.route("**/api/v1/ping", async (route) => {
       pingRequests += 1;
       await route.fulfill({
@@ -18,8 +23,17 @@ test.describe("browser speed-test runtime", () => {
 
     await page.goto("/");
 
-    await expect(page.locator("#networkIPv4")).toHaveText("198.51.100.42");
     await expect(page.locator("#idleState")).toBeVisible();
+    await expect(page.locator("#idleNetworkIPv4")).toBeVisible();
+    await expect(page.locator("#idleNetworkIPv4")).toHaveText(
+      "198.51.100.42",
+    );
+    await expect(page.locator("#idleNetworkIPv6")).toHaveText("Not detected");
+    await expect(page.locator("#idleNetworkInfo")).toHaveAttribute(
+      "aria-busy",
+      "false",
+    );
+    await expect(page.locator("#serverInfo")).toContainText("Ready");
     expect(pingRequests).toBeGreaterThan(0);
   });
 
@@ -93,6 +107,36 @@ test.describe("browser speed-test runtime", () => {
     await expect(page.locator("#errorMessage")).toContainText(
       /worker boot failed|worker failed/i,
     );
+    await expect(page.locator("#idleState")).toBeVisible();
+    await expect(page.locator("#startBtn")).toBeFocused();
+  });
+
+  test("cancel terminates an active worker download", async ({ page }) => {
+    await page.addInitScript(() => {
+      const OriginalWorker = globalThis.Worker;
+      globalThis.__openbyteWorkerTerminated = false;
+      globalThis.Worker = class TrackedWorker extends OriginalWorker {
+        terminate() {
+          globalThis.__openbyteWorkerTerminated = true;
+          super.terminate();
+        }
+      };
+    });
+    await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
+
+    const downloadStarted = page.waitForRequest((request) =>
+      request.url().includes("/api/v1/download?"),
+    );
+    await page.locator("#startBtn").click();
+    await downloadStarted;
+
+    await page.locator("#cancelBtn").click();
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => globalThis.__openbyteWorkerTerminated),
+      )
+      .toBe(true);
     await expect(page.locator("#idleState")).toBeVisible();
     await expect(page.locator("#startBtn")).toBeFocused();
   });

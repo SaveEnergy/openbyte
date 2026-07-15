@@ -33,6 +33,7 @@
     />
     <link rel="stylesheet" href="base.css" />
     <link rel="stylesheet" href="speed.css" />
+    <link rel="stylesheet" href="results.css" />
     <link rel="stylesheet" href="toast.css" />
     <link rel="stylesheet" href="motion.css" />
   </head>
@@ -59,6 +60,28 @@
             <span class="start-btn-text">GO</span>
             <span class="start-btn-hint">Click to test your speed</span>
           </button>
+          <section class="public-ip" aria-labelledby="publicIpTitle">
+            <h2 class="public-ip-title" id="publicIpTitle">Your public IP</h2>
+            <dl
+              class="public-ip-grid"
+              id="idleNetworkInfo"
+              aria-live="polite"
+              aria-busy="true"
+            >
+              <div class="public-ip-item">
+                <dt class="public-ip-label">IPv4</dt>
+                <dd class="public-ip-value" id="idleNetworkIPv4">
+                  Detecting…
+                </dd>
+              </div>
+              <div class="public-ip-item">
+                <dt class="public-ip-label">IPv6</dt>
+                <dd class="public-ip-value" id="idleNetworkIPv6">
+                  Detecting…
+                </dd>
+              </div>
+            </dl>
+          </section>
         </section>
 
         <!-- Testing State: Speed Counter -->
@@ -129,7 +152,7 @@
           </div>
           <div class="results-details">
             <div class="detail-section">
-              <h3 class="detail-title">Network Information</h3>
+              <h3 class="detail-title">Test public IP</h3>
               <div class="detail-grid">
                 <div class="detail-item">
                   <span class="detail-label">IPv4</span>
