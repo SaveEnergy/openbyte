@@ -33,6 +33,40 @@ The overlay terminates TLS, forwards requests without a buffering middleware,
 and defaults the openByte router to the measured-faster `openbyte-h1@file` ALPN policy. Set
 `TRAEFIK_TLS_OPTIONS=openbyte-h2@file` only for an intentional comparison.
 
+### Official container contract and upgrades
+
+The published image and bundled Compose service use one fixed internal
+contract: plain HTTP on `8080`, with persistent SQLite data at `/app/data`.
+The binary supplies the remaining defaults, and Compose forwards only
+explicitly configured server, branding, proxy, transfer-limit, and
+result-retention overrides. Change the public port through the host port
+mapping.
+
+Default `openbyte-data` volume users need no migration. If an existing custom
+deployment sets `DATA_DIR`, stop openByte before upgrading and retarget the same
+bind mount or named volume to `/app/data`; copy `results.db` plus any present
+`results.db-wal` and `results.db-shm` sidecars together. If the old directory
+was not mounted from the host, copy its contents from the stopped container
+before Compose recreates it, for example:
+
+```bash
+docker compose stop openbyte
+mkdir -p openbyte-data-backup
+docker cp openbyte:/old/data/path/. ./openbyte-data-backup/
+```
+
+Restore that complete directory into the bind mount or named volume mapped to
+`/app/data` before starting the new container, preserving or granting write
+access for the image's `openbyte` user.
+
+Direct TLS, its HTTP/2 policy, and loopback pprof remain binary features, not
+part of the bundled container contract. An existing custom direct-TLS overlay
+must now explicitly declare either `TLS_CERT_FILE` plus `TLS_KEY_FILE` or
+`TLS_AUTO_GEN`, optional `HTTP2_ENABLED`, any required certificate mounts, and
+an HTTPS-aware healthcheck. A custom pprof deployment must likewise declare its
+variables and exposure deliberately. The bare-metal settings below are
+unchanged.
+
 ## Visual branding
 
 The header logo and primary/secondary test colors can be supplied without

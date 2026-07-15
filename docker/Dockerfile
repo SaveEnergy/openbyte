@@ -45,12 +45,8 @@ VOLUME /app/data
 # Expose API + Web UI port
 EXPOSE 8080
 
-# Environment variables for server runtime
-ENV PORT=8080 \
-    BIND_ADDRESS=0.0.0.0 \
-    MAX_CONCURRENT_TRANSFERS=200 \
-    RATE_LIMIT_PER_IP=100 \
-    DATA_DIR=/app/data
+# Canonical persistence path for the official container.
+ENV DATA_DIR=/app/data
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \

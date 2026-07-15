@@ -63,7 +63,10 @@
 
 ### Build / CI / Deploy
 
-- Docker exposes only **8080** (HTTP API + UI).
+- The official image and bundled Compose expose plain HTTP only on internal
+  **8080** and persist at **`/app/data`**. The Dockerfile sets only that data
+  path; Compose forwards explicit optional overrides while Go owns defaults.
+  Direct TLS, HTTP/2 policy, and pprof remain binary/custom-deployment features.
 - **Recovery**: Actions → `ci` → Run workflow on `main` if stuck; or `git fetch` via HTTPS if SSH fails.
 - **`build-push` + `deploy`** on every `main` push or `main` workflow dispatch after `checks` (no path filtering—doc-only pushes still roll images). Dispatches from other refs run checks only. PR Playwright runs are gated by a plain `git diff` check inside `checks` (no third-party filter action).
 - CI builds/pushes `edge` + `sha`; release publishes semver + `latest` images and Linux/macOS amd64/arm64 tarballs.
