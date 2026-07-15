@@ -30,12 +30,12 @@ func (tb *trackingBody) Close() error {
 	return nil
 }
 
-func assertTrackingBodyDrained(t *testing.T, tb *trackingBody) {
+func assertTrackingBodyUntouched(t *testing.T, tb *trackingBody, wantBytes int) {
 	t.Helper()
-	if len(tb.data) != 0 {
-		t.Fatal("expected request body to be drained")
+	if len(tb.data) != wantBytes {
+		t.Fatalf("request body bytes = %d, want %d", len(tb.data), wantBytes)
 	}
-	if !tb.closed {
-		t.Fatal("expected request body to be closed")
+	if tb.closed {
+		t.Fatal("expected request body to remain open for the server")
 	}
 }

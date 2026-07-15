@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 
+	"github.com/saveenergy/openbyte/internal/httpbody"
 	"github.com/saveenergy/openbyte/internal/logging"
 	"github.com/saveenergy/openbyte/internal/results"
 )
@@ -45,7 +46,7 @@ type saveResultResponse struct {
 
 func (h *resultHandler) save(w http.ResponseWriter, r *http.Request) {
 	if contentType := r.Header.Get("Content-Type"); contentType != "" && !isJSONContentType(r) {
-		drainRequestBody(r)
+		httpbody.DrainAndClose(w, r)
 		respondResultError(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 		return
 	}
@@ -142,11 +143,11 @@ func decodeSingleObject(w http.ResponseWriter, r *http.Request, dst any, limit i
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(dst); err != nil {
-		_, _ = io.Copy(io.Discard, r.Body)
+		httpbody.DrainAndClose(w, r)
 		return err
 	}
 	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		_, _ = io.Copy(io.Discard, r.Body)
+		httpbody.DrainAndClose(w, r)
 		return errTrailingJSON
 	}
 	return nil
