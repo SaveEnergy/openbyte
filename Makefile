@@ -52,7 +52,7 @@ perf-bench:
 run:
 	@echo "Starting server..."
 	@echo "Port: $${PORT:-8080} (set PORT env var to change)"
-	@go run -ldflags "$(LDFLAGS)" ./cmd/openbyte server
+	@go run -ldflags "$(LDFLAGS)" ./cmd/openbyte
 
 
 # Docker
@@ -80,7 +80,7 @@ clean:
 
 perf-smoke: build
 	@echo "Starting server with pprof..."
-	@PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6060 PORT=8080 ./bin/openbyte server & echo $$! > /tmp/openbyte-perf.pid
+	@PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6060 PORT=8080 ./bin/openbyte & echo $$! > /tmp/openbyte-perf.pid
 	@sleep 2
 	@$(MAKE) perf-bench
 	@curl -sf "http://127.0.0.1:8080/api/v1/ping" >/dev/null

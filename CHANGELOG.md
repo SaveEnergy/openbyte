@@ -13,9 +13,6 @@ in Git history and pull requests, not release notes.
 
 ### Fixed
 
-- Removed the Go SDK's 60-second global HTTP timeout so long speed-test streams
-  use caller and operation contexts; health and the full latency phase are each
-  bounded to 10 seconds.
 - Required `MAX_TEST_DURATION` to be whole seconds of at least `1s`, and bounded
   an omitted download duration by the configured maximum.
 
@@ -41,9 +38,9 @@ in Git history and pull requests, not release notes.
 
 ### Removed
 
-- Removed the full `openbyte client`, its YAML configuration, terminal output
-  formats, Docker target, and CLI throughput harness. Use the browser, HTTP API,
-  Go SDK, or `openbyte check --json`.
+- Removed the CLI speed-test clients, Go SDK, diagnostics package, and shared
+  client transfer helpers. The `openbyte` binary now runs only the server; use
+  the browser or HTTP API for tests and automation.
 - Removed the compatibility-only `diagnostics` field from result creation;
   result sharing and persisted result fields are unchanged.
 - Removed unused `PUBLIC_HOST`, nonfunctional `LOG_LEVEL`, periodic runtime

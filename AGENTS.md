@@ -2,7 +2,7 @@
 
 ### Core Runtime
 
-- Single `openbyte` binary with `server` / `check` subcommands.
+- Single `openbyte` server binary; server configuration is environment-only.
 - Routing uses stdlib `net/http.ServeMux` (`METHOD /path/{param}` + `r.PathValue`).
 - Web assets are embedded (`//go:embed`) with optional `WEB_ROOT` override for development.
 - Runtime is HTTP-only: no MCP server, registry, server selector, downloads page, TCP/UDP data ports, `/api/v1/stream/*`, or websocket metrics feed.
@@ -17,7 +17,7 @@
 ### Reliability & Concurrency
 
 - Request bodies are drained only within strict byte/time bounds; unexpected bodyless-route bodies and incomplete drains are aborted without sacrificing the HTTP/2 connection.
-- SDK/browser cancel paths propagate request contexts so aborts tear down transfer loops.
+- Browser cancel paths propagate request contexts so aborts tear down transfer loops.
 - Results store shutdown is explicit and idempotent enough for server lifecycle.
 - Upload/download handlers enforce bounded concurrency, per-IP slots, max duration, and safe body deadlines.
 
@@ -45,14 +45,12 @@
 
 ### Agent & API Surface
 
-- Agent integrations use the HTTP API / OpenAPI contract and Go SDK; the former `openbyte mcp` stdio server was removed pre-1.0.
+- Agent integrations use the HTTP API / OpenAPI contract; the former `openbyte mcp` stdio server was removed pre-1.0.
 - The former registry service/client/routes/config and web server selector were removed pre-1.0; use explicit URLs outside the app for multi-server comparisons.
-- The full CLI speed-test client was removed during alpha; use the browser UI, HTTP API, Go SDK, or `openbyte check`.
+- CLI speed-test clients and the Go SDK were removed during alpha; use the browser UI or HTTP API.
 - The server-side TCP/UDP stream stack, `/api/v1/stream/*`, websocket stream API, `cmd/loadtest`, and direct test ports were removed pre-1.0.
 - The unwired `internal/metrics` package, `pkg/types` RTT/NetworkInfo/CLI metric collectors, and the multi-server compose example were removed post-0.10.
-- Go SDK (`pkg/client`): `Check`, `SpeedTest`, `Diagnose`, `Healthy`; implementation split across `client.go` + `client_{check,speedtest,diagnose,health,measure}.go` (same exported API). The SDK uses stateless request/body handling from `internal/httptransfer`.
 - OpenAPI spec lives at `api/openapi.yaml`; CI/release lint it.
-- `openbyte check --json` supports schema versioning and structured error contracts.
 
 ### Build / CI / Deploy
 
@@ -84,8 +82,8 @@
 
 ## Verification baseline
 
-- `go test ./cmd/check ./cmd/server ./cmd/openbyte`
-- `go test ./test/unit/api ./test/unit/client ./test/unit/results`
+- `go test ./cmd/server ./cmd/openbyte`
+- `go test ./test/unit/api ./test/unit/results`
 - `go test ./internal/results`
 - `bun run lint:openapi`
 - UI E2E: `PLAYWRIGHT_WORKERS=1 bunx playwright test test/e2e/ui/basic.spec.js`
@@ -113,7 +111,7 @@
 ### Running the server (development)
 
 ```bash
-make build && WEB_ROOT=./web ./bin/openbyte server
+make build && WEB_ROOT=./web ./bin/openbyte
 ```
 
 - `WEB_ROOT=./web` serves static files from disk instead of the embedded copy, enabling live edits without rebuilding.
@@ -125,7 +123,7 @@ make build && WEB_ROOT=./web ./bin/openbyte server
 | Task                | Command                                                |
 | ------------------- | ------------------------------------------------------ |
 | Build               | `make build`                                           |
-| Run server (dev)    | `make run` (or `WEB_ROOT=./web ./bin/openbyte server`) |
+| Run server (dev)    | `make run` (or `WEB_ROOT=./web ./bin/openbyte`)        |
 | Lint (Go)           | `make ci-lint`                                         |
 | Lint (OpenAPI)      | `bun run lint:openapi`                                 |
 | Short Go suite      | `go test ./... -short`                                 |
@@ -140,4 +138,3 @@ make build && WEB_ROOT=./web ./bin/openbyte server
 - No CGO required; SQLite uses `modernc.org/sqlite` (pure Go).
 - No external databases or services needed to run locally.
 - New web assets matching `web/embed.go` are served automatically; `WEB_ROOT` remains restricted to those embedded paths.
-- `openbyte check` needs a full URL scheme: `./bin/openbyte check http://localhost:8080`, not just `localhost`.

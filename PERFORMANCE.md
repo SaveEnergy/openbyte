@@ -17,7 +17,7 @@ predicates and has no pretend regression gate without a maintained baseline.
 
 ```bash
 make build
-PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6060 ./bin/openbyte server
+PPROF_ENABLED=true PPROF_ADDR=127.0.0.1:6060 ./bin/openbyte
 curl -sf http://127.0.0.1:8080/api/v1/ping
 curl -s "http://127.0.0.1:6060/debug/pprof/profile?seconds=10" -o /tmp/openbyte-cpu.pprof
 go tool pprof /tmp/openbyte-cpu.pprof
