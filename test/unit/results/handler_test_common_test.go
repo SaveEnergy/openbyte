@@ -6,6 +6,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"time"
+
+	"github.com/saveenergy/openbyte/internal/api"
+	"github.com/saveenergy/openbyte/internal/config"
+	"github.com/saveenergy/openbyte/internal/results"
 )
 
 type failingResponseWriter struct {
@@ -96,4 +100,8 @@ func (tb *trackingBody) Read(p []byte) (int, error) {
 func (tb *trackingBody) Close() error {
 	tb.closed = true
 	return nil
+}
+
+func newResultsAPI(store *results.Store) http.Handler {
+	return api.NewRouter(config.DefaultConfig(), "test", store).SetupRoutes()
 }

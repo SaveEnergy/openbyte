@@ -16,8 +16,7 @@ import (
 )
 
 func TestRouterDoesNotWaitForUnexpectedSlowGETBody(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, config.DefaultConfig())
+	router := api.NewRouter(config.DefaultConfig(), "", nil)
 	got := requestWithOpenChunkedBody(t, router.SetupRoutes(), http.MethodGet, versionAPIPath)
 
 	if got.status != http.StatusOK {

@@ -12,15 +12,12 @@ import (
 )
 
 func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, config.DefaultConfig())
-
 	store, err := results.New(t.TempDir()+resultsDBPath, 10)
 	if err != nil {
 		t.Fatalf(resultsNewErrFmt, err)
 	}
 	defer store.Close()
-	router.SetResultsHandler(results.NewHandler(store))
+	router := api.NewRouter(config.DefaultConfig(), "", store)
 
 	h := router.SetupRoutes()
 
@@ -41,15 +38,12 @@ func TestResultsPageServesNoStoreWhenResultsHandlerEnabled(t *testing.T) {
 }
 
 func TestResultsPageRouteRejectsInvalidID(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, config.DefaultConfig())
-
 	store, err := results.New(t.TempDir()+resultsDBPath, 10)
 	if err != nil {
 		t.Fatalf(resultsNewErrFmt, err)
 	}
 	defer store.Close()
-	router.SetResultsHandler(results.NewHandler(store))
+	router := api.NewRouter(config.DefaultConfig(), "", store)
 
 	h := router.SetupRoutes()
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/results/not-valid-id", nil)
@@ -62,8 +56,7 @@ func TestResultsPageRouteRejectsInvalidID(t *testing.T) {
 }
 
 func TestUnknownAPIRouteReturnsJSONNotFound(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, config.DefaultConfig())
+	router := api.NewRouter(config.DefaultConfig(), "", nil)
 	h := router.SetupRoutes()
 
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+apiUnknownPath, nil)
@@ -83,19 +76,15 @@ func TestUnknownAPIRouteReturnsJSONNotFound(t *testing.T) {
 }
 
 func TestResultsPageRouteRateLimited(t *testing.T) {
-	handler := api.NewHandler()
 	cfg := config.DefaultConfig()
 	cfg.GlobalRateLimit = 1
 	cfg.RateLimitPerIP = 1
-	router := api.NewRouter(handler, cfg)
-	router.SetRateLimiter(cfg)
-
 	store, err := results.New(t.TempDir()+resultsDBPath, 10)
 	if err != nil {
 		t.Fatalf(resultsNewErrFmt, err)
 	}
 	defer store.Close()
-	router.SetResultsHandler(results.NewHandler(store))
+	router := api.NewRouter(cfg, "", store)
 	h := router.SetupRoutes()
 
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+resultsPagePath, nil)

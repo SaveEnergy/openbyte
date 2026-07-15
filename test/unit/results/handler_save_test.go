@@ -26,7 +26,7 @@ func TestSaveReturnsInternalErrorWhenStoreFails(t *testing.T) {
 	// Force save path to fail by closing DB before handler call.
 	store.Close()
 
-	h := results.NewHandler(store)
+	h := newResultsAPI(store)
 
 	body := sampleResultPayload
 
@@ -34,7 +34,7 @@ func TestSaveReturnsInternalErrorWhenStoreFails(t *testing.T) {
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 
-	h.Save(rec, req)
+	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusInternalServerError)
@@ -60,12 +60,12 @@ func TestSaveSucceedsReturns201WithIDAndURL(t *testing.T) {
 	}
 	defer store.Close()
 
-	h := results.NewHandler(store)
+	h := newResultsAPI(store)
 	body := sampleResultPayload
 	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
-	h.Save(rec, req)
+	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusCreated)
@@ -96,7 +96,7 @@ func TestHandlerSaveRejectsWrongContentTypeDrainsBody(t *testing.T) {
 	}
 	defer store.Close()
 
-	h := results.NewHandler(store)
+	h := newResultsAPI(store)
 	tb := &trackingBody{data: []byte(`{"download_mbps":1}`)}
 	req := httptest.NewRequest(http.MethodPost, resultsPath, nil)
 	req.Body = tb
@@ -104,7 +104,7 @@ func TestHandlerSaveRejectsWrongContentTypeDrainsBody(t *testing.T) {
 	req.Header.Set(contentTypeHeader, plainTextType)
 	rec := newDeadlineRecorder()
 
-	h.Save(rec, req)
+	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusUnsupportedMediaType {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusUnsupportedMediaType)
@@ -129,12 +129,12 @@ func TestSaveWithWriteFailureStillSetsCreatedStatus(t *testing.T) {
 	}
 	defer store.Close()
 
-	h := results.NewHandler(store)
+	h := newResultsAPI(store)
 	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(sampleResultPayload))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	fw := &failingResponseWriter{}
 
-	h.Save(fw, req)
+	h.ServeHTTP(fw, req)
 	if fw.status != http.StatusCreated {
 		t.Fatalf(statusCodeWantFmt, fw.status, http.StatusCreated)
 	}
@@ -152,7 +152,7 @@ func TestHandlerSaveBodyTooLarge(t *testing.T) {
 	}
 	defer store.Close()
 
-	h := results.NewHandler(store)
+	h := newResultsAPI(store)
 	large := strings.Repeat("x", 5000)
 	body := `{"download_mbps":1,"upload_mbps":1,"latency_ms":1,"jitter_ms":1,"loaded_latency_ms":1,"bufferbloat_grade":"A","ipv4":"203.0.113.10","ipv6":"","server_name":"` + large + `"}`
 
@@ -160,7 +160,7 @@ func TestHandlerSaveBodyTooLarge(t *testing.T) {
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
 
-	h.Save(rec, req)
+	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusRequestEntityTooLarge)
@@ -183,7 +183,7 @@ func TestSaveAcceptsOptionalDiagnostics(t *testing.T) {
 	}
 	defer store.Close()
 
-	h := results.NewHandler(store)
+	h := newResultsAPI(store)
 	body := `{
 		"download_mbps": 100,
 		"upload_mbps": 50,
@@ -199,7 +199,7 @@ func TestSaveAcceptsOptionalDiagnostics(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
-	h.Save(rec, req)
+	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusCreated)
@@ -215,7 +215,7 @@ func TestHandlerSaveRejectsUnknownFields(t *testing.T) {
 	}
 	defer store.Close()
 
-	h := results.NewHandler(store)
+	h := newResultsAPI(store)
 	body := `{
 		"download_mbps": 100,
 		"upload_mbps": 50,
@@ -232,7 +232,7 @@ func TestHandlerSaveRejectsUnknownFields(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(body))
 	req.Header.Set(contentTypeHeader, applicationJSON)
 	rec := httptest.NewRecorder()
-	h.Save(rec, req)
+	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusBadRequest)

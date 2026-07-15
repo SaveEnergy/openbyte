@@ -84,8 +84,6 @@ Copy `docker/docker-compose.ghcr.yaml`, `docker/docker-compose.ghcr.traefik.yaml
 ```bash
 SERVER_NAME="Frankfurt 10G"
 ALLOWED_ORIGINS="https://speedtest.example.com"
-TRUST_PROXY_HEADERS=true
-TRUSTED_PROXY_CIDRS="10.0.0.0/8,192.168.0.0/16"
 ```
 
 Then, GH Actions can SSH in and run:
@@ -95,7 +93,7 @@ docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.
 docker compose -f docker/docker-compose.ghcr.yaml -f docker/docker-compose.ghcr.traefik.yaml up -d
 ```
 
-CI deploy path is Traefik-based (the workflow syncs and uses both compose files). Ensure the external `traefik` network exists on the server.
+CI deploy path is Traefik-based (the workflow syncs and uses both compose files). It creates the external `traefik` network when needed and injects its exact IPAM subnet into openByte's trusted-proxy configuration.
 
 Workflow behavior details (important for on-call):
 
@@ -212,8 +210,8 @@ sudo systemctl status openbyte
 # Health check
 curl http://localhost:8080/health
 
-# Test from client
-./bin/openbyte client -d download -t 10 https://speedtest.example.com
+# Verify the public endpoint
+./bin/openbyte check --json https://speedtest.example.com
 ```
 
 ## Reverse Proxy (Nginx)
@@ -284,7 +282,7 @@ TRAEFIK_HOST=speedtest.example.com \
   docker compose -f docker-compose.yaml -f docker-compose.traefik.yaml up -d
 ```
 
-The GHCR overlay declares `traefik` as an external network; create it before a manual GHCR deployment. CI and release deployments create it automatically. When running behind Traefik, set `TRUST_PROXY_HEADERS=true` and set `TRUSTED_PROXY_CIDRS` to the Traefik network subnet:
+The GHCR overlay declares `traefik` as an external network; create it before a manual GHCR deployment. CI and release deployments create it and trust its exact subnet automatically. For a manual Traefik deployment, set `TRUST_PROXY_HEADERS=true` and set `TRUSTED_PROXY_CIDRS` to the inspected subnet rather than a blanket private range:
 
 ```bash
 docker network inspect traefik --format '{{ (index .IPAM.Config 0).Subnet }}'

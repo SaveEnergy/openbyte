@@ -11,8 +11,7 @@ import (
 )
 
 func TestStaticHTMLUsesNoStoreCacheControl(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, config.DefaultConfig())
+	router := api.NewRouter(config.DefaultConfig(), "", nil)
 
 	h := router.SetupRoutes()
 
@@ -34,8 +33,7 @@ func TestStaticHTMLUsesNoStoreCacheControl(t *testing.T) {
 }
 
 func TestStaticJSDoesNotForceNoStore(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, config.DefaultConfig())
+	router := api.NewRouter(config.DefaultConfig(), "", nil)
 
 	h := router.SetupRoutes()
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/openbyte.js", nil)
@@ -79,12 +77,10 @@ func TestSecurityHeadersMiddlewareSetsCSP(t *testing.T) {
 }
 
 func TestRateLimitSkipPaths(t *testing.T) {
-	handler := api.NewHandler()
 	cfg := config.DefaultConfig()
 	cfg.GlobalRateLimit = 1
 	cfg.RateLimitPerIP = 1
-	router := api.NewRouter(handler, cfg)
-	router.SetRateLimiter(cfg)
+	router := api.NewRouter(cfg, "", nil)
 	h := router.SetupRoutes()
 
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+versionAPIPath, nil)
@@ -101,7 +97,7 @@ func TestRateLimitSkipPaths(t *testing.T) {
 		t.Fatal(routerPingBypassErr)
 	}
 
-	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+downloadAPIPath, nil)
+	req = httptest.NewRequest(http.MethodGet, exampleBaseURL+downloadAPIPath+"?duration=0", nil)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code == http.StatusTooManyRequests {

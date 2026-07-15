@@ -42,9 +42,9 @@ func mustStringField(t *testing.T, m map[string]any, key string) string {
 }
 
 func TestCORSAllowedOrigin(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, testConfig())
-	router.SetAllowedOrigins([]string{integrationOrigin})
+	cfg := testConfig()
+	cfg.AllowedOrigins = []string{integrationOrigin}
+	router := api.NewRouter(cfg, "", nil)
 
 	req := httptest.NewRequest(integrationGetMethod, "/health", nil)
 	req.Header.Set("Origin", integrationOrigin)
@@ -58,9 +58,9 @@ func TestCORSAllowedOrigin(t *testing.T) {
 }
 
 func TestCORSBlockedOrigin(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, testConfig())
-	router.SetAllowedOrigins([]string{integrationOrigin})
+	cfg := testConfig()
+	cfg.AllowedOrigins = []string{integrationOrigin}
+	router := api.NewRouter(cfg, "", nil)
 
 	req := httptest.NewRequest(integrationOptionsVerb, "/health", nil)
 	req.Header.Set("Origin", "https://evil.example")
@@ -74,15 +74,12 @@ func TestCORSBlockedOrigin(t *testing.T) {
 }
 
 func TestAPIResultsSaveAndGet(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, testConfig())
-
 	store, err := results.New(t.TempDir()+resultsDBSuffix, 100)
 	if err != nil {
 		t.Fatalf("results.New: %v", err)
 	}
 	defer store.Close()
-	router.SetResultsHandler(results.NewHandler(store))
+	router := api.NewRouter(testConfig(), "", store)
 
 	h := router.SetupRoutes()
 
