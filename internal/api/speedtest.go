@@ -2,7 +2,6 @@ package api
 
 import (
 	"crypto/rand"
-	"log/slog"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -18,7 +17,6 @@ type SpeedTestHandler struct {
 	clientIPResolver   *ClientIPResolver
 	randomData         []byte
 	uploadBufPool      sync.Pool
-	fallbackRandomPool sync.Pool
 	ipMu               sync.Mutex
 	activeByIP         map[string]*speedtestIPCounts
 }
@@ -56,7 +54,6 @@ func NewSpeedTestHandlerWithPolicy(maxConcurrent, maxDurationSec, maxConcurrentP
 	if resolver == nil {
 		resolver = NewClientIPResolver(nil)
 	}
-	const fallbackRandomSize = 64 * 1024
 	handler := &SpeedTestHandler{
 		maxConcurrent:      int64(maxConcurrent),
 		maxConcurrentPerIP: maxConcurrentPerIP,
@@ -67,14 +64,8 @@ func NewSpeedTestHandlerWithPolicy(maxConcurrent, maxDurationSec, maxConcurrentP
 		uploadBufPool: sync.Pool{
 			New: func() any { return newUploadBuffer() },
 		},
-		fallbackRandomPool: sync.Pool{
-			New: func() any { return newSpeedtestBuffer(fallbackRandomSize) },
-		},
 	}
-	if _, err := rand.Read(handler.randomData); err != nil {
-		slog.Warn("speedtest: random data init failed, using per-request random", "error", err)
-		handler.randomData = nil
-	}
+	rand.Read(handler.randomData)
 	return handler
 }
 

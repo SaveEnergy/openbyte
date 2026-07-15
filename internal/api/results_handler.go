@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"math"
 	"net/http"
 
 	"github.com/saveenergy/openbyte/internal/httpbody"
@@ -68,10 +67,6 @@ func (h *resultHandler) save(w http.ResponseWriter, r *http.Request) {
 	if req.DownloadMbps < 0 || req.UploadMbps < 0 || req.LatencyMs < 0 ||
 		req.JitterMs < 0 || req.LoadedLatencyMs < 0 {
 		respondResultError(w, "numeric fields must be >= 0", http.StatusBadRequest)
-		return
-	}
-	if hasNonFinite(req.DownloadMbps, req.UploadMbps, req.LatencyMs, req.JitterMs, req.LoadedLatencyMs) {
-		respondResultError(w, "numeric fields must be finite", http.StatusBadRequest)
 		return
 	}
 	if req.DownloadMbps > 100000 || req.UploadMbps > 100000 ||
@@ -182,13 +177,4 @@ func mapSaveStoreError(err error) (string, int) {
 		return "store temporarily unavailable", http.StatusServiceUnavailable
 	}
 	return "failed to save result", http.StatusInternalServerError
-}
-
-func hasNonFinite(values ...float64) bool {
-	for _, value := range values {
-		if math.IsNaN(value) || math.IsInf(value, 0) {
-			return true
-		}
-	}
-	return false
 }

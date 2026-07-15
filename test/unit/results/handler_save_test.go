@@ -97,26 +97,30 @@ func TestHandlerSaveRejectsWrongContentTypeDrainsBody(t *testing.T) {
 	defer store.Close()
 
 	h := newResultsAPI(store)
-	tb := &trackingBody{data: []byte(`{"download_mbps":1}`)}
-	req := httptest.NewRequest(http.MethodPost, resultsPath, nil)
-	req.Body = tb
-	req.ContentLength = int64(len(tb.data))
-	req.Header.Set(contentTypeHeader, plainTextType)
-	rec := newDeadlineRecorder()
+	for _, contentType := range []string{plainTextType, "application/jsonp"} {
+		t.Run(contentType, func(t *testing.T) {
+			tb := &trackingBody{data: []byte(`{"download_mbps":1}`)}
+			req := httptest.NewRequest(http.MethodPost, resultsPath, nil)
+			req.Body = tb
+			req.ContentLength = int64(len(tb.data))
+			req.Header.Set(contentTypeHeader, contentType)
+			rec := newDeadlineRecorder()
 
-	h.ServeHTTP(rec, req)
+			h.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusUnsupportedMediaType {
-		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusUnsupportedMediaType)
-	}
-	if tb.reads == 0 {
-		t.Fatal("expected body to be drained")
-	}
-	if !tb.closed {
-		t.Fatal("expected body to be closed")
-	}
-	if len(rec.readDeadlines) != 2 || !rec.readDeadlines[1].IsZero() {
-		t.Fatalf("read deadlines = %v, want bounded drain then reset", rec.readDeadlines)
+			if rec.Code != http.StatusUnsupportedMediaType {
+				t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusUnsupportedMediaType)
+			}
+			if tb.reads == 0 {
+				t.Fatal("expected body to be drained")
+			}
+			if !tb.closed {
+				t.Fatal("expected body to be closed")
+			}
+			if len(rec.readDeadlines) != 2 || !rec.readDeadlines[1].IsZero() {
+				t.Fatalf("read deadlines = %v, want bounded drain then reset", rec.readDeadlines)
+			}
+		})
 	}
 }
 

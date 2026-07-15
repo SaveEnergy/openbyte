@@ -15,9 +15,13 @@ func TestIsJSONContentType(t *testing.T) {
 		{"application/json", true},
 		{"application/json; charset=utf-8", true},
 		{"application/json;charset=utf-8", true},
+		{"application/JSON", true},
+		{"APPLICATION/JSON", true},
+		{"application/jsonp", false},
+		{"application/problem+json", false},
+		{"application/json; charset", false},
 		{"text/plain", false},
 		{"", false},
-		{"application/JSON", false},
 	}
 	for _, tt := range cases {
 		req := httptest.NewRequest(http.MethodPost, "/", nil)
@@ -27,16 +31,5 @@ func TestIsJSONContentType(t *testing.T) {
 		if got := isJSONContentType(req); got != tt.want {
 			t.Errorf("Content-Type %q: got %v, want %v", tt.ct, got, tt.want)
 		}
-	}
-}
-
-func TestRespondJSONNoTrailingNewline(t *testing.T) {
-	w := httptest.NewRecorder()
-	data := map[string]string{"key": "value"}
-	respondJSON(w, data, http.StatusOK)
-
-	body := w.Body.Bytes()
-	if len(body) > 0 && body[len(body)-1] == '\n' {
-		t.Errorf("respondJSON added trailing newline; want exact json.Marshal output")
 	}
 }

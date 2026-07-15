@@ -1,34 +1,10 @@
 package api
 
 import (
-	"crypto/rand"
 	"errors"
 	"net/http"
 	"time"
 )
-
-// resolveRandomSource returns data source and release func. Call release when done.
-func (h *SpeedTestHandler) resolveRandomSource() ([]byte, func(), error) {
-	if len(h.randomData) != 0 {
-		return h.randomData, func() {
-			// Intentionally empty: shared randomData has no per-request cleanup.
-		}, nil
-	}
-	const fallbackSize = 64 * 1024
-	pooledPtr, ok := h.fallbackRandomPool.Get().(*[]byte)
-	if !ok || pooledPtr == nil || cap(*pooledPtr) < fallbackSize {
-		pooledPtr = newSpeedtestBuffer(fallbackSize)
-	}
-	pooled := (*pooledPtr)[:fallbackSize]
-	randomSource := pooled[:fallbackSize]
-	if _, err := rand.Read(randomSource); err != nil {
-		h.fallbackRandomPool.Put(pooledPtr)
-		return nil, nil, err
-	}
-	return randomSource, func() {
-		h.fallbackRandomPool.Put(pooledPtr)
-	}, nil
-}
 
 func streamDownload(w http.ResponseWriter, r *http.Request, randomSource []byte, chunkSize int, duration time.Duration) {
 	flusher, canFlush := w.(http.Flusher)

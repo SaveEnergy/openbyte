@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -28,13 +29,21 @@ func TestSpeedTestUploadReportsBytes(t *testing.T) {
 	}
 
 	var resp struct {
-		Bytes int64 `json:"bytes"`
+		Bytes          int64   `json:"bytes"`
+		DurationMS     int64   `json:"duration_ms"`
+		ThroughputMbps float64 `json:"throughput_mbps"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf(speedtestDecodeRespFmt, err)
 	}
 	if resp.Bytes != int64(len(payload)) {
 		t.Fatalf("bytes = %d, want %d", resp.Bytes, len(payload))
+	}
+	if resp.DurationMS < 0 {
+		t.Fatalf("duration_ms = %d, want >= 0", resp.DurationMS)
+	}
+	if resp.ThroughputMbps <= 0 || math.IsNaN(resp.ThroughputMbps) || math.IsInf(resp.ThroughputMbps, 0) {
+		t.Fatalf("throughput_mbps = %v, want finite positive value", resp.ThroughputMbps)
 	}
 }
 
