@@ -288,7 +288,7 @@ components:
       additionalProperties: false
       description: |
         Single JSON object. Body max 4096 bytes.
-        Unknown fields are rejected. Optional diagnostics metadata is accepted but not persisted.
+        Unknown fields are rejected.
         Validation: numeric fields >= 0 and finite; download_mbps/upload_mbps <= 100000;
         latency_ms/jitter_ms/loaded_latency_ms <= 60000; server_name <= 200 UTF-8 bytes;
         ipv4/ipv6 <= 45 UTF-8 bytes; bufferbloat_grade <= 5 UTF-8 bytes.
@@ -325,9 +325,6 @@ components:
         server_name:
           type: string
           description: Maximum 200 UTF-8 bytes.
-        diagnostics:
-          description: Optional client diagnostic metadata; accepted for compatibility but not persisted or returned.
-
     SaveResultResponse:
       type: object
       properties:

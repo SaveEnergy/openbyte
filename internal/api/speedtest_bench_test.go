@@ -27,20 +27,6 @@ func BenchmarkWriteChunkFromSource(b *testing.B) {
 	}
 }
 
-// BenchmarkParseDownloadParams measures query parsing for GET /download (typical UI query string).
-func BenchmarkParseDownloadParams(b *testing.B) {
-	req := httptest.NewRequest("GET", "/api/v1/download?duration=60&chunk=1048576", nil)
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		_, _, err := parseDownloadParams(req, 300)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-}
-
 // BenchmarkReadUploadBody drains a fixed-size body through the speedtest upload read loop (buffer pool + Read).
 func BenchmarkReadUploadBody(b *testing.B) {
 	const bodySize = 4 * 1024 * 1024

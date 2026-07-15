@@ -33,14 +33,11 @@ func (c *Client) SpeedTest(ctx context.Context, opts SpeedTestOptions) (*SpeedTe
 		return nil, err
 	}
 
-	testCtx, cancel := context.WithTimeout(ctx, time.Duration(opts.Duration+15)*time.Second)
-	defer cancel()
-
-	if err := c.healthCheck(testCtx); err != nil {
+	if err := c.healthCheck(ctx); err != nil {
 		return nil, err
 	}
 
-	avgLatency, jitter, latencyOK := c.measureLatency(testCtx, 5)
+	avgLatency, jitter, latencyOK := c.measureLatency(ctx, 5)
 	if !latencyOK {
 		return nil, ErrLatencyMeasurementFailed
 	}
@@ -49,7 +46,7 @@ func (c *Client) SpeedTest(ctx context.Context, opts SpeedTestOptions) (*SpeedTe
 	var throughput float64
 	var totalBytes int64
 
-	throughput, totalBytes, throughputOK := c.measureThroughput(testCtx, opts)
+	throughput, totalBytes, throughputOK := c.measureThroughput(ctx, opts)
 	if !throughputOK {
 		if opts.Direction == directionDownload {
 			return nil, ErrDownloadMeasurementFailed

@@ -5,8 +5,6 @@ WORKDIR /app
 
 # Build metadata
 ARG VERSION=dev
-ARG COMMIT=unknown
-ARG BUILD_DATE=unknown
 
 # Install build dependencies
 RUN apk add --no-cache git
@@ -51,7 +49,6 @@ EXPOSE 8080
 # Environment variables for server runtime
 ENV PORT=8080 \
     BIND_ADDRESS=0.0.0.0 \
-    PUBLIC_HOST="" \
     CAPACITY_GBPS=25 \
     RATE_LIMIT_PER_IP=100 \
     DATA_DIR=/app/data
@@ -61,20 +58,3 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD wget -q --spider http://localhost:8080/health || exit 1
 
 ENTRYPOINT ["/app/openbyte", "server"]
-
-# Client image
-FROM alpine:3.24 AS client
-
-RUN apk add --no-cache ca-certificates tzdata
-
-WORKDIR /app
-
-# Copy openbyte binary
-COPY --from=builder-openbyte /openbyte /app/openbyte
-
-# Create non-root user
-RUN adduser -D -H -s /sbin/nologin openbyte
-USER openbyte
-
-ENTRYPOINT ["/app/openbyte", "client"]
-CMD ["--help"]

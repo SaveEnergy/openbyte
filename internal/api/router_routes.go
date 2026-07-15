@@ -2,29 +2,18 @@ package api
 
 import "net/http"
 
-func (r *Router) newV1Registrar(mux *http.ServeMux) func(method, route string, handler http.HandlerFunc) {
+func (r *Router) newRateLimitedV1Registrar(mux *http.ServeMux) func(method, route string, handler http.HandlerFunc) {
 	return func(method, route string, handler http.HandlerFunc) {
-		h := handler
-		if r.limiter != nil {
-			h = applyRateLimit(r.limiter, h)
-		}
-		mux.HandleFunc(method+" "+apiV1Prefix+route, h)
+		mux.HandleFunc(method+" "+apiV1Prefix+route, applyRateLimit(r.limiter, handler))
 	}
-}
-
-func (r *Router) registerCoreV1Routes(v1 func(method, route string, handler http.HandlerFunc)) {
-	v1("GET", "/version", r.handler.GetVersion)
-	v1("GET", "/download", r.speedtest.Download)
-	v1("POST", "/upload", r.speedtest.Upload)
-	v1("GET", "/ping", r.speedtest.Ping)
 }
 
 func (r *Router) registerResultsAPIRoutes(v1 func(method, route string, handler http.HandlerFunc)) {
 	if r.resultsHandler == nil {
 		return
 	}
-	v1("POST", "/results", r.resultsHandler.Save)
-	v1("GET", "/results/{id}", r.resultsHandler.Get)
+	v1("POST", "/results", r.resultsHandler.save)
+	v1("GET", "/results/{id}", r.resultsHandler.get)
 }
 
 func (r *Router) registerResultsPageRoute(mux *http.ServeMux, webFS http.FileSystem) {
@@ -32,7 +21,7 @@ func (r *Router) registerResultsPageRoute(mux *http.ServeMux, webFS http.FileSys
 		return
 	}
 	resultsPageHandler := func(w http.ResponseWriter, req *http.Request) {
-		if !validResultID.MatchString(req.PathValue("id")) {
+		if !validResultID(req.PathValue("id")) {
 			http.NotFound(w, req)
 			return
 		}
@@ -57,8 +46,8 @@ func (r *Router) registerResultsPageRoute(mux *http.ServeMux, webFS http.FileSys
 }
 
 func (r *Router) wrapMiddlewares(handler http.Handler) http.Handler {
-	handler = DeadlineMiddleware(handler)
 	handler = r.CORSMiddleware(handler)
+	handler = rejectBodylessRequestBodies(handler)
 	handler = SecurityHeadersMiddleware(handler)
 	handler = r.LoggingMiddleware(handler)
 	return handler

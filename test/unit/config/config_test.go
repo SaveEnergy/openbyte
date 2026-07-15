@@ -39,11 +39,27 @@ func TestConfigValidateMaxTestDuration(t *testing.T) {
 }
 
 func TestConfigLoadRejectsFractionalMaxTestDuration(t *testing.T) {
-	t.Setenv("MAX_TEST_DURATION", "500ms")
+	for _, raw := range []string{"500ms", "1500ms"} {
+		t.Run(raw, func(t *testing.T) {
+			t.Setenv("MAX_TEST_DURATION", raw)
+
+			cfg := config.DefaultConfig()
+			if err := cfg.LoadFromEnv(); err == nil {
+				t.Fatalf("expected MAX_TEST_DURATION=%s to be rejected", raw)
+			}
+		})
+	}
+}
+
+func TestConfigLoadAcceptsWholeSecondMaxTestDuration(t *testing.T) {
+	t.Setenv("MAX_TEST_DURATION", "2s")
 
 	cfg := config.DefaultConfig()
-	if err := cfg.LoadFromEnv(); err == nil {
-		t.Fatal("expected fractional MAX_TEST_DURATION to be rejected")
+	if err := cfg.LoadFromEnv(); err != nil {
+		t.Fatalf("load MAX_TEST_DURATION: %v", err)
+	}
+	if cfg.MaxTestDuration != 2*time.Second {
+		t.Fatalf("max test duration = %v, want 2s", cfg.MaxTestDuration)
 	}
 }
 

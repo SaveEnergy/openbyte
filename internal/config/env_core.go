@@ -12,8 +12,8 @@ func (c *Config) loadCoreEnv() error {
 	if err := c.loadCoreEnvPortsAndBind(); err != nil {
 		return err
 	}
-	if err := c.loadCoreEnvPublicHost(); err != nil {
-		return err
+	if name := strings.TrimSpace(os.Getenv("SERVER_NAME")); name != "" {
+		c.ServerName = name
 	}
 	return c.loadCoreEnvCapacityAndLimits()
 }
@@ -27,16 +27,6 @@ func (c *Config) loadCoreEnvPortsAndBind() error {
 	}
 	if addr := os.Getenv("BIND_ADDRESS"); addr != "" {
 		c.BindAddress = addr
-	}
-	return nil
-}
-
-func (c *Config) loadCoreEnvPublicHost() error {
-	if host := os.Getenv("PUBLIC_HOST"); host != "" {
-		c.PublicHost = host
-	}
-	if name := strings.TrimSpace(os.Getenv("SERVER_NAME")); name != "" {
-		c.ServerName = name
 	}
 	return nil
 }

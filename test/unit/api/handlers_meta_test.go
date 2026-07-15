@@ -13,15 +13,13 @@ import (
 const versionEndpoint = "/api/v1/version"
 
 func TestGetVersion(t *testing.T) {
-	handler := api.NewHandler()
-	handler.SetVersion("1.2.3")
 	cfg := config.DefaultConfig()
 	cfg.ServerName = "Frankfurt 10G"
-	handler.SetConfig(cfg)
+	handler := api.NewRouter(cfg, "1.2.3", nil).SetupRoutes()
 
 	req := httptest.NewRequest(http.MethodGet, versionEndpoint, nil)
 	rec := httptest.NewRecorder()
-	handler.GetVersion(rec, req)
+	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
@@ -40,11 +38,11 @@ func TestGetVersion(t *testing.T) {
 }
 
 func TestGetVersionDefault(t *testing.T) {
-	handler := api.NewHandler()
+	handler := api.NewRouter(config.DefaultConfig(), "", nil).SetupRoutes()
 
 	req := httptest.NewRequest(http.MethodGet, versionEndpoint, nil)
 	rec := httptest.NewRecorder()
-	handler.GetVersion(rec, req)
+	handler.ServeHTTP(rec, req)
 
 	var resp api.VersionResponse
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
@@ -58,17 +56,18 @@ func TestGetVersionDefault(t *testing.T) {
 	}
 }
 
-func TestGetVersionDrainsUnexpectedBody(t *testing.T) {
-	handler := api.NewHandler()
-	tb := &trackingBody{data: []byte(`{"unexpected":"payload"}`)}
+func TestGetVersionDoesNotReadUnexpectedBody(t *testing.T) {
+	handler := api.NewRouter(config.DefaultConfig(), "", nil).SetupRoutes()
+	payload := []byte(`{"unexpected":"payload"}`)
+	tb := &trackingBody{data: payload}
 
 	req := httptest.NewRequest(http.MethodGet, versionEndpoint, nil)
 	req.Body = tb
 	rec := httptest.NewRecorder()
-	handler.GetVersion(rec, req)
+	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
 	}
-	assertTrackingBodyDrained(t, tb)
+	assertTrackingBodyUntouched(t, tb, len(payload))
 }

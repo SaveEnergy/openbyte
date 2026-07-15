@@ -73,7 +73,7 @@ func TestNewRouterDoesNotBroadenFractionalDurationLimit(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.MaxTestDuration = 500 * time.Millisecond
 
-	router := NewRouter(NewHandler(), cfg)
+	router := NewRouter(cfg, "test", nil)
 	if got := router.speedtest.maxDurationSec; got != 1 {
 		t.Fatalf("max duration seconds = %d, want safe 1-second fallback", got)
 	}

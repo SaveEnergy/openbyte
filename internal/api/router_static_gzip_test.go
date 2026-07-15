@@ -152,11 +152,12 @@ func TestStaticAssetHandlerGzipSemantics(t *testing.T) {
 func TestStaticAssetHandlerSkipsFontGzip(t *testing.T) {
 	t.Parallel()
 	payload := []byte("already-compressed-font")
+	const fontName = "fonts/dm-sans-latin.woff2"
 	h := newStaticAllowlistHandler(http.FS(fstest.MapFS{
-		"fonts/test.woff2": &fstest.MapFile{Data: payload},
+		fontName: &fstest.MapFile{Data: payload},
 	}))
 
-	rec := serveStaticRequest(h, http.MethodGet, "/fonts/test.woff2", "gzip", "")
+	rec := serveStaticRequest(h, http.MethodGet, "/"+fontName, "gzip", "")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("font status = %d, want %d", rec.Code, http.StatusOK)
 	}

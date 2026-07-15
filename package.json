@@ -6,8 +6,6 @@
   },
   "scripts": {
     "lint:openapi": "redocly lint api/openapi.yaml --config redocly.yaml",
-    "test:e2e": "node scripts/run-playwright.mjs test",
-    "test:e2e:ui": "node scripts/run-playwright.mjs test --ui",
-    "test:e2e:debug": "node scripts/run-playwright.mjs test --debug"
+    "test:ui": "playwright test"
   }
 }

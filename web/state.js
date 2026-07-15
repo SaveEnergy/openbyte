@@ -13,12 +13,11 @@ export const state = {
   jitterResult: null,
   downloadLatency: 0,
   uploadLatency: 0,
-  currentSpeed: 0,
-  progress: 0,
   abortController: null,
   networkInfo: {
     ipv4: null,
     ipv6: null,
+    complete: false,
   },
   serverName: "openByte Server",
   resultId: null,
@@ -37,7 +36,6 @@ export function initElements() {
   elements.speedUnit = document.getElementById("speedUnit");
   elements.testType = document.getElementById("testType");
   elements.progressMeter = document.getElementById("progressMeter");
-  elements.progressRing = document.getElementById("progressRing");
   elements.downloadResult = document.getElementById("downloadResult");
   elements.uploadResult = document.getElementById("uploadResult");
   elements.latencyResult = document.getElementById("latencyResult");
@@ -45,6 +43,9 @@ export function initElements() {
   elements.loadedLatencyResult = document.getElementById("loadedLatencyResult");
   elements.bufferbloatResult = document.getElementById("bufferbloatResult");
   elements.serverName = document.getElementById("serverName");
+  elements.idleNetworkInfo = document.getElementById("idleNetworkInfo");
+  elements.idleNetworkIPv4 = document.getElementById("idleNetworkIPv4");
+  elements.idleNetworkIPv6 = document.getElementById("idleNetworkIPv6");
   elements.networkIPv4 = document.getElementById("networkIPv4");
   elements.networkIPv6 = document.getElementById("networkIPv6");
   elements.restartBtn = document.getElementById("restartBtn");
@@ -62,8 +63,6 @@ export function initElements() {
 export const TEST_CONFIG = {
   HTTP_TIMEOUT_BUFFER_MS: 10000,
   HEALTH_CHECK_TIMEOUT_MS: 5000,
-  RETRY_AFTER_DEFAULT_MS: 1000,
-  RETRY_AFTER_MAX_MS: 120000,
   ADAPTIVE_MIN_STREAMS: 1,
   ADAPTIVE_MAX_STREAMS: 64,
   ADAPTIVE_HTTP1_MAX_STREAMS: 6,

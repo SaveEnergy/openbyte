@@ -66,7 +66,7 @@ func TestSpeedTestHandlerPingNilResolverFallback(t *testing.T) {
 	}
 }
 
-func TestSpeedTestHandlerPingDrainsUnexpectedBody(t *testing.T) {
+func TestSpeedTestHandlerPingDoesNotReadUnexpectedBody(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 	tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 1024)}
 	req := httptest.NewRequest(http.MethodGet, pingEndpoint, nil)
@@ -78,10 +78,10 @@ func TestSpeedTestHandlerPingDrainsUnexpectedBody(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf(speedtestStatusFmt, rec.Code, http.StatusOK)
 	}
-	if tb.reads == 0 {
-		t.Fatal(speedtestExpectBodyDrained)
+	if tb.reads != 0 {
+		t.Fatalf("request body reads = %d, want 0", tb.reads)
 	}
-	if !tb.closed {
-		t.Fatal(speedtestExpectBodyClosed)
+	if tb.closed {
+		t.Fatal("expected the server to own request body cleanup")
 	}
 }

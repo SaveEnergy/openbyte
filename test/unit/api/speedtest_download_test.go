@@ -97,7 +97,7 @@ func TestDownloadConcurrentLimitAndRelease(t *testing.T) {
 	}
 }
 
-func TestDownloadAtCapacityDrainsBodyBefore503(t *testing.T) {
+func TestDownloadAtCapacityDoesNotReadUnexpectedBody(t *testing.T) {
 	handler := api.NewSpeedTestHandler(0, 300)
 
 	tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 4096)}
@@ -110,11 +110,11 @@ func TestDownloadAtCapacityDrainsBodyBefore503(t *testing.T) {
 	if rec.Code != statusServiceUnavailable {
 		t.Fatalf(speedtestStatusFmt, rec.Code, statusServiceUnavailable)
 	}
-	if tb.reads == 0 {
-		t.Fatal(speedtestExpectReqBodyDrained503)
+	if tb.reads != 0 {
+		t.Fatalf("request body reads = %d, want 0", tb.reads)
 	}
-	if !tb.closed {
-		t.Fatal(speedtestExpectReqBodyClosed)
+	if tb.closed {
+		t.Fatal("expected the server to own request body cleanup")
 	}
 }
 
@@ -177,7 +177,7 @@ func TestDownloadPerIPLimitRejectsSameIPAllowsDifferentIP(t *testing.T) {
 	}
 }
 
-func TestDownloadValidationRejectsDrainBody(t *testing.T) {
+func TestDownloadValidationDoesNotReadUnexpectedBody(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 
 	tests := []string{
@@ -195,11 +195,11 @@ func TestDownloadValidationRejectsDrainBody(t *testing.T) {
 		if rec.Code != statusBadRequest {
 			t.Fatalf(speedtestURLStatusFmt, u, rec.Code, statusBadRequest)
 		}
-		if tb.reads == 0 {
-			t.Fatalf(speedtestURLBodyDrainedFmt, u)
+		if tb.reads != 0 {
+			t.Fatalf("url=%s request body reads = %d, want 0", u, tb.reads)
 		}
-		if !tb.closed {
-			t.Fatalf(speedtestURLBodyClosedFmt, u)
+		if tb.closed {
+			t.Fatalf("url=%s expected the server to own request body cleanup", u)
 		}
 	}
 }

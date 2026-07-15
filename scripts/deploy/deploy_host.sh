@@ -1,5 +1,5 @@
 #!/bin/sh
-# Runs on the deployment host. scripts/deploy/deploy_remote.sh streams this file over SSH.
+# Runs on the deployment host after scripts/deploy/deploy.sh verifies and syncs it.
 set -eu
 
 [ -n "${REMOTE_DIR:-}" ] || { echo "REMOTE_DIR not set"; exit 1; }
@@ -39,7 +39,7 @@ run_compose() {
   GHCR_OWNER="$OWNER_LC" IMAGE_TAG="$image_tag" docker compose \
     --env-file "$REMOTE_DIR/.env" \
     -f docker/docker-compose.ghcr.yaml \
-    -f docker/docker-compose.ghcr.traefik.yaml \
+    -f docker/docker-compose.traefik.yaml \
     "$@"
 }
 
@@ -74,6 +74,17 @@ echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 cd "$REMOTE_DIR"
 docker network inspect traefik >/dev/null 2>&1 || docker network create traefik >/dev/null 2>&1 || { echo "failed to create traefik network"; exit 1; }
 docker network inspect traefik >/dev/null 2>&1 || { echo "traefik network missing after create"; exit 1; }
+traefik_network_cidrs=$(docker network inspect traefik --format '{{range .IPAM.Config}}{{if .Subnet}}{{printf "%s," .Subnet}}{{end}}{{end}}') || {
+  echo "failed to inspect traefik network subnets"
+  exit 1
+}
+traefik_network_cidrs=${traefik_network_cidrs%,}
+[ -n "$traefik_network_cidrs" ] || { echo "traefik network has no configured subnet"; exit 1; }
+
+TRUST_PROXY_HEADERS=true
+TRUSTED_PROXY_CIDRS=$traefik_network_cidrs
+export TRUST_PROXY_HEADERS TRUSTED_PROXY_CIDRS
+
 run_compose "$DEPLOY_TAG" pull || { echo "docker compose pull failed"; exit 1; }
 
 expected_image="ghcr.io/${OWNER_LC}/openbyte:${DEPLOY_TAG}"

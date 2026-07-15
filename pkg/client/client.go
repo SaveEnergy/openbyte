@@ -1,6 +1,5 @@
 // Package client provides a Go SDK for running openByte speed tests
-// programmatically. Agents and applications can import this package instead
-// of shelling out to the CLI.
+// programmatically. Agents and applications can use it alongside the HTTP API.
 //
 // Usage:
 //

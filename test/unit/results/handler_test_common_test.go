@@ -4,6 +4,12 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"time"
+
+	"github.com/saveenergy/openbyte/internal/api"
+	"github.com/saveenergy/openbyte/internal/config"
+	"github.com/saveenergy/openbyte/internal/results"
 )
 
 type failingResponseWriter struct {
@@ -67,6 +73,20 @@ type trackingBody struct {
 	closed bool
 }
 
+type deadlineRecorder struct {
+	*httptest.ResponseRecorder
+	readDeadlines []time.Time
+}
+
+func newDeadlineRecorder() *deadlineRecorder {
+	return &deadlineRecorder{ResponseRecorder: httptest.NewRecorder()}
+}
+
+func (w *deadlineRecorder) SetReadDeadline(deadline time.Time) error {
+	w.readDeadlines = append(w.readDeadlines, deadline)
+	return nil
+}
+
 func (tb *trackingBody) Read(p []byte) (int, error) {
 	tb.reads++
 	if tb.offset >= len(tb.data) {
@@ -80,4 +100,8 @@ func (tb *trackingBody) Read(p []byte) (int, error) {
 func (tb *trackingBody) Close() error {
 	tb.closed = true
 	return nil
+}
+
+func newResultsAPI(store *results.Store) http.Handler {
+	return api.NewRouter(config.DefaultConfig(), "test", store).SetupRoutes()
 }
