@@ -3,7 +3,6 @@ package client
 import (
 	"io"
 	"sync"
-	"time"
 
 	"github.com/saveenergy/openbyte/pkg/diagnostic"
 	"github.com/saveenergy/openbyte/pkg/types"
@@ -113,12 +112,8 @@ type ResultMetrics struct {
 type EngineMetrics struct {
 	ThroughputMbps   float64
 	BytesTransferred int64
-	BytesSent        int64
-	BytesReceived    int64
 	Latency          LatencyStats
 	JitterMs         float64
-	Elapsed          time.Duration
-	Running          bool
 }
 
 type LatencyStats struct {

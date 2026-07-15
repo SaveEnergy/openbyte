@@ -1,9 +1,7 @@
-/** Server health and network info (barrel). */
+/** Server health, client IP discovery, and network display. */
 
-import { getApiBase, elements, state } from "./state.js";
-import { isHealthyServerCandidate } from "./network-health.js";
-
-export { detectNetworkInfo, updateNetworkDisplay } from "./network-probes.js";
+import { getApiBase, elements, state, TEST_CONFIG } from "./state.js";
+import { fetchWithTimeout, parseJSONOrThrow } from "./utils.js";
 
 const fallbackServerName = "openByte Server";
 
@@ -71,4 +69,100 @@ export async function checkServer() {
     console.debug("Server health check failed:", e);
     setServerOfflineUI();
   }
+}
+
+async function isHealthyServerCandidate(url) {
+  try {
+    const res = await fetchWithTimeout(
+      url,
+      {},
+      TEST_CONFIG.HEALTH_CHECK_TIMEOUT_MS,
+    );
+    if (!res.ok) {
+      await res.text().catch(() => {});
+      return false;
+    }
+
+    let data;
+    try {
+      data = await res.json();
+    } catch (err) {
+      console.debug("failed to parse health response", err);
+      await res.text().catch(() => {});
+      return false;
+    }
+
+    return (
+      data.status === "ok" || data.status === "healthy" || data.pong === true
+    );
+  } catch (err) {
+    console.debug("server health candidate failed", err);
+    return false;
+  }
+}
+
+function startsWithDigit(value) {
+  if (!value || typeof value !== "string") return false;
+  const code = value.codePointAt(0);
+  return typeof code === "number" && code >= 48 && code <= 57;
+}
+
+export function updateNetworkDisplay() {
+  if (elements.networkIPv4) {
+    elements.networkIPv4.textContent = state.networkInfo.ipv4 || "-";
+  }
+  if (elements.networkIPv6) {
+    elements.networkIPv6.textContent = state.networkInfo.ipv6 || "-";
+  }
+}
+
+export function detectNetworkInfo() {
+  const mainPing = fetch(`${getApiBase()}/ping`)
+    .then((res) => parseJSONOrThrow(res))
+    .then((data) => {
+      if (data.client_ip) {
+        if (data.ipv6) {
+          state.networkInfo.ipv6 = data.client_ip;
+        } else {
+          state.networkInfo.ipv4 = data.client_ip;
+        }
+      }
+    })
+    .catch(() => {});
+
+  const hostname = globalThis.location.hostname;
+  const canProbe =
+    hostname &&
+    hostname !== "localhost" &&
+    !hostname.startsWith("v4.") &&
+    !hostname.startsWith("v6.") &&
+    !hostname.startsWith("[") &&
+    !startsWithDigit(hostname);
+
+  const probeOpts = { cache: "no-store", credentials: "omit", mode: "cors" };
+  const proto = globalThis.location.protocol;
+
+  const v4Ping = canProbe
+    ? fetch(`${proto}//v4.${hostname}/api/v1/ping`, probeOpts)
+        .then((res) => parseJSONOrThrow(res))
+        .then((data) => {
+          if (!data.ipv6 && data.client_ip) {
+            state.networkInfo.ipv4 = data.client_ip;
+          }
+        })
+        .catch(() => {})
+    : Promise.resolve();
+
+  const v6Ping = canProbe
+    ? fetch(`${proto}//v6.${hostname}/api/v1/ping`, probeOpts)
+        .then((res) => parseJSONOrThrow(res))
+        .then((data) => {
+          if (data.ipv6 && data.client_ip) {
+            state.networkInfo.ipv6 = data.client_ip;
+          }
+        })
+        .catch(() => {})
+    : Promise.resolve();
+
+  Promise.allSettled([mainPing, v4Ping, v6Ping]).then(updateNetworkDisplay);
 }

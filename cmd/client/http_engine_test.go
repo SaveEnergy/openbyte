@@ -36,15 +36,14 @@ func TestHTTPTestEngineDownload(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	cfg := &HTTPTestConfig{
-		ServerURL:      server.URL,
-		Duration:       engineDuration,
-		Streams:        1,
-		ChunkSize:      downloadChunkSize,
-		Direction:      downloadDirection,
-		GraceTime:      0,
-		StreamDelay:    0,
-		OverheadFactor: 1.0,
-		Timeout:        engineTimeout,
+		ServerURL:   server.URL,
+		Duration:    engineDuration,
+		Streams:     1,
+		ChunkSize:   downloadChunkSize,
+		Direction:   downloadDirection,
+		GraceTime:   0,
+		StreamDelay: 0,
+		Timeout:     engineTimeout,
 	}
 
 	engine, err := NewHTTPTestEngine(cfg)
@@ -63,9 +62,6 @@ func TestHTTPTestEngineDownload(t *testing.T) {
 	if metrics.BytesTransferred == 0 {
 		t.Fatalf("expected bytes transferred > 0")
 	}
-	if metrics.BytesReceived == 0 {
-		t.Fatalf("expected bytes received > 0")
-	}
 }
 
 func TestHTTPTestEngineDownloadUsesGlobalDuration(t *testing.T) {
@@ -76,15 +72,14 @@ func TestHTTPTestEngineDownloadUsesGlobalDuration(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	cfg := &HTTPTestConfig{
-		ServerURL:      server.URL,
-		Duration:       engineDuration,
-		Streams:        8,
-		ChunkSize:      downloadChunkSize,
-		Direction:      downloadDirection,
-		GraceTime:      0,
-		StreamDelay:    200 * time.Millisecond,
-		OverheadFactor: 1.0,
-		Timeout:        engineTimeout,
+		ServerURL:   server.URL,
+		Duration:    engineDuration,
+		Streams:     8,
+		ChunkSize:   downloadChunkSize,
+		Direction:   downloadDirection,
+		GraceTime:   0,
+		StreamDelay: 200 * time.Millisecond,
+		Timeout:     engineTimeout,
 	}
 
 	engine, err := NewHTTPTestEngine(cfg)
@@ -122,6 +117,19 @@ func TestHTTPAddBytesStopsAtConfiguredDuration(t *testing.T) {
 	}
 }
 
+func TestHTTPAddBytesSkipsWarmup(t *testing.T) {
+	engine := &HTTPTestEngine{config: &HTTPTestConfig{
+		Duration:  engineDuration,
+		GraceTime: 500 * time.Millisecond,
+	}}
+
+	engine.addBytes(100, 250*time.Millisecond)
+	engine.addBytes(100, 750*time.Millisecond)
+	if total := atomic.LoadInt64(&engine.totalBytes); total != 100 {
+		t.Fatalf("total bytes = %d, want only post-warmup bytes", total)
+	}
+}
+
 func TestHTTPTestEngineUpload(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 	mux := http.NewServeMux()
@@ -131,15 +139,14 @@ func TestHTTPTestEngineUpload(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	cfg := &HTTPTestConfig{
-		ServerURL:      server.URL,
-		Duration:       engineDuration,
-		Streams:        1,
-		ChunkSize:      downloadChunkSize,
-		Direction:      uploadDirection,
-		GraceTime:      0,
-		StreamDelay:    0,
-		OverheadFactor: 1.0,
-		Timeout:        engineTimeout,
+		ServerURL:   server.URL,
+		Duration:    engineDuration,
+		Streams:     1,
+		ChunkSize:   downloadChunkSize,
+		Direction:   uploadDirection,
+		GraceTime:   0,
+		StreamDelay: 0,
+		Timeout:     engineTimeout,
 	}
 
 	engine, err := NewHTTPTestEngine(cfg)
@@ -157,9 +164,6 @@ func TestHTTPTestEngineUpload(t *testing.T) {
 	metrics := engine.GetMetrics()
 	if metrics.BytesTransferred == 0 {
 		t.Fatalf("expected bytes transferred > 0")
-	}
-	if metrics.BytesSent == 0 {
-		t.Fatalf("expected bytes sent > 0")
 	}
 }
 
@@ -260,15 +264,14 @@ func TestHTTPEngineMultiStreamFailure(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	cfg := &HTTPTestConfig{
-		ServerURL:      server.URL,
-		Duration:       engineDuration,
-		Streams:        3,
-		ChunkSize:      multiStreamChunkSize,
-		Direction:      downloadDirection,
-		GraceTime:      0,
-		StreamDelay:    0,
-		OverheadFactor: 1.0,
-		Timeout:        runContextTimeout,
+		ServerURL:   server.URL,
+		Duration:    engineDuration,
+		Streams:     3,
+		ChunkSize:   multiStreamChunkSize,
+		Direction:   downloadDirection,
+		GraceTime:   0,
+		StreamDelay: 0,
+		Timeout:     runContextTimeout,
 	}
 	engine, err := NewHTTPTestEngine(cfg)
 	if err != nil {

@@ -154,7 +154,7 @@ export async function runAdaptiveHTTPTest(options) {
       mbps = await runWindow({
         duration: config.rampDuration,
         streams,
-        collectDiagnostics: false,
+        isRamp: true,
       });
     } catch (err) {
       if (best.mbps > 0) break;
@@ -178,7 +178,6 @@ export async function runAdaptiveHTTPTest(options) {
   const mbps = await runWindow({
     duration: measureDuration,
     streams: best.streams,
-    collectDiagnostics: true,
     adaptive: {
       direction,
       nextHopProtocol,

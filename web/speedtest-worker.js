@@ -1,7 +1,8 @@
 /** Worker data plane for browser HTTP speed tests. */
 
-import { state, TEST_CONFIG } from "./state.js";
-import { runDownloadTest, runUploadTest } from "./speedtest-http.js";
+import { TEST_CONFIG } from "./state.js";
+import { runDownloadTest } from "./speedtest-http-download.js";
+import { runUploadTest } from "./speedtest-http-upload.js";
 
 let currentRun = null;
 
@@ -47,7 +48,6 @@ async function runSpeedTest({ id, direction, config }) {
 
   const controller = new AbortController();
   currentRun = { id, controller };
-  state.diagnostics = null;
 
   try {
     const mbps = await runByDirection(
@@ -60,7 +60,7 @@ async function runSpeedTest({ id, direction, config }) {
         onMeasureStart: (streams) => post(id, "measureStart", { streams }),
       },
     );
-    post(id, "result", { mbps, diagnostics: state.diagnostics });
+    post(id, "result", { mbps });
   } catch (error) {
     post(id, "error", serializeError(error));
   } finally {

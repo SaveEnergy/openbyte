@@ -162,11 +162,13 @@ test.describe("openByte UI", () => {
 
   test("saves result only when share is clicked", async ({ page }) => {
     let saveRequests = 0;
+    let savePayload = null;
     page.on("dialog", async (dialog) => {
       await dialog.dismiss().catch(() => {});
     });
     await page.route("**/api/v1/results", async (route) => {
       saveRequests += 1;
+      savePayload = route.request().postDataJSON();
       await route.fulfill({
         status: 201,
         contentType: "application/json",
@@ -185,6 +187,7 @@ test.describe("openByte UI", () => {
 
     await page.locator("#shareBtn").click();
     await expect.poll(() => saveRequests).toBe(1);
+    expect(savePayload).not.toHaveProperty("diagnostics");
   });
 
   test("handles cancel then restart cleanly", async ({ page }) => {

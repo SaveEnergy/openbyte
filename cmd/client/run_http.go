@@ -23,15 +23,14 @@ func runHTTPStream(ctx context.Context, config *Config, formatter OutputFormatte
 	graceTime := time.Duration(config.WarmUp) * time.Second
 
 	httpCfg := &HTTPTestConfig{
-		ServerURL:      config.ServerURL,
-		Duration:       time.Duration(config.Duration) * time.Second,
-		Streams:        config.Streams,
-		ChunkSize:      config.ChunkSize,
-		Direction:      config.Direction,
-		GraceTime:      graceTime,
-		StreamDelay:    200 * time.Millisecond,
-		OverheadFactor: 1.0,
-		Timeout:        time.Duration(config.Timeout) * time.Second,
+		ServerURL:   config.ServerURL,
+		Duration:    time.Duration(config.Duration) * time.Second,
+		Streams:     config.Streams,
+		ChunkSize:   config.ChunkSize,
+		Direction:   config.Direction,
+		GraceTime:   graceTime,
+		StreamDelay: 200 * time.Millisecond,
+		Timeout:     time.Duration(config.Timeout) * time.Second,
 	}
 	minTimeout := httpCfg.Duration + 10*time.Second
 	if httpCfg.Timeout < minTimeout {
@@ -107,7 +106,7 @@ func finalizeHTTPStreamRun(input finalizeHTTPStreamRunInput) error {
 	if measuredElapsed <= 0 {
 		measuredElapsed = 1 * time.Millisecond
 	}
-	avgSpeed := float64(totalBytes*8) / measuredElapsed.Seconds() / 1_000_000 * input.httpCfg.OverheadFactor
+	avgSpeed := float64(totalBytes*8) / measuredElapsed.Seconds() / 1_000_000
 	metrics.ThroughputMbps = avgSpeed
 
 	results := buildResults(protocolHTTP, input.config, metrics, input.startTime)
