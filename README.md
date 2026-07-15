@@ -156,7 +156,7 @@ internal/
 docker/       # Docker + Compose configurations
 web/          # Web UI (embedded in binary)
   fonts/      # Self-hosted font files
-test/         # Unit, integration, E2E tests
+test/         # Unit, Go E2E, and Playwright tests
 ```
 
 ## License

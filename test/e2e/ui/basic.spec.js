@@ -366,17 +366,21 @@ test.describe("openByte UI", () => {
   });
 
   test("shows timeout message when results API hangs", async ({ page }) => {
-    await page.route("**/api/v1/results/*", async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 25_000));
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ id: "ABCDEF12" }),
-      });
+    await page.clock.install();
+    let markRequestStarted;
+    const requestStarted = new Promise((resolve) => {
+      markRequestStarted = resolve;
+    });
+    await page.route("**/api/v1/results/*", async () => {
+      markRequestStarted();
+      await new Promise(() => {});
     });
 
-    await page.goto("/results/ABCDEF12");
-    await expect(page.locator("#errorView")).toBeVisible({ timeout: 30_000 });
+    await page.goto("/results/ABCDEF12", { waitUntil: "commit" });
+    await requestStarted;
+    await page.clock.fastForward(20_000);
+
+    await expect(page.locator("#errorView")).toBeVisible();
     await expect(page.locator("#resultView")).toHaveClass(/hidden/);
     await expect(page.locator("#errorView .error-message")).toContainText(
       /timed out/i,

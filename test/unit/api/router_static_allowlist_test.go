@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"encoding/json"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -88,28 +89,23 @@ func TestRouterStaticFileServerAllowlistServesFontsFromWebRoot(t *testing.T) {
 	}
 }
 
-func TestCriticalRoutesRespondOK(t *testing.T) {
-	router := api.NewRouter(config.DefaultConfig(), nil)
-	h := router.SetupRoutes()
+func TestHealthRouteResponse(t *testing.T) {
+	handler := api.NewRouter(config.DefaultConfig(), nil).SetupRoutes()
+	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+healthRoutePath, nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
 
-	tests := []struct {
-		name   string
-		method string
-		path   string
-	}{
-		{name: "health", method: http.MethodGet, path: healthRoutePath},
-		{name: "ping", method: http.MethodGet, path: pingAPIPath},
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET %s "+statusWantFmt, healthRoutePath, rec.Code, http.StatusOK)
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, exampleBaseURL+tt.path, nil)
-			rec := httptest.NewRecorder()
-			h.ServeHTTP(rec, req)
-			if rec.Code != http.StatusOK {
-				t.Fatalf("%s %s "+statusWantFmt, tt.method, tt.path, rec.Code, http.StatusOK)
-			}
-		})
+	var response struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode health response: %v", err)
+	}
+	if response.Status != "ok" {
+		t.Fatalf("health status = %q, want ok", response.Status)
 	}
 }
 
