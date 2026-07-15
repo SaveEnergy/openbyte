@@ -129,4 +129,13 @@ func TestResultsPageRouteRateLimited(t *testing.T) {
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf(routerSecondResultsReq+statusWantFmt, rec.Code, http.StatusTooManyRequests)
 	}
+	if got := rec.Header().Get("Retry-After"); got != "60" {
+		t.Fatalf("retry-after = %q, want 60", got)
+	}
+	if got := rec.Header().Get(contentTypeHeader); !strings.Contains(got, routerContentTypeJSON) {
+		t.Fatalf(routerContentTypeWantFmt, got, routerContentTypeJSON)
+	}
+	if !strings.Contains(rec.Body.String(), `"error":"rate limit exceeded"`) {
+		t.Fatalf("rate-limit body = %q, want JSON error", rec.Body.String())
+	}
 }
