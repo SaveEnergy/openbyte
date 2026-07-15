@@ -21,12 +21,20 @@ in Git history and pull requests, not release notes.
 - **Result context**: a loaded-latency advisory, a colored bufferbloat grade
   badge, and a "What do these numbers mean?" disclosure explaining the
   secondary metrics without assigning a subjective connection label.
+
 ### Changed
 
 - **Official container contract**: the published image and bundled Compose now
   use plain HTTP on internal port `8080` and persist only at `/app/data`, while
   runtime defaults come from the binary. Custom data-path, direct-TLS, HTTP/2,
   and pprof deployments now require an explicit container override.
+- **Server configuration**: deployment settings are now environment-only; the
+  pre-release command-line configuration flags were removed.
+- **Compose setup**: local source builds now layer a minimal override on the
+  published-image base; the unused Traefik dashboard and upload-specific routers
+  were removed.
+- **Deployment**: releases now deploy through one verified SSH connection while
+  retaining checksum, image, health, and rollback checks.
 - **Transfer concurrency**: replaced the inferred capacity heuristic with the
   explicit `MAX_CONCURRENT_TRANSFERS` limit, defaulting to the same 200
   download streams and 200 upload streams. Migrate a previous capacity value
@@ -57,6 +65,8 @@ in Git history and pull requests, not release notes.
   advisory, colored bufferbloat badge, and metric explanations now appear on
   `/results/{id}` too. The explanations live in a shared `stats-help.js` module
   used by both pages.
+- **Release archives**: Linux and macOS builds are published for amd64 and arm64
+  as `.tar.gz` files with one checksum manifest.
 
 ### Security
 
@@ -71,32 +81,6 @@ in Git history and pull requests, not release notes.
 - Required `MAX_TEST_DURATION` to be whole seconds of at least `1s`, and bounded
   an omitted download duration by the configured maximum.
 
-### Changed
-
-- Simplified the browser transfer state machines, one-shot worker protocol, and
-  instrument animation while retaining adaptive streams, result sharing, and
-  eager same-origin/IPv4/IPv6 address discovery.
-- Made discovered public IPv4/IPv6 addresses visible before starting a test;
-  the same-origin bootstrap ping now supplies server-name metadata while
-  measurement and address-discovery pings retain their lean response.
-- Made server configuration environment-only, replaced the custom logger with
-  `log/slog`, and consolidated router/result HTTP setup without changing the
-  persisted result schema or share URLs.
-- Consolidated duplicated source/GHCR Compose definitions into a published-image
-  base plus a minimal local-build override; removed the unused Traefik dashboard
-  and redundant upload-specific routers.
-- Deployment now verifies, syncs, and starts the remote release through one SSH
-  connection while retaining fingerprint, checksum, image, health, and rollback
-  checks.
-- Main workflow dispatches now follow the same build/deploy path as main pushes;
-  branch dispatches run checks only. Nightly is one full race gate, while perf
-  and leak profiling remain explicit local tools.
-- Release archives now match the installer-supported platforms: Linux and macOS
-  on amd64/arm64, all as `.tar.gz` with one checksum manifest.
-- Curated performance benchmarks around transfer, gzip, JSON, ping, and SQLite
-  behavior; removed unused baseline-comparison plumbing.
-- Reduced unit-test wall-clock waits without reducing behavioral coverage.
-
 ### Removed
 
 - Removed the browser API quick reference, configurable generic CORS, and
@@ -109,8 +93,10 @@ in Git history and pull requests, not release notes.
   result sharing and persisted result fields are unchanged.
 - Removed unused `PUBLIC_HOST`, nonfunctional `LOG_LEVEL`, periodic runtime
   statistics, and `/debug/runtime-metrics`; loopback pprof remains available.
-- Removed the unwired metrics collectors, always-zero legacy CLI JSON fields,
-  obsolete multi-server Compose example, and abandoned autoresearch harness.
+- Removed the obsolete multi-server Compose example; use independent deployments
+  with explicit URLs when comparing regions.
+- Removed the unadvertised curl installer; release archives and their checksum
+  manifest remain available for manual installation.
 
 ## [0.10.2] - 2026-05-04
 
