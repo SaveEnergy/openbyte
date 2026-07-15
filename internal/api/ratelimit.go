@@ -9,7 +9,8 @@ import (
 )
 
 type RateLimiter struct {
-	config           *config.Config
+	rateLimitPerIP   int
+	globalRateLimit  int
 	ipLimits         map[string]*IPLimit
 	ipMu             sync.RWMutex
 	globalTokens     int
@@ -29,9 +30,14 @@ type IPLimit struct {
 }
 
 func NewRateLimiter(cfg *config.Config) *RateLimiter {
+	return newRateLimiter(cfg, NewClientIPResolver(cfg))
+}
+
+func newRateLimiter(cfg *config.Config, resolver *ClientIPResolver) *RateLimiter {
 	maxIPEntries := max(cfg.GlobalRateLimit*20, 10000)
 	return &RateLimiter{
-		config:           cfg,
+		rateLimitPerIP:   cfg.RateLimitPerIP,
+		globalRateLimit:  cfg.GlobalRateLimit,
 		ipLimits:         make(map[string]*IPLimit),
 		globalTokens:     cfg.GlobalRateLimit,
 		globalLastRefill: time.Now(),
@@ -39,7 +45,7 @@ func NewRateLimiter(cfg *config.Config) *RateLimiter {
 		cleanupInterval:  5 * time.Minute,
 		ipLimitTTL:       10 * time.Minute,
 		maxIPEntries:     maxIPEntries,
-		clientIPResolver: NewClientIPResolver(cfg),
+		clientIPResolver: resolver,
 	}
 }
 
@@ -77,12 +83,4 @@ func (rl *RateLimiter) SetMaxIPEntries(limit int) {
 	if limit > 0 {
 		rl.maxIPEntries = limit
 	}
-}
-
-// skipRateLimitPaths are endpoints that should not be rate limited
-// These are high-frequency speedtest endpoints
-var skipRateLimitPaths = map[string]bool{
-	"/api/v1/download": true,
-	"/api/v1/upload":   true,
-	"/api/v1/ping":     true,
 }

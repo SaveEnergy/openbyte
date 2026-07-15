@@ -1,25 +1,14 @@
 package config
 
 import (
-	"fmt"
 	"os"
-	"time"
 )
 
-func (c *Config) loadRuntimeEnv() error {
+func (c *Config) loadRuntimeEnv() {
 	c.PprofEnabled = c.PprofEnabled || envBool("PPROF_ENABLED")
 	if addr := os.Getenv("PPROF_ADDR"); addr != "" {
 		c.PprofAddress = addr
 	}
-	if intervalRaw := os.Getenv("PERF_STATS_INTERVAL"); intervalRaw != "" {
-		d, err := time.ParseDuration(intervalRaw)
-		if err != nil || d <= 0 {
-			return fmt.Errorf("invalid PERF_STATS_INTERVAL %q: must be a positive duration (e.g. 10s)", intervalRaw)
-		}
-		c.PerfStatsInterval = d
-	}
-	c.RuntimeMetrics = c.RuntimeMetrics || envBool("RUNTIME_METRICS_ENABLED")
-	return nil
 }
 
 func (c *Config) loadLimitsAndNetworkEnv() error {

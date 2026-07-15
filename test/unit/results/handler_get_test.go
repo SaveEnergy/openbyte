@@ -36,11 +36,10 @@ func TestGetReturnsNoStoreForSavedResult(t *testing.T) {
 		t.Fatalf("save result: %v", err)
 	}
 
-	h := results.NewHandler(store)
+	h := newResultsAPI(store)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/results/"+id, nil)
-	req.SetPathValue("id", id)
 	rec := httptest.NewRecorder()
-	h.Get(rec, req)
+	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusOK)
@@ -60,11 +59,10 @@ func TestGetReturnsNotFoundForMissingResult(t *testing.T) {
 	}
 	defer store.Close()
 
-	h := results.NewHandler(store)
+	h := newResultsAPI(store)
 	req := httptest.NewRequest(http.MethodGet, resultsPath+"/"+abcResultID, nil)
-	req.SetPathValue("id", abcResultID)
 	rec := httptest.NewRecorder()
-	h.Get(rec, req)
+	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusNotFound)
@@ -81,11 +79,10 @@ func TestGetRejectsInvalidResultID(t *testing.T) {
 	}
 	defer store.Close()
 
-	h := results.NewHandler(store)
+	h := newResultsAPI(store)
 	req := httptest.NewRequest(http.MethodGet, resultsPath+"/"+invalidResultID, nil)
-	req.SetPathValue("id", invalidResultID)
 	rec := httptest.NewRecorder()
-	h.Get(rec, req)
+	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusBadRequest)
@@ -102,11 +99,10 @@ func TestGetReturnsInternalErrorWhenStoreFails(t *testing.T) {
 	}
 	store.Close()
 
-	h := results.NewHandler(store)
+	h := newResultsAPI(store)
 	req := httptest.NewRequest(http.MethodGet, resultsPath+"/"+abcResultID, nil)
-	req.SetPathValue("id", abcResultID)
 	rec := httptest.NewRecorder()
-	h.Get(rec, req)
+	h.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusInternalServerError)
@@ -129,20 +125,19 @@ func TestResultsResponsesSetNoStore(t *testing.T) {
 	}
 	defer store.Close()
 
-	h := results.NewHandler(store)
+	h := newResultsAPI(store)
 
 	saveReq := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(sampleResultPayload))
 	saveReq.Header.Set(contentTypeHeader, applicationJSON)
 	saveRec := httptest.NewRecorder()
-	h.Save(saveRec, saveReq)
+	h.ServeHTTP(saveRec, saveReq)
 	if saveRec.Header().Get(cacheControlHeader) != cacheNoStore {
 		t.Fatalf("save cache-control = %q, want %q", saveRec.Header().Get(cacheControlHeader), cacheNoStore)
 	}
 
 	getReq := httptest.NewRequest(http.MethodGet, resultsPath+"/"+missingResultID, nil)
-	getReq.SetPathValue("id", missingResultID)
 	getRec := httptest.NewRecorder()
-	h.Get(getRec, getReq)
+	h.ServeHTTP(getRec, getReq)
 	if getRec.Header().Get(cacheControlHeader) != cacheNoStore {
 		t.Fatalf("get cache-control = %q, want %q", getRec.Header().Get(cacheControlHeader), cacheNoStore)
 	}

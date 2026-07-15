@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"time"
 )
 
 func isHTTPS(r *http.Request) bool {
@@ -30,16 +29,6 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 				"connect-src 'self' https: http:")
 		if isHTTPS(r) {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-func DeadlineMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if deadline, ok := r.Context().Deadline(); ok {
-			controller := http.NewResponseController(w)
-			_ = controller.SetWriteDeadline(deadline.Add(5 * time.Second))
 		}
 		next.ServeHTTP(w, r)
 	})

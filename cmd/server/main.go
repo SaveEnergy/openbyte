@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -20,32 +21,21 @@ var (
 )
 
 func Run(args []string, version string) int {
-	logLevel := logging.LevelInfo
-	if os.Getenv("LOG_LEVEL") == config.EnvDebug {
-		logLevel = logging.LevelDebug
-	}
-	logging.Init(logLevel)
-
-	cfg := config.DefaultConfig()
-	if err := cfg.LoadFromEnv(); err != nil {
-		logging.Error("Failed to load config", logging.Field{Key: "error", Value: err})
-		return exitFailure
-	}
-	fs, fv := buildServerFlagSet(cfg)
-	versionFlag := fs.Bool("version", false, "Print version")
-	if err := fs.Parse(args); err != nil {
+	versionFlag, err := parseServerArgs(args)
+	if err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return exitSuccess
 		}
 		logging.Error("Invalid flags", logging.Field{Key: "error", Value: err})
 		return exitFailure
 	}
-	if *versionFlag {
+	if versionFlag {
 		fmt.Printf("openbyte %s\n", version)
 		return exitSuccess
 	}
-	if err := applyServerFlagOverrides(cfg, fs, fv); err != nil {
-		logging.Error("Invalid flag values", logging.Field{Key: "error", Value: err})
+	cfg := config.DefaultConfig()
+	if err := cfg.LoadFromEnv(); err != nil {
+		logging.Error("Failed to load config", logging.Field{Key: "error", Value: err})
 		return exitFailure
 	}
 	if err := cfg.Validate(); err != nil {
@@ -54,7 +44,6 @@ func Run(args []string, version string) int {
 	}
 
 	pprofServer := startPprofServer(cfg)
-	stopStats := startRuntimeStatsLogger(cfg)
 	cleanupOnError := true
 
 	resources := &serverResources{}
@@ -62,7 +51,7 @@ func Run(args []string, version string) int {
 		if !cleanupOnError {
 			return
 		}
-		resources.stopAll(pprofServer, stopStats)
+		resources.stopAll(pprofServer)
 	}()
 
 	muxRouter, err := setupRuntimeResources(cfg, version, resources)
@@ -88,11 +77,28 @@ func Run(args []string, version string) int {
 	exitCode := waitForShutdown(quit, srvErrCh)
 	shutdownHTTPServer(srv, 30*time.Second)
 
-	resources.stopAll(pprofServer, stopStats)
+	resources.stopAll(pprofServer)
 	cleanupOnError = false
 
 	logging.Info("Server stopped")
 	return exitCode
+}
+
+func parseServerArgs(args []string) (bool, error) {
+	fs := flag.NewFlagSet("openbyte server", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stdout, "Usage: openbyte server [--version]")
+		fmt.Fprintln(os.Stdout, "\nServer configuration is environment-only; see README.md for variables.")
+	}
+	version := fs.Bool("version", false, "Print version")
+	if err := fs.Parse(args); err != nil {
+		return false, err
+	}
+	if fs.NArg() != 0 {
+		return false, fmt.Errorf("unexpected server argument %q", fs.Arg(0))
+	}
+	return *version, nil
 }
 
 func speedtestHTTP2Config(cfg *config.Config) *http.HTTP2Config {

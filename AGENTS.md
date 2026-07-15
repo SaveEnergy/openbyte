@@ -25,7 +25,7 @@
 
 - CORS wildcard matching enforces safe dot-boundary behavior.
 - CSP is strict (`script-src 'self'`, `worker-src 'self'`), with JS moved to external files only.
-- The results POST handler enforces a 4096-byte limit, rejects unknown fields, and decodes exactly one JSON object through `internal/jsonbody.DecodeSingleObject`.
+- The results POST handler enforces a 4096-byte limit, rejects unknown fields, and decodes exactly one JSON object in `internal/api/results_handler.go`.
 - Config validation includes trusted CIDR parsing and strict positive limits.
 
 ### Frontend Behavior

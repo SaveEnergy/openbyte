@@ -34,10 +34,10 @@ func BenchmarkRouterIsAllowedOriginWildcardSubdomain(b *testing.B) {
 	}
 }
 
-// BenchmarkRouterIsAllowAllOrigins measures the allow-* flag (cached in SetAllowedOrigins).
+// BenchmarkRouterIsAllowAllOrigins measures the precomputed allow-* flag.
 func BenchmarkRouterIsAllowAllOrigins(b *testing.B) {
-	var r Router
-	r.SetAllowedOrigins([]string{"https://a.example", "*", "https://b.example"})
+	origins, allowAll := normalizeAllowedOrigins([]string{"https://a.example", "*", "https://b.example"})
+	r := Router{allowedOrigins: origins, corsAllowAll: allowAll}
 
 	b.ReportAllocs()
 	b.ResetTimer()

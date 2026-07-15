@@ -12,8 +12,7 @@ import (
 )
 
 func TestRouterStaticServesFrontendModules(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, config.DefaultConfig())
+	router := api.NewRouter(config.DefaultConfig(), "", nil)
 	h := router.SetupRoutes()
 
 	for _, name := range []string{
@@ -42,8 +41,7 @@ func TestRouterStaticServesFrontendModules(t *testing.T) {
 }
 
 func TestRouterStaticFileServerAllowlist(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, config.DefaultConfig())
+	router := api.NewRouter(config.DefaultConfig(), "", nil)
 	h := router.SetupRoutes()
 
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/embed.go", nil)
@@ -55,9 +53,6 @@ func TestRouterStaticFileServerAllowlist(t *testing.T) {
 }
 
 func TestRouterStaticFileServerAllowlistServesFontsFromWebRoot(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, config.DefaultConfig())
-
 	webRoot := t.TempDir()
 	fontDir := filepath.Join(webRoot, "fonts")
 	if err := os.MkdirAll(fontDir, 0o755); err != nil {
@@ -69,7 +64,9 @@ func TestRouterStaticFileServerAllowlistServesFontsFromWebRoot(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(fontDir, "dm-sans-latin.woff2"), []byte("font-bytes"), 0o644); err != nil {
 		t.Fatalf(routerWriteFontFmt, err)
 	}
-	router.SetWebRoot(webRoot)
+	cfg := config.DefaultConfig()
+	cfg.WebRoot = webRoot
+	router := api.NewRouter(cfg, "", nil)
 
 	h := router.SetupRoutes()
 	req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/fonts/dm-sans-latin.woff2", nil)
@@ -81,8 +78,7 @@ func TestRouterStaticFileServerAllowlistServesFontsFromWebRoot(t *testing.T) {
 }
 
 func TestCriticalRoutesRespondOK(t *testing.T) {
-	handler := api.NewHandler()
-	router := api.NewRouter(handler, config.DefaultConfig())
+	router := api.NewRouter(config.DefaultConfig(), "", nil)
 	h := router.SetupRoutes()
 
 	tests := []struct {
