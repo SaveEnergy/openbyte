@@ -13,8 +13,6 @@ export const state = {
   jitterResult: null,
   downloadLatency: 0,
   uploadLatency: 0,
-  currentSpeed: 0,
-  progress: 0,
   abortController: null,
   networkInfo: {
     ipv4: null,
@@ -37,7 +35,6 @@ export function initElements() {
   elements.speedUnit = document.getElementById("speedUnit");
   elements.testType = document.getElementById("testType");
   elements.progressMeter = document.getElementById("progressMeter");
-  elements.progressRing = document.getElementById("progressRing");
   elements.downloadResult = document.getElementById("downloadResult");
   elements.uploadResult = document.getElementById("uploadResult");
   elements.latencyResult = document.getElementById("latencyResult");
@@ -62,8 +59,6 @@ export function initElements() {
 export const TEST_CONFIG = {
   HTTP_TIMEOUT_BUFFER_MS: 10000,
   HEALTH_CHECK_TIMEOUT_MS: 5000,
-  RETRY_AFTER_DEFAULT_MS: 1000,
-  RETRY_AFTER_MAX_MS: 120000,
   ADAPTIVE_MIN_STREAMS: 1,
   ADAPTIVE_MAX_STREAMS: 64,
   ADAPTIVE_HTTP1_MAX_STREAMS: 6,

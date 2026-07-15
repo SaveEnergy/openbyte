@@ -2,7 +2,6 @@
 
 import { getApiBase, state, TEST_CONFIG } from "./state.js";
 import {
-  updateProgress,
   updateSpeed,
   showState,
   resetProgress,
@@ -10,9 +9,7 @@ import {
 } from "./ui.js";
 import { resolveAdaptiveConfig } from "./speedtest-adaptive.js";
 import { fetchWithTimeout } from "./utils.js";
-import { updateNetworkDisplay } from "./network.js";
-
-let workerRunCounter = 0;
+import { getNextHopProtocol, updateNetworkDisplay } from "./network.js";
 
 function setTestPhase(phase, label, className) {
   state.phase = phase;
@@ -61,11 +58,13 @@ function runWorkerSpeedTest(direction, onProgress, signal, callbacks) {
     throw new TypeError("This browser does not support Web Workers.");
   }
 
-  const id = `${Date.now()}-${++workerRunCounter}`;
   const worker = new Worker(new URL("./speedtest-worker.js", import.meta.url), {
     type: "module",
   });
-  const config = resolveAdaptiveConfig();
+  const config = {
+    ...resolveAdaptiveConfig(),
+    nextHopProtocol: getNextHopProtocol(),
+  };
 
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -86,20 +85,18 @@ function runWorkerSpeedTest(direction, onProgress, signal, callbacks) {
     };
 
     const onAbort = () => {
-      worker.postMessage({ type: "cancel", id });
       settle(reject, makeAbortError());
     };
 
     const onMessage = (event) => {
       const message = event.data || {};
-      if (message.id !== id) return;
 
       if (message.type === "progress") {
         onProgress(message.bytes || 0);
       } else if (message.type === "phase") {
-        callbacks.onPhase?.(message.stage, message.streams);
+        callbacks.onPhase?.(message.stage);
       } else if (message.type === "measureStart") {
-        callbacks.onMeasureStart?.(message.streams);
+        callbacks.onMeasureStart?.();
       } else if (message.type === "result") {
         settle(resolve, Math.max(message.mbps || 0, 0));
       } else if (message.type === "error") {
@@ -125,7 +122,7 @@ function runWorkerSpeedTest(direction, onProgress, signal, callbacks) {
       return;
     }
 
-    worker.postMessage({ type: "run", id, direction, config });
+    worker.postMessage({ direction, config });
   });
 }
 
@@ -137,11 +134,6 @@ async function runTest(direction, signal) {
   let lastBytes = 0;
   let ewmaSpeed = 0;
   const ewmaAlpha = TEST_CONFIG.EWMA_ALPHA;
-
-  const progressTick = setInterval(() => {
-    if (signal.aborted) return;
-    updateProgress(0);
-  }, TEST_CONFIG.PROGRESS_TICK_MS);
 
   const onProgress = (bytes) => {
     const now = performance.now();
@@ -185,7 +177,6 @@ async function runTest(direction, signal) {
       onMeasureStart: startMeasureLatencyProbe,
     });
   } finally {
-    clearInterval(progressTick);
     if (latencyProbe) await latencyProbe.stop();
   }
   const loadedLatency = latencyProbe ? latencyProbe.getMedian() : 0;
@@ -193,10 +184,6 @@ async function runTest(direction, signal) {
     state.downloadLatency = loadedLatency;
   } else {
     state.uploadLatency = loadedLatency;
-  }
-
-  if (state.isRunning) {
-    updateProgress(100);
   }
 
   return result;
@@ -337,7 +324,6 @@ export async function measureLatency(signal) {
       await captureClientIPIfNeeded(res, capturedRef);
 
       rawSamples.push(rtt);
-      updateProgress((i / numSamples) * 100);
       updateSpeed(rtt, "latency");
     } catch (e) {
       if (e.name === "AbortError") break;
