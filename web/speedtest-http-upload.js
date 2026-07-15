@@ -10,6 +10,7 @@ import {
   retryAfterMs,
   isNetworkError,
   fetchWithTimeout,
+  createCodedError,
 } from "./utils.js";
 import {
   resolveChunkSize,
@@ -146,7 +147,12 @@ async function runSingleUploadStream(index, options) {
       if (!isNetworkError(error)) throw error;
       metricsState.sawNetworkError = true;
       consecutiveErrors += 1;
-      if (consecutiveErrors > TEST_CONFIG.MAX_NETWORK_RETRIES) throw error;
+      if (consecutiveErrors > TEST_CONFIG.MAX_NETWORK_RETRIES) {
+        throw createCodedError(
+          "upload.network",
+          error.message || "Network error during upload",
+        );
+      }
       await sleep(TEST_CONFIG.NETWORK_RETRY_DELAY_MS);
     }
   }
@@ -208,13 +214,12 @@ async function runUploadWindow(options) {
   const avgSpeed =
     (metricsState.totalBytes * 8 * overheadFactor) / measureTime / 1_000_000;
 
-  throwIfZeroBytes(metricsState, metricsState.totalBytes, {
-    network: "Network error during upload. Try again or change server.",
-    overload: "Server overloaded. Try again in a moment or change server.",
-    noStreams: "Upload failed. No stream completed successfully.",
-  });
+  throwIfZeroBytes(metricsState, metricsState.totalBytes, "upload");
   if (isRamp && metricsState.sawOverload) {
-    throw new Error("Server overloaded during adaptive upload ramp");
+    throw createCodedError(
+      "server.overloaded",
+      "Server overloaded during adaptive upload ramp",
+    );
   }
 
   return Math.max(avgSpeed, 0);

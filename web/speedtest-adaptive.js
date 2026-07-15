@@ -121,7 +121,7 @@ export async function runAdaptiveHTTPTest(options) {
     rampDuration: config.rampDuration,
   });
 
-  onPhase?.("Saturating", streams, phaseInfo());
+  onPhase?.("saturating", streams, phaseInfo());
   while (!signal.aborted) {
     let mbps = 0;
     try {
@@ -143,12 +143,12 @@ export async function runAdaptiveHTTPTest(options) {
     previousMbps = mbps;
     streams = next;
     windowIndex += 1;
-    onPhase?.("Saturating", streams, phaseInfo());
+    onPhase?.("saturating", streams, phaseInfo());
   }
 
   if (signal.aborted) throw new DOMException("Aborted", "AbortError");
   const measureDuration = resolveMeasureDuration(best.mbps, config);
-  onPhase?.("Measuring", best.streams, phaseInfo());
+  onPhase?.("measuring", best.streams, phaseInfo());
   onMeasureStart?.(best.streams, measureDuration);
   const mbps = await runWindow({
     duration: measureDuration,

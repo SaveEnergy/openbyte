@@ -16,6 +16,10 @@
   font-size: 0.875rem;
   animation: slideUp var(--motion-duration-medium) var(--ease-out);
   z-index: 100;
+  max-width: calc(100vw - 2rem);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
 }
 
 .toast-success {

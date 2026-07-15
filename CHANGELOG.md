@@ -7,6 +7,9 @@ in Git history and pull requests, not release notes.
 
 ### Added
 
+- **English and German UI**: the speed test and shared-result pages now detect
+  the browser language, provide a persistent language selector, localize
+  accessible status text, and format results and history for the chosen locale.
 - **Test legibility**: the testing screen now shows a determinate progress ring
   (ramp windows + measure countdown reported by the worker), a phase stepper
   (Ping → Download → Upload) that keeps completed phase results visible as

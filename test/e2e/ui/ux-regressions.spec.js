@@ -176,7 +176,7 @@ test.describe("openByte UI regressions", () => {
         },
         runWindow: async ({ streams }) => streams * 100,
         onPhase: (stage, streams, info) => {
-          if (stage === "Saturating") {
+          if (stage === "saturating") {
             phases.push({ streams, maxWindows: info.maxWindows });
           }
         },
@@ -193,8 +193,10 @@ test.describe("openByte UI regressions", () => {
       };
     });
 
-    expect(result.verdict).toContain("download speed");
-    expect(result.verdict).not.toContain("cloud backups");
+    expect(result.verdict).toEqual({
+      key: "verdict.partial.exceptional",
+      warningKey: null,
+    });
     expect(result.phases).toEqual([
       { streams: 1, maxWindows: 4 },
       { streams: 2, maxWindows: 4 },

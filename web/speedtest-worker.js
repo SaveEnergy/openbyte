@@ -9,6 +9,7 @@ function post(type, payload = {}) {
 function serializeError(error) {
   return {
     name: error?.name || "Error",
+    code: error?.code || "worker.failed",
     message: error?.message || "Speed test failed",
   };
 }
