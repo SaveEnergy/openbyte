@@ -31,7 +31,6 @@ func TestDeployUsesOneVerifiedSSHConnection(t *testing.T) {
 	}
 
 	writeExecutable(t, filepath.Join(binDir, "docker"), fakeDocker)
-	writeExecutable(t, filepath.Join(binDir, "sleep"), "#!/bin/sh\nexit 0\n")
 	writeExecutable(t, filepath.Join(binDir, "timeout"), "#!/bin/sh\nshift\nexec \"$@\"\n")
 	writeExecutable(t, filepath.Join(binDir, "ssh-keyscan"), "#!/bin/sh\necho scanned-key\n")
 	writeExecutable(t, filepath.Join(binDir, "ssh-keygen"), "#!/bin/sh\necho '256 SHA256:test host (ED25519)'\n")
@@ -89,24 +88,31 @@ func TestHostDeployRollback(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		scenario       string
-		wantSuccess    bool
-		wantDeployment string
-		wantRollback   bool
+		name            string
+		scenario        string
+		wantSuccess     bool
+		wantDeployment  string
+		wantRollback    bool
+		wantDeploy      bool
+		wantDiagnostics bool
 	}{
-		{name: "success", scenario: "success", wantSuccess: true, wantDeployment: "new"},
-		{name: "first deployment", scenario: "no_previous", wantSuccess: true, wantDeployment: "new"},
+		{name: "success", scenario: "success", wantSuccess: true, wantDeployment: "new", wantDeploy: true},
+		{name: "first deployment", scenario: "no_previous", wantSuccess: true, wantDeployment: "new", wantDeploy: true},
+		{name: "unsupported Compose", scenario: "old_compose", wantDeployment: "old"},
 		{name: "missing Traefik subnet", scenario: "missing_proxy_subnet", wantDeployment: "old"},
-		{name: "image mismatch", scenario: "image_mismatch", wantDeployment: "old", wantRollback: true},
-		{name: "unhealthy openbyte", scenario: "app_unhealthy", wantDeployment: "old", wantRollback: true},
+		{name: "image mismatch", scenario: "image_mismatch", wantDeployment: "old", wantRollback: true, wantDeploy: true},
+		{name: "unhealthy openbyte", scenario: "app_unhealthy", wantDeployment: "old", wantRollback: true, wantDeploy: true, wantDiagnostics: true},
 		{
-			name:           "unhealthy traefik restores previous app",
-			scenario:       "traefik_unhealthy",
-			wantDeployment: "old",
-			wantRollback:   true,
+			name:            "unhealthy traefik restores previous app",
+			scenario:        "traefik_unhealthy",
+			wantDeployment:  "old",
+			wantRollback:    true,
+			wantDeploy:      true,
+			wantDiagnostics: true,
 		},
-		{name: "compose failure", scenario: "compose_failure", wantDeployment: "old", wantRollback: true},
+		{name: "compose failure", scenario: "compose_failure", wantDeployment: "old", wantRollback: true, wantDeploy: true, wantDiagnostics: true},
+		{name: "rollback wait failure", scenario: "rollback_wait_failure", wantDeployment: "new", wantRollback: true, wantDeploy: true, wantDiagnostics: true},
+		{name: "rollback image mismatch", scenario: "rollback_image_mismatch", wantDeployment: "old", wantRollback: true, wantDeploy: true, wantDiagnostics: true},
 	}
 
 	for _, tt := range tests {
@@ -124,7 +130,6 @@ func TestHostDeployRollback(t *testing.T) {
 				t.Fatalf("seed deployment state: %v", err)
 			}
 			writeExecutable(t, filepath.Join(binDir, "docker"), fakeDocker)
-			writeExecutable(t, filepath.Join(binDir, "sleep"), "#!/bin/sh\nexit 0\n")
 			envContents := "TRUST_PROXY_HEADERS=false\nTRUSTED_PROXY_CIDRS=\"10.0.0.0/8,192.168.0.0/16\"\n"
 			if err := os.WriteFile(filepath.Join(stateDir, ".env"), []byte(envContents), 0o600); err != nil {
 				t.Fatalf("write deployment env: %v", err)
@@ -165,13 +170,30 @@ func TestHostDeployRollback(t *testing.T) {
 			if strings.Contains(logText, "docker-compose.ghcr.yaml") {
 				t.Fatalf("deployment still used the removed GHCR Compose file:\n%s", logText)
 			}
-			if tt.scenario != "missing_proxy_subnet" {
+			if !strings.Contains(logText, "compose up --help") {
+				t.Fatalf("deployment did not check Compose wait support:\n%s", logText)
+			}
+			if tt.scenario == "old_compose" {
+				if !strings.Contains(string(output), "Docker Compose with up --wait-timeout support is required") {
+					t.Fatalf("unsupported Compose failure was unclear:\n%s", output)
+				}
+				commands := strings.Split(strings.TrimSpace(logText), "\n")
+				if len(commands) != 1 || !strings.Contains(commands[0], "compose up --help") {
+					t.Fatalf("unsupported Compose mutated deployment state:\n%s", logText)
+				}
+				return
+			}
+
+			newDeploy := composeUpCommand(logText, "new")
+			if got := newDeploy != ""; got != tt.wantDeploy {
+				t.Fatalf("new deploy command present = %v, want %v\nlog:\n%s", got, tt.wantDeploy, logText)
+			}
+			if tt.wantDeploy {
 				composeFiles := "-f docker/docker-compose.yaml -f docker/docker-compose.traefik.yaml"
-				if !strings.Contains(logText, composeFiles) {
+				if !strings.Contains(newDeploy, composeFiles) {
 					t.Fatalf("deployment did not use the base and Traefik Compose files:\n%s", logText)
 				}
 				wantCIDRs := "172.18.0.0/16,fd00:dead:beef::/64"
-				newDeploy := newDeployCommand(logText)
 				if !strings.Contains(newDeploy, "TRUST_PROXY_HEADERS=true") {
 					t.Fatalf("new deployment does not trust proxy headers:\n%s", logText)
 				}
@@ -181,13 +203,33 @@ func TestHostDeployRollback(t *testing.T) {
 				if strings.Contains(newDeploy, "10.0.0.0/8") || strings.Contains(newDeploy, "192.168.0.0/16") {
 					t.Fatalf("new deployment retained stale proxy CIDRs:\n%s", logText)
 				}
+				if !strings.Contains(newDeploy, " up --wait --wait-timeout 60") {
+					t.Fatalf("new deployment did not use the bounded Compose health gate:\n%s", newDeploy)
+				}
+				if strings.Contains(newDeploy, "--force-recreate") {
+					t.Fatalf("new deployment force-recreated the full stack:\n%s", logText)
+				}
 			}
-			rollbackCommand := "IMAGE_TAG=rollback-new compose "
-			if got := strings.Contains(logText, rollbackCommand); got != tt.wantRollback {
+
+			rollbackDeploy := composeUpCommand(logText, "rollback-new")
+			if got := rollbackDeploy != ""; got != tt.wantRollback {
 				t.Fatalf("rollback command present = %v, want %v\nlog:\n%s", got, tt.wantRollback, logText)
 			}
-			if strings.Contains(logText, "IMAGE_TAG=new compose ") && strings.Contains(newDeployCommand(logText), "--force-recreate") {
-				t.Fatalf("new deployment force-recreated the full stack:\n%s", logText)
+			if tt.wantRollback && !strings.Contains(rollbackDeploy, " up --wait --wait-timeout 60 --no-deps --force-recreate openbyte") {
+				t.Fatalf("rollback did not use the bounded single-service health gate:\n%s", rollbackDeploy)
+			}
+			if tt.wantDiagnostics {
+				for _, container := range []string{"openbyte", "traefik"} {
+					if !strings.Contains(logText, "inspect "+container+" --format {{json .State}}") {
+						t.Fatalf("missing %s state diagnostics:\n%s", container, logText)
+					}
+				}
+			}
+			if tt.scenario == "rollback_wait_failure" && !strings.Contains(string(output), "rollback compose up failed") {
+				t.Fatalf("rollback wait failure was not reported:\n%s", output)
+			}
+			if tt.scenario == "rollback_image_mismatch" && !strings.Contains(string(output), "rollback image mismatch expected_id=old-id running_id=wrong-old-id") {
+				t.Fatalf("rollback image mismatch was not reported:\n%s", output)
 			}
 		})
 	}
@@ -200,9 +242,10 @@ func writeExecutable(t *testing.T, path, contents string) {
 	}
 }
 
-func newDeployCommand(logText string) string {
+func composeUpCommand(logText, imageTag string) string {
+	marker := "IMAGE_TAG=" + imageTag + " compose "
 	for _, line := range strings.Split(logText, "\n") {
-		if strings.Contains(line, "IMAGE_TAG=new compose ") && strings.Contains(line, " up ") {
+		if strings.Contains(line, marker) && strings.Contains(line, " up ") {
 			return line
 		}
 	}
@@ -247,6 +290,14 @@ case "$command" in
     esac
     ;;
   compose)
+    if [ "${1:-}" = up ] && [ "${2:-}" = --help ]; then
+      echo 'Usage: docker compose up [OPTIONS]'
+      echo '      --wait              Wait for services to be running or healthy'
+      if [ "$FAKE_SCENARIO" != old_compose ]; then
+        echo '      --wait-timeout int  Maximum duration in seconds to wait'
+      fi
+      exit 0
+    fi
     action=
     for argument in "$@"; do
       case "$argument" in
@@ -264,8 +315,17 @@ case "$command" in
               exit 1
             fi
             echo new > "$FAKE_STATE_DIR/deployment"
+            case "$FAKE_SCENARIO" in
+              app_unhealthy|traefik_unhealthy|rollback_wait_failure|rollback_image_mismatch)
+                exit 1
+                ;;
+            esac
             ;;
           rollback-*)
+            : > "$FAKE_STATE_DIR/rollback-attempted"
+            if [ "$FAKE_SCENARIO" = rollback_wait_failure ]; then
+              exit 1
+            fi
             echo old > "$FAKE_STATE_DIR/deployment"
             ;;
         esac
@@ -278,33 +338,21 @@ case "$command" in
     esac
     ;;
   inspect)
-    container=
-    for argument in "$@"; do
-      container=$argument
-    done
     deployment=$(cat "$FAKE_STATE_DIR/deployment")
     case "$*" in
       *'{{.Image}}'*)
         if [ "$deployment" = missing ]; then
           exit 0
         elif [ "$deployment" = old ]; then
-          echo old-id
+          if [ "$FAKE_SCENARIO" = rollback_image_mismatch ] && [ -f "$FAKE_STATE_DIR/rollback-attempted" ]; then
+            echo wrong-old-id
+          else
+            echo old-id
+          fi
         elif [ "$FAKE_SCENARIO" = image_mismatch ]; then
           echo wrong-id
         else
           echo new-id
-        fi
-        ;;
-      *'{{.State.Status}}'*)
-        echo running
-        ;;
-      *'{{if .State.Health}}'*)
-        if [ "$container" = traefik ] && [ "$FAKE_SCENARIO" = traefik_unhealthy ]; then
-          echo unhealthy
-        elif [ "$container" = openbyte ] && [ "$deployment" = new ] && [ "$FAKE_SCENARIO" = app_unhealthy ]; then
-          echo unhealthy
-        else
-          echo healthy
         fi
         ;;
       *)

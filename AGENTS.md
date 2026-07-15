@@ -72,6 +72,8 @@
 - CI builds/pushes `edge` + `sha`; release publishes semver + `latest` images and Linux/macOS amd64/arm64 tarballs.
 - **`release.yml` `deploy`**: same `vars`/secrets as CI; gate on **`needs.release.result == 'success'`** (not derived job booleans).
 - Deploy: **checkout first**, then `scripts/deploy/deploy.sh` validates the host key, streams and checksums the bundle over one SSH connection, and runs `deploy_host.sh`; the previous openByte image is pinned locally for Compose-based rollback.
+- `deploy_host.sh` requires Compose `up --wait-timeout`; deploy and rollback use
+  60-second Compose-native health gates followed by image identity checks.
 - Compose uses a published-image base; local source builds add `docker-compose.local.yaml`. The app healthcheck lives in the Dockerfile.
 - Traefik deploy uses the external `traefik` network and generic HTTP/HTTPS routers only; workflows ensure network presence.
 - **Race matrix**: `ci.yml` on `main`: `go test ./... -race -p 1`; `nightly.yml`: `go test -race ./...`.

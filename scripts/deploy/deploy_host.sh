@@ -4,6 +4,10 @@ set -eu
 
 [ -n "${REMOTE_DIR:-}" ] || { echo "REMOTE_DIR not set"; exit 1; }
 test -f "$REMOTE_DIR/.env" || { echo "Missing .env at $REMOTE_DIR/.env"; exit 1; }
+if ! docker compose up --help 2>/dev/null | grep -q -- '--wait-timeout'; then
+  echo "Docker Compose with up --wait-timeout support is required"
+  exit 1
+fi
 
 traefik_host_rule=$(sed -n 's/^TRAEFIK_HOST_RULE=//p' "$REMOTE_DIR/.env" | tail -n 1)
 if [ -n "$traefik_host_rule" ]; then
@@ -47,27 +51,20 @@ restore_openbyte() {
   [ "$rollback_enabled" -eq 1 ] || return 0
 
   echo "restoring previous openbyte image"
-  if ! run_compose "$rollback_image_tag" up -d --no-deps --force-recreate openbyte; then
+  if ! run_compose "$rollback_image_tag" up --wait --wait-timeout 60 --no-deps --force-recreate openbyte; then
     echo "rollback compose up failed"
+    docker inspect openbyte --format '{{json .State}}' || true
     return 1
   fi
 
-  i=1
-  while [ "$i" -le 20 ]; do
-    restored_id=$(docker inspect -f '{{.Image}}' openbyte 2>/dev/null || true)
-    state=$(docker inspect -f '{{.State.Status}}' openbyte 2>/dev/null || true)
-    status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' openbyte 2>/dev/null || true)
-    if [ "$restored_id" = "$previous_id" ] && [ "$state" = "running" ] && [ "$status" = "healthy" ]; then
-      echo "previous openbyte image restored"
-      return 0
-    fi
-    i=$((i + 1))
-    sleep 3
-  done
+  restored_id=$(docker inspect -f '{{.Image}}' openbyte 2>/dev/null || true)
+  if [ "$restored_id" != "$previous_id" ]; then
+    echo "rollback image mismatch expected_id=$previous_id running_id=$restored_id"
+    docker inspect openbyte --format '{{json .State}}' || true
+    return 1
+  fi
 
-  docker inspect openbyte --format '{{json .State}}' || true
-  echo "rollback health check failed"
-  return 1
+  echo "previous openbyte image restored"
 }
 
 echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
@@ -102,8 +99,10 @@ fi
 
 # A unique image tag changes openbyte's Compose config. Avoid force-recreating an unchanged
 # Traefik container on every application deployment.
-if ! run_compose "$DEPLOY_TAG" up -d; then
+if ! run_compose "$DEPLOY_TAG" up --wait --wait-timeout 60; then
   echo "docker compose up failed"
+  docker inspect openbyte --format '{{json .State}}' || true
+  docker inspect traefik --format '{{json .State}}' || true
   restore_openbyte || echo "rollback failed"
   exit 1
 fi
@@ -114,21 +113,3 @@ if [ -z "$running_id" ] || [ "$expected_id" != "$running_id" ]; then
   restore_openbyte || echo "rollback failed"
   exit 1
 fi
-
-i=1
-while [ "$i" -le 20 ]; do
-  state=$(docker inspect -f '{{.State.Status}}' openbyte 2>/dev/null || true)
-  status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' openbyte 2>/dev/null || true)
-  traefik_state=$(docker inspect -f '{{.State.Status}}' traefik 2>/dev/null || true)
-  traefik_status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' traefik 2>/dev/null || true)
-  if [ "$state" = "running" ] && [ "$status" = "healthy" ] && [ "$traefik_state" = "running" ] && [ "$traefik_status" = "healthy" ]; then
-    exit 0
-  fi
-  i=$((i + 1))
-  sleep 3
-done
-
-docker inspect openbyte --format '{{json .State}}' || true
-docker inspect traefik --format '{{json .State}}' || true
-restore_openbyte || echo "rollback failed"
-exit 1
