@@ -77,6 +77,9 @@ The browser client implements:
 | --------------------- | ----------------- | ------------------------------------------------------------------ |
 | `PORT`                | 8080              | HTTP API port                                                      |
 | `SERVER_NAME`         | `openByte Server` | Display name in bootstrap ping metadata, the Web UI, and saved results |
+| `BRAND_PRIMARY_COLOR_DARK` / `BRAND_PRIMARY_COLOR_LIGHT` | — | Primary action/download color pair, in exact `#RRGGBB` form |
+| `BRAND_SECONDARY_COLOR_DARK` / `BRAND_SECONDARY_COLOR_LIGHT` | — | Secondary/upload color pair, in exact `#RRGGBB` form |
+| `BRAND_LOGO_PATH`     | —                 | PNG or JPEG logo path readable by the server (maximum 1 MiB)       |
 | `CAPACITY_GBPS`       | 25                | Server link capacity; HTTP concurrency limits auto-scale from this |
 | `MAX_CONCURRENT_PER_IP` | 64              | Concurrent speed-test streams allowed per client IP and direction  |
 | `RATE_LIMIT_PER_IP`   | 100               | Per-IP requests/minute for shared-result routes                     |
@@ -104,6 +107,15 @@ Notes:
 - If running behind a reverse proxy, allow more than the browser's adaptive 64 MiB maximum request payload and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.
 - Server configuration uses environment variables only; `openbyte --help` lists command-only options.
 
+Brand colors are optional, but each dark/light pair must be set together.
+Primary colors must meet a 4.5:1 contrast ratio and secondary colors a 3:1
+ratio against the corresponding built-in surfaces; invalid combinations fail
+startup instead of silently producing an unreadable UI. A custom logo replaces
+the header wordmark on both the speed-test and shared-result pages. It is read
+once at startup, must be a bounded PNG or JPEG, and does not replace the
+favicon, page metadata, or upstream attribution. Use logo artwork that remains
+legible in both light and dark themes.
+
 ### Deployment With Environment Variables
 
 ```bash
@@ -112,7 +124,20 @@ docker run --rm -p 8080:8080 \
   -e SERVER_NAME="Frankfurt 25G" \
   ghcr.io/saveenergy/openbyte:latest
 
-# Docker Compose reads SERVER_NAME from docker/.env
+# Branded deployment (the light values are deliberately darker for contrast)
+mkdir -p branding
+cp /path/to/company-logo.png branding/logo.png
+docker run --rm -p 8080:8080 \
+  -v "$PWD/branding:/app/branding:ro" \
+  -e BRAND_LOGO_PATH=/app/branding/logo.png \
+  -e BRAND_PRIMARY_COLOR_DARK="#66E3FF" \
+  -e BRAND_PRIMARY_COLOR_LIGHT="#00677A" \
+  -e BRAND_SECONDARY_COLOR_DARK="#FFB45C" \
+  -e BRAND_SECONDARY_COLOR_LIGHT="#9A4D00" \
+  ghcr.io/saveenergy/openbyte:latest
+
+# Docker Compose reads the same values from docker/.env and mounts
+# BRAND_ASSETS_DIR read-only at /app/branding.
 ```
 
 ### IPv4/IPv6 Detection

@@ -36,8 +36,8 @@
 }
 
 .bb-badge.bb-good {
-  color: var(--accent-primary);
-  background: rgba(0, 212, 170, 0.12);
+  color: var(--success);
+  background: var(--success-soft);
 }
 
 .bb-badge.bb-mid {

@@ -66,10 +66,15 @@
   --accent-primary: var(--brand-primary);
   --accent-secondary: var(--brand-secondary);
   --accent-glow: rgba(0, 212, 170, 0.3);
+  --ambient-primary: rgba(0, 212, 170, 0.08);
+  --ambient-secondary: rgba(102, 126, 234, 0.05);
 
   --upload-color: #667eea;
   --download-color: #00d4aa;
 
+  --success: #00d4aa;
+  --success-soft: rgba(0, 212, 170, 0.12);
+  --success-glow: rgba(0, 212, 170, 0.3);
   --error: #ff6b6b;
   --warning: #feca57;
 
@@ -117,6 +122,9 @@
     --accent-secondary: #006f61;
     --accent-glow: rgba(0, 212, 170, 0.22);
     --download-color: #00796b;
+    --success: #00796b;
+    --success-soft: rgba(0, 121, 107, 0.12);
+    --success-glow: rgba(0, 121, 107, 0.22);
     --error: #dc2626;
     --warning: #b45309;
 
@@ -141,6 +149,9 @@
   --accent-secondary: #006f61;
   --accent-glow: rgba(0, 212, 170, 0.22);
   --download-color: #00796b;
+  --success: #00796b;
+  --success-soft: rgba(0, 121, 107, 0.12);
+  --success-glow: rgba(0, 121, 107, 0.22);
   --error: #dc2626;
   --warning: #b45309;
 
@@ -222,12 +233,12 @@ body::before {
   background:
     radial-gradient(
       ellipse 80% 50% at 50% -20%,
-      rgba(0, 212, 170, 0.08),
+      var(--ambient-primary),
       transparent
     ),
     radial-gradient(
       ellipse 60% 40% at 100% 100%,
-      rgba(102, 126, 234, 0.05),
+      var(--ambient-secondary),
       transparent
     );
   pointer-events: none;
@@ -264,6 +275,21 @@ body::before {
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--text-primary);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.brand-wordmark {
+  display: block;
+}
+
+.brand-logo {
+  display: none;
+  width: 180px;
+  max-width: 100%;
+  height: 32px;
+  object-fit: contain;
+  object-position: left center;
 }
 
 .link-plain {
@@ -302,8 +328,8 @@ body::before {
 }
 
 .server-dot.connected {
-  background: var(--accent-primary);
-  box-shadow: 0 0 8px var(--accent-glow);
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success-glow);
 }
 
 .server-dot.error {

@@ -7,6 +7,11 @@ services:
       - "8080:8080" # API + Web UI
     environment:
       - SERVER_NAME=${SERVER_NAME:-openByte Server}
+      - BRAND_PRIMARY_COLOR_DARK=${BRAND_PRIMARY_COLOR_DARK:-}
+      - BRAND_PRIMARY_COLOR_LIGHT=${BRAND_PRIMARY_COLOR_LIGHT:-}
+      - BRAND_SECONDARY_COLOR_DARK=${BRAND_SECONDARY_COLOR_DARK:-}
+      - BRAND_SECONDARY_COLOR_LIGHT=${BRAND_SECONDARY_COLOR_LIGHT:-}
+      - BRAND_LOGO_PATH=${BRAND_LOGO_PATH:-}
       - TRUST_PROXY_HEADERS=${TRUST_PROXY_HEADERS:-false}
       - TRUSTED_PROXY_CIDRS=${TRUSTED_PROXY_CIDRS:-}
       - CAPACITY_GBPS=${CAPACITY_GBPS:-25}
@@ -24,6 +29,7 @@ services:
       - PPROF_ADDR=${PPROF_ADDR:-127.0.0.1:6060}
     volumes:
       - openbyte-data:/app/data
+      - ${BRAND_ASSETS_DIR:-../branding}:/app/branding:ro
     restart: unless-stopped
 
 volumes:

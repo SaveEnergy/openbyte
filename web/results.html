@@ -36,6 +36,7 @@
     />
     <link rel="stylesheet" href="/base.css" />
     <link rel="stylesheet" href="/preferences.css" />
+    <link rel="stylesheet" href="/branding.css" />
     <link rel="stylesheet" href="/speed-results.css" />
     <link rel="stylesheet" href="/results.css" />
     <link rel="stylesheet" href="/motion.css" />
@@ -47,9 +48,22 @@
     <div class="app">
       <header class="header">
         <div class="brand">
-          <a href="/" class="link-plain"
+          <a
+            href="/"
+            class="link-plain"
+            data-i18n-aria-label="nav.speedTest"
+            aria-label="Speed Test"
             ><div class="logo">
-              open<span class="logo-accent">Byte</span>
+              <span class="brand-wordmark"
+                >open<span class="logo-accent">Byte</span></span
+              >
+              <img
+                class="brand-logo"
+                src="/branding/logo"
+                width="180"
+                height="32"
+                alt=""
+              />
             </div></a
           >
           <div
