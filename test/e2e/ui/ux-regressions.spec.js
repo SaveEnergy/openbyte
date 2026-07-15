@@ -405,8 +405,6 @@ test.describe("openByte UI regressions", () => {
       document.documentElement.dataset.theme = "light";
       document.getElementById("idleState").classList.add("hidden");
       document.getElementById("resultsState").classList.remove("hidden");
-      const partial = document.getElementById("partialNotice");
-      partial.classList.remove("hidden");
       const badge = document.getElementById("bufferbloatResult");
       badge.classList.add("bb-good");
       const background = getComputedStyle(document.body).backgroundColor;
@@ -423,7 +421,6 @@ test.describe("openByte UI regressions", () => {
       return {
         badgeContrast: contrast(getComputedStyle(badge).color, background),
         historyDirection: getComputedStyle(historyItem).flexDirection,
-        partialContrast: contrast(getComputedStyle(partial).color, background),
         summaryHeight: summaryRect.height,
         themeHeight: themeRect.height,
         themeWidth: themeRect.width,
@@ -432,7 +429,6 @@ test.describe("openByte UI regressions", () => {
 
     expect(audit.badgeContrast).toBeGreaterThanOrEqual(4.5);
     expect(audit.historyDirection).toBe("column");
-    expect(audit.partialContrast).toBeGreaterThanOrEqual(4.5);
     expect(audit.summaryHeight).toBeGreaterThanOrEqual(44);
     expect(audit.themeHeight).toBeGreaterThanOrEqual(44);
     expect(audit.themeWidth).toBeGreaterThanOrEqual(44);

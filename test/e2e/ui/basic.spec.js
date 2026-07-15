@@ -239,27 +239,70 @@ test.describe("openByte UI", () => {
     expect(savePayload).not.toHaveProperty("diagnostics");
   });
 
-  test("handles cancel then restart cleanly", async ({ page }) => {
+  test("discards an upload-phase cancel then restarts cleanly", async ({
+    page,
+  }) => {
     await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
 
     await page.locator("#startBtn").click();
-    await expect(page.locator("#testingState")).toBeVisible({ timeout: 10000 });
-    await page.evaluate(() => {
-      document.getElementById("cancelBtn").click();
-      setTimeout(() => {
-        document.getElementById("startBtn").click();
-      }, 25);
+    await expect
+      .poll(
+        () =>
+          page.evaluate(async () => {
+            const { state } = await import("/state.js");
+            return {
+              phase: state.phase,
+              downloadComplete: state.downloadResult > 0,
+            };
+          }),
+        { timeout: 60_000 },
+      )
+      .toEqual({ phase: "upload", downloadComplete: true });
+
+    await page.locator("#cancelBtn").click();
+    await expect(page.locator("#idleState")).toBeVisible();
+    await expect(page.locator("#startBtn")).toBeFocused();
+    await expect(page.locator("#shareBtn")).toBeHidden();
+
+    const cancelled = await page.evaluate(async () => {
+      const { state } = await import("/state.js");
+      return {
+        phase: state.phase,
+        isRunning: state.isRunning,
+        hasController: state.abortController !== null,
+        download: state.downloadResult,
+        upload: state.uploadResult,
+        latency: state.latencyResult,
+        jitter: state.jitterResult,
+        downloadLatency: state.downloadLatency,
+        uploadLatency: state.uploadLatency,
+        history: JSON.parse(localStorage.getItem("openbyte-history") || "[]"),
+      };
+    });
+    expect(cancelled).toEqual({
+      phase: "idle",
+      isRunning: false,
+      hasController: false,
+      download: 0,
+      upload: 0,
+      latency: null,
+      jitter: null,
+      downloadLatency: 0,
+      uploadLatency: 0,
+      history: [],
     });
 
+    await page.locator("#startBtn").click();
     await expect(page.locator("#resultsState")).toBeVisible({
       timeout: 60_000,
     });
-    const downloadMbps = await page.evaluate(async () => {
-      const { state } = await import("/state.js");
-      return state.downloadResult;
-    });
-    expect(Number.isFinite(downloadMbps)).toBeTruthy();
-    expect(downloadMbps).toBeGreaterThanOrEqual(0);
+    await expect(page.locator("#loadedLatencyResult")).not.toHaveText("-");
+    await expect(page.locator("#bufferbloatResult")).toHaveText(
+      /^(A\+|A|B|C|D|F)$/,
+    );
+    await expect(page.locator(".stats-help")).toBeVisible();
+    await expect(page.locator("#historyList .history-item")).toHaveCount(1);
+    await expect(page.locator("#shareBtn")).toBeVisible();
   });
 
   test("renders shared result page from saved result", async ({

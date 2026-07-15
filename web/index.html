@@ -236,13 +236,6 @@
             id="resultsAnnouncement"
             aria-live="polite"
           ></p>
-          <div
-            class="partial-notice hidden"
-            id="partialNotice"
-            data-i18n="result.partialNotice"
-          >
-            Partial result — upload was not measured.
-          </div>
           <div class="results-main">
             <div class="result-card result-primary">
               <div class="result-icon">↓</div>
@@ -271,15 +264,12 @@
               <span class="extra-value" id="jitterResult">0 ms</span>
             </div>
             <div class="extra-stat">
-              <span
-                class="extra-label"
-                id="loadedLatencyLabel"
-                data-i18n="metric.loadedLatency"
+              <span class="extra-label" data-i18n="metric.loadedLatency"
                 >Under load</span
               >
               <span class="extra-value" id="loadedLatencyResult">0 ms</span>
             </div>
-            <div class="extra-stat" id="bufferbloatStat">
+            <div class="extra-stat">
               <span class="extra-label" data-i18n="metric.bufferbloat"
                 >Bufferbloat</span
               >

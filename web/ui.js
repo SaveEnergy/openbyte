@@ -327,10 +327,9 @@ export function showState(stateName) {
   focusStateAction(stateName);
 }
 
-export function showResults(options = {}) {
-  const partial = options.partial === true;
+export function showResults() {
   showState("results");
-  enterResults(partial);
+  enterResults();
 }
 
 function renderToast() {

@@ -43,23 +43,10 @@ function clearRunResults() {
   state.jitterResult = null;
   state.downloadLatency = 0;
   state.uploadLatency = 0;
-  state.partialCancelRequested = false;
-  state.lastResultPartial = false;
 }
 
 function isCurrentRun(signal) {
   return state.abortController?.signal === signal;
-}
-
-function finishAbortedRun(signal) {
-  if (!isCurrentRun(signal)) return;
-  if (state.partialCancelRequested && state.downloadResult > 0) {
-    state.partialCancelRequested = false;
-    state.phase = "results";
-    showResults({ partial: true });
-  } else {
-    resetToIdle();
-  }
 }
 
 function recordRunInHistory() {
@@ -103,7 +90,7 @@ export async function startTest() {
 
     if (!isCurrentRun(signal)) return;
     if (signal.aborted) {
-      finishAbortedRun(signal);
+      resetToIdle();
       return;
     }
     state.latencyResult = latency.value;
@@ -121,7 +108,7 @@ export async function startTest() {
 
     if (!isCurrentRun(signal)) return;
     if (signal.aborted) {
-      finishAbortedRun(signal);
+      resetToIdle();
       return;
     }
     state.downloadResult = downloadResult;
@@ -138,7 +125,7 @@ export async function startTest() {
 
     if (!isCurrentRun(signal)) return;
     if (signal.aborted) {
-      finishAbortedRun(signal);
+      resetToIdle();
       return;
     }
     state.uploadResult = uploadResult;
@@ -150,7 +137,7 @@ export async function startTest() {
   } catch (e) {
     if (!isCurrentRun(signal)) return;
     if (e.name === "AbortError") {
-      finishAbortedRun(signal);
+      resetToIdle();
     } else {
       console.error("Test failed:", e);
       // Reset first: resetToIdle clears toasts, so the error must be shown after.
@@ -167,28 +154,9 @@ export async function startTest() {
   }
 }
 
-export function cancelTest() {
-  if (state.abortController) {
-    state.abortController.abort();
-  }
-  state.isRunning = false;
-}
-
-/**
- * Cancel button: keep already-measured latency and download figures when the
- * download phase finished; otherwise there is nothing worth showing.
- */
-export function handleCancel() {
-  if (state.isRunning && state.downloadResult > 0) {
-    state.partialCancelRequested = true;
-    cancelTest();
-    return;
-  }
-  resetToIdle();
-}
-
 export function resetToIdle() {
-  cancelTest();
+  state.abortController?.abort();
+  state.isRunning = false;
   state.abortController = null;
 
   state.runGeneration += 1;
@@ -204,10 +172,6 @@ export function resetToIdle() {
     elements.shareBtn.disabled = false;
     elements.shareBtn.textContent = t("action.share");
   }
-  if (elements.partialNotice) {
-    elements.partialNotice.classList.add("hidden");
-  }
-
   resetProgress();
   showState("idle");
   hideError();
@@ -281,7 +245,7 @@ function copyShareUrl(resultId = state.resultId) {
 
 /** One tap: save the result (first time) and hand over the link. */
 export async function handleShare() {
-  if (state.phase !== "results" || state.lastResultPartial) return;
+  if (state.phase !== "results") return;
 
   const generation = state.runGeneration;
   if (state.resultId) {
@@ -340,7 +304,7 @@ function bindEvents() {
   }
   elements.startBtn.addEventListener("click", startTest);
   elements.restartBtn.addEventListener("click", resetToIdle);
-  elements.cancelBtn?.addEventListener("click", handleCancel);
+  elements.cancelBtn?.addEventListener("click", resetToIdle);
   elements.shareBtn?.addEventListener("click", handleShare);
 }
 

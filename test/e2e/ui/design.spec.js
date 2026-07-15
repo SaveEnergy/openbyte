@@ -24,21 +24,21 @@ function contrast(first, second) {
   return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
-async function showSyntheticResult(page, { partial = false } = {}) {
-  await page.evaluate(async (isPartial) => {
+async function showSyntheticResult(page) {
+  await page.evaluate(async () => {
     const { state } = await import("/state.js");
     const { showResults } = await import("/ui.js");
     Object.assign(state, {
       phase: "results",
       downloadResult: 320,
-      uploadResult: isPartial ? 0 : 48,
+      uploadResult: 48,
       latencyResult: 10,
       jitterResult: 1.5,
       downloadLatency: 82,
-      uploadLatency: isPartial ? 0 : 74,
+      uploadLatency: 74,
     });
-    showResults({ partial: isPartial });
-  }, partial);
+    showResults();
+  });
 }
 
 test.describe("brand and localized layout", () => {
@@ -171,24 +171,6 @@ test.describe("brand and localized layout", () => {
     expect(layout.extraLabelTransform).toBe("none");
     await expect(page.locator("#resultsAdvisory")).toHaveText(
       "Die Latenz steigt unter Last. Anrufe und Spiele können dann stocken.",
-    );
-  });
-
-  test("does not invent an upload-based grade for a partial result", async ({
-    page,
-  }) => {
-    await page.goto("/");
-    await showSyntheticResult(page, { partial: true });
-
-    await expect(page.locator("#partialNotice")).toBeVisible();
-    await expect(page.locator("#loadedLatencyLabel")).toHaveText(
-      "Beim Download",
-    );
-    await expect(page.locator("#bufferbloatStat")).toBeHidden();
-    await expect(page.locator("#resultsAdvisory")).toBeHidden();
-    await expect(page.locator(".stats-help")).toBeHidden();
-    await expect(page.locator("#resultsAnnouncement")).not.toContainText(
-      /Bufferbloat|Bewertung/,
     );
   });
 
