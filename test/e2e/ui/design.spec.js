@@ -45,13 +45,14 @@ test.describe("brand and localized layout", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem("openbyte-theme", "light");
+      localStorage.setItem("openbyte-language", "de");
     });
   });
 
   test("keeps mint branding while using accessible light-theme text", async ({
     page,
   }) => {
-    await page.goto("/?lang=de");
+    await page.goto("/");
     const styles = await page.evaluate(() => {
       const root = getComputedStyle(document.documentElement);
       const read = (selector) => getComputedStyle(document.querySelector(selector));
@@ -108,7 +109,7 @@ test.describe("brand and localized layout", () => {
   test("keeps the preference capsule inside narrow and intermediate headers", async ({
     page,
   }) => {
-    await page.goto("/?lang=de");
+    await page.goto("/");
     for (const width of [320, 390, 430, 600]) {
       await page.setViewportSize({ width, height: 800 });
       const layout = await page.evaluate(() => {
@@ -140,7 +141,7 @@ test.describe("brand and localized layout", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 320, height: 800 });
-    await page.goto("/?lang=de");
+    await page.goto("/");
     await showSyntheticResult(page);
 
     const layout = await page.evaluate(() => {
@@ -176,7 +177,7 @@ test.describe("brand and localized layout", () => {
   test("does not invent an upload-based grade for a partial result", async ({
     page,
   }) => {
-    await page.goto("/?lang=de");
+    await page.goto("/");
     await showSyntheticResult(page, { partial: true });
 
     await expect(page.locator("#partialNotice")).toBeVisible();
@@ -199,13 +200,13 @@ test.describe("brand and localized layout", () => {
         body: JSON.stringify({ error: "internal error" }),
       });
     });
-    await page.goto("/results/ABCDEF12?lang=de");
+    await page.goto("/results/ABCDEF12");
     await expect(page.locator("h1")).toHaveCount(1);
     await expect(page.locator("h1")).toHaveText("Testergebnis");
     await expect(page.locator("#errorCode")).toBeHidden();
 
     await page.unrouteAll({ behavior: "wait" });
-    await page.goto("/results/00000000?lang=de");
+    await page.goto("/results/00000000");
     await expect(page.locator("#errorCode")).toBeVisible();
     await expect(page.locator("#errorCode")).toHaveText("404");
   });
