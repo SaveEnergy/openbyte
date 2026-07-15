@@ -31,6 +31,7 @@ func TestRouterStaticServesFrontendModules(t *testing.T) {
 		"toast.css",
 		"api.html",
 		"api.css",
+		"api.js",
 	} {
 		t.Run(name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, exampleBaseURL+"/"+name, nil)

@@ -45,6 +45,7 @@ func newStaticAllowlistHandler(webFS http.FileSystem) http.Handler {
 		"results.js":                 true,
 		"theme.js":                   true,
 		"history.js":                 true,
+		"api.js":                     true,
 		"api.css":                    true,
 		"base.css":                   true,
 		"speed.css":                  true,

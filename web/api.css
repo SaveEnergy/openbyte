@@ -116,6 +116,14 @@
   line-height: 1.65;
 }
 
+/* The global reset zeroes ul padding/margins; restore list layout here. */
+.api-note ul {
+  display: grid;
+  gap: var(--space-md);
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+
 .api-method {
   display: inline-flex;
   border-radius: 999px;

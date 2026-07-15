@@ -60,7 +60,7 @@
           </p>
           <div class="api-base-card" aria-label="API base URL">
             <span class="api-label">Base URL</span>
-            <code>window.location.origin</code>
+            <code id="apiBaseUrl">same origin as this page</code>
           </div>
         </section>
 
@@ -236,5 +236,6 @@ async function uploadOnce(size = 1048576, base = location.origin) {
       </footer>
     </div>
     <script type="module" src="theme.js"></script>
+    <script type="module" src="api.js"></script>
   </body>
 </html>

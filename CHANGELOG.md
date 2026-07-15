@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   toasts use fixed high-contrast colors in both themes.
 - **Mobile results layout**: the four secondary stats render as a 2×2 grid on
   small screens instead of one long column.
+- **API docs page**: the Base URL chip now shows the actual server origin
+  (filled in by `web/api.js`) instead of the literal text
+  `window.location.origin`, and the Agent notes list regained its bullet
+  indentation and spacing lost to the global CSS reset.
 
 ### Security
 
