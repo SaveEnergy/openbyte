@@ -21,6 +21,8 @@ in Git history and pull requests, not release notes.
 - **Result context**: a loaded-latency advisory, a colored bufferbloat grade
   badge, and a "What do these numbers mean?" disclosure explaining the
   secondary metrics without assigning a subjective connection label.
+- **Manual theme toggle**: header button cycles system → light → dark and
+  persists per device (`web/theme.js`) on the main and shared-result pages.
 
 ### Changed
 
@@ -52,19 +54,18 @@ in Git history and pull requests, not release notes.
   result.
 - **Offline handling**: the server health check re-runs every 30 s while idle,
   and an offline server disables the GO button instead of failing on click.
-- **Light theme & toast polish**: the UI follows the system color scheme, light
-  mode gains card borders/shadows, and toasts use fixed high-contrast colors in
-  both themes.
+- **Light theme & toast polish**: light mode gains card borders/shadows, and
+  toasts use fixed high-contrast colors in both themes.
 - **Mobile results layout**: the four secondary stats render as a 2×2 grid on
   small screens, while download and upload remain side by side.
 - **Brand and localization polish**: restored mint as the stable openByte brand
-  color without reusing it for low-contrast light-theme text, kept the language
-  preference compact, shortened German copy, and stopped exposing
-  adaptive-stream jargon in the test UI.
+  color without reusing it for low-contrast light-theme text, grouped language
+  and theme preferences into one compact control, shortened German copy, and
+  stopped exposing adaptive-stream jargon in the test UI.
 - **Shared result page**: aligned with the live results view — loaded-latency
-  advisory, colored bufferbloat badge, and metric explanations now appear on
-  `/results/{id}` too. The explanations live in a shared `stats-help.js` module
-  used by both pages.
+  advisory, colored bufferbloat badge, metric explanations, and the theme
+  toggle now appear on `/results/{id}` too. The explanations live in a shared
+  `stats-help.js` module used by both pages.
 - **Release archives**: Linux and macOS builds are published for amd64 and arm64
   as `.tar.gz` files with one checksum manifest.
 

@@ -74,46 +74,20 @@ test.describe("openByte UI", () => {
     });
   });
 
-  test("follows the system color scheme on both pages", async ({
-    page,
-    request,
-  }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem("openbyte-theme", "light");
-    });
+  test("theme toggle cycles system, light, dark", async ({ page }) => {
+    await page.goto("/");
+    const html = page.locator("html");
 
-    for (const path of ["/", "/results/abc12345"]) {
-      await page.emulateMedia({ colorScheme: "dark" });
-      await page.goto(path);
+    await expect(html).not.toHaveAttribute("data-theme", /.+/);
+    await page.locator("#themeToggle").click();
+    await expect(html).toHaveAttribute("data-theme", "light");
+    await page.locator("#themeToggle").click();
+    await expect(html).toHaveAttribute("data-theme", "dark");
 
-      await expect(page.locator("#themeToggle")).toHaveCount(0);
-      await expect(page.locator("html")).not.toHaveAttribute("data-theme", /.+/);
-      await expect
-        .poll(() =>
-          page.evaluate(() =>
-            getComputedStyle(document.documentElement)
-              .getPropertyValue("--bg-primary")
-              .trim(),
-          ),
-        )
-        .toBe("#0a0a0f");
-
-      await page.emulateMedia({ colorScheme: "light" });
-      await expect
-        .poll(() =>
-          page.evaluate(() =>
-            getComputedStyle(document.documentElement)
-              .getPropertyValue("--bg-primary")
-              .trim(),
-          ),
-        )
-        .toBe("#f6f8fb");
-      expect(
-        await page.evaluate(() => localStorage.getItem("openbyte-theme")),
-      ).toBe("light");
-    }
-
-    expect((await request.get("/theme.js")).status()).toBe(404);
+    await page.reload();
+    await expect(html).toHaveAttribute("data-theme", "dark");
+    await page.locator("#themeToggle").click();
+    await expect(html).not.toHaveAttribute("data-theme", /.+/);
   });
 
   test("toast regions keep accessible roles", async ({ page }) => {

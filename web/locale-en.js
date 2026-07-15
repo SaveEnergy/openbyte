@@ -9,6 +9,13 @@ export const en = Object.freeze({
   "language.label": "Choose language",
   "language.system": "System · {locale}",
 
+  "theme.switch": "Switch theme",
+  "theme.systemNextLight":
+    "Theme follows system preference. Activate for light theme.",
+  "theme.lightNextDark": "Light theme active. Activate for dark theme.",
+  "theme.darkNextSystem":
+    "Dark theme active. Activate to follow system preference.",
+
   "server.connecting": "Connecting…",
   "server.ready": "Ready",
   "server.offline": "Offline",

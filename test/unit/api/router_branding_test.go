@@ -15,7 +15,7 @@ import (
 	"github.com/saveenergy/openbyte/internal/config"
 )
 
-func TestBrandingCSSServesValidatedSystemPalettes(t *testing.T) {
+func TestBrandingCSSServesValidatedThemeOverrides(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.BrandPrimaryColorDark = "#00d4aa"
 	cfg.BrandPrimaryColorLight = "#00796b"
@@ -49,19 +49,14 @@ func TestBrandingCSSServesValidatedSystemPalettes(t *testing.T) {
 		`--ambient-primary: rgba(0, 212, 170, 0.08);`,
 		`--ambient-secondary: rgba(102, 126, 234, 0.05);`,
 		`--upload-color: #667eea;`,
-		`@media (prefers-color-scheme: light)`,
+		`:root:not([data-theme="dark"])`,
+		`:root[data-theme="light"]`,
 		`--accent-primary: #00796b;`,
 		`--on-brand: #ffffff;`,
 	} {
 		if !strings.Contains(css, want) {
 			t.Errorf("branding CSS missing %q:\n%s", want, css)
 		}
-	}
-	if strings.Contains(css, "data-theme") {
-		t.Fatalf("branding CSS retains manual theme selectors:\n%s", css)
-	}
-	if got := strings.Count(css, "--accent-primary: #00796b;"); got != 1 {
-		t.Fatalf("light palette emitted %d times, want 1:\n%s", got, css)
 	}
 	if strings.Contains(css, "color-mix") {
 		t.Fatal("branding CSS should contain only precomputed color literals")

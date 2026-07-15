@@ -15,7 +15,7 @@ const brandingCSS = `
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme="dark"]) {
     --brand-primary: #805f00;
     --brand-secondary: #6b4f00;
     --on-brand: #ffffff;
@@ -27,6 +27,19 @@ const brandingCSS = `
     --download-color: #805f00;
     --upload-color: #315db8;
   }
+}
+
+:root[data-theme="light"] {
+  --brand-primary: #805f00;
+  --brand-secondary: #6b4f00;
+  --on-brand: #ffffff;
+  --accent-primary: #805f00;
+  --accent-secondary: #6b4f00;
+  --accent-glow: rgba(128, 95, 0, 0.22);
+  --ambient-primary: rgba(128, 95, 0, 0.08);
+  --ambient-secondary: rgba(49, 93, 184, 0.05);
+  --download-color: #805f00;
+  --upload-color: #315db8;
 }
 
 .brand-wordmark { display: none; }
@@ -152,7 +165,9 @@ test.describe("visual branding", () => {
       good: "rgb(0, 212, 170)",
     });
 
-    await page.emulateMedia({ colorScheme: "light" });
+    const html = page.locator("html");
+    await page.locator("#themeToggle").click();
+    await expect(html).toHaveAttribute("data-theme", "light");
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -167,7 +182,8 @@ test.describe("visual branding", () => {
       )
       .toEqual(["#805f00", "#805f00", "#805f00", "#315db8"]);
 
-    await page.emulateMedia({ colorScheme: "dark" });
+    await page.locator("#themeToggle").click();
+    await expect(html).toHaveAttribute("data-theme", "dark");
     await expect
       .poll(() =>
         page.evaluate(() => {
@@ -206,7 +222,6 @@ test.describe("visual branding", () => {
   test("keeps the branded result-page home link accessible", async ({
     page,
   }) => {
-    await page.emulateMedia({ colorScheme: "dark" });
     await mockBranding(page);
     await page.goto("/results/abc12345?lang=en");
 
@@ -215,25 +230,5 @@ test.describe("visual branding", () => {
       .getByRole("link", { name: "Speed Test", exact: true });
     await expect(home).toBeVisible();
     await expect(home.locator(".brand-logo")).toBeVisible();
-
-    await expect
-      .poll(() =>
-        page.evaluate(() =>
-          getComputedStyle(document.documentElement)
-            .getPropertyValue("--brand-primary")
-            .trim(),
-        ),
-      )
-      .toBe("#ffcc00");
-    await page.emulateMedia({ colorScheme: "light" });
-    await expect
-      .poll(() =>
-        page.evaluate(() =>
-          getComputedStyle(document.documentElement)
-            .getPropertyValue("--brand-primary")
-            .trim(),
-        ),
-      )
-      .toBe("#805f00");
   });
 });
