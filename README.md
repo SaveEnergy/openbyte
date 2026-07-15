@@ -103,7 +103,7 @@ Notes:
 - Configure public DNS and reverse-proxy routing outside openByte; saved-result URLs are relative.
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
 - `/api/v1/ping` is the only cross-origin API: it allows any origin so the UI can probe dedicated IPv4/IPv6 hostnames. Other API routes are same-origin.
-- There is no `/api/v1/version` route. The UI requests `/api/v1/ping?meta=1` during bootstrap to load `SERVER_NAME`; measurement and address-discovery pings keep the smaller default response.
+- There is no `/api/v1/version` route. A ping returns `client_ip`, and the UI infers its address family from the canonical address; `/api/v1/ping?meta=1` also returns `server_name` during bootstrap.
 - If running behind a reverse proxy, allow more than the browser's adaptive 64 MiB maximum request payload and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.
 - Server configuration uses environment variables only; `openbyte --help` lists command-only options.
 

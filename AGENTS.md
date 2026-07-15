@@ -34,6 +34,7 @@
 - Self-hosted fonts, motion, loaded-latency measurement, and bufferbloat grading are intentional product features; simplification work must preserve them.
 - English/German localization resolves once per page from the stored choice or browser-language Auto mode; changing it persists the choice and reloads. Navigation/share URLs never carry locale, static metadata stays server-authored English, and worker failures cross into the UI as catalog-key codes without prose.
 - Network probe fetch paths drain non-OK and malformed JSON responses.
+- Ping returns `client_ip` by default and adds `server_name` only for `?meta=1`; the UI infers IPv4/IPv6 from the canonical address while keeping all discovery probes eager.
 - Server settings UI: no server selector; a single deployed server tests itself.
 - UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.
 - Header language/theme controls live in **`preferences.css`**; automatic language labels expose the resolved locale. The built-in **`--brand-primary`** stays mint while light-theme foregrounds use the separate accessible accent token; configured branding replaces the appropriate brand/accent tokens for each theme.

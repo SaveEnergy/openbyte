@@ -10,9 +10,7 @@ test.describe("browser speed-test runtime", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          pong: true,
           client_ip: "198.51.100.42",
-          ipv6: false,
           server_name: "Playwright Server",
         }),
       });

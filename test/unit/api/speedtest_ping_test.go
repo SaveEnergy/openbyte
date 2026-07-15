@@ -35,24 +35,15 @@ func TestSpeedTestHandlerPingResponseShape(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf(speedtestDecodeRespFmt, err)
 	}
-	if pong, ok := resp["pong"].(bool); !ok || !pong {
-		t.Fatalf("pong = %v, want true", resp["pong"])
-	}
-	if _, ok := resp["timestamp"].(float64); !ok {
-		t.Fatalf("timestamp missing or wrong type: %T", resp["timestamp"])
+	if len(resp) != 1 {
+		t.Fatalf("plain ping fields = %v, want only client_ip", resp)
 	}
 	if ip, ok := resp[pingClientIPKey].(string); !ok || ip != pingClientIPv4Want {
 		t.Fatalf("client_ip = %v, want %s", resp[pingClientIPKey], pingClientIPv4Want)
 	}
-	if ipv6, ok := resp[pingIPv6Key].(bool); !ok || ipv6 {
-		t.Fatalf(pingIPv6FalseMsg, resp[pingIPv6Key])
-	}
-	if _, exists := resp["server_name"]; exists {
-		t.Fatalf("plain ping unexpectedly included server_name: %s", rec.Body.String())
-	}
 }
 
-func TestSpeedTestHandlerPingNilResolverFallback(t *testing.T) {
+func TestSpeedTestHandlerPingReturnsIPv6Address(t *testing.T) {
 	handler := api.NewSpeedTestHandler(10, 300)
 	req := httptest.NewRequest(http.MethodGet, pingEndpoint, nil)
 	req.RemoteAddr = "[2001:db8::1]:4242"
@@ -64,11 +55,11 @@ func TestSpeedTestHandlerPingNilResolverFallback(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf(speedtestDecodeRespFmt, err)
 	}
+	if len(resp) != 1 {
+		t.Fatalf("plain ping fields = %v, want only client_ip", resp)
+	}
 	if ip, ok := resp[pingClientIPKey].(string); !ok || ip != pingClientIPv6Want {
 		t.Fatalf("client_ip = %v, want %s", resp[pingClientIPKey], pingClientIPv6Want)
-	}
-	if ipv6, ok := resp[pingIPv6Key].(bool); !ok || !ipv6 {
-		t.Fatalf(pingIPv6TrueMsg, resp[pingIPv6Key])
 	}
 }
 

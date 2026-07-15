@@ -2,11 +2,8 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -82,30 +79,17 @@ func (h *SpeedTestHandler) Ping(w http.ResponseWriter, r *http.Request) {
 }
 
 type pingResponse struct {
-	Pong       bool   `json:"pong"`
-	Timestamp  int64  `json:"timestamp"`
 	ClientIP   string `json:"client_ip"`
-	IPv6       bool   `json:"ipv6"`
 	ServerName string `json:"server_name,omitempty"`
 }
 
 func (h *SpeedTestHandler) ping(w http.ResponseWriter, r *http.Request, serverName string) {
-	clientIP := h.resolveClientIP(r)
-	isIPv6 := strings.IndexByte(clientIP, ':') >= 0
-
-	w.Header().Set(headerContentType, contentTypeJSON)
 	w.Header().Set(headerCacheControl, valueNoStore)
 	if r.Header.Get("Origin") != "" {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 	}
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(pingResponse{
-		Pong:       true,
-		Timestamp:  time.Now().UnixMilli(),
-		ClientIP:   clientIP,
-		IPv6:       isIPv6,
+	respondJSON(w, pingResponse{
+		ClientIP:   h.resolveClientIP(r),
 		ServerName: serverName,
-	}); err != nil {
-		slog.Warn("speedtest: encode ping response", "error", err)
-	}
+	}, http.StatusOK)
 }

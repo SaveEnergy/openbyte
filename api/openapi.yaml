@@ -47,7 +47,7 @@ paths:
           description: Include the configured server display name when set to `1`. Omit for latency measurements.
       responses:
         "200":
-          description: Pong response with client IP info and optional bootstrap metadata.
+          description: Client IP address with optional bootstrap metadata.
           content:
             application/json:
               schema:
@@ -238,18 +238,12 @@ components:
 
     PingResponse:
       type: object
+      additionalProperties: false
+      required: [client_ip]
       properties:
-        pong:
-          type: boolean
-          example: true
-        timestamp:
-          type: integer
-          format: int64
-          description: Unix milliseconds.
         client_ip:
           type: string
-        ipv6:
-          type: boolean
+          description: Canonical client IP address. A colon identifies IPv6.
         server_name:
           type: string
           description: Display name configured for this server. Present only when `meta=1`.

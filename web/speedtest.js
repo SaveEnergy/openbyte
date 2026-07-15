@@ -284,7 +284,8 @@ async function captureClientIPIfNeeded(res, capturedRef, signal) {
   try {
     const data = await res.json();
     if (data.client_ip && state.abortController?.signal === signal) {
-      state.networkInfo[data.ipv6 ? "ipv6" : "ipv4"] = data.client_ip;
+      const family = data.client_ip.includes(":") ? "ipv6" : "ipv4";
+      state.networkInfo[family] = data.client_ip;
       updateNetworkDisplay();
       capturedRef.captured = true;
     }
