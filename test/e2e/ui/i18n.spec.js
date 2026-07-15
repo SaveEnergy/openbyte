@@ -177,6 +177,10 @@ test.describe("German UI", () => {
     await expect(page.locator(".stats-help summary")).toHaveText(
       "Was bedeuten die Werte?",
     );
+    await expect(page.locator("#themeToggle")).toHaveAttribute(
+      "aria-label",
+      /Farbschema/,
+    );
     await expect(page.locator('meta[name="description"]')).toHaveAttribute(
       "content",
       /Open-source internet speed test/,
@@ -275,15 +279,17 @@ test.describe("German UI", () => {
         viewportWidth: innerWidth,
         scrollWidth: document.documentElement.scrollWidth,
         language: bounds(document.getElementById("languageSelect")),
+        theme: bounds(document.getElementById("themeToggle")),
         toast: bounds(document.getElementById("errorToast")),
       };
     });
 
     expect(audit.scrollWidth).toBeLessThanOrEqual(audit.viewportWidth);
-    for (const control of [audit.language, audit.toast]) {
+    for (const control of [audit.language, audit.theme, audit.toast]) {
       expect(control.left).toBeGreaterThanOrEqual(0);
       expect(control.right).toBeLessThanOrEqual(audit.viewportWidth);
     }
     expect(audit.language.height).toBeGreaterThanOrEqual(44);
+    expect(audit.theme.height).toBeGreaterThanOrEqual(44);
   });
 });

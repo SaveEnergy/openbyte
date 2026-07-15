@@ -108,7 +108,7 @@
 }
 
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme="dark"]) {
     --bg-primary: #f6f8fb;
     --bg-secondary: #ffffff;
     --bg-card: #ffffff;
@@ -132,6 +132,32 @@
     --card-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
     --control-border: #7c899a;
   }
+}
+
+/* Manual theme override (theme.js sets data-theme on <html>). */
+:root[data-theme="light"] {
+  --bg-primary: #f6f8fb;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #e8edf5;
+
+  --text-primary: #111827;
+  --text-secondary: #334155;
+  --text-muted: #617187;
+
+  --accent-primary: #00796b;
+  --accent-secondary: #006f61;
+  --accent-glow: rgba(0, 212, 170, 0.22);
+  --download-color: #00796b;
+  --success: #00796b;
+  --success-soft: rgba(0, 121, 107, 0.12);
+  --success-glow: rgba(0, 121, 107, 0.22);
+  --error: #dc2626;
+  --warning: #b45309;
+
+  --card-border: rgba(15, 23, 42, 0.1);
+  --card-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --control-border: #7c899a;
 }
 
 *,
