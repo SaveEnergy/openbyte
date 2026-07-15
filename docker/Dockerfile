@@ -5,8 +5,6 @@ WORKDIR /app
 
 # Build metadata
 ARG VERSION=dev
-ARG COMMIT=unknown
-ARG BUILD_DATE=unknown
 
 # Install build dependencies
 RUN apk add --no-cache git

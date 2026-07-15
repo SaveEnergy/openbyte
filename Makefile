@@ -1,4 +1,4 @@
-.PHONY: build openbyte test test-ui clean run help docker docker-up docker-down perf-smoke perf-bench perf-record perf-compare perf-check perf-leakcheck ci-test ci-lint lint-openapi
+.PHONY: build openbyte test test-ui test-e2e test-race test-coverage clean run help docker docker-up docker-down perf-smoke perf-bench perf-leakcheck ci-lint lint-openapi
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
@@ -20,11 +20,7 @@ test:
 
 test-ui:
 	@echo "Running Playwright UI tests..."
-	@env -u NO_COLOR bunx playwright test
-
-ci-test:
-	@echo "Running CI tests..."
-	@go test ./... -short
+	@env -u NO_COLOR bun run test:ui
 
 ci-lint:
 	@echo "Running CI lint..."
@@ -49,26 +45,8 @@ test-coverage:
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "✓ Coverage report: coverage.html"
 
-# Unified suite: test/perf/bench_packages.txt + scripts/perf/run_benchmarks.sh
 perf-bench:
-	@BENCH_COUNT=$${BENCH_COUNT:-1} BENCH_TIME=$${BENCH_TIME:-1s} "$(CURDIR)/scripts/perf/run_benchmarks.sh" --stdout
-
-perf-record:
-	@BENCH_COUNT=$${BENCH_COUNT:-5} BENCH_TIME=$${BENCH_TIME:-1s} "$(CURDIR)/scripts/perf/run_benchmarks.sh"
-
-# Compare build/perf/bench.txt to test/perf/bench_baseline.txt (uses benchstat on PATH, else go run …@latest)
-perf-compare:
-	@test -f test/perf/bench_baseline.txt || (echo "Missing test/perf/bench_baseline.txt — run: make perf-record && cp build/perf/bench.txt test/perf/bench_baseline.txt"; exit 1)
-	@test -f build/perf/bench.txt || (echo "Missing build/perf/bench.txt — run make perf-record first"; exit 1)
-	@if command -v benchstat >/dev/null 2>&1; then \
-		benchstat test/perf/bench_baseline.txt build/perf/bench.txt; \
-	else \
-		echo "perf-compare: benchstat not on PATH; using go run golang.org/x/perf/cmd/benchstat@latest"; \
-		go run golang.org/x/perf/cmd/benchstat@latest test/perf/bench_baseline.txt build/perf/bench.txt; \
-	fi
-
-perf-check: perf-record
-	@if [ -f test/perf/bench_baseline.txt ]; then $(MAKE) perf-compare; else echo "perf-check: wrote build/perf/bench.txt (add test/perf/bench_baseline.txt to enable compare)"; fi
+	@BENCH_COUNT=$${BENCH_COUNT:-1} BENCH_TIME=$${BENCH_TIME:-1s} "$(CURDIR)/scripts/perf/run_benchmarks.sh"
 
 # Development
 run:
@@ -76,12 +54,6 @@ run:
 	@echo "Port: $${PORT:-8080} (set PORT env var to change)"
 	@go run -ldflags "$(LDFLAGS)" ./cmd/openbyte server
 
-
-kill-ports:
-	@echo "Killing processes on port 8080..."
-	@-lsof -ti :8080 2>/dev/null | xargs kill -9 2>/dev/null || true
-	@sleep 1
-	@echo "✓ Port cleared"
 
 # Docker
 docker:
@@ -137,19 +109,14 @@ help:
 	@echo "  test          - Run short Go test suite"
 	@echo "  test-ui       - Run Playwright UI tests"
 	@echo "  test-e2e      - Run full Go E2E tests"
-	@echo "  ci-test       - Run CI test suite (short)"
 	@echo "  ci-lint       - Run CI lint checks"
 	@echo "  lint-openapi  - Lint api/openapi.yaml (Bun + devDependencies)"
 	@echo "  test-race     - Run short Go suite with race detector"
 	@echo "  test-coverage - Generate short-suite coverage report"
 	@echo "  perf-bench    - Run perf benchmarks (stdout; quick count)"
-	@echo "  perf-record   - Write build/perf/bench.txt (stable; for benchstat)"
-	@echo "  perf-compare  - benchstat baseline vs build/perf/bench.txt (go run fallback)"
-	@echo "  perf-check    - perf-record + perf-compare if baseline exists"
 	@echo "  perf-smoke    - Run perf smoke with pprof capture"
 	@echo "  perf-leakcheck - Run goroutine leak profile smoke (Go 1.26 experiment)"
 	@echo "  run           - Run server (development, port 8080)"
-	@echo "  kill-ports    - Kill processes on port 8080"
 	@echo "  docker        - Build Docker image"
 	@echo "  docker-up     - Start Docker containers"
 	@echo "  docker-down   - Stop Docker containers"

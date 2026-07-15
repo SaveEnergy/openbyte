@@ -1,33 +1,17 @@
 package api_test
 
 import (
+	"bufio"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
 	"testing"
-
-	"go.yaml.in/yaml/v3"
 )
 
-type openAPISpec struct {
-	Paths map[string]map[string]any `yaml:"paths"`
-}
-
 func TestOpenAPIRouteContract(t *testing.T) {
-	spec := loadOpenAPISpec(t)
-
-	got := make(map[string]struct{})
-	for path, operations := range spec.Paths {
-		for method := range operations {
-			upper := strings.ToUpper(strings.TrimSpace(method))
-			if !isHTTPMethod(upper) {
-				continue
-			}
-			got[upper+" "+path] = struct{}{}
-		}
-	}
+	got := loadOpenAPIRoutes(t)
 
 	expected := map[string]struct{}{
 		"GET /health":              {},
@@ -47,7 +31,7 @@ func TestOpenAPIRouteContract(t *testing.T) {
 	}
 }
 
-func loadOpenAPISpec(t *testing.T) openAPISpec {
+func loadOpenAPIRoutes(t *testing.T) map[string]struct{} {
 	t.Helper()
 
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -62,14 +46,41 @@ func loadOpenAPISpec(t *testing.T) openAPISpec {
 		t.Fatalf("read OpenAPI spec: %v", err)
 	}
 
-	var spec openAPISpec
-	if err := yaml.Unmarshal(raw, &spec); err != nil {
-		t.Fatalf("unmarshal OpenAPI spec: %v", err)
+	routes := make(map[string]struct{})
+	var currentPath string
+	inPaths := false
+	scanner := bufio.NewScanner(strings.NewReader(string(raw)))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "paths:" {
+			inPaths = true
+			continue
+		}
+		if !inPaths {
+			continue
+		}
+		if line != "" && line[0] != ' ' {
+			break
+		}
+		if strings.HasPrefix(line, "  /") && strings.HasSuffix(line, ":") {
+			currentPath = strings.TrimSuffix(strings.TrimSpace(line), ":")
+			continue
+		}
+		if currentPath == "" || !strings.HasPrefix(line, "    ") {
+			continue
+		}
+		method := strings.ToUpper(strings.TrimSuffix(strings.TrimSpace(line), ":"))
+		if isHTTPMethod(method) {
+			routes[method+" "+currentPath] = struct{}{}
+		}
 	}
-	if len(spec.Paths) == 0 {
+	if err := scanner.Err(); err != nil {
+		t.Fatalf("scan OpenAPI spec: %v", err)
+	}
+	if len(routes) == 0 {
 		t.Fatal("OpenAPI spec has no paths")
 	}
-	return spec
+	return routes
 }
 
 func isHTTPMethod(method string) bool {

@@ -64,7 +64,7 @@ The browser client implements:
 - Adaptive Web Worker stream ramping plus dynamic warm-up with throughput stabilization detection
 - Baseline latency measurement before each test
 - Metrics reset after warm-up for accurate results
-- Statistical reporting with P50, P95, P99 percentiles
+- Median latency reporting with IQR outlier filtering
 
 ## Configuration
 
@@ -120,7 +120,7 @@ The web UI displays both client IPv4 and IPv6 addresses using dedicated single-s
 2. Add a DNS **AAAA-only** record for `v6.<your-domain>` → server IPv6 (no A).
 3. Include both in your Traefik host rule or reverse proxy config.
 
-See [Deployment Guide](DEPLOYMENT.md#ipv4ipv6-detection) for details.
+See [Deployment Guide](DEPLOYMENT.md#ipv4-and-ipv6-discovery) for details.
 
 ## Testing
 
@@ -137,7 +137,7 @@ Playwright starts a local server on `127.0.0.1:8080`, or reuses one already runn
 ## Documentation
 
 - [Architecture](ARCHITECTURE.md) — System design and components
-- [API Reference](API.md) — REST API specification
+- [`api/openapi.yaml`](api/openapi.yaml) — authoritative API contract
 - Web API quick reference: `/api.html` on any running openByte server
 - [Deployment Guide](DEPLOYMENT.md) — Production deployment
 - [Performance Guide](PERFORMANCE.md) — Profiling, load testing, perf checks
