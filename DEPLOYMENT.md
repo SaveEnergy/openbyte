@@ -141,15 +141,19 @@ EOF
 Both CI and release call `scripts/deploy/deploy.sh`. It validates the host key,
 streams the compose bundle and its checksum manifest over one SSH connection,
 verifies every remote checksum, pulls the immutable image tag, and deploys.
+Automated deployment requires Docker Compose with `up --wait-timeout` support
+(upstream v2.17 or newer). The host script rejects older clients before login,
+network changes, image pulls, or application replacement.
 The host script inspects the active `traefik` network and overrides
 `TRUST_PROXY_HEADERS` plus `TRUSTED_PROXY_CIDRS` with its exact IPv4/IPv6 IPAM
 subnets. Deployment fails before replacing the application if no subnet exists.
 
-The health gate requires both openByte and Traefik to be running and healthy.
-Before replacement, the current openByte image is pinned under a temporary
-rollback tag. Compose failure, image mismatch, or failed health checks restore
-that image and verify it. A failed first deployment remains available for
-inspection because no previous image exists.
+Compose applies a bounded 60-second health gate that requires both openByte and
+Traefik to be running and healthy. Before replacement, the current openByte
+image is pinned under a temporary rollback tag. Compose failure, image mismatch,
+or failed health checks restore that image through the same bounded gate and
+verify its identity. A failed first deployment remains available for inspection
+because no previous image exists.
 
 ## Reverse proxies
 
