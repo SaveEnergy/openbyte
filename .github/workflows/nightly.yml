@@ -25,9 +25,6 @@ jobs:
       - name: Race tests
         run: go test -race ./...
 
-      - name: E2E tests
-        run: go test ./test/e2e -timeout 5m
-
       # Default nightly (20260320-perf-01). Opt-out: set repo var PERF_BENCH to "false".
       - name: Perf bench
         if: ${{ vars.PERF_BENCH != 'false' }}

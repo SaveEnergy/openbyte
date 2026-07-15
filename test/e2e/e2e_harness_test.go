@@ -77,8 +77,6 @@ func NewTestServerWithOrigins(t *testing.T, allowedOrigins []string) *TestServer
 	srv := &http.Server{Handler: router.SetupRoutes()}
 	go srv.Serve(listener)
 
-	time.Sleep(100 * time.Millisecond)
-
 	port := listener.Addr().(*net.TCPAddr).Port
 	return &TestServer{
 		server:       srv,

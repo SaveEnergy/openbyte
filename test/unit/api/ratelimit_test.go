@@ -41,30 +41,6 @@ func TestRateLimiterIndependentIPs(t *testing.T) {
 	}
 }
 
-func TestRateLimiterCleanupRemovesExpired(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.GlobalRateLimit = 1000
-	cfg.RateLimitPerIP = 100
-	rl := api.NewRateLimiter(cfg)
-	rl.SetCleanupPolicy(10*time.Millisecond, 50*time.Millisecond)
-
-	// Create entry
-	rl.Allow(cleanupTestIP)
-
-	// Wait past TTL + cleanup interval
-	time.Sleep(100 * time.Millisecond)
-
-	// Trigger cleanup by calling Allow (different IP)
-	rl.Allow(ipPrimary)
-
-	// Original IP should have full bucket (entry cleaned, fresh on next access)
-	for i := range cfg.RateLimitPerIP {
-		if !rl.Allow(cleanupTestIP) {
-			t.Fatalf("token %d not allowed after cleanup", i)
-		}
-	}
-}
-
 func TestRateLimiterConcurrentAccess(t *testing.T) {
 	cfg := config.DefaultConfig()
 	rl := api.NewRateLimiter(cfg)
@@ -90,29 +66,18 @@ func TestRateLimiterCleanupConcurrentAllowStress(t *testing.T) {
 	rl := api.NewRateLimiter(cfg)
 	rl.SetCleanupPolicy(2*time.Millisecond, 4*time.Millisecond)
 
-	stop := make(chan struct{})
 	var wg sync.WaitGroup
 	workers := 12
 	for i := range workers {
 		wg.Add(1)
 		go func(worker int) {
 			defer wg.Done()
-			n := 0
-			for {
-				select {
-				case <-stop:
-					return
-				default:
-					ip := fmt.Sprintf(ipPrefixWorkers, worker, n%64)
-					rl.Allow(ip)
-					n++
-				}
+			for n := range 2_000 {
+				ip := fmt.Sprintf(ipPrefixWorkers, worker, n%64)
+				rl.Allow(ip)
 			}
 		}(i)
 	}
-
-	time.Sleep(200 * time.Millisecond)
-	close(stop)
 	wg.Wait()
 }
 

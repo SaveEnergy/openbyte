@@ -31,7 +31,7 @@
 ### Frontend Behavior
 
 - HTTP test mode uses `/api/v1/download`, `/api/v1/upload`, and `/api/v1/ping`; never TCP/UDP proxy mode.
-- Network probe and health-check fetch paths drain non-OK and malformed JSON responses.
+- Network and version probe fetch paths drain non-OK and malformed JSON responses.
 - Server settings UI: no server selector; a single deployed server tests itself.
 - UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.
 - Speed test: **`speedtest-orchestrator.js`** owns lifecycle/share; **`speedtest.js`** owns latency and bridges UI state to the one-shot **`speedtest-worker.js`**; **`speedtest-adaptive.js`** chooses stream count/duration; **`speedtest-http-{shared,download,upload}.js`** owns warm-up, progress, and transfer loops. Thin **`openbyte.js`** owns init/events; **`network.js`** owns readiness and address probes. Client IP discovery is a user-facing feature: same-origin and IPv4/IPv6 probes stay eager on page load, never deferred until **GO**. API docs are **`api.html`** + **`api.css`**. Static serving derives its safe path set from assets embedded by **`web/embed.go`**; **`WEB_ROOT`** may override file contents but cannot expose additional paths.
@@ -61,13 +61,13 @@
 - **`build-push` + `deploy`** on every `main` push after `checks` (no path filtering—doc-only pushes still roll images). PR Playwright runs are gated by a plain `git diff` check inside `checks` (no third-party filter action).
 - CI builds/pushes `edge` + `sha`; release publishes semver + `latest`.
 - **`release.yml` `deploy`**: same `vars`/secrets as CI; gate on **`needs.release.result == 'success'`** (not derived job booleans).
-- Deploy: **checkout first**, then `validate_env` → sync compose → remote `docker compose pull` + `up -d` → verify; previous openByte image is pinned locally for Compose-based rollback; scripts in **`scripts/deploy/`** (`validate_env`, `sync_compose`, `deploy_remote`, `deploy_host`).
+- Deploy: **checkout first**, then `scripts/deploy/deploy.sh` validates the host key, streams and checksums the bundle over one SSH connection, and runs `deploy_host.sh`; the previous openByte image is pinned locally for Compose-based rollback.
 - Traefik deploy uses external `traefik` network; workflows ensure network presence.
-- **Race matrix**: `ci.yml` on `main`: `go test ./... -race -short -p 1`; `nightly.yml`: full `go test -race ./...` + separate `test/e2e` (timeout budget).
+- **Race matrix**: `ci.yml` on `main`: `go test ./... -race -short -p 1`; `nightly.yml`: full `go test -race ./...` (including E2E once).
 - **Playwright**: `workers` = `2` on `GITHUB_ACTIONS`; optional `PLAYWRIGHT_WORKERS`; trace/reuse unchanged.
 - **CI concurrency**: `cancel-in-progress` only for `pull_request`; `push`/`workflow_dispatch` queue on same `ref` (deploy not mid-aborted).
 - **Nightly**: `make perf-bench` each run unless `PERF_BENCH=false`; `perf-leakcheck` still behind `LEAK_PROFILE_SMOKE`.
-- **`make perf-bench`**: runs **`scripts/perf/run_benchmarks.sh`** (package list **`test/perf/bench_packages.txt`**) to stdout; **`make perf-record`** → **`build/perf/bench.txt`** for **`make perf-compare`** (**`benchstat`** on PATH, else **`go run golang.org/x/perf/cmd/benchstat@latest`**). See **`test/perf/README.md`**.
+- **`make perf-bench`**: runs the curated transfer/gzip/JSON/SQLite suite from **`test/perf/bench_packages.txt`**; explicit experiments save output and use `benchstat` manually. See **`test/perf/README.md`**.
 
 ## Engineering Guardrails
 

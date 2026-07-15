@@ -9,6 +9,77 @@ import (
 	"testing"
 )
 
+func TestDeployUsesOneVerifiedSSHConnection(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("deployment scripts target POSIX servers")
+	}
+
+	stateDir := t.TempDir()
+	binDir := filepath.Join(stateDir, "bin")
+	remoteDir := filepath.Join(stateDir, "remote")
+	if err := os.MkdirAll(binDir, 0o755); err != nil {
+		t.Fatalf("create fake bin directory: %v", err)
+	}
+	if err := os.MkdirAll(remoteDir, 0o755); err != nil {
+		t.Fatalf("create remote directory: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(remoteDir, ".env"), nil, 0o600); err != nil {
+		t.Fatalf("write deployment env: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(stateDir, "deployment"), []byte("missing\n"), 0o600); err != nil {
+		t.Fatalf("seed deployment state: %v", err)
+	}
+
+	writeExecutable(t, filepath.Join(binDir, "docker"), fakeDocker)
+	writeExecutable(t, filepath.Join(binDir, "sleep"), "#!/bin/sh\nexit 0\n")
+	writeExecutable(t, filepath.Join(binDir, "timeout"), "#!/bin/sh\nshift\nexec \"$@\"\n")
+	writeExecutable(t, filepath.Join(binDir, "ssh-keyscan"), "#!/bin/sh\necho scanned-key\n")
+	writeExecutable(t, filepath.Join(binDir, "ssh-keygen"), "#!/bin/sh\necho '256 SHA256:test host (ED25519)'\n")
+	writeExecutable(t, filepath.Join(binDir, "ssh"), fakeSSH)
+
+	root := repositoryRoot(t)
+	cmd := exec.Command("bash", filepath.Join(root, "scripts", "deploy", "deploy.sh"))
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(),
+		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"FAKE_STATE_DIR="+stateDir,
+		"FAKE_SCENARIO=success",
+		"SSH_HOST=host.example",
+		"SSH_HOST_FINGERPRINT=SHA256:test",
+		"SSH_USER=deploy",
+		"REMOTE_DIR="+remoteDir,
+		"SSH_KEY=test-key",
+		"GHCR_USERNAME=test-user",
+		"GHCR_TOKEN=test-token",
+		"DEPLOY_TAG=new",
+		"GITHUB_REPOSITORY_OWNER=SaveEnergy",
+	)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("deploy failed: %v\n%s", err, output)
+	}
+
+	count, err := os.ReadFile(filepath.Join(stateDir, "ssh-count"))
+	if err != nil {
+		t.Fatalf("read SSH count: %v", err)
+	}
+	if got := strings.TrimSpace(string(count)); got != "1" {
+		t.Fatalf("SSH connection count = %q, want 1", got)
+	}
+	for _, path := range []string{
+		"docker/docker-compose.ghcr.yaml",
+		"docker/docker-compose.traefik.yaml",
+		"docker/traefik-openbyte.yaml",
+		"scripts/deploy/deploy_host.sh",
+	} {
+		if _, err := os.Stat(filepath.Join(remoteDir, path)); err != nil {
+			t.Fatalf("synced file %s: %v", path, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(remoteDir, ".openbyte-deploy-checksums")); !os.IsNotExist(err) {
+		t.Fatalf("checksum manifest was not removed: %v", err)
+	}
+}
+
 func TestHostDeployRollback(t *testing.T) {
 	if _, err := exec.LookPath("sh"); err != nil {
 		t.Skip("POSIX sh is required")
@@ -239,4 +310,16 @@ case "$command" in
     exit 1
     ;;
 esac
+`
+
+const fakeSSH = `#!/bin/sh
+set -eu
+count_file="$FAKE_STATE_DIR/ssh-count"
+count=0
+test ! -f "$count_file" || count=$(cat "$count_file")
+echo $((count + 1)) > "$count_file"
+for argument in "$@"; do
+  remote_command=$argument
+done
+exec sh -c "$remote_command"
 `

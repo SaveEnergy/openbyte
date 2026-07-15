@@ -42,9 +42,6 @@ Thumbs.db
 # Build artifacts
 /tmp/
 
-# Perf harness (local)
-build/perf/
-
 # Agent tasks/results
 .agent/
 
