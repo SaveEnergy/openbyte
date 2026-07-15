@@ -13,16 +13,14 @@ in Git history and pull requests, not release notes.
 - **English and German UI**: the speed test and shared-result pages now detect
   the browser language, provide a persistent reload-based selector that exposes
   the resolved system language, localize accessible status text, and format
-  results and history for the chosen locale. Language preferences stay on the
-  device instead of being propagated through navigation and share links.
+  results for the chosen locale. Language preferences stay on the device instead
+  of being propagated through navigation and share links.
 - **Test legibility**: the testing screen now shows a determinate progress ring
   (ramp windows + measure countdown reported by the worker), a localized live
   phase label, and the current latency or throughput reading.
 - **Result context**: a loaded-latency advisory, a colored bufferbloat grade
   badge, and a "What do these numbers mean?" disclosure explaining the
   secondary metrics without assigning a subjective connection label.
-- **Recent tests**: the last runs are stored in `localStorage` and listed on
-  the results screen (`web/history.js`).
 - **Manual theme toggle**: header button cycles system → light → dark and
   persists per device (`web/theme.js`); applies on the main, shared-result,
   and shared-result pages.
@@ -38,8 +36,8 @@ in Git history and pull requests, not release notes.
 - **One-tap share**: tapping Share now saves the result and copies the link in
   a single gesture (previously it required two taps).
 - **Cancel behavior**: cancelling aborts the active transfer, discards the
-  incomplete run, and returns to the ready screen without saving history or a
-  shareable result.
+  incomplete run, and returns to the ready screen without creating a shareable
+  result.
 - **Offline handling**: the server health check re-runs every 30 s while idle,
   and an offline server disables the GO button instead of failing on click.
 - **Light theme & toast polish**: light mode gains card borders/shadows, and
