@@ -45,7 +45,7 @@ func TestStaticJSDoesNotForceNoStore(t *testing.T) {
 	}
 }
 
-func TestSecurityHeadersMiddlewareSetsCSP(t *testing.T) {
+func TestSecurityHeadersMiddlewareSetsHeadersOnHTTP(t *testing.T) {
 	h := api.SecurityHeadersMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -56,6 +56,10 @@ func TestSecurityHeadersMiddlewareSetsCSP(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf(statusWantFmt, rec.Code, http.StatusOK)
+	}
+	const wantHSTS = "max-age=31536000; includeSubDomains"
+	if got := rec.Header().Get("Strict-Transport-Security"); got != wantHSTS {
+		t.Fatalf("strict-transport-security = %q, want %q", got, wantHSTS)
 	}
 
 	csp := rec.Header().Get("Content-Security-Policy")

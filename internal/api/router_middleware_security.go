@@ -1,24 +1,13 @@
 package api
 
-import (
-	"net/http"
-)
-
-func isHTTPS(r *http.Request) bool {
-	if r == nil {
-		return false
-	}
-	if r.TLS != nil {
-		return true
-	}
-	return forwardedProtoIsHTTPS(r.Header.Get("X-Forwarded-Proto"))
-}
+import "net/http"
 
 func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'self'; "+
 				"font-src 'self'; "+
@@ -27,9 +16,6 @@ func SecurityHeadersMiddleware(next http.Handler) http.Handler {
 				"worker-src 'self'; "+
 				"img-src 'self' data:; "+
 				"connect-src 'self' https: http:")
-		if isHTTPS(r) {
-			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-		}
 		next.ServeHTTP(w, r)
 	})
 }
