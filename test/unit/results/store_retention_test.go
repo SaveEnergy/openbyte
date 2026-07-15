@@ -1,6 +1,7 @@
 package results_test
 
 import (
+	"context"
 	"database/sql"
 	"path/filepath"
 	"testing"
@@ -22,7 +23,7 @@ func TestStoreTrimToMax(t *testing.T) {
 
 	ids := make([]string, 5)
 	for i := range 5 {
-		id, saveErr := store.Save(results.Result{
+		id, saveErr := store.Save(context.Background(), results.Result{
 			DownloadMbps: float64(i + 1),
 			UploadMbps:   1,
 			LatencyMs:    1,
@@ -60,7 +61,7 @@ func TestStoreTrimToMax(t *testing.T) {
 
 	// Oldest 2 should be gone
 	for _, id := range ids[:2] {
-		got, getErr := store2.Get(id)
+		got, getErr := store2.Get(context.Background(), id)
 		if getErr != nil {
 			t.Fatalf(storeGetByIDFmt, id, getErr)
 		}
@@ -70,7 +71,7 @@ func TestStoreTrimToMax(t *testing.T) {
 	}
 	// Newest 3 should remain
 	for _, id := range ids[2:] {
-		got, getErr := store2.Get(id)
+		got, getErr := store2.Get(context.Background(), id)
 		if getErr != nil {
 			t.Fatalf(storeGetByIDFmt, id, getErr)
 		}
@@ -117,21 +118,21 @@ func TestStoreTrimToMaxDeterministicWithEqualCreatedAt(t *testing.T) {
 	}
 	defer store2.Close()
 
-	trimmed, err := store2.Get("AAAA0001")
+	trimmed, err := store2.Get(context.Background(), "AAAA0001")
 	if err != nil {
 		t.Fatalf("Get trimmed id: %v", err)
 	}
 	if trimmed != nil {
 		t.Fatal("expected AAAA0001 trimmed under deterministic tie-break")
 	}
-	keptA, err := store2.Get("BBBB0001")
+	keptA, err := store2.Get(context.Background(), "BBBB0001")
 	if err != nil {
 		t.Fatalf("Get kept id BBBB0001: %v", err)
 	}
 	if keptA == nil {
 		t.Fatal(storeKeptBBBBMsg)
 	}
-	keptB, err := store2.Get("CCCC0001")
+	keptB, err := store2.Get(context.Background(), "CCCC0001")
 	if err != nil {
 		t.Fatalf("Get kept id CCCC0001: %v", err)
 	}

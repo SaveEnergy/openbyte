@@ -2,11 +2,62 @@ package api
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
 
 const testPathAPIUpload = "/api/v1/upload"
+
+type deadlineResponseWriter struct {
+	header        http.Header
+	readDeadline  time.Time
+	writeDeadline time.Time
+}
+
+func (w *deadlineResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *deadlineResponseWriter) Write(body []byte) (int, error) {
+	return len(body), nil
+}
+
+func (w *deadlineResponseWriter) WriteHeader(int) {}
+
+func (w *deadlineResponseWriter) SetReadDeadline(deadline time.Time) error {
+	w.readDeadline = deadline
+	return nil
+}
+
+func (w *deadlineResponseWriter) SetWriteDeadline(deadline time.Time) error {
+	w.writeDeadline = deadline
+	return nil
+}
+
+func TestLoggingMiddlewarePreservesResponseControllerDeadlines(t *testing.T) {
+	readDeadline := time.Date(2026, 7, 15, 8, 0, 0, 0, time.UTC)
+	writeDeadline := readDeadline.Add(time.Second)
+	underlying := &deadlineResponseWriter{header: make(http.Header)}
+
+	handler := (&Router{}).LoggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		controller := http.NewResponseController(w)
+		if err := controller.SetReadDeadline(readDeadline); err != nil {
+			t.Fatalf("SetReadDeadline: %v", err)
+		}
+		if err := controller.SetWriteDeadline(writeDeadline); err != nil {
+			t.Fatalf("SetWriteDeadline: %v", err)
+		}
+	}))
+	handler.ServeHTTP(underlying, httptest.NewRequest(http.MethodGet, "/api/v1/download", nil))
+
+	if !underlying.readDeadline.Equal(readDeadline) {
+		t.Fatalf("read deadline = %v, want %v", underlying.readDeadline, readDeadline)
+	}
+	if !underlying.writeDeadline.Equal(writeDeadline) {
+		t.Fatalf("write deadline = %v, want %v", underlying.writeDeadline, writeDeadline)
+	}
+}
 
 func TestShouldSkipRequestLog(t *testing.T) {
 	tests := []struct {

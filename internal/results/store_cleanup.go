@@ -1,7 +1,9 @@
 package results
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/logging"
@@ -13,8 +15,9 @@ const (
 )
 
 func (s *Store) cleanup() {
+	ctx := context.Background()
 	cutoff := time.Now().UTC().Add(-retentionDays * 24 * time.Hour)
-	res, err := s.execWithBusyRetry(`DELETE FROM results WHERE created_at < ?`, cutoff)
+	res, err := execWithBusyRetry(ctx, s.db, `DELETE FROM results WHERE created_at < ?`, cutoff)
 	if err != nil {
 		logging.Warn("results cleanup (age) failed", logging.Field{Key: "error", Value: err})
 	} else {
@@ -23,7 +26,9 @@ func (s *Store) cleanup() {
 
 	// Trim to max count, keeping newest
 	if s.maxResults > 0 {
-		res, err = s.execWithBusyRetry(
+		res, err = execWithBusyRetry(
+			ctx,
+			s.db,
 			`DELETE FROM results
 			WHERE id IN (
 				SELECT id FROM results
@@ -45,23 +50,33 @@ func (s *Store) cleanup() {
 	}
 }
 
-func (s *Store) execWithBusyRetry(query string, args ...any) (sql.Result, error) {
+func execWithBusyRetry(
+	ctx context.Context,
+	execer execContexter,
+	query string,
+	args ...any,
+) (sql.Result, error) {
 	var (
-		res sql.Result
-		err error
+		res          sql.Result
+		err          error
+		busyDeadline = time.Now().Add(busyRetryBudget)
 	)
-	for busyAttempt := 0; busyAttempt <= maxBusyRetries; busyAttempt++ {
-		res, err = s.db.Exec(query, args...)
+	for busyAttempt := 0; ; busyAttempt++ {
+		res, err = execer.ExecContext(ctx, query, args...)
 		if err == nil {
 			return res, nil
 		}
-		if isBusyError(err) && busyAttempt < maxBusyRetries {
-			time.Sleep(time.Duration(busyAttempt+1) * busyRetryBackoff)
+		if isBusyError(err) {
+			if waitErr := waitForBusyRetry(ctx, busyDeadline, busyAttempt); waitErr != nil {
+				if errors.Is(waitErr, errBusyRetryBudget) {
+					return nil, err
+				}
+				return nil, waitErr
+			}
 			continue
 		}
 		return nil, err
 	}
-	panic("unreachable")
 }
 
 func (s *Store) logCleanupCount(msg string, field string, res sql.Result) {

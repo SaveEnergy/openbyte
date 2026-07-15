@@ -146,7 +146,7 @@ func (h *Handler) Save(w http.ResponseWriter, r *http.Request) {
 		ServerName:       req.ServerName,
 	}
 
-	id, err := h.store.Save(result)
+	id, err := h.store.Save(r.Context(), result)
 	if err != nil {
 		logging.Warn("results: save failed", logging.Field{Key: "error", Value: err})
 		msg, code := mapSaveStoreError(err)
@@ -167,7 +167,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.store.Get(id)
+	result, err := h.store.Get(r.Context(), id)
 	if err != nil {
 		msg, code := mapGetStoreError(err)
 		respondJSONError(w, msg, code)

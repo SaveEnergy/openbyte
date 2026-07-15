@@ -1,15 +1,20 @@
 package client
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
+
+const maxConfigFileSize = 64 << 10
 
 type ConfigFile struct {
 	ServerURL  string `yaml:"server_url,omitempty"`
@@ -54,17 +59,34 @@ func loadConfigFile() (*ConfigFile, error) {
 		return nil, nil
 	}
 
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	file, err := os.Open(configPath)
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
-
-	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("read config file: %w", err)
 	}
+	defer file.Close()
+
+	data, err := io.ReadAll(io.LimitReader(file, maxConfigFileSize+1))
+	if err != nil {
+		return nil, fmt.Errorf("read config file: %w", err)
+	}
+	if len(data) > maxConfigFileSize {
+		return nil, fmt.Errorf("read config file: exceeds %d-byte limit", maxConfigFileSize)
+	}
 
 	var config ConfigFile
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	decoder := yaml.NewDecoder(bytes.NewReader(data))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&config); err != nil && !errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("parse config file: %w", err)
+	}
+
+	var extraDocument any
+	if err := decoder.Decode(&extraDocument); err == nil {
+		return nil, fmt.Errorf("parse config file: multiple YAML documents are not allowed")
+	} else if !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("parse config file: %w", err)
 	}
 

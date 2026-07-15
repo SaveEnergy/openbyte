@@ -1,6 +1,7 @@
 package results_test
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -21,7 +22,7 @@ func TestGetReturnsNoStoreForSavedResult(t *testing.T) {
 	}
 	defer store.Close()
 
-	id, err := store.Save(results.Result{
+	id, err := store.Save(context.Background(), results.Result{
 		DownloadMbps:     100,
 		UploadMbps:       50,
 		LatencyMs:        10,
