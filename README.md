@@ -30,8 +30,8 @@ High-performance browser-first network speed test server for multi-gigabit links
 make build
 ./bin/openbyte server
 
-# With server flags (flags override env values when set)
-./bin/openbyte server --server-name "Frankfurt 25G"
+# Server configuration is environment-only
+SERVER_NAME="Frankfurt 25G" ./bin/openbyte server
 ```
 
 ### Docker
@@ -74,7 +74,6 @@ The browser client implements:
 | --------------------- | ----------------- | ------------------------------------------------------------------ |
 | `PORT`                | 8080              | HTTP API port                                                      |
 | `SERVER_NAME`         | `openByte Server` | Display name shown in the Web UI and saved results                 |
-| `PUBLIC_HOST`         | —                 | Reserved compatibility value; does not change routing or result URLs |
 | `CAPACITY_GBPS`       | 25                | Server link capacity; HTTP concurrency limits auto-scale from this |
 | `MAX_CONCURRENT_PER_IP` | 64              | Concurrent speed-test streams allowed per client IP and direction  |
 | `RATE_LIMIT_PER_IP`   | 100               | Per-IP requests/minute for version and result routes                |
@@ -89,9 +88,6 @@ The browser client implements:
 | `BIND_ADDRESS`        | `0.0.0.0`         | Address to bind listeners                                          |
 | `PPROF_ENABLED`       | false             | Enable pprof profiling server                                      |
 | `PPROF_ADDR`          | `127.0.0.1:6060`  | pprof server listen address                                        |
-| `PERF_STATS_INTERVAL` | —                 | Log runtime stats at this interval (e.g. `10s`)                    |
-| `RUNTIME_METRICS_ENABLED` | false         | Expose runtime data at `/debug/runtime-metrics`                     |
-| `LOG_LEVEL`           | `info`            | Logging level (`info` or `debug`)                                   |
 | `TLS_CERT_FILE` / `TLS_KEY_FILE` | —      | Serve TLS with this PEM pair; both values are required              |
 | `TLS_AUTO_GEN`        | false             | Generate an ephemeral self-signed localhost certificate for development |
 | `HTTP2_ENABLED`       | true              | Enable HTTP/2 when the server is serving TLS                        |
@@ -99,22 +95,21 @@ The browser client implements:
 Notes:
 
 - If you bind `127.0.0.1` only, open the UI at `http://127.0.0.1:PORT`.
-- `PUBLIC_HOST` / `--public-host` is currently parsed for compatibility only. Configure public DNS and reverse-proxy routing outside openByte; saved-result URLs are relative.
+- Configure public DNS and reverse-proxy routing outside openByte; saved-result URLs are relative.
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
 - Default CORS allows all origins; set `ALLOWED_ORIGINS` to restrict (supports `*` and `*.example.com`).
 - If running behind a reverse proxy, allow more than the browser's adaptive 64 MiB maximum request payload and disable request buffering for `/api/v1/upload` to avoid upload failures or inflated results.
-- Server command supports flags for deployment (`openbyte server --help`). If both env var and flag are set, the flag wins.
+- Server configuration uses environment variables only; `openbyte server --help` lists command-only options.
 
-### Deployment With Server Flags
+### Deployment With Environment Variables
 
 ```bash
 # docker run
 docker run --rm -p 8080:8080 \
-  ghcr.io/saveenergy/openbyte:latest \
-  --server-name="Frankfurt 25G"
+  -e SERVER_NAME="Frankfurt 25G" \
+  ghcr.io/saveenergy/openbyte:latest
 
-# docker compose service command override
-# command: ["--server-name=Frankfurt 25G"]
+# Docker Compose reads SERVER_NAME from docker/.env
 ```
 
 ### IPv4/IPv6 Detection

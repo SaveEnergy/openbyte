@@ -1,6 +1,5 @@
 # Packages included in perf-record / perf-bench (one import path per line).
 # Prefer internal/* benchmarks that call production hot paths (not synthetic loops in test/unit).
 ./internal/api
-./internal/jsonbody
 ./internal/results
 ./pkg/types

@@ -36,7 +36,7 @@ head -c 33554432 /dev/zero | curl -X POST --data-binary @- \
 - `internal/api/speedtest_download.go`
 - `internal/api/speedtest_upload.go`
 - `internal/api/speedtest_handlers.go`
-- `internal/jsonbody/decode.go`
+- `internal/api/results_handler.go`
 - `internal/results/*`
 - `web/speedtest-worker.js`
 - `web/speedtest-adaptive.js`

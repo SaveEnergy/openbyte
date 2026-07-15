@@ -19,19 +19,14 @@ type serverResources struct {
 	resultsStore *results.Store
 }
 
-func (r *serverResources) stopAll(pprofServer *http.Server, stopStats func()) {
+func (r *serverResources) stopAll(pprofServer *http.Server) {
 	if r.resultsStore != nil {
 		r.resultsStore.Close()
 	}
 	shutdownPprofServer(pprofServer, 5*time.Second)
-	stopStats()
 }
 
 func setupRuntimeResources(cfg *config.Config, version string, resources *serverResources) (http.Handler, error) {
-	apiHandler := api.NewHandler()
-	apiHandler.SetConfig(cfg)
-	apiHandler.SetVersion(version)
-
 	if err := os.MkdirAll(cfg.DataDir, 0755); err != nil {
 		logging.Error("Failed to create data directory", logging.Field{Key: "error", Value: err})
 		return nil, err
@@ -46,16 +41,7 @@ func setupRuntimeResources(cfg *config.Config, version string, resources *server
 		logging.Field{Key: "path", Value: cfg.DataDir + "/results.db"},
 		logging.Field{Key: "max_results", Value: cfg.MaxStoredResults})
 
-	router := api.NewRouter(apiHandler, cfg)
-	router.SetRateLimiter(cfg)
-	router.SetClientIPResolver(api.NewClientIPResolver(cfg))
-	router.SetAllowedOrigins(cfg.AllowedOrigins)
-	router.SetResultsHandler(results.NewHandler(resources.resultsStore))
-	router.SetWebRoot(cfg.WebRoot)
-	if cfg.RuntimeMetrics {
-		router.SetRuntimeMetricsHandler(runtimeMetricsHandler())
-	}
-
+	router := api.NewRouter(cfg, version, resources.resultsStore)
 	return router.SetupRoutes(), nil
 }
 

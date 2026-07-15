@@ -1,11 +1,8 @@
 package results
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"testing"
-	"time"
 )
 
 // Open test store without long-lived cleanup noise for microbenches.
@@ -17,72 +14,6 @@ func benchOpenStore(b *testing.B) *Store {
 	}
 	b.Cleanup(func() { s.Close() })
 	return s
-}
-
-// BenchmarkMarshalResult matches JSON work for GET /results/{id} responses (typical row shape).
-func BenchmarkMarshalResult(b *testing.B) {
-	r := Result{
-		ID:               "a1b2c3d4",
-		DownloadMbps:     942.7,
-		UploadMbps:       88.3,
-		LatencyMs:        12.4,
-		JitterMs:         0.8,
-		LoadedLatencyMs:  18.1,
-		BufferbloatGrade: "B",
-		IPv4:             "192.0.2.10",
-		IPv6:             "",
-		ServerName:       "bench-east",
-		CreatedAt:        time.Date(2025, 3, 1, 12, 0, 0, 0, time.UTC),
-	}
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		buf, ok := resultsJSONBufPool.Get().(*bytes.Buffer)
-		if !ok {
-			buf = &bytes.Buffer{}
-		}
-		buf.Reset()
-		buf.Grow(256)
-		enc := json.NewEncoder(buf)
-		enc.SetEscapeHTML(false)
-		if err := enc.Encode(r); err != nil {
-			resultsJSONBufPool.Put(buf)
-			b.Fatal(err)
-		}
-		if buf.Len() > 0 && buf.Bytes()[buf.Len()-1] == '\n' {
-			buf.Truncate(buf.Len() - 1)
-		}
-		_ = buf.Len()
-		buf.Reset()
-		resultsJSONBufPool.Put(buf)
-	}
-}
-
-// BenchmarkValidResultIDMatch is the regexp gate on results routes (GET/PUT paths).
-func BenchmarkValidResultIDMatch(b *testing.B) {
-	id := "a1b2c3d4"
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		if !validResultID(id) {
-			b.Fatal("expected match")
-		}
-	}
-}
-
-// BenchmarkValidResultIDReject catches malformed IDs cheaply.
-func BenchmarkValidResultIDReject(b *testing.B) {
-	id := "not-valid-id-too-long"
-
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		if validResultID(id) {
-			b.Fatal("expected reject")
-		}
-	}
 }
 
 // BenchmarkStoreSave is INSERT throughput on the results SQLite path (:memory:).
