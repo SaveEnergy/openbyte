@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
-
-	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 func uploadReadDeadline(start time.Time, maxDurationSec int) time.Time {
@@ -86,7 +85,7 @@ func writeUploadResponse(w http.ResponseWriter, controller *http.ResponseControl
 	var buf [128]byte
 	payload := appendUploadResponseJSON(buf[:0], totalBytes, durationMs, throughputMbps)
 	if _, err := w.Write(payload); err != nil {
-		logging.Warn("speedtest: write upload response", logging.Field{Key: "error", Value: err})
+		slog.Warn("speedtest: write upload response", "error", err)
 	}
 }
 

@@ -1,12 +1,12 @@
 package api
 
 import (
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
 
 	"github.com/saveenergy/openbyte/internal/config"
-	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 type ClientIPResolver struct {
@@ -22,8 +22,8 @@ func NewClientIPResolver(cfg *config.Config) *ClientIPResolver {
 	trustProxyHeaders := cfg.TrustProxyHeaders
 	if trustProxyHeaders && len(invalidCIDRs) > 0 {
 		// Fail closed on proxy trust when CIDR config is invalid.
-		logging.Error("disabling trusted proxy headers due to invalid trusted CIDRs",
-			logging.Field{Key: "invalid_cidrs", Value: strings.Join(invalidCIDRs, ",")})
+		slog.Error("disabling trusted proxy headers due to invalid trusted CIDRs",
+			"invalid_cidrs", strings.Join(invalidCIDRs, ","))
 		trustProxyHeaders = false
 	}
 	return &ClientIPResolver{
@@ -105,7 +105,7 @@ func parseTrustedProxyCIDRs(cidrs []string) ([]*net.IPNet, []string) {
 		}
 		_, network, err := net.ParseCIDR(trimmed)
 		if err != nil {
-			logging.Warn("invalid trusted proxy CIDR", logging.Field{Key: "cidr", Value: trimmed}, logging.Field{Key: "error", Value: err})
+			slog.Warn("invalid trusted proxy CIDR", "cidr", trimmed, "error", err)
 			invalid = append(invalid, trimmed)
 			continue
 		}

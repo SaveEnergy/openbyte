@@ -11,7 +11,7 @@ import (
 )
 
 func TestSpeedTestHandlerPingResponseShape(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10, 300)
+	handler := api.NewSpeedTestHandler(10, 300, 0, nil)
 	req := httptest.NewRequest(http.MethodGet, pingEndpoint, nil)
 	req.RemoteAddr = "203.0.113.10:12345"
 	rec := httptest.NewRecorder()
@@ -53,7 +53,7 @@ func TestSpeedTestHandlerPingResponseShape(t *testing.T) {
 }
 
 func TestSpeedTestHandlerPingAllowsCrossOriginDiscovery(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10, 300)
+	handler := api.NewSpeedTestHandler(10, 300, 0, nil)
 	req := httptest.NewRequest(http.MethodGet, pingEndpoint, nil)
 	req.Header.Set("Origin", "https://speed.example.com")
 	rec := httptest.NewRecorder()
@@ -66,7 +66,7 @@ func TestSpeedTestHandlerPingAllowsCrossOriginDiscovery(t *testing.T) {
 }
 
 func TestSpeedTestHandlerPingNilResolverFallback(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10, 300)
+	handler := api.NewSpeedTestHandler(10, 300, 0, nil)
 	req := httptest.NewRequest(http.MethodGet, pingEndpoint, nil)
 	req.RemoteAddr = "[2001:db8::1]:4242"
 	rec := httptest.NewRecorder()
@@ -86,7 +86,7 @@ func TestSpeedTestHandlerPingNilResolverFallback(t *testing.T) {
 }
 
 func TestSpeedTestHandlerPingDoesNotReadUnexpectedBody(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10, 300)
+	handler := api.NewSpeedTestHandler(10, 300, 0, nil)
 	tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 1024)}
 	req := httptest.NewRequest(http.MethodGet, pingEndpoint, nil)
 	req.Body = tb

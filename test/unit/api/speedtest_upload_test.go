@@ -14,7 +14,7 @@ import (
 )
 
 func TestSpeedTestUploadReportsBytes(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10, 300)
+	handler := api.NewSpeedTestHandler(10, 300, 0, nil)
 
 	payload := bytes.Repeat([]byte("a"), 256*1024)
 	req := httptest.NewRequest(http.MethodPost, uploadEndpoint, bytes.NewReader(payload))
@@ -39,7 +39,7 @@ func TestSpeedTestUploadReportsBytes(t *testing.T) {
 }
 
 func TestSpeedTestUploadHandlesReadError(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10, 300)
+	handler := api.NewSpeedTestHandler(10, 300, 0, nil)
 
 	req := httptest.NewRequest(http.MethodPost, uploadEndpoint, nil)
 	req.Body = io.NopCloser(&errReader{})
@@ -53,7 +53,7 @@ func TestSpeedTestUploadHandlesReadError(t *testing.T) {
 }
 
 func TestSpeedTestUploadReadErrorAbortsBody(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10, 300)
+	handler := api.NewSpeedTestHandler(10, 300, 0, nil)
 	tb := &failingTrackingBody{}
 	req := httptest.NewRequest(http.MethodPost, uploadEndpoint, nil)
 	req.Body = tb
@@ -77,7 +77,7 @@ func TestSpeedTestUploadReadErrorAbortsBody(t *testing.T) {
 
 func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 	maxConcurrent := 2
-	handler := api.NewSpeedTestHandler(maxConcurrent, 300)
+	handler := api.NewSpeedTestHandler(maxConcurrent, 300, 0, nil)
 
 	// Fill all upload slots with long-running uploads using signal readers
 	cancels := make([]context.CancelFunc, maxConcurrent)
@@ -139,8 +139,7 @@ func TestUploadConcurrentLimitAndRelease(t *testing.T) {
 }
 
 func TestUploadPerIPLimitRejectsSameIPAllowsDifferentIP(t *testing.T) {
-	handler := api.NewSpeedTestHandler(4, 300)
-	handler.SetMaxConcurrentPerIP(2)
+	handler := api.NewSpeedTestHandler(4, 300, 2, nil)
 
 	sameIP := "203.0.113.10:1234"
 	otherIP := "203.0.113.11:1234"
@@ -200,7 +199,7 @@ func TestUploadPerIPLimitRejectsSameIPAllowsDifferentIP(t *testing.T) {
 }
 
 func TestUploadAtCapacityDrainsBodyBefore503(t *testing.T) {
-	handler := api.NewSpeedTestHandler(0, 300)
+	handler := api.NewSpeedTestHandler(0, 300, 0, nil)
 
 	tb := &trackingUploadBody{data: bytes.Repeat([]byte("x"), 4096)}
 	req := httptest.NewRequest(http.MethodPost, uploadEndpoint, nil)
@@ -225,7 +224,7 @@ func TestUploadAtCapacityDrainsBodyBefore503(t *testing.T) {
 }
 
 func TestUploadRespectsReadDeadlineWhenBodyStalls(t *testing.T) {
-	handler := api.NewSpeedTestHandler(10, 1)
+	handler := api.NewSpeedTestHandler(10, 1, 0, nil)
 	body := &blockingUploadBody{closed: make(chan struct{})}
 	req := httptest.NewRequest(http.MethodPost, uploadEndpoint, nil)
 	req.Body = body

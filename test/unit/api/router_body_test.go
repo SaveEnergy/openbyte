@@ -28,7 +28,7 @@ func TestRouterDoesNotWaitForUnexpectedSlowGETBody(t *testing.T) {
 }
 
 func TestUploadAtCapacityDoesNotWaitForSlowBody(t *testing.T) {
-	handler := api.NewSpeedTestHandler(0, 300)
+	handler := api.NewSpeedTestHandler(0, 300, 0, nil)
 	got := requestWithOpenChunkedBody(t, http.HandlerFunc(handler.Upload), http.MethodPost, uploadAPIPath)
 
 	if got.status != http.StatusServiceUnavailable {

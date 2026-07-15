@@ -4,9 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"time"
-
-	"github.com/saveenergy/openbyte/internal/logging"
 )
 
 const (
@@ -19,7 +18,7 @@ func (s *Store) cleanup() {
 	cutoff := time.Now().UTC().Add(-retentionDays * 24 * time.Hour)
 	res, err := execWithBusyRetry(ctx, s.db, `DELETE FROM results WHERE created_at < ?`, cutoff)
 	if err != nil {
-		logging.Warn("results cleanup (age) failed", logging.Field{Key: "error", Value: err})
+		slog.Warn("results cleanup (age) failed", "error", err)
 	} else {
 		s.logCleanupCount("results cleanup: removed expired", "count", res)
 	}
@@ -36,15 +35,13 @@ func (s *Store) cleanup() {
 				LIMIT -1 OFFSET ?
 			)`, s.maxResults)
 		if err != nil {
-			logging.Warn("results cleanup (count) failed", logging.Field{Key: "error", Value: err})
+			slog.Warn("results cleanup (count) failed", "error", err)
 		} else {
 			n, rowsErr := res.RowsAffected()
 			if rowsErr != nil {
-				logging.Warn("results cleanup (count): rows affected failed", logging.Field{Key: "error", Value: rowsErr})
+				slog.Warn("results cleanup (count): rows affected failed", "error", rowsErr)
 			} else if n > 0 {
-				logging.Info("results cleanup: trimmed to max",
-					logging.Field{Key: "removed", Value: n},
-					logging.Field{Key: "max", Value: s.maxResults})
+				slog.Info("results cleanup: trimmed to max", "removed", n, "max", s.maxResults)
 			}
 		}
 	}
@@ -82,11 +79,11 @@ func execWithBusyRetry(
 func (s *Store) logCleanupCount(msg string, field string, res sql.Result) {
 	n, rowsErr := res.RowsAffected()
 	if rowsErr != nil {
-		logging.Warn(msg+": rows affected failed", logging.Field{Key: "error", Value: rowsErr})
+		slog.Warn(msg+": rows affected failed", "error", rowsErr)
 		return
 	}
 	if n > 0 {
-		logging.Info(msg, logging.Field{Key: field, Value: n})
+		slog.Info(msg, field, n)
 	}
 }
 

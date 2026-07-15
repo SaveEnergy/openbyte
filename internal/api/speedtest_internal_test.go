@@ -11,7 +11,7 @@ import (
 )
 
 func TestResolveRandomSourceFallback(t *testing.T) {
-	handler := NewSpeedTestHandler(2, 60)
+	handler := NewSpeedTestHandler(2, 60, 0, nil)
 	handler.randomData = nil
 
 	src, release, err := handler.resolveRandomSource()
@@ -25,6 +25,17 @@ func TestResolveRandomSourceFallback(t *testing.T) {
 	}
 	if bytes.Equal(src, make([]byte, 64*1024)) {
 		t.Error("expected non-zero random data")
+	}
+}
+
+func TestNewSpeedTestHandlerNormalizesImmutablePolicy(t *testing.T) {
+	handler := NewSpeedTestHandler(2, 60, -1, nil)
+
+	if handler.maxConcurrentPerIP != 0 {
+		t.Fatalf("max concurrent per IP = %d, want 0", handler.maxConcurrentPerIP)
+	}
+	if handler.clientIPResolver == nil {
+		t.Fatal("expected default client IP resolver")
 	}
 }
 
