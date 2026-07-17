@@ -324,6 +324,35 @@ func TestValidateMaxConcurrentPerIPPositive(t *testing.T) {
 	}
 }
 
+func TestConfigLoadImpressumURLEnv(t *testing.T) {
+	t.Setenv("IMPRESSUM_URL", " https://legal.example.com/impressum ")
+
+	cfg := config.DefaultConfig()
+	if err := cfg.LoadFromEnv(); err != nil {
+		t.Fatalf("load IMPRESSUM_URL: %v", err)
+	}
+	if cfg.ImpressumURL != "https://legal.example.com/impressum" {
+		t.Fatalf("impressum URL = %q, want trimmed value", cfg.ImpressumURL)
+	}
+}
+
+func TestConfigValidateImpressumURL(t *testing.T) {
+	for _, valid := range []string{"", "https://legal.example.com/impressum", "http://intranet/impressum"} {
+		cfg := config.DefaultConfig()
+		cfg.ImpressumURL = valid
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("impressum URL %q should be valid: %v", valid, err)
+		}
+	}
+	for _, invalid := range []string{"/impressum", "example.com/impressum", "ftp://example.com/impressum", "https://"} {
+		cfg := config.DefaultConfig()
+		cfg.ImpressumURL = invalid
+		if cfg.Validate() == nil {
+			t.Fatalf("impressum URL %q should be invalid", invalid)
+		}
+	}
+}
+
 func TestValidateServerName(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.ServerName = ""

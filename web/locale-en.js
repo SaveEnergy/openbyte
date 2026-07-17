@@ -73,6 +73,34 @@ export const en = Object.freeze({
   "share.nativeTitle": "openByte Speed Test Result",
   "share.copyPrompt": "Copy this link:",
   "nav.speedTest": "Speed Test",
+  "nav.privacy": "Privacy",
+  "nav.impressum": "Legal Notice",
+
+  "privacy.meta.title": "openByte — Privacy",
+  "privacy.heading": "Data privacy",
+  "privacy.intro":
+    "This page explains what data this openByte server processes when you use the speed test, and what stays on your device.",
+  "privacy.test.heading": "Running a speed test",
+  "privacy.test.body":
+    "A speed test transfers randomly generated data between your browser and this server; the transferred data itself is meaningless and is discarded. While the test runs, the server uses your IP address in memory to enforce per-address transfer and request limits. Neither the test nor your IP address is written to its database, and no result is stored on the server unless you share it.",
+  "privacy.ip.heading": "Public IP addresses",
+  "privacy.ip.body":
+    "The page shows the public IPv4 and IPv6 addresses your browser uses to reach this server. They are looked up when the page loads and are only displayed to you; the server does not store them.",
+  "privacy.share.heading": "Shared results",
+  "privacy.share.body":
+    "A result is stored on this server only when you tap Share. The stored record contains the measured values (download, upload, latency, jitter, latency under load, and the bufferbloat grade), the public IP addresses shown with the result, the server name, and the time of the test. It is published under a random link: anyone who knows the link can view it. Shared results are deleted after 90 days at the latest, or earlier when the server trims its stored results.",
+  "privacy.local.heading": "Data stored in your browser",
+  "privacy.local.body":
+    "Your language choice, your theme choice, and a short list of your recent test results are kept in your browser's local storage so the page can restore them on your next visit. This data never leaves your device; you can remove it at any time by clearing this site's browsing data.",
+  "privacy.tracking.heading": "Cookies, tracking, and third parties",
+  "privacy.tracking.body":
+    "This site sets no cookies, uses no analytics, and loads nothing from third parties. Fonts and all other assets are served by this server.",
+  "privacy.logs.heading": "Server logs",
+  "privacy.logs.body":
+    "To keep the service reliable and to protect it from abuse, the server may write technical log entries for API requests, including the request path, status code, duration, and IP address. How long logs are kept is decided by the operator of this instance.",
+  "privacy.operator.heading": "Who is responsible",
+  "privacy.operator.body":
+    "openByte is self-hosted open-source software; this instance is run by its own operator, who is responsible for the deployment, including any infrastructure in front of it (such as a reverse proxy) that may process additional data. If this deployment provides a legal notice, you can reach it from the link in the footer.",
 
   "announcement.complete":
     "Speed test complete. Download {download}. Upload {upload}. Latency {latency}.",

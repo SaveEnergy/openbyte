@@ -16,8 +16,11 @@ const (
 	brandingLogoPath       = "/branding/logo"
 )
 
-func renderBrandingCSS(palette config.BrandPalette, colorsConfigured, logoConfigured bool) []byte {
-	if !colorsConfigured && !logoConfigured {
+// renderBrandingCSS produces the deployment-configured presentation overrides
+// served at /branding.css: brand colors, the header logo swap, and the footer
+// legal-notice link that only configured deployments show.
+func renderBrandingCSS(palette config.BrandPalette, colorsConfigured, logoConfigured, impressumConfigured bool) []byte {
+	if !colorsConfigured && !logoConfigured && !impressumConfigured {
 		return nil
 	}
 
@@ -25,6 +28,9 @@ func renderBrandingCSS(palette config.BrandPalette, colorsConfigured, logoConfig
 	if logoConfigured {
 		css.WriteString(".brand-wordmark { display: none; }\n")
 		css.WriteString(".brand-logo { display: block; }\n")
+	}
+	if impressumConfigured {
+		css.WriteString(".footer-impressum { display: contents; }\n")
 	}
 	if colorsConfigured {
 		css.WriteString(":root {\n")

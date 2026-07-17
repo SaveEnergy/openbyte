@@ -45,6 +45,13 @@
   `/branding/logo`; neutral and semantic status colors remain fixed for contrast.
   **`branding.js`** assigns the logo `src` only when `/branding.css` makes the
   logo visible, so unbranded deployments never request (and 404 on) the logo.
+- Legal pages: `/privacy` serves the embedded, localized **`privacy.html`**
+  describing actual data handling; the Impressum is never authored by openByte —
+  a validated `IMPRESSUM_URL` makes `/impressum` redirect (302) to the
+  operator's document and `/branding.css` unhide the footer link
+  (`.footer-impressum`, hidden by default in `base.css`). Unconfigured
+  deployments keep `/impressum` a 404 with no visible link and zero extra
+  requests.
 - Speed test: **`openbyte.js`** owns init/events/lifecycle/share/cancel; **`ui-results.js`** owns live result rendering; **`speedtest.js`** owns latency, the determinate progress model, and bridges UI state to the one-shot **`speedtest-worker.js`**; **`speedtest-adaptive.js`** chooses stream count/duration and reports ramp-window/measure progress; **`speedtest-http-{shared,download,upload}.js`** owns warm-up, progress, and transfer loops; **`network.js`** owns readiness and idle address probes (offline disables the start button); **`theme.js`** owns the manual light/dark override; **`history.js`** owns the localStorage recent-results list; **`stats-help.js`** injects the shared metric explanations on both `index.html` and `results.html`. Client IP discovery is a user-facing feature: same-origin and IPv4/IPv6 probes stay eager on page load, never deferred until **GO**; startup probes may finish during the first run but never overwrite completed results, and periodic probes mutate addresses only while idle. One exception: a `v4.`/`v6.` probe host that failed while the same-origin server was reachable is skipped for 24 h (localStorage negative cache) so unconfigured probe DNS does not log a console network error on every load. The same-origin bootstrap ping requests metadata to populate the configured server name; measurement, readiness, and address pings remain lean. Static serving derives its safe path set from assets embedded by **`web/embed.go`**; **`WEB_ROOT`** may override file contents but cannot expose additional paths.
 
 ### Storage

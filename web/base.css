@@ -392,6 +392,11 @@ body::before {
   color: var(--text-muted);
 }
 
+/* Hidden unless /branding.css enables it on deployments with IMPRESSUM_URL. */
+.footer-impressum {
+  display: none;
+}
+
 @media (max-width: 600px) {
   .header {
     padding: var(--space-md);

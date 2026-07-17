@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -47,6 +48,17 @@ func (c *Config) validateLimits() error {
 	}
 	if c.MaxConcurrentPerIP <= 0 {
 		return fmt.Errorf("max concurrent per IP must be > 0")
+	}
+	return nil
+}
+
+func (c *Config) validateImpressum() error {
+	if c.ImpressumURL == "" {
+		return nil
+	}
+	parsed, err := url.Parse(c.ImpressumURL)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return fmt.Errorf("invalid IMPRESSUM_URL %q: must be an absolute http(s) URL", c.ImpressumURL)
 	}
 	return nil
 }

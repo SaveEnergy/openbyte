@@ -9,6 +9,10 @@ type Config struct {
 	BindAddress string
 	ServerName  string
 
+	// ImpressumURL activates the /impressum redirect and the footer
+	// legal-notice link when set to an absolute http(s) URL.
+	ImpressumURL string
+
 	MaxTestDuration time.Duration
 
 	PprofEnabled bool
@@ -85,6 +89,9 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := c.validateLimits(); err != nil {
+		return err
+	}
+	if err := c.validateImpressum(); err != nil {
 		return err
 	}
 	if err := c.validateProxyAndStorage(); err != nil {

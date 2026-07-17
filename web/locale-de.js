@@ -75,6 +75,34 @@ export const de = Object.freeze({
   "share.nativeTitle": "openByte-Speedtest-Ergebnis",
   "share.copyPrompt": "Diesen Link kopieren:",
   "nav.speedTest": "Speedtest",
+  "nav.privacy": "Datenschutz",
+  "nav.impressum": "Impressum",
+
+  "privacy.meta.title": "openByte — Datenschutz",
+  "privacy.heading": "Datenschutz",
+  "privacy.intro":
+    "Diese Seite erklärt, welche Daten dieser openByte-Server bei der Nutzung des Speedtests verarbeitet und welche Daten auf Ihrem Gerät bleiben.",
+  "privacy.test.heading": "Während eines Speedtests",
+  "privacy.test.body":
+    "Ein Speedtest überträgt zufällig erzeugte Daten zwischen Ihrem Browser und diesem Server; die übertragenen Daten selbst sind bedeutungslos und werden verworfen. Während des Tests verwendet der Server Ihre IP-Adresse im Arbeitsspeicher, um Übertragungs- und Anfragelimits pro Adresse durchzusetzen. Weder der Test noch Ihre IP-Adresse werden in der Datenbank gespeichert; ein Ergebnis wird nur dann auf dem Server abgelegt, wenn Sie es teilen.",
+  "privacy.ip.heading": "Öffentliche IP-Adressen",
+  "privacy.ip.body":
+    "Die Seite zeigt die öffentlichen IPv4- und IPv6-Adressen, mit denen Ihr Browser diesen Server erreicht. Sie werden beim Laden der Seite ermittelt und nur Ihnen angezeigt; der Server speichert sie nicht.",
+  "privacy.share.heading": "Geteilte Ergebnisse",
+  "privacy.share.body":
+    "Ein Ergebnis wird nur dann auf diesem Server gespeichert, wenn Sie auf „Teilen“ tippen. Der gespeicherte Eintrag enthält die Messwerte (Download, Upload, Latenz, Jitter, Latenz unter Last und die Bufferbloat-Bewertung), die zum Ergebnis angezeigten öffentlichen IP-Adressen, den Servernamen und den Testzeitpunkt. Er ist unter einem zufälligen Link erreichbar: Wer den Link kennt, kann das Ergebnis sehen. Geteilte Ergebnisse werden spätestens nach 90 Tagen gelöscht, bei Platzmangel auch früher.",
+  "privacy.local.heading": "Daten in Ihrem Browser",
+  "privacy.local.body":
+    "Ihre Sprachwahl, Ihr Farbschema und eine kurze Liste Ihrer letzten Testergebnisse liegen im lokalen Speicher Ihres Browsers, damit die Seite sie beim nächsten Besuch wiederherstellen kann. Diese Daten verlassen Ihr Gerät nicht; Sie können sie jederzeit über die Websitedaten-Einstellungen Ihres Browsers löschen.",
+  "privacy.tracking.heading": "Cookies, Tracking und Dritte",
+  "privacy.tracking.body":
+    "Diese Seite setzt keine Cookies, verwendet keine Analysedienste und lädt nichts von Dritten. Schriften und alle weiteren Inhalte liefert dieser Server selbst aus.",
+  "privacy.logs.heading": "Server-Protokolle",
+  "privacy.logs.body":
+    "Um den Dienst zuverlässig zu betreiben und vor Missbrauch zu schützen, kann der Server technische Protokolleinträge zu API-Anfragen schreiben, einschließlich Pfad, Statuscode, Dauer und IP-Adresse. Wie lange Protokolle aufbewahrt werden, entscheidet der Betreiber dieser Instanz.",
+  "privacy.operator.heading": "Verantwortlichkeit",
+  "privacy.operator.body":
+    "openByte ist selbst gehostete Open-Source-Software; diese Instanz wird von ihrem eigenen Betreiber betrieben. Er ist für den Betrieb verantwortlich, einschließlich vorgelagerter Infrastruktur (etwa eines Reverse-Proxys), die zusätzliche Daten verarbeiten kann. Stellt diese Installation ein Impressum bereit, erreichen Sie es über den Link in der Fußzeile.",
 
   "announcement.complete":
     "Speedtest abgeschlossen. Download {download}. Upload {upload}. Latenz {latency}.",

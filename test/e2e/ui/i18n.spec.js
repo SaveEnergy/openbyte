@@ -50,7 +50,7 @@ test.describe("English and German localization", () => {
           JSON.stringify(placeholders(de[key])),
       );
       const htmlKeys = new Set();
-      for (const path of ["/index.html", "/results.html"]) {
+      for (const path of ["/index.html", "/results.html", "/privacy.html"]) {
         const html = await (await fetch(path)).text();
         const document = new DOMParser().parseFromString(html, "text/html");
         for (const element of document.querySelectorAll("*")) {

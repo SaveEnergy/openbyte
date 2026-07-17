@@ -38,7 +38,9 @@ module.exports = defineConfig({
     viewport: { width: 1280, height: 720 },
   },
   webServer: {
-    command: "BIND_ADDRESS=127.0.0.1 PORT=8080 go run ./cmd/openbyte",
+    // env (not a shell prefix) keeps the command portable across platforms.
+    command: "go run ./cmd/openbyte",
+    env: { BIND_ADDRESS: "127.0.0.1", PORT: "8080" },
     url: "http://127.0.0.1:8080/health",
     timeout: 120_000,
     reuseExistingServer: false,

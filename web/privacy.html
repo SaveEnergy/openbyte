@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="How this openByte speed test server handles your data."
+    />
+    <meta
+      property="og:title"
+      content="openByte — Privacy"
+    />
+    <meta
+      property="og:description"
+      content="How this openByte speed test server handles your data."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/favicon.svg" />
+    <meta name="theme-color" content="#0a0a0f" />
+    <title data-i18n="privacy.meta.title">openByte — Privacy</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      rel="preload"
+      href="/fonts/dm-sans-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="/base.css" />
+    <link rel="stylesheet" href="/preferences.css" />
+    <link rel="stylesheet" href="/branding.css" />
+    <link rel="stylesheet" href="/legal.css" />
+    <link rel="stylesheet" href="/motion.css" />
+  </head>
+  <body class="legal-view">
+    <a class="skip-link" href="#mainContent" data-i18n="common.skipToMain"
+      >Skip to main content</a
+    >
+    <div class="app">
+      <header class="header">
+        <div class="brand">
+          <a
+            href="/"
+            class="link-plain"
+            data-i18n-aria-label="nav.speedTest"
+            aria-label="Speed Test"
+            ><div class="logo">
+              <span class="brand-wordmark"
+                >open<span class="logo-accent">Byte</span></span
+              >
+              <img
+                class="brand-logo"
+                data-src="/branding/logo"
+                width="180"
+                height="32"
+                alt=""
+              />
+            </div></a
+          >
+          <div class="server-name" data-i18n="privacy.heading">
+            Data privacy
+          </div>
+        </div>
+        <div class="header-tools">
+          <div class="preference-controls">
+            <label
+              class="visually-hidden"
+              for="languageSelect"
+              data-i18n="language.label"
+              >Choose language</label
+            >
+            <select
+              class="language-select"
+              id="languageSelect"
+              data-i18n-aria-label="language.label"
+              aria-label="Choose language"
+            >
+              <option value="auto">System · EN</option>
+              <option value="en" lang="en">English</option>
+              <option value="de" lang="de">Deutsch</option>
+            </select>
+            <button
+              class="theme-toggle"
+              id="themeToggle"
+              type="button"
+              data-i18n-aria-label="theme.switch"
+              aria-label="Switch theme"
+            >
+              ◐
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="main" id="mainContent">
+        <article class="legal-article">
+          <h1 class="legal-title" data-i18n="privacy.heading">Data privacy</h1>
+          <p class="legal-intro" data-i18n="privacy.intro">
+            This page explains what data this openByte server processes when
+            you use the speed test, and what stays on your device.
+          </p>
+          <section class="legal-section">
+            <h2 data-i18n="privacy.test.heading">Running a speed test</h2>
+            <p data-i18n="privacy.test.body">
+              A speed test transfers randomly generated data between your
+              browser and this server; the transferred data itself is
+              meaningless and is discarded. While the test runs, the server
+              uses your IP address in memory to enforce per-address transfer
+              and request limits. Neither the test nor your IP address is
+              written to its database, and no result is stored on the server
+              unless you share it.
+            </p>
+          </section>
+          <section class="legal-section">
+            <h2 data-i18n="privacy.ip.heading">Public IP addresses</h2>
+            <p data-i18n="privacy.ip.body">
+              The page shows the public IPv4 and IPv6 addresses your browser
+              uses to reach this server. They are looked up when the page loads
+              and are only displayed to you; the server does not store them.
+            </p>
+          </section>
+          <section class="legal-section">
+            <h2 data-i18n="privacy.share.heading">Shared results</h2>
+            <p data-i18n="privacy.share.body">
+              A result is stored on this server only when you tap Share. The
+              stored record contains the measured values (download, upload,
+              latency, jitter, latency under load, and the bufferbloat grade),
+              the public IP addresses shown with the result, the server name,
+              and the time of the test. It is published under a random link:
+              anyone who knows the link can view it. Shared results are deleted
+              after 90 days at the latest, or earlier when the server trims its
+              stored results.
+            </p>
+          </section>
+          <section class="legal-section">
+            <h2 data-i18n="privacy.local.heading">
+              Data stored in your browser
+            </h2>
+            <p data-i18n="privacy.local.body">
+              Your language choice, your theme choice, and a short list of your
+              recent test results are kept in your browser's local storage so
+              the page can restore them on your next visit. This data never
+              leaves your device; you can remove it at any time by clearing
+              this site's browsing data.
+            </p>
+          </section>
+          <section class="legal-section">
+            <h2 data-i18n="privacy.tracking.heading">
+              Cookies, tracking, and third parties
+            </h2>
+            <p data-i18n="privacy.tracking.body">
+              This site sets no cookies, uses no analytics, and loads nothing
+              from third parties. Fonts and all other assets are served by this
+              server.
+            </p>
+          </section>
+          <section class="legal-section">
+            <h2 data-i18n="privacy.logs.heading">Server logs</h2>
+            <p data-i18n="privacy.logs.body">
+              To keep the service reliable and to protect it from abuse, the
+              server may write technical log entries for API requests,
+              including the request path, status code, duration, and IP
+              address. How long logs are kept is decided by the operator of
+              this instance.
+            </p>
+          </section>
+          <section class="legal-section">
+            <h2 data-i18n="privacy.operator.heading">Who is responsible</h2>
+            <p data-i18n="privacy.operator.body">
+              openByte is self-hosted open-source software; this instance is
+              run by its own operator, who is responsible for the deployment,
+              including any infrastructure in front of it (such as a reverse
+              proxy) that may process additional data. If this deployment
+              provides a legal notice, you can reach it from the link in the
+              footer.
+            </p>
+          </section>
+        </article>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-links">
+          <a
+            class="footer-link"
+            href="/"
+            data-i18n="nav.speedTest"
+            >Speed Test</a
+          >
+          <span class="footer-divider">&middot;</span>
+          <a
+            class="footer-link"
+            href="/privacy"
+            data-i18n="nav.privacy"
+            >Privacy</a
+          >
+          <span class="footer-impressum">
+            <span class="footer-divider">&middot;</span>
+            <a
+              class="footer-link"
+              href="/impressum"
+              data-i18n="nav.impressum"
+              >Legal Notice</a
+            >
+          </span>
+          <span class="footer-divider">&middot;</span>
+          <a
+            class="footer-link"
+            href="https://github.com/saveenergy/openbyte"
+            target="_blank"
+            rel="noopener noreferrer"
+            >GitHub</a
+          >
+        </div>
+      </footer>
+    </div>
+
+    <script type="module" src="/branding.js"></script>
+    <script type="module" src="/theme.js"></script>
+  </body>
+</html>

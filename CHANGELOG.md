@@ -7,6 +7,12 @@ in Git history and pull requests, not release notes.
 
 ### Added
 
+- **Legal pages**: a localized privacy page at `/privacy` describes exactly
+  what the server processes (nothing stored without sharing, no cookies, no
+  third parties, localStorage-only preferences and history), and an optional
+  `IMPRESSUM_URL` makes `/impressum` redirect to the operator's legal notice
+  while revealing the matching footer link on all pages.
+
 - **Environment-driven visual branding**: operators can provide accessible
   dark/light primary and secondary colors plus a bounded local header logo;
   both the speed-test and shared-result pages apply the branding before paint.
