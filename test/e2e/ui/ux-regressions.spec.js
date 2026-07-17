@@ -137,6 +137,69 @@ test.describe("openByte UI regressions", () => {
     await page.locator("#cancelBtn").click();
   });
 
+  test("unbranded pages never request the brand logo", async ({ page }) => {
+    const logoRequests = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/branding/logo")) {
+        logoRequests.push(request.url());
+      }
+    });
+
+    await page.goto("/");
+    await expect(page.locator(".brand-wordmark")).toBeVisible();
+    await expect(page.locator(".brand-logo")).toBeHidden();
+    expect(await page.locator(".brand-logo").getAttribute("src")).toBeNull();
+    expect(logoRequests).toEqual([]);
+  });
+
+  test("failed probe hosts are skipped after the server answered", async ({
+    page,
+    baseURL,
+  }) => {
+    const crossProbeRequests = [];
+    await page.route(pingRoute, async (route) => {
+      const url = new URL(route.request().url());
+      if (url.hostname.startsWith("v4.") || url.hostname.startsWith("v6.")) {
+        crossProbeRequests.push(url.hostname);
+        await route.abort("failed");
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        headers: { "Access-Control-Allow-Origin": "*" },
+        contentType: "application/json",
+        body: JSON.stringify({ client_ip: "198.51.100.7" }),
+      });
+    });
+
+    const testURL = new URL("/", baseURL);
+    testURL.hostname = "openbyte.localhost";
+    await page.goto(testURL.href);
+    await expect(page.locator("#idleNetworkInfo")).toHaveAttribute(
+      "aria-busy",
+      "false",
+    );
+    expect(crossProbeRequests.sort()).toEqual([
+      "v4.openbyte.localhost",
+      "v6.openbyte.localhost",
+    ]);
+
+    const skips = await page.evaluate(() =>
+      Object.keys(
+        JSON.parse(localStorage.getItem("openbyte-probe-skip")) ?? {},
+      ).sort(),
+    );
+    expect(skips).toEqual(["v4.openbyte.localhost", "v6.openbyte.localhost"]);
+
+    crossProbeRequests.length = 0;
+    await page.reload();
+    await expect(page.locator("#idleNetworkInfo")).toHaveAttribute(
+      "aria-busy",
+      "false",
+    );
+    expect(crossProbeRequests).toEqual([]);
+  });
+
   test("theme toggle cycles when storage is unavailable", async ({ page }) => {
     await page.addInitScript(() => {
       for (const method of ["getItem", "setItem", "removeItem"]) {

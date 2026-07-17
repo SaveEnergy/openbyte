@@ -6,6 +6,48 @@ import { fetchWithTimeout, parseJSONOrThrow } from "./utils.js";
 
 const fallbackServerName = "openByte Server";
 
+/**
+ * Negative cache for the optional v4./v6. probe hosts. Deployments without
+ * those DNS records fail the probe on every load and the browser logs a
+ * network error each time; remembering the failure keeps the console clean
+ * until the TTL expires and the probe becomes eager again.
+ */
+const PROBE_SKIP_KEY = "openbyte-probe-skip";
+const PROBE_SKIP_TTL_MS = 24 * 60 * 60 * 1000;
+
+function loadProbeSkips() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PROBE_SKIP_KEY));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function shouldSkipProbe(host) {
+  const expiry = loadProbeSkips()[host];
+  return typeof expiry === "number" && Date.now() < expiry;
+}
+
+function rememberProbeOutcome(host, reachable, sameOriginOK) {
+  const skips = loadProbeSkips();
+  if (reachable) {
+    if (!(host in skips)) return;
+    delete skips[host];
+  } else if (sameOriginOK) {
+    skips[host] = Date.now() + PROBE_SKIP_TTL_MS;
+  } else {
+    // The server itself was unreachable: probably offline, not a missing
+    // probe host, so keep probing on the next load.
+    return;
+  }
+  try {
+    localStorage.setItem(PROBE_SKIP_KEY, JSON.stringify(skips));
+  } catch {
+    // Storage unavailable: the probe stays eager on every load.
+  }
+}
+
 function isIdle() {
   return !state.isRunning && state.phase === "idle";
 }
@@ -182,22 +224,32 @@ export function detectNetworkInfo() {
   const probeOpts = { cache: "no-store", credentials: "omit", mode: "cors" };
   const proto = globalThis.location.protocol;
 
+  const subdomainProbes = [];
   if (canProbe) {
-    probes.push(
-      discoverAddress(
-        `${proto}//v4.${hostname}/api/v1/ping`,
-        probeOpts,
-        canUpdateStartupAddress,
-      ),
-      discoverAddress(
-        `${proto}//v6.${hostname}/api/v1/ping`,
-        probeOpts,
-        canUpdateStartupAddress,
-      ),
-    );
+    for (const host of [`v4.${hostname}`, `v6.${hostname}`]) {
+      if (shouldSkipProbe(host)) continue;
+      subdomainProbes.push(
+        discoverAddress(
+          `${proto}//${host}/api/v1/ping`,
+          probeOpts,
+          canUpdateStartupAddress,
+        ).then((reachable) => ({ host, reachable })),
+      );
+    }
+    probes.push(...subdomainProbes);
   }
 
-  return Promise.allSettled(probes).then((results) => {
+  return Promise.allSettled(probes).then(async (results) => {
+    const sameOriginOK = await sameOriginProbe.catch(() => false);
+    for (const settled of await Promise.allSettled(subdomainProbes)) {
+      if (settled.status === "fulfilled") {
+        rememberProbeOutcome(
+          settled.value.host,
+          settled.value.reachable,
+          sameOriginOK,
+        );
+      }
+    }
     state.networkInfo.complete = true;
     updateNetworkDisplay();
     return results;
