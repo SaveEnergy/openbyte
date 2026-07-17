@@ -166,7 +166,8 @@ test.describe("visual branding", () => {
     });
 
     const html = page.locator("html");
-    await page.locator("#themeToggle").click();
+    await page.locator(".preferences-trigger").click();
+    await page.locator('.theme-option:has(input[value="light"])').click();
     await expect(html).toHaveAttribute("data-theme", "light");
     await expect
       .poll(() =>
@@ -182,7 +183,7 @@ test.describe("visual branding", () => {
       )
       .toEqual(["#805f00", "#805f00", "#805f00", "#315db8"]);
 
-    await page.locator("#themeToggle").click();
+    await page.locator('.theme-option:has(input[value="dark"])').click();
     await expect(html).toHaveAttribute("data-theme", "dark");
     await expect
       .poll(() =>

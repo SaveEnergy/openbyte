@@ -16,6 +16,7 @@ test.describe("Privacy page", () => {
     await expect(
       page.getByText(/not a complete operator-specific notice/),
     ).toBeVisible();
+    await expect(page.locator('main a[href="/impressum"]')).toHaveCount(0);
   });
 
   test("footer links the privacy page from the speed test", async ({

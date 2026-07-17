@@ -71,7 +71,9 @@ test.describe("openByte UI", () => {
   }) => {
     await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
 
+    await page.locator(".preferences-trigger").click();
     await page.locator("#historyPreference").check();
+    await page.keyboard.press("Escape");
     await page.locator("#startBtn").click();
     await expect(page.locator("#phaseSteps")).toBeVisible();
     await expect(page.locator("#phaseStepPing")).toHaveAttribute(
@@ -98,6 +100,7 @@ test.describe("openByte UI", () => {
     });
     await page.goto("/");
 
+    await page.locator(".preferences-trigger").click();
     const preference = page.locator("#historyPreference");
     await expect(preference).toBeChecked();
     await preference.uncheck();
@@ -109,20 +112,26 @@ test.describe("openByte UI", () => {
     ).toEqual({ enabled: null, entries: null });
   });
 
-  test("theme toggle cycles system, light, dark", async ({ page }) => {
+  test("explicit theme choices persist and System clears the override", async ({ page }) => {
     await page.goto("/");
     const html = page.locator("html");
 
     await expect(html).not.toHaveAttribute("data-theme", /.+/);
-    await page.locator("#themeToggle").click();
+    await page.locator(".preferences-trigger").click();
+    await page.locator('.theme-option:has(input[value="light"])').click();
     await expect(html).toHaveAttribute("data-theme", "light");
-    await page.locator("#themeToggle").click();
+    await page.locator('.theme-option:has(input[value="dark"])').click();
     await expect(html).toHaveAttribute("data-theme", "dark");
 
     await page.reload();
     await expect(html).toHaveAttribute("data-theme", "dark");
-    await page.locator("#themeToggle").click();
+    await page.locator(".preferences-trigger").click();
+    await expect(page.locator('input[name="themeMode"][value="dark"]')).toBeChecked();
+    await page.locator('.theme-option:has(input[value="system"])').click();
     await expect(html).not.toHaveAttribute("data-theme", /.+/);
+    expect(
+      await page.evaluate(() => localStorage.getItem("openbyte-theme")),
+    ).toBeNull();
   });
 
   test("toast regions keep accessible roles", async ({ page }) => {
@@ -270,7 +279,9 @@ test.describe("openByte UI", () => {
   }) => {
     await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
 
+    await page.locator(".preferences-trigger").click();
     await page.locator("#historyPreference").check();
+    await page.keyboard.press("Escape");
     await page.locator("#startBtn").click();
     await expect
       .poll(

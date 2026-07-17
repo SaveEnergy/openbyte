@@ -7,12 +7,13 @@ in Git history and pull requests, not release notes.
 
 ### Added
 
-- **Legal and privacy controls**: a localized `/privacy` technical summary
+- **Privacy controls**: a localized `/privacy` technical summary
   documents request IPs, sharing, retention, logs, recipients, and device
-  storage. `PRIVACY_URL` can redirect to the operator-specific GDPR notice;
-  `IMPRESSUM_URL` redirects to the operator's legal notice and reveals its
-  footer link. Recent-result persistence is now an explicit, default-off
-  browser choice rather than an automatic write.
+  storage. `PRIVACY_URL` can redirect to the operator-specific GDPR notice.
+  Recent-result persistence is now an explicit, default-off browser choice
+  rather than an automatic write.
+- **Operator legal notice**: `IMPRESSUM_URL` redirects to the operator's
+  separate legal notice and reveals its footer link.
 
 - **Environment-driven visual branding**: operators can provide accessible
   dark/light primary and secondary colors plus a bounded local header logo;
@@ -29,20 +30,18 @@ in Git history and pull requests, not release notes.
 - **Result context**: a loaded-latency advisory, a colored bufferbloat grade
   badge, and a "What do these numbers mean?" disclosure explaining the
   secondary metrics without assigning a subjective connection label.
-- **Recent tests**: the last runs are stored in `localStorage` and listed on
-  the results screen (`web/history.js`).
-- **Manual theme toggle**: header button cycles system → light → dark and
-  persists per device (`web/theme.js`) on the main and shared-result pages.
+- **Recent tests**: users can explicitly enable storage of the last runs in
+  `localStorage`; disabling it deletes the history (`web/history.js`).
+- **Preferences menu**: one header disclosure exposes language, explicit
+  system/light/dark choices, and result storage on every page.
 
 ### Changed
 
-- **Header polish**: removed the underline accent from the wordmark, replaced
-  the native language-selector arrow with a themed chevron that keeps clear
-  spacing from the theme-toggle divider, and the optional brand logo is now
-  requested only on branded deployments (no more `/branding/logo` 404 in the
-  console). Unresolvable `v4.`/`v6.` probe hosts are remembered for a day so
-  deployments without those DNS records stop logging a failed probe on every
-  page load.
+- **Header polish**: removed the underline accent from the wordmark, moved
+  device preferences behind one compact settings trigger, and the optional
+  brand logo is requested only on branded deployments (no more
+  `/branding/logo` 404 in the console). Unresolvable `v4.`/`v6.` probe hosts
+  are remembered only in page memory, never device storage.
 - **Official container contract**: the published image and bundled Compose now
   use plain HTTP on internal port `8080` and persist only at `/app/data`, while
   runtime defaults come from the binary. Custom data-path, direct-TLS, HTTP/2,

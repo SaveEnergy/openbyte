@@ -117,8 +117,9 @@ Notes:
   generic self-hosted software cannot identify the controller or choose an
   operator's legal bases, processors, transfers, log/backup retention, DPO, or
   supervisory authority. Public deployments subject to GDPR should set
-  `PRIVACY_URL` to a reviewed operator-specific Article 13 notice;
-  `IMPRESSUM_URL` alone is not a substitute.
+  `PRIVACY_URL` to a reviewed operator-specific Article 13 notice.
+- Privacy notices and Impressum/legal notices are independent operator
+  documents; configure `PRIVACY_URL` and `IMPRESSUM_URL` separately.
 - Configure public DNS and reverse-proxy routing outside openByte; saved-result URLs are relative.
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
 - `/api/v1/ping` is the only cross-origin API: it allows any origin so the UI can probe dedicated IPv4/IPv6 hostnames. Other API routes are same-origin.

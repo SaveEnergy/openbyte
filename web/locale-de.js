@@ -6,16 +6,13 @@ export const de = Object.freeze({
   "common.skipToMain": "Zum Hauptinhalt springen",
   "common.error": "Fehler",
   "common.success": "Erfolgreich",
-  "language.label": "Sprache auswählen",
+  "preferences.title": "Einstellungen",
+  "preferences.language": "Sprache",
+  "preferences.appearance": "Darstellung",
   "language.system": "System · {locale}",
-
-  "theme.switch": "Farbschema wechseln",
-  "theme.systemNextLight":
-    "Das Farbschema folgt der Systemeinstellung. Aktivieren, um das helle Farbschema zu verwenden.",
-  "theme.lightNextDark":
-    "Helles Farbschema aktiv. Aktivieren, um zum dunklen Farbschema zu wechseln.",
-  "theme.darkNextSystem":
-    "Dunkles Farbschema aktiv. Aktivieren, um der Systemeinstellung zu folgen.",
+  "theme.system": "System",
+  "theme.light": "Hell",
+  "theme.dark": "Dunkel",
 
   "server.connecting": "Verbindung wird hergestellt…",
   "server.ready": "Bereit",
@@ -63,9 +60,9 @@ export const de = Object.freeze({
   "network.publicIpAtTest": "Öffentliche IP-Adressen beim Test",
   "history.heading": "Letzte Tests",
   "history.justNow": "gerade eben",
-  "history.remember": "Letzte Tests merken",
+  "history.remember": "Letzte Ergebnisse auf diesem Gerät speichern",
   "history.rememberHint":
-    "Speichert bis zu 10 Ergebnisse in diesem Browser, bis Sie die Funktion ausschalten.",
+    "Speichert bis zu 10 Ergebnisse in diesem Browser. Beim Ausschalten werden sie gelöscht.",
 
   "action.testAgain": "Nochmal testen",
   "action.share": "Teilen",
@@ -89,10 +86,9 @@ export const de = Object.freeze({
   "privacy.scope.heading": "Zu dieser technischen Zusammenfassung",
   "privacy.scope.body":
     "openByte ist selbst gehostete Software. Diese integrierte Seite ist daher keine vollständige, betreiberspezifische Information nach Art. 13 DSGVO. Der Betreiber muss eigene Datenschutzhinweise veröffentlichen und kann /privacy dorthin weiterleiten.",
-  "privacy.operator.heading": "Verantwortlicher und vollständige Hinweise",
+  "privacy.operator.heading": "Betreiberspezifische Datenschutzhinweise",
   "privacy.operator.body":
-    "Verantwortlicher ist die Person oder Organisation, die diese Instanz betreibt – nicht das openByte-Projekt oder seine Mitwirkenden. Die Hinweise des Betreibers müssen Namen und Kontaktdaten des Verantwortlichen, gegebenenfalls den Datenschutzbeauftragten, Zwecke und Rechtsgrundlagen, gegebenenfalls berechtigte Interessen sowie das Beschwerderecht bei einer Aufsichtsbehörde nennen.",
-  "privacy.operator.link": "Impressum des Betreibers öffnen",
+    "Vollständige betreiberspezifische Datenschutzhinweise müssen den Verantwortlichen und seine Kontaktdaten, gegebenenfalls den Datenschutzbeauftragten, Zwecke und Rechtsgrundlagen, gegebenenfalls berechtigte Interessen sowie das Beschwerderecht bei einer Aufsichtsbehörde nennen.",
   "privacy.test.heading": "Anfragen, Speedtests und IP-Adressen",
   "privacy.test.body":
     "Bei jeder Anfrage wird die Quell-IP-Adresse zwangsläufig von diesem Server und einem etwaigen Reverse-Proxy verarbeitet. openByte verwendet sie, um zu antworten, die öffentliche IPv4- und IPv6-Adresse anzuzeigen, Übertragungs- und Anfragelimits durchzusetzen und die Dienstkapazität zu schützen. Die Download- und Uploadtests tauschen bedeutungslose Zufallsdaten aus, die verworfen werden. Ein abgeschlossenes Messergebnis wird nur dann in die Ergebnisdatenbank geschrieben, wenn Sie Teilen wählen.",
@@ -101,7 +97,7 @@ export const de = Object.freeze({
     "Erst das Aktivieren von Teilen sendet ein Ergebnis an die Serverdatenbank. Der Eintrag enthält Download, Upload, Latenz, Jitter, Latenz unter Last, Bufferbloat-Bewertung, die angezeigten öffentlichen IPv4- und IPv6-Adressen, den Servernamen und den Zeitpunkt des Teilens. Der zufällige Ergebnislink hat keine Zugriffskontrolle: Wer ihn kennt, kann den Eintrag ansehen.",
   "privacy.local.heading": "Speicherung auf Ihrem Gerät",
   "privacy.local.body":
-    "Sprache und Farbschema werden erst nach Ihrer Auswahl im lokalen Speicher abgelegt. Der Verlauf letzter Tests ist standardmäßig ausgeschaltet; beim Einschalten speichert der Browser die Einstellung und bis zu 10 Ergebnisse (Messwerte, Zeitpunkt und Bewertung), bis Sie die Funktion ausschalten oder Websitedaten löschen. Die lokale Kopie wird nicht automatisch übertragen. Fehlgeschlagene optionale Adressabfragen werden für diesen Tab höchstens 24 Stunden im Sitzungsspeicher vermerkt.",
+    "Sprache und Farbschema werden erst nach Ihrer Auswahl im lokalen Speicher abgelegt. Der Verlauf letzter Tests ist standardmäßig ausgeschaltet; beim Einschalten speichert der Browser die Einstellung und bis zu 10 Ergebnisse (Messwerte, Zeitpunkt und Bewertung), bis Sie die Funktion ausschalten oder Websitedaten löschen. Die lokale Kopie wird nicht automatisch übertragen. Fehlgeschlagene optionale Adressabfragen bleiben nur im Arbeitsspeicher der Seite und werden nicht auf dem Gerät gespeichert.",
   "privacy.tracking.heading": "Cookies und Tracking",
   "privacy.tracking.body":
     "openByte setzt keine Cookies, führt kein Analyse- oder Werbetracking durch und bindet keine Ressourcen Dritter ein. Schriften und andere Anwendungsdateien kommen von diesem Server. Erst wenn Sie einem externen Link oder einer vom Betreiber konfigurierten Weiterleitung folgen, wird eine Anfrage an dieses Ziel gesendet.",

@@ -6,15 +6,13 @@ export const en = Object.freeze({
   "common.skipToMain": "Skip to main content",
   "common.error": "Error",
   "common.success": "Success",
-  "language.label": "Choose language",
+  "preferences.title": "Preferences",
+  "preferences.language": "Language",
+  "preferences.appearance": "Appearance",
   "language.system": "System · {locale}",
-
-  "theme.switch": "Switch theme",
-  "theme.systemNextLight":
-    "Theme follows system preference. Activate for light theme.",
-  "theme.lightNextDark": "Light theme active. Activate for dark theme.",
-  "theme.darkNextSystem":
-    "Dark theme active. Activate to follow system preference.",
+  "theme.system": "System",
+  "theme.light": "Light",
+  "theme.dark": "Dark",
 
   "server.connecting": "Connecting…",
   "server.ready": "Ready",
@@ -62,9 +60,9 @@ export const en = Object.freeze({
   "network.publicIpAtTest": "Public IP addresses for this test",
   "history.heading": "Recent tests",
   "history.justNow": "just now",
-  "history.remember": "Remember recent tests",
+  "history.remember": "Save recent results on this device",
   "history.rememberHint":
-    "Stores up to 10 results in this browser until you turn it off.",
+    "Stores up to 10 results in this browser. Turning this off deletes them.",
 
   "action.testAgain": "Test again",
   "action.share": "Share",
@@ -87,10 +85,9 @@ export const en = Object.freeze({
   "privacy.scope.heading": "About this technical summary",
   "privacy.scope.body":
     "openByte is self-hosted software, so this built-in page is not a complete operator-specific notice under Article 13 GDPR. The operator must publish its own notice and can configure /privacy to redirect to it.",
-  "privacy.operator.heading": "Controller and complete notice",
+  "privacy.operator.heading": "Operator-specific privacy notice",
   "privacy.operator.body":
-    "The controller is the person or organisation operating this instance, not the openByte project or its contributors. The operator's notice must identify the controller and contact details, any data protection officer, the purposes and legal bases, applicable legitimate interests, and the right to complain to a supervisory authority.",
-  "privacy.operator.link": "Open the operator's Legal Notice",
+    "A complete operator-specific privacy notice must identify the controller and contact details, any data protection officer, the purposes and legal bases, applicable legitimate interests, and the right to complain to a supervisory authority.",
   "privacy.test.heading": "Requests, speed tests, and IP addresses",
   "privacy.test.body":
     "Every request necessarily exposes its source IP address to this server and any reverse proxy. openByte uses it to answer the request, display the public IPv4 and IPv6 addresses, enforce transfer and request limits, and protect service capacity. The download and upload tests exchange meaningless random bytes that are discarded. A completed measurement is not written to the results database unless you choose Share.",
@@ -99,7 +96,7 @@ export const en = Object.freeze({
     "Only activating Share sends a result to the server database. The record contains download, upload, latency, jitter, latency under load, bufferbloat grade, the displayed public IPv4 and IPv6 addresses, server name, and the time it was shared. The random result link has no access control: anyone who knows it can view the record.",
   "privacy.local.heading": "Storage on your device",
   "privacy.local.body":
-    "Language and theme are stored in local storage only after you select them. Recent-test history is off by default; enabling it stores the setting and up to 10 results (measurements, time, and grade) in this browser until you turn it off or clear site data. The local copy is not transmitted automatically. Failed optional address probes are remembered in session storage for this tab, for no more than 24 hours.",
+    "Language and theme are stored in local storage only after you select them. Recent-test history is off by default; enabling it stores the setting and up to 10 results (measurements, time, and grade) in this browser until you turn it off or clear site data. The local copy is not transmitted automatically. Failed optional address probes are remembered only in page memory and are not written to device storage.",
   "privacy.tracking.heading": "Cookies and tracking",
   "privacy.tracking.body":
     "openByte sets no cookies, performs no analytics or advertising tracking, and embeds no third-party resources. Fonts and other application assets come from this server. Following an external link or an operator-configured redirect sends a request to that destination only after you navigate there.",

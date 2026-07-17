@@ -82,7 +82,6 @@ export function initElements() {
   );
   elements.historySection = document.getElementById("historySection");
   elements.historyList = document.getElementById("historyList");
-  elements.historyPreference = document.getElementById("historyPreference");
   elements.startBtnHint = document.querySelector(".start-btn-hint");
 }
 

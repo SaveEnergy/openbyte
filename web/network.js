@@ -7,44 +7,28 @@ import { fetchWithTimeout, parseJSONOrThrow } from "./utils.js";
 const fallbackServerName = "openByte Server";
 
 /**
- * Negative cache for the optional v4./v6. probe hosts. Deployments without
- * those DNS records fail the probe on every load and the browser logs a
- * network error each time; remembering the failure for this tab keeps the
- * console clean until the TTL expires and the probe becomes eager again.
+ * In-memory negative cache for optional v4./v6. probe hosts. It avoids
+ * repeating failed probes during this document's lifetime without writing
+ * device storage before the user has made a choice.
  */
-const PROBE_SKIP_KEY = "openbyte-probe-skip";
 const PROBE_SKIP_TTL_MS = 24 * 60 * 60 * 1000;
-
-function loadProbeSkips() {
-  try {
-    const parsed = JSON.parse(sessionStorage.getItem(PROBE_SKIP_KEY));
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
+const probeSkips = Object.create(null);
 
 function shouldSkipProbe(host) {
-  const expiry = loadProbeSkips()[host];
-  return typeof expiry === "number" && Date.now() < expiry;
+  const expiry = probeSkips[host];
+  if (typeof expiry === "number" && Date.now() < expiry) return true;
+  delete probeSkips[host];
+  return false;
 }
 
 function rememberProbeOutcome(host, reachable, sameOriginOK) {
-  const skips = loadProbeSkips();
   if (reachable) {
-    if (!(host in skips)) return;
-    delete skips[host];
+    delete probeSkips[host];
   } else if (sameOriginOK) {
-    skips[host] = Date.now() + PROBE_SKIP_TTL_MS;
+    probeSkips[host] = Date.now() + PROBE_SKIP_TTL_MS;
   } else {
     // The server itself was unreachable: probably offline, not a missing
-    // probe host, so keep probing on the next load.
-    return;
-  }
-  try {
-    sessionStorage.setItem(PROBE_SKIP_KEY, JSON.stringify(skips));
-  } catch {
-    // Storage unavailable: the probe stays eager on every load.
+    // probe host, so keep probing on the next attempt.
   }
 }
 

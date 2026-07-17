@@ -75,33 +75,76 @@
           </div>
         </div>
         <div class="header-tools">
-          <div class="preference-controls">
-            <label
-              class="visually-hidden"
-              for="languageSelect"
-              data-i18n="language.label"
-              >Choose language</label
-            >
-            <select
-              class="language-select"
-              id="languageSelect"
-              data-i18n-aria-label="language.label"
-              aria-label="Choose language"
-            >
-              <option value="auto">System · EN</option>
-              <option value="en" lang="en">English</option>
-              <option value="de" lang="de">Deutsch</option>
-            </select>
-            <button
-              class="theme-toggle"
-              id="themeToggle"
-              type="button"
-              data-i18n-aria-label="theme.switch"
-              aria-label="Switch theme"
-            >
-              ◐
-            </button>
-          </div>
+          <details class="preferences-menu" id="preferencesMenu">
+            <summary class="preferences-trigger">
+              <svg
+                class="preferences-icon"
+                aria-hidden="true"
+                focusable="false"
+                viewBox="0 0 24 24"
+              >
+                <path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M7 14v6" />
+              </svg>
+              <span class="visually-hidden" data-i18n="preferences.title"
+                >Preferences</span
+              >
+            </summary>
+            <div class="preferences-panel">
+              <p class="preferences-title" data-i18n="preferences.title">
+                Preferences
+              </p>
+              <label class="preference-field" for="languageSelect">
+                <span
+                  class="preference-label"
+                  data-i18n="preferences.language"
+                  >Language</span
+                >
+                <select class="language-select" id="languageSelect">
+                  <option value="auto">System · EN</option>
+                  <option value="en" lang="en">English</option>
+                  <option value="de" lang="de">Deutsch</option>
+                </select>
+              </label>
+              <fieldset class="preference-fieldset">
+                <legend
+                  class="preference-label"
+                  data-i18n="preferences.appearance"
+                >
+                  Appearance
+                </legend>
+                <div class="theme-options">
+                  <label class="theme-option">
+                    <input type="radio" name="themeMode" value="system" />
+                    <span data-i18n="theme.system">System</span>
+                  </label>
+                  <label class="theme-option">
+                    <input type="radio" name="themeMode" value="light" />
+                    <span data-i18n="theme.light">Light</span>
+                  </label>
+                  <label class="theme-option">
+                    <input type="radio" name="themeMode" value="dark" />
+                    <span data-i18n="theme.dark">Dark</span>
+                  </label>
+                </div>
+              </fieldset>
+              <label class="history-preference" for="historyPreference">
+                <input id="historyPreference" type="checkbox" />
+                <span class="history-preference-copy">
+                  <span
+                    class="history-preference-label"
+                    data-i18n="history.remember"
+                    >Save recent results on this device</span
+                  >
+                  <span
+                    class="history-preference-hint"
+                    data-i18n="history.rememberHint"
+                    >Stores up to 10 results in this browser. Turning this off
+                    deletes them.</span
+                  >
+                </span>
+              </label>
+            </div>
+          </details>
         </div>
       </header>
 
@@ -268,7 +311,7 @@
     </div>
 
     <script type="module" src="/branding.js"></script>
-    <script type="module" src="/theme.js"></script>
+    <script type="module" src="/preferences.js"></script>
     <script type="module" src="/stats-help.js"></script>
     <script type="module" src="/results.js"></script>
   </body>

@@ -38,21 +38,27 @@
 - Ping returns `client_ip` by default and adds `server_name` only for `?meta=1`; the UI infers IPv4/IPv6 from the canonical address while keeping all discovery probes eager.
 - Server settings UI: no server selector; a single deployed server tests itself.
 - UI render helpers guard missing DOM nodes to avoid runtime crashes in partial layouts.
-- Header language/theme controls live in **`preferences.css`**; automatic language labels expose the resolved locale. The built-in **`--brand-primary`** stays mint while light-theme foregrounds use the separate accessible accent token; configured branding replaces the appropriate brand/accent tokens for each theme.
+- Header language, theme, and local-result controls live in one disclosure owned
+  by **`preferences.js`** and **`preferences.css`**; automatic language labels
+  expose the resolved locale. The built-in **`--brand-primary`** stays mint
+  while light-theme foregrounds use the separate accessible accent token;
+  configured branding replaces the appropriate brand/accent tokens per theme.
 - Live and shared results put primary measurements before the loaded-latency advisory; they do not assign subjective speed or connection labels.
 - Optional visual branding uses validated environment colors exposed through a
   generated same-origin `/branding.css` and a startup-loaded raster logo at
   `/branding/logo`; neutral and semantic status colors remain fixed for contrast.
   **`branding.js`** assigns the logo `src` only when `/branding.css` makes the
   logo visible, so unbranded deployments never request (and 404 on) the logo.
-- Legal pages: without `PRIVACY_URL`, `/privacy` serves the embedded, localized
+- Privacy: without `PRIVACY_URL`, `/privacy` serves the embedded, localized
   **`privacy.html`** technical data-handling summary; a validated `PRIVACY_URL`
   redirects `/privacy` (302) to the operator-authored, controller-specific
-  notice. The Impressum is likewise operator-owned: a validated
-  `IMPRESSUM_URL` redirects `/impressum` and `/branding.css` unhides its footer
-  link (`.footer-impressum`, hidden by default). Unconfigured Impressum routes
-  stay 404 with no visible link.
-- Speed test: **`openbyte.js`** owns init/events/lifecycle/share/cancel; **`ui-results.js`** owns live result rendering; **`speedtest.js`** owns latency, the determinate progress model, and bridges UI state to the one-shot **`speedtest-worker.js`**; **`speedtest-adaptive.js`** chooses stream count/duration and reports ramp-window/measure progress; **`speedtest-http-{shared,download,upload}.js`** owns warm-up, progress, and transfer loops; **`network.js`** owns readiness and idle address probes (offline disables the start button); **`theme.js`** owns the manual light/dark override; **`history.js`** owns the default-off, user-enabled localStorage recent-results list; **`stats-help.js`** injects the shared metric explanations on both `index.html` and `results.html`. Client IP discovery is a user-facing feature: same-origin and IPv4/IPv6 probes stay eager on page load, never deferred until **GO**; startup probes may finish during the first run but never overwrite completed results, and periodic probes mutate addresses only while idle. One exception: a `v4.`/`v6.` probe host that failed while the same-origin server was reachable is skipped for up to 24 h in the current tab (`sessionStorage`) so reloads do not repeat unconfigured probe failures. The same-origin bootstrap ping requests metadata to populate the configured server name; measurement, readiness, and address pings remain lean. Static serving derives its safe path set from assets embedded by **`web/embed.go`**; **`WEB_ROOT`** may override file contents but cannot expose additional paths.
+  notice.
+- Impressum: a validated `IMPRESSUM_URL` redirects `/impressum` and
+  `/branding.css` unhides its footer link (`.footer-impressum`, hidden by
+  default). Unconfigured routes stay 404 with no visible link. Privacy notices
+  and Impressum/legal notices are independent documents; never use, link, or
+  describe either one as a substitute for disclosures required in the other.
+- Speed test: **`openbyte.js`** owns init/events/lifecycle/share/cancel; **`ui-results.js`** owns live result rendering; **`speedtest.js`** owns latency, the determinate progress model, and bridges UI state to the one-shot **`speedtest-worker.js`**; **`speedtest-adaptive.js`** chooses stream count/duration and reports ramp-window/measure progress; **`speedtest-http-{shared,download,upload}.js`** owns warm-up, progress, and transfer loops; **`network.js`** owns readiness and idle address probes (offline disables the start button); **`theme.js`** owns the explicit system/light/dark choice; **`history.js`** owns the default-off, user-enabled localStorage recent-results list; **`stats-help.js`** injects the shared metric explanations on both `index.html` and `results.html`. Client IP discovery is a user-facing feature: same-origin and IPv4/IPv6 probes stay eager on page load, never deferred until **GO**; startup probes may finish during the first run but never overwrite completed results, and periodic probes mutate addresses only while idle. Failed optional `v4.`/`v6.` probes are cached only in module memory for the current document, never device storage. The same-origin bootstrap ping requests metadata to populate the configured server name; measurement, readiness, and address pings remain lean. Static serving derives its safe path set from assets embedded by **`web/embed.go`**; **`WEB_ROOT`** may override file contents but cannot expose additional paths.
 
 ### Storage
 
