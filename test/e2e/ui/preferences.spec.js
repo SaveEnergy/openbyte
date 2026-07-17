@@ -13,7 +13,11 @@ test.describe("preferences disclosure", () => {
       await expect(page.locator(".preferences-panel")).toBeVisible();
       await expect(page.locator("#languageSelect")).toBeVisible();
       await expect(page.locator('input[name="themeMode"]')).toHaveCount(3);
-      await expect(page.locator("#historyPreference")).toBeVisible();
+      await expect(page.locator(".theme-option-icon")).toHaveCount(3);
+      await expect(page.getByRole("radio", { name: "System" })).toBeVisible();
+      await expect(page.getByRole("radio", { name: "Light" })).toBeVisible();
+      await expect(page.getByRole("radio", { name: "Dark" })).toBeVisible();
+      await expect(page.getByRole("switch")).toBeVisible();
     }
   });
 
@@ -40,6 +44,30 @@ test.describe("preferences disclosure", () => {
     await expect(menu).not.toHaveAttribute("open", "");
   });
 
+  test("keeps native keyboard behavior for theme tiles and history switch", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.locator(".preferences-trigger").click();
+
+    const system = page.getByRole("radio", { name: "System" });
+    const light = page.getByRole("radio", { name: "Light" });
+    const history = page.getByRole("switch");
+    await expect(system).toBeChecked();
+
+    await system.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(light).toBeChecked();
+    expect(
+      await page.evaluate(() => localStorage.getItem("openbyte-theme")),
+    ).toBe("light");
+
+    await page.keyboard.press("Tab");
+    await expect(history).toBeFocused();
+    await page.keyboard.press("Space");
+    await expect(history).toBeChecked();
+  });
+
   test("never creates result storage before explicit opt-in", async ({
     page,
   }) => {
@@ -59,7 +87,7 @@ test.describe("preferences disclosure", () => {
     ).toEqual({ enabled: null, entries: null });
 
     await page.locator(".preferences-trigger").click();
-    const history = page.locator("#historyPreference");
+    const history = page.getByRole("switch");
     await expect(history).not.toBeChecked();
     await history.check();
     expect(
