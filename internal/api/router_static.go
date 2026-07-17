@@ -62,8 +62,7 @@ func (h *staticAssetHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if name == "." || name == "/" {
 		name = "index.html"
 	}
-	switch name {
-	case "results":
+	if staticCleanHTMLPaths[name] {
 		name += ".html"
 	}
 	if strings.Contains(name, "..") || !isAllowedStaticAsset(name) {
@@ -180,12 +179,21 @@ func isAllowedStaticAsset(name string) bool {
 	return embeddedStaticAssets[name]
 }
 
-func staticPathIsRootOrHTML(path string) bool {
-	if path == "/" {
+// Extension-less aliases for embedded HTML pages ("/privacy" -> privacy.html).
+var staticCleanHTMLPaths = map[string]bool{
+	"results": true,
+	"privacy": true,
+}
+
+func staticPathIsRootOrHTML(requestPath string) bool {
+	cleanPath := path.Clean(requestPath)
+	if cleanPath == "/" {
 		return true
 	}
-	n := len(path)
-	return n >= 5 && path[n-5:] == ".html"
+	if staticCleanHTMLPaths[strings.TrimPrefix(cleanPath, "/")] {
+		return true
+	}
+	return strings.HasSuffix(cleanPath, ".html")
 }
 
 func staticCacheMiddleware(next http.Handler) http.Handler {

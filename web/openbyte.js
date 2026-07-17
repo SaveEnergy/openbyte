@@ -29,7 +29,8 @@ import {
   checkServer,
   renderNetworkState,
 } from "./network.js";
-import { saveHistoryEntry } from "./history.js";
+import { renderHistory, saveHistoryEntry } from "./history.js";
+import { HISTORY_PREFERENCE_EVENT } from "./preferences.js";
 
 function testErrorKey(error) {
   const code = error?.code;
@@ -310,6 +311,9 @@ function bindEvents() {
 
 function init() {
   initElements();
+  document.addEventListener(HISTORY_PREFERENCE_EVENT, () => {
+    renderHistory(elements.historyList, elements.historySection);
+  });
   renderNetworkState();
   bindEvents();
   detectNetworkInfo();

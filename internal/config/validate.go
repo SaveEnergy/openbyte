@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -49,6 +50,24 @@ func (c *Config) validateLimits() error {
 		return fmt.Errorf("max concurrent per IP must be > 0")
 	}
 	return nil
+}
+
+func validateLegalURL(name, value string) error {
+	if value == "" {
+		return nil
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" {
+		return fmt.Errorf("invalid %s %q: must be an absolute http(s) URL", name, value)
+	}
+	return nil
+}
+
+func (c *Config) validateLegalURLs() error {
+	if err := validateLegalURL("IMPRESSUM_URL", c.ImpressumURL); err != nil {
+		return err
+	}
+	return validateLegalURL("PRIVACY_URL", c.PrivacyURL)
 }
 
 func (c *Config) validateProxyAndStorage() error {

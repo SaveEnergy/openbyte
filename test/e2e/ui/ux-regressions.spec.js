@@ -152,7 +152,7 @@ test.describe("openByte UI regressions", () => {
     expect(logoRequests).toEqual([]);
   });
 
-  test("failed probe hosts are skipped after the server answered", async ({
+  test("failed probe hosts are skipped in memory but never persisted", async ({
     page,
     baseURL,
   }) => {
@@ -184,23 +184,23 @@ test.describe("openByte UI regressions", () => {
       "v6.openbyte.localhost",
     ]);
 
-    const skips = await page.evaluate(() =>
-      Object.keys(
-        JSON.parse(localStorage.getItem("openbyte-probe-skip")) ?? {},
-      ).sort(),
-    );
-    expect(skips).toEqual(["v4.openbyte.localhost", "v6.openbyte.localhost"]);
+    const persisted = await page.evaluate(() => ({
+      local: localStorage.getItem("openbyte-probe-skip"),
+      session: sessionStorage.getItem("openbyte-probe-skip"),
+    }));
+    expect(persisted).toEqual({ local: null, session: null });
 
     crossProbeRequests.length = 0;
-    await page.reload();
-    await expect(page.locator("#idleNetworkInfo")).toHaveAttribute(
-      "aria-busy",
-      "false",
-    );
+    await page.evaluate(async () => {
+      const { detectNetworkInfo } = await import("/network.js");
+      await detectNetworkInfo();
+    });
     expect(crossProbeRequests).toEqual([]);
   });
 
-  test("theme toggle cycles when storage is unavailable", async ({ page }) => {
+  test("theme choices still apply when storage is unavailable", async ({
+    page,
+  }) => {
     await page.addInitScript(() => {
       for (const method of ["getItem", "setItem", "removeItem"]) {
         Object.defineProperty(Storage.prototype, method, {
@@ -214,11 +214,12 @@ test.describe("openByte UI regressions", () => {
     await page.goto("/");
     const html = page.locator("html");
 
-    await page.locator("#themeToggle").click();
+    await page.locator(".preferences-trigger").click();
+    await page.locator('.theme-option:has(input[value="light"])').click();
     await expect(html).toHaveAttribute("data-theme", "light");
-    await page.locator("#themeToggle").click();
+    await page.locator('.theme-option:has(input[value="dark"])').click();
     await expect(html).toHaveAttribute("data-theme", "dark");
-    await page.locator("#themeToggle").click();
+    await page.locator('.theme-option:has(input[value="system"])').click();
     await expect(html).not.toHaveAttribute("data-theme", /.+/);
   });
 
@@ -470,8 +471,8 @@ test.describe("openByte UI regressions", () => {
       const badge = document.getElementById("bufferbloatResult");
       badge.classList.add("bb-good");
       const background = getComputedStyle(document.body).backgroundColor;
-      const themeRect = document
-        .getElementById("themeToggle")
+      const preferencesRect = document
+        .querySelector(".preferences-trigger")
         .getBoundingClientRect();
       const summaryRect = document
         .querySelector(".stats-help summary")
@@ -484,15 +485,15 @@ test.describe("openByte UI regressions", () => {
         badgeContrast: contrast(getComputedStyle(badge).color, background),
         historyDirection: getComputedStyle(historyItem).flexDirection,
         summaryHeight: summaryRect.height,
-        themeHeight: themeRect.height,
-        themeWidth: themeRect.width,
+        preferencesHeight: preferencesRect.height,
+        preferencesWidth: preferencesRect.width,
       };
     });
 
     expect(audit.badgeContrast).toBeGreaterThanOrEqual(4.5);
     expect(audit.historyDirection).toBe("column");
     expect(audit.summaryHeight).toBeGreaterThanOrEqual(44);
-    expect(audit.themeHeight).toBeGreaterThanOrEqual(44);
-    expect(audit.themeWidth).toBeGreaterThanOrEqual(44);
+    expect(audit.preferencesHeight).toBeGreaterThanOrEqual(44);
+    expect(audit.preferencesWidth).toBeGreaterThanOrEqual(44);
   });
 });

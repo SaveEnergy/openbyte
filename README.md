@@ -51,7 +51,7 @@ The official image serves plain HTTP on container port `8080` and stores its
 SQLite files under `/app/data`. Change the published host port in the Compose
 port mapping, not the internal listener. The Go binary owns all other runtime
 defaults; bundled Compose forwards only explicitly configured server,
-branding, proxy, transfer-limit, and result-retention overrides.
+legal, branding, proxy, transfer-limit, and result-retention overrides.
 
 ### Web Interface
 
@@ -88,6 +88,8 @@ or Compose overlay.
 | --------------------- | ----------------- | ------------------------------------------------------------------ |
 | `PORT`                | 8080              | HTTP API port                                                      |
 | `SERVER_NAME`         | `openByte Server` | Display name in bootstrap ping metadata, the Web UI, and saved results |
+| `IMPRESSUM_URL`       | —                 | Absolute http(s) URL of the operator's legal notice (Impressum); when set, `/impressum` redirects there and the footer shows the legal-notice link |
+| `PRIVACY_URL`         | —                 | Absolute http(s) URL of the operator-authored privacy notice; when set, `/privacy` redirects there instead of serving the bundled technical summary |
 | `BRAND_PRIMARY_COLOR_DARK` / `BRAND_PRIMARY_COLOR_LIGHT` | — | Primary action/download color pair, in exact `#RRGGBB` form |
 | `BRAND_SECONDARY_COLOR_DARK` / `BRAND_SECONDARY_COLOR_LIGHT` | — | Secondary/upload color pair, in exact `#RRGGBB` form |
 | `BRAND_LOGO_PATH`     | —                 | PNG or JPEG logo path readable by the server (maximum 1 MiB)       |
@@ -111,6 +113,13 @@ or Compose overlay.
 Notes:
 
 - If you bind `127.0.0.1` only, open the UI at `http://127.0.0.1:PORT`.
+- The bundled `/privacy` page documents openByte's technical defaults, but
+  generic self-hosted software cannot identify the controller or choose an
+  operator's legal bases, processors, transfers, log/backup retention, DPO, or
+  supervisory authority. Public deployments subject to GDPR should set
+  `PRIVACY_URL` to a reviewed operator-specific Article 13 notice.
+- Privacy notices and Impressum/legal notices are independent operator
+  documents; configure `PRIVACY_URL` and `IMPRESSUM_URL` separately.
 - Configure public DNS and reverse-proxy routing outside openByte; saved-result URLs are relative.
 - For reverse proxy deployments, set `TRUST_PROXY_HEADERS=true` and `TRUSTED_PROXY_CIDRS` to the proxy IP ranges.
 - `/api/v1/ping` is the only cross-origin API: it allows any origin so the UI can probe dedicated IPv4/IPv6 hostnames. Other API routes are same-origin.

@@ -15,6 +15,12 @@ func (c *Config) loadCoreEnv() error {
 	if name := strings.TrimSpace(os.Getenv("SERVER_NAME")); name != "" {
 		c.ServerName = name
 	}
+	if impressum := strings.TrimSpace(os.Getenv("IMPRESSUM_URL")); impressum != "" {
+		c.ImpressumURL = impressum
+	}
+	if privacy := strings.TrimSpace(os.Getenv("PRIVACY_URL")); privacy != "" {
+		c.PrivacyURL = privacy
+	}
 	if durRaw := os.Getenv("MAX_TEST_DURATION"); durRaw != "" {
 		d, err := time.ParseDuration(durRaw)
 		if err != nil || d < time.Second || d%time.Second != 0 {

@@ -50,7 +50,7 @@ test.describe("English and German localization", () => {
           JSON.stringify(placeholders(de[key])),
       );
       const htmlKeys = new Set();
-      for (const path of ["/index.html", "/results.html"]) {
+      for (const path of ["/index.html", "/results.html", "/privacy.html"]) {
         const html = await (await fetch(path)).text();
         const document = new DOMParser().parseFromString(html, "text/html");
         for (const element of document.querySelectorAll("*")) {
@@ -86,7 +86,10 @@ test.describe("English and German localization", () => {
   test("stored choice wins, reloads on change, and Auto restores browser locale", async ({
     browser,
   }) => {
-    const context = await browser.newContext({ locale: "de-DE" });
+    const context = await browser.newContext({
+      locale: "de-DE",
+      viewport: { width: 320, height: 800 },
+    });
     const page = await context.newPage();
     await page.goto("/");
     await page.evaluate(() => {
@@ -97,6 +100,7 @@ test.describe("English and German localization", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.locator("#languageSelect")).toHaveValue("en");
 
+    await page.locator(".preferences-trigger").click();
     await Promise.all([
       page.waitForEvent("domcontentloaded"),
       page.locator("#languageSelect").selectOption("de"),
@@ -119,6 +123,7 @@ test.describe("English and German localization", () => {
       url.searchParams.set("lang", "en");
       history.replaceState(history.state, "", url);
     });
+    await page.locator(".preferences-trigger").click();
     await Promise.all([
       page.waitForEvent("domcontentloaded"),
       page.locator("#languageSelect").selectOption("auto"),
@@ -128,6 +133,21 @@ test.describe("English and German localization", () => {
     await expect(page.locator('#languageSelect option[value="auto"]')).toHaveText(
       "System · DE",
     );
+    await page.locator(".preferences-trigger").click();
+    const labelFit = await page.locator("#languageSelect").evaluate((select) => {
+      const styles = getComputedStyle(select);
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+      context.font = styles.font;
+      return {
+        available:
+          select.clientWidth -
+          Number.parseFloat(styles.paddingLeft) -
+          Number.parseFloat(styles.paddingRight),
+        required: context.measureText(select.selectedOptions[0].textContent).width,
+      };
+    });
+    expect(labelFit.available).toBeGreaterThanOrEqual(labelFit.required);
     expect(
       await page.evaluate(() => localStorage.getItem("openbyte-language")),
     ).toBeNull();
@@ -147,6 +167,7 @@ test.describe("English and German localization", () => {
     await expect(page.locator('#languageSelect option[value="auto"]')).toHaveText(
       "System · EN",
     );
+    await page.locator(".preferences-trigger").click();
     await Promise.all([
       page.waitForEvent("domcontentloaded"),
       page.locator("#languageSelect").selectOption("auto"),
@@ -177,10 +198,10 @@ test.describe("German UI", () => {
     await expect(page.locator(".stats-help summary")).toHaveText(
       "Was bedeuten die Werte?",
     );
-    await expect(page.locator("#themeToggle")).toHaveAttribute(
-      "aria-label",
-      /Farbschema/,
-    );
+    await page.locator(".preferences-trigger").click();
+    await expect(page.locator(".preferences-title")).toHaveText("Einstellungen");
+    await expect(page.getByText("Darstellung", { exact: true })).toBeVisible();
+    await expect(page.getByText("Dunkel", { exact: true })).toBeVisible();
     await expect(page.locator('meta[name="description"]')).toHaveAttribute(
       "content",
       /Open-source internet speed test/,
@@ -265,6 +286,7 @@ test.describe("German UI", () => {
       showError("server.overloaded");
     });
     await expect(page.locator("#errorToast")).toBeVisible();
+    await page.locator(".preferences-trigger").click();
 
     const audit = await page.evaluate(() => {
       const bounds = (element) => {
@@ -278,18 +300,30 @@ test.describe("German UI", () => {
       return {
         viewportWidth: innerWidth,
         scrollWidth: document.documentElement.scrollWidth,
+        trigger: bounds(document.querySelector(".preferences-trigger")),
+        panel: bounds(document.querySelector(".preferences-panel")),
         language: bounds(document.getElementById("languageSelect")),
-        theme: bounds(document.getElementById("themeToggle")),
+        theme: bounds(document.querySelector(".theme-option span")),
+        history: bounds(document.querySelector(".history-preference")),
         toast: bounds(document.getElementById("errorToast")),
       };
     });
 
     expect(audit.scrollWidth).toBeLessThanOrEqual(audit.viewportWidth);
-    for (const control of [audit.language, audit.theme, audit.toast]) {
+    for (const control of [
+      audit.trigger,
+      audit.panel,
+      audit.language,
+      audit.theme,
+      audit.history,
+      audit.toast,
+    ]) {
       expect(control.left).toBeGreaterThanOrEqual(0);
       expect(control.right).toBeLessThanOrEqual(audit.viewportWidth);
     }
+    expect(audit.trigger.height).toBeGreaterThanOrEqual(44);
     expect(audit.language.height).toBeGreaterThanOrEqual(44);
     expect(audit.theme.height).toBeGreaterThanOrEqual(44);
+    expect(audit.history.height).toBeGreaterThanOrEqual(44);
   });
 });

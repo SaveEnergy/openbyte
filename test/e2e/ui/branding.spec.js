@@ -166,7 +166,8 @@ test.describe("visual branding", () => {
     });
 
     const html = page.locator("html");
-    await page.locator("#themeToggle").click();
+    await page.locator(".preferences-trigger").click();
+    await page.locator('.theme-option:has(input[value="light"])').click();
     await expect(html).toHaveAttribute("data-theme", "light");
     await expect
       .poll(() =>
@@ -182,7 +183,7 @@ test.describe("visual branding", () => {
       )
       .toEqual(["#805f00", "#805f00", "#805f00", "#315db8"]);
 
-    await page.locator("#themeToggle").click();
+    await page.locator('.theme-option:has(input[value="dark"])').click();
     await expect(html).toHaveAttribute("data-theme", "dark");
     await expect
       .poll(() =>
@@ -229,6 +230,48 @@ test.describe("visual branding", () => {
       .getByRole("link", { name: "Speed Test", exact: true });
     await expect(home).toBeVisible();
     await expect(home.locator(".brand-logo")).toBeVisible();
+  });
+
+  test("keeps checked theme labels readable at the brand contrast boundary", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem("openbyte-theme", "light");
+    });
+    await page.route("**/branding.css", (route) =>
+      route.fulfill({
+        contentType: "text/css",
+        body: ':root[data-theme="light"] { --accent-primary: #68709c; }',
+      }),
+    );
+    await page.goto("/");
+    await page.locator(".preferences-trigger").click();
+
+    const ratio = await page
+      .locator(".theme-option input:checked + .theme-option-control")
+      .evaluate((control) => {
+        const luminance = (value) => {
+          const weights = [0.2126, 0.7152, 0.0722];
+          return value
+            .match(/[\d.]+/g)
+            .slice(0, 3)
+            .map((channel) => {
+              const normalized = Number(channel) / 255;
+              return normalized <= 0.04045
+                ? normalized / 12.92
+                : ((normalized + 0.055) / 1.055) ** 2.4;
+            })
+            .reduce((sum, channel, index) => sum + channel * weights[index], 0);
+        };
+        const styles = getComputedStyle(control);
+        const values = [
+          luminance(styles.color),
+          luminance(styles.backgroundColor),
+        ].sort((a, b) => b - a);
+        return (values[0] + 0.05) / (values[1] + 0.05);
+      });
+
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
   });
 
   test("sizes the high-DPI sparkline from its mobile CSS box", async ({

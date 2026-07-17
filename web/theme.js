@@ -1,15 +1,7 @@
-/** Manual theme override: system -> light -> dark, persisted per device. */
-
-import { t } from "./i18n.js";
+/** Explicit system/light/dark theme preference, persisted per device. */
 
 const STORAGE_KEY = "openbyte-theme";
-const MODES = ["system", "light", "dark"];
-const MODE_ICONS = { system: "◐", light: "☀", dark: "☾" };
-const MODE_LABEL_KEYS = {
-  system: "theme.systemNextLight",
-  light: "theme.lightNextDark",
-  dark: "theme.darkNextSystem",
-};
+const MODES = new Set(["system", "light", "dark"]);
 let currentMode = storedMode();
 
 function storedMode() {
@@ -42,29 +34,24 @@ function applyMode(mode) {
   }
 }
 
-function updateToggle(button, mode) {
-  const label = t(MODE_LABEL_KEYS[mode]);
-  button.textContent = MODE_ICONS[mode];
-  button.setAttribute("aria-label", label);
-  button.title = label;
-}
+function wireThemeOptions() {
+  const controls = [...document.querySelectorAll('input[name="themeMode"]')];
+  if (controls.length === 0) return;
 
-function wireToggle() {
-  const button = document.getElementById("themeToggle");
-  if (!button) return;
-  updateToggle(button, currentMode);
-  button.addEventListener("click", () => {
-    const next = MODES[(MODES.indexOf(currentMode) + 1) % MODES.length];
-    currentMode = next;
-    persistMode(next);
-    applyMode(next);
-    updateToggle(button, next);
-  });
+  for (const control of controls) {
+    control.checked = control.value === currentMode;
+    control.addEventListener("change", () => {
+      if (!control.checked || !MODES.has(control.value)) return;
+      currentMode = control.value;
+      persistMode(currentMode);
+      applyMode(currentMode);
+    });
+  }
 }
 
 applyMode(currentMode);
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", wireToggle);
+  document.addEventListener("DOMContentLoaded", wireThemeOptions, { once: true });
 } else {
-  wireToggle();
+  wireThemeOptions();
 }

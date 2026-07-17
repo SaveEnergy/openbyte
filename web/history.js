@@ -1,7 +1,8 @@
-/** Recent-results history stored locally on this device. */
+/** Optional recent-results history stored locally on this device. */
 
 import { formatDateTime, formatRelativeTime, t } from "./i18n.js";
 import { formatLatency, formatSpeed } from "./presentation.js";
+import { isHistoryEnabled } from "./preferences.js";
 
 const STORAGE_KEY = "openbyte-history";
 const MAX_STORED_ENTRIES = 10;
@@ -18,6 +19,7 @@ function isValidEntry(entry) {
 }
 
 export function loadHistory() {
+  if (!isHistoryEnabled()) return [];
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
     return Array.isArray(parsed) ? parsed.filter(isValidEntry) : [];
@@ -27,7 +29,7 @@ export function loadHistory() {
 }
 
 export function saveHistoryEntry(entry) {
-  if (!isValidEntry(entry)) return;
+  if (!isHistoryEnabled() || !isValidEntry(entry)) return;
   try {
     const entries = [entry, ...loadHistory()].slice(0, MAX_STORED_ENTRIES);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));

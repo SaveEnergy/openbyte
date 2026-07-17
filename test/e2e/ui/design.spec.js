@@ -106,10 +106,11 @@ test.describe("brand and localized layout", () => {
     expect(styles.fontSynthesis).toBe("none");
   });
 
-  test("keeps the preference capsule inside narrow and intermediate headers", async ({
+  test("keeps the preferences trigger and panel inside narrow headers", async ({
     page,
   }) => {
     await page.goto("/");
+    await page.locator(".preferences-trigger").click();
     for (const width of [320, 390, 430, 600]) {
       await page.setViewportSize({ width, height: 800 });
       const layout = await page.evaluate(() => {
@@ -120,19 +121,31 @@ test.describe("brand and localized layout", () => {
         return {
           scrollWidth: document.documentElement.scrollWidth,
           viewportWidth: innerWidth,
-          capsule: rect(".preference-controls"),
+          trigger: rect(".preferences-trigger"),
+          panel: rect(".preferences-panel"),
           select: rect("#languageSelect"),
-          theme: rect("#themeToggle"),
+          theme: rect(".theme-option span"),
+          history: rect(".history-preference"),
           serverStatus: getComputedStyle(
             document.getElementById("serverInfo"),
           ).display,
         };
       });
       expect(layout.scrollWidth).toBeLessThanOrEqual(layout.viewportWidth);
-      expect(layout.capsule.left).toBeGreaterThanOrEqual(0);
-      expect(layout.capsule.right).toBeLessThanOrEqual(layout.viewportWidth);
+      for (const control of [
+        layout.trigger,
+        layout.panel,
+        layout.select,
+        layout.theme,
+        layout.history,
+      ]) {
+        expect(control.left).toBeGreaterThanOrEqual(0);
+        expect(control.right).toBeLessThanOrEqual(layout.viewportWidth);
+      }
+      expect(layout.trigger.height).toBeGreaterThanOrEqual(44);
       expect(layout.select.height).toBeGreaterThanOrEqual(44);
       expect(layout.theme.height).toBeGreaterThanOrEqual(44);
+      expect(layout.history.height).toBeGreaterThanOrEqual(44);
       expect(layout.serverStatus).toBe("none");
     }
   });

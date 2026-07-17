@@ -70,33 +70,128 @@
             <span class="server-dot"></span>
             <span class="server-text">Connecting...</span>
           </div>
-          <div class="preference-controls">
-            <label
-              class="visually-hidden"
-              for="languageSelect"
-              data-i18n="language.label"
-              >Choose language</label
-            >
-            <select
-              class="language-select"
-              id="languageSelect"
-              data-i18n-aria-label="language.label"
-              aria-label="Choose language"
-            >
-              <option value="auto">System · EN</option>
-              <option value="en" lang="en">English</option>
-              <option value="de" lang="de">Deutsch</option>
-            </select>
-            <button
-              class="theme-toggle"
-              id="themeToggle"
-              type="button"
-              data-i18n-aria-label="theme.switch"
-              aria-label="Switch theme"
-            >
-              ◐
-            </button>
-          </div>
+          <details class="preferences-menu" id="preferencesMenu">
+            <summary class="preferences-trigger">
+              <svg
+                class="preferences-icon"
+                aria-hidden="true"
+                focusable="false"
+                viewBox="0 0 24 24"
+              >
+                <path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M7 14v6" />
+              </svg>
+              <span class="visually-hidden" data-i18n="preferences.title"
+                >Preferences</span
+              >
+            </summary>
+            <div class="preferences-panel">
+              <p class="preferences-title" data-i18n="preferences.title">
+                Preferences
+              </p>
+              <label class="preference-field" for="languageSelect">
+                <span
+                  class="preference-label"
+                  data-i18n="preferences.language"
+                  >Language</span
+                >
+                <select class="language-select" id="languageSelect">
+                  <option value="auto">System · EN</option>
+                  <option value="en" lang="en">English</option>
+                  <option value="de" lang="de">Deutsch</option>
+                </select>
+              </label>
+              <fieldset class="preference-fieldset">
+                <legend
+                  class="preference-label"
+                  data-i18n="preferences.appearance"
+                >
+                  Appearance
+                </legend>
+                <div class="theme-options">
+                  <label class="theme-option">
+                    <input type="radio" name="themeMode" value="system" />
+                    <span class="theme-option-control">
+                      <svg
+                        class="theme-option-icon"
+                        aria-hidden="true"
+                        focusable="false"
+                        viewBox="0 0 24 24"
+                      >
+                        <rect x="3" y="4" width="18" height="13" rx="2" />
+                        <path d="M8 21h8M12 17v4" />
+                      </svg>
+                      <span class="theme-option-label" data-i18n="theme.system"
+                        >System</span
+                      >
+                    </span>
+                  </label>
+                  <label class="theme-option">
+                    <input type="radio" name="themeMode" value="light" />
+                    <span class="theme-option-control">
+                      <svg
+                        class="theme-option-icon"
+                        aria-hidden="true"
+                        focusable="false"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle cx="12" cy="12" r="3.5" />
+                        <path
+                          d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"
+                        />
+                      </svg>
+                      <span class="theme-option-label" data-i18n="theme.light"
+                        >Light</span
+                      >
+                    </span>
+                  </label>
+                  <label class="theme-option">
+                    <input type="radio" name="themeMode" value="dark" />
+                    <span class="theme-option-control">
+                      <svg
+                        class="theme-option-icon"
+                        aria-hidden="true"
+                        focusable="false"
+                        viewBox="0 0 24 24"
+                      >
+                        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                      </svg>
+                      <span class="theme-option-label" data-i18n="theme.dark"
+                        >Dark</span
+                      >
+                    </span>
+                  </label>
+                </div>
+              </fieldset>
+              <label class="history-preference" for="historyPreference">
+                <span class="history-preference-copy">
+                  <span
+                    class="history-preference-label"
+                    id="historyPreferenceLabel"
+                    data-i18n="history.remember"
+                    >Save recent results on this device</span
+                  >
+                  <span
+                    class="history-preference-hint"
+                    id="historyPreferenceHint"
+                    data-i18n="history.rememberHint"
+                    >Stores up to 10 results in this browser. Turning this off
+                    deletes them.</span
+                  >
+                </span>
+                <span class="history-switch-control">
+                  <input
+                    class="history-preference-input"
+                    id="historyPreference"
+                    type="checkbox"
+                    role="switch"
+                    aria-labelledby="historyPreferenceLabel"
+                    aria-describedby="historyPreferenceHint"
+                  />
+                  <span class="history-switch" aria-hidden="true"></span>
+                </span>
+              </label>
+            </div>
+          </details>
         </div>
       </header>
 
@@ -331,6 +426,22 @@
           <span class="footer-divider">·</span>
           <a
             class="footer-link"
+            href="/privacy"
+            data-i18n="nav.privacy"
+            >Privacy</a
+          >
+          <span class="footer-impressum">
+            <span class="footer-divider">·</span>
+            <a
+              class="footer-link"
+              href="/impressum"
+              data-i18n="nav.impressum"
+              >Legal Notice</a
+            >
+          </span>
+          <span class="footer-divider">·</span>
+          <a
+            class="footer-link"
             href="https://github.com/saveenergy/openbyte"
             target="_blank"
             rel="noopener noreferrer"
@@ -367,7 +478,7 @@
     </div>
 
     <script type="module" src="branding.js"></script>
-    <script type="module" src="theme.js"></script>
+    <script type="module" src="preferences.js"></script>
     <script type="module" src="stats-help.js"></script>
     <script type="module" src="openbyte.js"></script>
   </body>
