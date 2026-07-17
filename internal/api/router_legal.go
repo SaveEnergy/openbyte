@@ -26,8 +26,7 @@ func (r *Router) serveImpressumRedirect(w http.ResponseWriter, req *http.Request
 // serves openByte's bundled technical data-handling summary.
 func (r *Router) servePrivacy(w http.ResponseWriter, req *http.Request, fallback http.Handler) {
 	w.Header().Set(headerCacheControl, valueNoStore)
-	cleanPath := path.Clean(req.URL.Path)
-	if cleanPath != privacyPath && cleanPath != privacyPath+".html" {
+	if !isPrivacyPath(req.URL.Path) {
 		http.NotFound(w, req)
 		return
 	}
@@ -36,4 +35,9 @@ func (r *Router) servePrivacy(w http.ResponseWriter, req *http.Request, fallback
 		return
 	}
 	fallback.ServeHTTP(w, req)
+}
+
+func isPrivacyPath(requestPath string) bool {
+	cleanPath := path.Clean(requestPath)
+	return cleanPath == privacyPath || cleanPath == privacyPath+".html"
 }

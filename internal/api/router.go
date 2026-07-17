@@ -101,7 +101,15 @@ func (r *Router) SetupRoutes() http.Handler {
 		}
 		mux.HandleFunc("GET /results/{id}", resultsPageHandler)
 	}
-	mux.Handle("/", staticHandler)
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// The static allowlist intentionally cleans paths before resolving assets.
+		// Apply the privacy policy first so aliases cannot bypass an operator URL.
+		if (req.Method == http.MethodGet || req.Method == http.MethodHead) && isPrivacyPath(req.URL.Path) {
+			r.servePrivacy(w, req, staticHandler)
+			return
+		}
+		staticHandler.ServeHTTP(w, req)
+	}))
 
 	handler := rejectBodylessRequestBodies(mux)
 	handler = SecurityHeadersMiddleware(handler)

@@ -344,7 +344,7 @@ func TestConfigValidateImpressumURL(t *testing.T) {
 			t.Fatalf("impressum URL %q should be valid: %v", valid, err)
 		}
 	}
-	for _, invalid := range []string{"/impressum", "example.com/impressum", "ftp://example.com/impressum", "https://"} {
+	for _, invalid := range []string{"/impressum", "example.com/impressum", "ftp://example.com/impressum", "https://", "https://:443/impressum"} {
 		cfg := config.DefaultConfig()
 		cfg.ImpressumURL = invalid
 		if cfg.Validate() == nil {
@@ -373,7 +373,7 @@ func TestConfigValidatePrivacyURL(t *testing.T) {
 			t.Fatalf("privacy URL %q should be valid: %v", valid, err)
 		}
 	}
-	for _, invalid := range []string{"/privacy", "example.com/privacy", "ftp://example.com/privacy", "https://"} {
+	for _, invalid := range []string{"/privacy", "example.com/privacy", "ftp://example.com/privacy", "https://", "https://:443/privacy"} {
 		cfg := config.DefaultConfig()
 		cfg.PrivacyURL = invalid
 		if cfg.Validate() == nil {

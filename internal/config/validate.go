@@ -57,7 +57,7 @@ func validateLegalURL(name, value string) error {
 		return nil
 	}
 	parsed, err := url.Parse(value)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Hostname() == "" {
 		return fmt.Errorf("invalid %s %q: must be an absolute http(s) URL", name, value)
 	}
 	return nil

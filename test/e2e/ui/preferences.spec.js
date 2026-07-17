@@ -105,4 +105,17 @@ test.describe("preferences disclosure", () => {
       })),
     ).toEqual({ enabled: null, entries: null });
   });
+
+  test("removes the legacy automatic probe cache during upgrade", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem("openbyte-probe-skip", '{"v4.example":4102444800000}');
+    });
+    await page.goto("/");
+
+    expect(
+      await page.evaluate(() => localStorage.getItem("openbyte-probe-skip")),
+    ).toBeNull();
+  });
 });

@@ -5,6 +5,15 @@ import { t } from "./i18n.js";
 import { fetchWithTimeout, parseJSONOrThrow } from "./utils.js";
 
 const fallbackServerName = "openByte Server";
+const LEGACY_PROBE_SKIP_KEY = "openbyte-probe-skip";
+
+// Older releases cached optional probe failures in persistent browser storage.
+// The cache is now document-local, so remove that obsolete automatic state.
+try {
+  localStorage.removeItem(LEGACY_PROBE_SKIP_KEY);
+} catch {
+  // Storage can be blocked; network discovery must still initialize.
+}
 
 /**
  * In-memory negative cache for optional v4./v6. probe hosts. It avoids

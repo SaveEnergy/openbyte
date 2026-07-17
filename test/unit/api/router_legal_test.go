@@ -96,7 +96,14 @@ func TestPrivacyPageServedAtStaticPaths(t *testing.T) {
 
 func TestPrivacyRedirectsToOperatorNoticeWhenConfigured(t *testing.T) {
 	handler := newPrivacyRouter(t)
-	for _, requestPath := range []string{"/privacy", "/privacy/", "/privacy.html"} {
+	for _, requestPath := range []string{
+		"/privacy",
+		"/privacy/",
+		"/privacy.html",
+		"/privacy.html/",
+		"/alias/%2e%2e/privacy",
+		"/alias/%2e%2e/privacy.html/",
+	} {
 		for _, method := range []string{http.MethodGet, http.MethodHead} {
 			rec := httptest.NewRecorder()
 			handler.ServeHTTP(rec, httptest.NewRequest(method, exampleBaseURL+requestPath, nil))

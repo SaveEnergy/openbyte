@@ -182,7 +182,7 @@
 
 .theme-option input:checked + .theme-option-control {
   border-color: var(--accent-primary);
-  background: var(--success-soft);
+  background: var(--bg-card);
   box-shadow: inset 0 0 0 1px var(--accent-primary);
   color: var(--accent-primary);
 }
