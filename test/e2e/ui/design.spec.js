@@ -98,7 +98,7 @@ test.describe("brand and localized layout", () => {
     expect(styles.displayFont).toContain("JetBrains Mono");
     expect(styles.displayWeight).toBe("600");
     expect(styles.logoWeight).toBe("600");
-    expect(styles.logoAccent).toContain("rgb(0, 212, 170)");
+    expect(styles.logoAccent).toBe("none");
     expect(styles.instrumentRing).toContain("rgb(0, 212, 170)");
     expect(styles.instrumentRing).toContain("3px");
     expect(styles.shareBorder).toBe("rgb(0, 121, 107)");

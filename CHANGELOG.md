@@ -29,6 +29,13 @@ in Git history and pull requests, not release notes.
 
 ### Changed
 
+- **Header polish**: removed the underline accent from the wordmark, replaced
+  the native language-selector arrow with a themed chevron that keeps clear
+  spacing from the theme-toggle divider, and the optional brand logo is now
+  requested only on branded deployments (no more `/branding/logo` 404 in the
+  console). Unresolvable `v4.`/`v6.` probe hosts are remembered for a day so
+  deployments without those DNS records stop logging a failed probe on every
+  page load.
 - **Official container contract**: the published image and bundled Compose now
   use plain HTTP on internal port `8080` and persist only at `/app/data`, while
   runtime defaults come from the binary. Custom data-path, direct-TLS, HTTP/2,

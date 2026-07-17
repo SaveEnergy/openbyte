@@ -53,4 +53,7 @@ branding/
 
 # SQLite data
 data/
+data-*/
 *.db
+*.db-shm
+*.db-wal
