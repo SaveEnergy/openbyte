@@ -353,6 +353,35 @@ func TestConfigValidateImpressumURL(t *testing.T) {
 	}
 }
 
+func TestConfigLoadPrivacyURLEnv(t *testing.T) {
+	t.Setenv("PRIVACY_URL", " https://legal.example.com/privacy ")
+
+	cfg := config.DefaultConfig()
+	if err := cfg.LoadFromEnv(); err != nil {
+		t.Fatalf("load PRIVACY_URL: %v", err)
+	}
+	if cfg.PrivacyURL != "https://legal.example.com/privacy" {
+		t.Fatalf("privacy URL = %q, want trimmed value", cfg.PrivacyURL)
+	}
+}
+
+func TestConfigValidatePrivacyURL(t *testing.T) {
+	for _, valid := range []string{"", "https://legal.example.com/privacy", "http://intranet/privacy"} {
+		cfg := config.DefaultConfig()
+		cfg.PrivacyURL = valid
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("privacy URL %q should be valid: %v", valid, err)
+		}
+	}
+	for _, invalid := range []string{"/privacy", "example.com/privacy", "ftp://example.com/privacy", "https://"} {
+		cfg := config.DefaultConfig()
+		cfg.PrivacyURL = invalid
+		if cfg.Validate() == nil {
+			t.Fatalf("privacy URL %q should be invalid", invalid)
+		}
+	}
+}
+
 func TestValidateServerName(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.ServerName = ""

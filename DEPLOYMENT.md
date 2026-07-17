@@ -135,8 +135,14 @@ mkdir -p /opt/openbyte
 cat >/opt/openbyte/.env <<'EOF'
 SERVER_NAME="Frankfurt 25G"
 TRAEFIK_HOST_RULE="Host(`speedtest.example.com`) || Host(`v4.speedtest.example.com`) || Host(`v6.speedtest.example.com`)"
+PRIVACY_URL="https://example.com/privacy"
+IMPRESSUM_URL="https://example.com/impressum"
 EOF
 ```
+
+For a public deployment subject to the GDPR, point `PRIVACY_URL` at the
+operator's reviewed Article 13 notice. The bundled `/privacy` page is only a
+technical data-handling summary and cannot supply operator-specific details.
 
 Both CI and release call `scripts/deploy/deploy.sh`. It validates the host key,
 streams the compose bundle and its checksum manifest over one SSH connection,

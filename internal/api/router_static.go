@@ -185,15 +185,15 @@ var staticCleanHTMLPaths = map[string]bool{
 	"privacy": true,
 }
 
-func staticPathIsRootOrHTML(path string) bool {
-	if path == "/" {
+func staticPathIsRootOrHTML(requestPath string) bool {
+	cleanPath := path.Clean(requestPath)
+	if cleanPath == "/" {
 		return true
 	}
-	if staticCleanHTMLPaths[strings.TrimPrefix(path, "/")] {
+	if staticCleanHTMLPaths[strings.TrimPrefix(cleanPath, "/")] {
 		return true
 	}
-	n := len(path)
-	return n >= 5 && path[n-5:] == ".html"
+	return strings.HasSuffix(cleanPath, ".html")
 }
 
 func staticCacheMiddleware(next http.Handler) http.Handler {

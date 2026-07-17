@@ -9,15 +9,15 @@ const fallbackServerName = "openByte Server";
 /**
  * Negative cache for the optional v4./v6. probe hosts. Deployments without
  * those DNS records fail the probe on every load and the browser logs a
- * network error each time; remembering the failure keeps the console clean
- * until the TTL expires and the probe becomes eager again.
+ * network error each time; remembering the failure for this tab keeps the
+ * console clean until the TTL expires and the probe becomes eager again.
  */
 const PROBE_SKIP_KEY = "openbyte-probe-skip";
 const PROBE_SKIP_TTL_MS = 24 * 60 * 60 * 1000;
 
 function loadProbeSkips() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(PROBE_SKIP_KEY));
+    const parsed = JSON.parse(sessionStorage.getItem(PROBE_SKIP_KEY));
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
@@ -42,7 +42,7 @@ function rememberProbeOutcome(host, reachable, sameOriginOK) {
     return;
   }
   try {
-    localStorage.setItem(PROBE_SKIP_KEY, JSON.stringify(skips));
+    sessionStorage.setItem(PROBE_SKIP_KEY, JSON.stringify(skips));
   } catch {
     // Storage unavailable: the probe stays eager on every load.
   }

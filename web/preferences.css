@@ -1,4 +1,4 @@
-/* Compact language and theme preferences shared by both pages. */
+/* User preference controls. */
 
 .header-tools {
   display: flex;
@@ -76,6 +76,50 @@
   box-shadow: inset 0 0 0 2px var(--accent-primary);
 }
 
+.history-preference {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+  margin-top: var(--space-lg);
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-preference input {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  accent-color: var(--brand-primary);
+}
+
+.history-preference-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.history-preference-label {
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.history-preference-hint {
+  max-width: 22rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.history-preference:has(input:focus-visible) {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 @media (max-width: 720px) {
   .server-info {
     display: none;
@@ -109,7 +153,7 @@
   }
 
   .language-select {
-    min-width: 104px;
-    width: 104px;
+    min-width: 112px;
+    width: 112px;
   }
 }

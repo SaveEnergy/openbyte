@@ -364,6 +364,7 @@ body::before {
 
 .footer-links {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
@@ -404,5 +405,24 @@ body::before {
 
   .logo {
     font-size: 1.25rem;
+  }
+
+  .footer {
+    padding-right: calc(var(--space-sm) + env(safe-area-inset-right));
+    padding-left: calc(var(--space-sm) + env(safe-area-inset-left));
+  }
+
+  .footer-links {
+    column-gap: var(--space-xs);
+    row-gap: 0;
+  }
+
+  .footer-divider {
+    display: none;
+  }
+
+  .footer-link {
+    padding-right: 0.375rem;
+    padding-left: 0.375rem;
   }
 }

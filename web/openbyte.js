@@ -29,7 +29,7 @@ import {
   checkServer,
   renderNetworkState,
 } from "./network.js";
-import { saveHistoryEntry } from "./history.js";
+import { saveHistoryEntry, wireHistoryPreference } from "./history.js";
 
 function testErrorKey(error) {
   const code = error?.code;
@@ -310,6 +310,11 @@ function bindEvents() {
 
 function init() {
   initElements();
+  wireHistoryPreference(
+    elements.historyPreference,
+    elements.historyList,
+    elements.historySection,
+  );
   renderNetworkState();
   bindEvents();
   detectNetworkInfo();

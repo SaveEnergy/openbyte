@@ -86,7 +86,10 @@ test.describe("English and German localization", () => {
   test("stored choice wins, reloads on change, and Auto restores browser locale", async ({
     browser,
   }) => {
-    const context = await browser.newContext({ locale: "de-DE" });
+    const context = await browser.newContext({
+      locale: "de-DE",
+      viewport: { width: 320, height: 800 },
+    });
     const page = await context.newPage();
     await page.goto("/");
     await page.evaluate(() => {
@@ -128,6 +131,20 @@ test.describe("English and German localization", () => {
     await expect(page.locator('#languageSelect option[value="auto"]')).toHaveText(
       "System · DE",
     );
+    const labelFit = await page.locator("#languageSelect").evaluate((select) => {
+      const styles = getComputedStyle(select);
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+      context.font = styles.font;
+      return {
+        available:
+          select.clientWidth -
+          Number.parseFloat(styles.paddingLeft) -
+          Number.parseFloat(styles.paddingRight),
+        required: context.measureText(select.selectedOptions[0].textContent).width,
+      };
+    });
+    expect(labelFit.available).toBeGreaterThanOrEqual(labelFit.required);
     expect(
       await page.evaluate(() => localStorage.getItem("openbyte-language")),
     ).toBeNull();

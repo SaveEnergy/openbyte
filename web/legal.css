@@ -24,6 +24,12 @@
 .legal-intro {
   color: var(--text-secondary);
   line-height: 1.6;
+  margin-bottom: var(--space-sm);
+}
+
+.legal-updated {
+  color: var(--text-muted);
+  font-size: 0.75rem;
   margin-bottom: var(--space-xl);
 }
 
@@ -40,4 +46,27 @@
 .legal-section p {
   color: var(--text-secondary);
   line-height: 1.6;
+}
+
+.legal-contact-link {
+  margin-top: var(--space-sm);
+}
+
+.legal-contact-link a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--accent-primary);
+  font-weight: 600;
+  text-underline-offset: 0.2em;
+}
+
+.legal-contact-link a:hover {
+  color: var(--text-primary);
+}
+
+.legal-contact-link a:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+  border-radius: 2px;
 }

@@ -52,15 +52,22 @@ func (c *Config) validateLimits() error {
 	return nil
 }
 
-func (c *Config) validateImpressum() error {
-	if c.ImpressumURL == "" {
+func validateLegalURL(name, value string) error {
+	if value == "" {
 		return nil
 	}
-	parsed, err := url.Parse(c.ImpressumURL)
+	parsed, err := url.Parse(value)
 	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
-		return fmt.Errorf("invalid IMPRESSUM_URL %q: must be an absolute http(s) URL", c.ImpressumURL)
+		return fmt.Errorf("invalid %s %q: must be an absolute http(s) URL", name, value)
 	}
 	return nil
+}
+
+func (c *Config) validateLegalURLs() error {
+	if err := validateLegalURL("IMPRESSUM_URL", c.ImpressumURL); err != nil {
+		return err
+	}
+	return validateLegalURL("PRIVACY_URL", c.PrivacyURL)
 }
 
 func (c *Config) validateProxyAndStorage() error {

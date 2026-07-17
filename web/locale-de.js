@@ -63,6 +63,9 @@ export const de = Object.freeze({
   "network.publicIpAtTest": "Öffentliche IP-Adressen beim Test",
   "history.heading": "Letzte Tests",
   "history.justNow": "gerade eben",
+  "history.remember": "Letzte Tests merken",
+  "history.rememberHint":
+    "Speichert bis zu 10 Ergebnisse in diesem Browser, bis Sie die Funktion ausschalten.",
 
   "action.testAgain": "Nochmal testen",
   "action.share": "Teilen",
@@ -79,30 +82,41 @@ export const de = Object.freeze({
   "nav.impressum": "Impressum",
 
   "privacy.meta.title": "openByte — Datenschutz",
-  "privacy.heading": "Datenschutz",
+  "privacy.heading": "Datenschutz und Datenverarbeitung",
   "privacy.intro":
-    "Diese Seite erklärt, welche Daten dieser openByte-Server bei der Nutzung des Speedtests verarbeitet und welche Daten auf Ihrem Gerät bleiben.",
-  "privacy.test.heading": "Während eines Speedtests",
-  "privacy.test.body":
-    "Ein Speedtest überträgt zufällig erzeugte Daten zwischen Ihrem Browser und diesem Server; die übertragenen Daten selbst sind bedeutungslos und werden verworfen. Während des Tests verwendet der Server Ihre IP-Adresse im Arbeitsspeicher, um Übertragungs- und Anfragelimits pro Adresse durchzusetzen. Weder der Test noch Ihre IP-Adresse werden in der Datenbank gespeichert; ein Ergebnis wird nur dann auf dem Server abgelegt, wenn Sie es teilen.",
-  "privacy.ip.heading": "Öffentliche IP-Adressen",
-  "privacy.ip.body":
-    "Die Seite zeigt die öffentlichen IPv4- und IPv6-Adressen, mit denen Ihr Browser diesen Server erreicht. Sie werden beim Laden der Seite ermittelt und nur Ihnen angezeigt; der Server speichert sie nicht.",
-  "privacy.share.heading": "Geteilte Ergebnisse",
-  "privacy.share.body":
-    "Ein Ergebnis wird nur dann auf diesem Server gespeichert, wenn Sie auf „Teilen“ tippen. Der gespeicherte Eintrag enthält die Messwerte (Download, Upload, Latenz, Jitter, Latenz unter Last und die Bufferbloat-Bewertung), die zum Ergebnis angezeigten öffentlichen IP-Adressen, den Servernamen und den Testzeitpunkt. Er ist unter einem zufälligen Link erreichbar: Wer den Link kennt, kann das Ergebnis sehen. Geteilte Ergebnisse werden spätestens nach 90 Tagen gelöscht, bei Platzmangel auch früher.",
-  "privacy.local.heading": "Daten in Ihrem Browser",
-  "privacy.local.body":
-    "Ihre Sprachwahl, Ihr Farbschema und eine kurze Liste Ihrer letzten Testergebnisse liegen im lokalen Speicher Ihres Browsers, damit die Seite sie beim nächsten Besuch wiederherstellen kann. Diese Daten verlassen Ihr Gerät nicht; Sie können sie jederzeit über die Websitedaten-Einstellungen Ihres Browsers löschen.",
-  "privacy.tracking.heading": "Cookies, Tracking und Dritte",
-  "privacy.tracking.body":
-    "Diese Seite setzt keine Cookies, verwendet keine Analysedienste und lädt nichts von Dritten. Schriften und alle weiteren Inhalte liefert dieser Server selbst aus.",
-  "privacy.logs.heading": "Server-Protokolle",
-  "privacy.logs.body":
-    "Um den Dienst zuverlässig zu betreiben und vor Missbrauch zu schützen, kann der Server technische Protokolleinträge zu API-Anfragen schreiben, einschließlich Pfad, Statuscode, Dauer und IP-Adresse. Wie lange Protokolle aufbewahrt werden, entscheidet der Betreiber dieser Instanz.",
-  "privacy.operator.heading": "Verantwortlichkeit",
+    "Diese technische Zusammenfassung erklärt, welche Daten die openByte-Anwendung selbst verarbeitet und welche Daten auf Ihrem Gerät bleiben.",
+  "privacy.updated": "Stand: 17. Juli 2026",
+  "privacy.scope.heading": "Zu dieser technischen Zusammenfassung",
+  "privacy.scope.body":
+    "openByte ist selbst gehostete Software. Diese integrierte Seite ist daher keine vollständige, betreiberspezifische Information nach Art. 13 DSGVO. Der Betreiber muss eigene Datenschutzhinweise veröffentlichen und kann /privacy dorthin weiterleiten.",
+  "privacy.operator.heading": "Verantwortlicher und vollständige Hinweise",
   "privacy.operator.body":
-    "openByte ist selbst gehostete Open-Source-Software; diese Instanz wird von ihrem eigenen Betreiber betrieben. Er ist für den Betrieb verantwortlich, einschließlich vorgelagerter Infrastruktur (etwa eines Reverse-Proxys), die zusätzliche Daten verarbeiten kann. Stellt diese Installation ein Impressum bereit, erreichen Sie es über den Link in der Fußzeile.",
+    "Verantwortlicher ist die Person oder Organisation, die diese Instanz betreibt – nicht das openByte-Projekt oder seine Mitwirkenden. Die Hinweise des Betreibers müssen Namen und Kontaktdaten des Verantwortlichen, gegebenenfalls den Datenschutzbeauftragten, Zwecke und Rechtsgrundlagen, gegebenenfalls berechtigte Interessen sowie das Beschwerderecht bei einer Aufsichtsbehörde nennen.",
+  "privacy.operator.link": "Impressum des Betreibers öffnen",
+  "privacy.test.heading": "Anfragen, Speedtests und IP-Adressen",
+  "privacy.test.body":
+    "Bei jeder Anfrage wird die Quell-IP-Adresse zwangsläufig von diesem Server und einem etwaigen Reverse-Proxy verarbeitet. openByte verwendet sie, um zu antworten, die öffentliche IPv4- und IPv6-Adresse anzuzeigen, Übertragungs- und Anfragelimits durchzusetzen und die Dienstkapazität zu schützen. Die Download- und Uploadtests tauschen bedeutungslose Zufallsdaten aus, die verworfen werden. Ein abgeschlossenes Messergebnis wird nur dann in die Ergebnisdatenbank geschrieben, wenn Sie Teilen wählen.",
+  "privacy.share.heading": "Ergebnis teilen",
+  "privacy.share.body":
+    "Erst das Aktivieren von Teilen sendet ein Ergebnis an die Serverdatenbank. Der Eintrag enthält Download, Upload, Latenz, Jitter, Latenz unter Last, Bufferbloat-Bewertung, die angezeigten öffentlichen IPv4- und IPv6-Adressen, den Servernamen und den Zeitpunkt des Teilens. Der zufällige Ergebnislink hat keine Zugriffskontrolle: Wer ihn kennt, kann den Eintrag ansehen.",
+  "privacy.local.heading": "Speicherung auf Ihrem Gerät",
+  "privacy.local.body":
+    "Sprache und Farbschema werden erst nach Ihrer Auswahl im lokalen Speicher abgelegt. Der Verlauf letzter Tests ist standardmäßig ausgeschaltet; beim Einschalten speichert der Browser die Einstellung und bis zu 10 Ergebnisse (Messwerte, Zeitpunkt und Bewertung), bis Sie die Funktion ausschalten oder Websitedaten löschen. Die lokale Kopie wird nicht automatisch übertragen. Fehlgeschlagene optionale Adressabfragen werden für diesen Tab höchstens 24 Stunden im Sitzungsspeicher vermerkt.",
+  "privacy.tracking.heading": "Cookies und Tracking",
+  "privacy.tracking.body":
+    "openByte setzt keine Cookies, führt kein Analyse- oder Werbetracking durch und bindet keine Ressourcen Dritter ein. Schriften und andere Anwendungsdateien kommen von diesem Server. Erst wenn Sie einem externen Link oder einer vom Betreiber konfigurierten Weiterleitung folgen, wird eine Anfrage an dieses Ziel gesendet.",
+  "privacy.recipients.heading": "Protokolle, Empfänger und Übermittlungen",
+  "privacy.recipients.body":
+    "API-Protokolle können Methode, Pfad, Status, Dauer und IP-Adresse enthalten. Der Betreiber und seine eingesetzten Reverse-Proxy-, Hosting-, Protokollierungs-, Speicher- oder Supportanbieter können Anfragedaten erhalten; wer einen geteilten Ergebnislink kennt, erhält diesen Eintrag. openByte selbst sendet keine Daten an Analyse- oder Werbenetzwerke. Nur der Betreiber kann in seinen vollständigen Hinweisen die tatsächlichen Auftragsverarbeiter, Drittlandübermittlungen und Garantien nennen.",
+  "privacy.retention.heading": "Speicherdauer",
+  "privacy.retention.body":
+    "Übertragene Testdaten werden mit der Anfrage verworfen. IP-Einträge für Anfragelimits bleiben im flüchtigen Arbeitsspeicher; inaktive Einträge können nach 10 Minuten bereinigt werden und verschwinden bei einer späteren Bereinigung oder einem Neustart. Ein stündlicher Vorgang entfernt geteilte Ergebnisse, sobald sie älter als 90 Tage sind; die konfigurierte Höchstzahl kann sie früher entfernen. Betriebsstörungen können die Bereinigung verzögern. Der Betreiber bestimmt die Aufbewahrung von Protokollen und etwaigen Sicherungen und muss diese Fristen in seinen Hinweisen nennen.",
+  "privacy.rights.heading": "Ihre Wahlmöglichkeiten und Rechte",
+  "privacy.rights.body":
+    "Soweit die DSGVO gilt, können Ihnen Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerspruch sowie ein Beschwerderecht bei einer Datenschutzaufsichtsbehörde zustehen. Richten Sie diese Rechte an den Betreiber aus seinen Hinweisen; weil openByte keine Konten führt, können ein Ergebnislink oder Anfragedetails zur Zuordnung nötig sein. Schalten Sie den Verlauf aus oder löschen Sie Websitedaten, um im Browser gespeicherte Ergebnisse zu entfernen.",
+  "privacy.required.heading": "Erforderliche Daten und automatisierte Entscheidungen",
+  "privacy.required.body":
+    "Eine IP-Adresse ist technisch erforderlich, damit der Server antworten kann; ohne Netzwerkanfrage können Seite und Speedtest nicht bereitgestellt werden. Eine Messung durchzuführen und sie zu teilen ist freiwillig, und openByte begründet keine gesetzliche oder vertragliche Pflicht zur Datenbereitstellung. Es erstellt keine Profile und trifft keine Entscheidung im Sinne des Art. 22 DSGVO.",
 
   "announcement.complete":
     "Speedtest abgeschlossen. Download {download}. Upload {upload}. Latenz {latency}.",

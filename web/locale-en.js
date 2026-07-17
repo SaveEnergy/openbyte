@@ -62,6 +62,9 @@ export const en = Object.freeze({
   "network.publicIpAtTest": "Public IP addresses for this test",
   "history.heading": "Recent tests",
   "history.justNow": "just now",
+  "history.remember": "Remember recent tests",
+  "history.rememberHint":
+    "Stores up to 10 results in this browser until you turn it off.",
 
   "action.testAgain": "Test again",
   "action.share": "Share",
@@ -77,30 +80,41 @@ export const en = Object.freeze({
   "nav.impressum": "Legal Notice",
 
   "privacy.meta.title": "openByte — Privacy",
-  "privacy.heading": "Data privacy",
+  "privacy.heading": "Privacy and data handling",
   "privacy.intro":
-    "This page explains what data this openByte server processes when you use the speed test, and what stays on your device.",
-  "privacy.test.heading": "Running a speed test",
-  "privacy.test.body":
-    "A speed test transfers randomly generated data between your browser and this server; the transferred data itself is meaningless and is discarded. While the test runs, the server uses your IP address in memory to enforce per-address transfer and request limits. Neither the test nor your IP address is written to its database, and no result is stored on the server unless you share it.",
-  "privacy.ip.heading": "Public IP addresses",
-  "privacy.ip.body":
-    "The page shows the public IPv4 and IPv6 addresses your browser uses to reach this server. They are looked up when the page loads and are only displayed to you; the server does not store them.",
-  "privacy.share.heading": "Shared results",
-  "privacy.share.body":
-    "A result is stored on this server only when you tap Share. The stored record contains the measured values (download, upload, latency, jitter, latency under load, and the bufferbloat grade), the public IP addresses shown with the result, the server name, and the time of the test. It is published under a random link: anyone who knows the link can view it. Shared results are deleted after 90 days at the latest, or earlier when the server trims its stored results.",
-  "privacy.local.heading": "Data stored in your browser",
-  "privacy.local.body":
-    "Your language choice, your theme choice, and a short list of your recent test results are kept in your browser's local storage so the page can restore them on your next visit. This data never leaves your device; you can remove it at any time by clearing this site's browsing data.",
-  "privacy.tracking.heading": "Cookies, tracking, and third parties",
-  "privacy.tracking.body":
-    "This site sets no cookies, uses no analytics, and loads nothing from third parties. Fonts and all other assets are served by this server.",
-  "privacy.logs.heading": "Server logs",
-  "privacy.logs.body":
-    "To keep the service reliable and to protect it from abuse, the server may write technical log entries for API requests, including the request path, status code, duration, and IP address. How long logs are kept is decided by the operator of this instance.",
-  "privacy.operator.heading": "Who is responsible",
+    "This technical summary explains what the openByte application itself processes and what stays on your device.",
+  "privacy.updated": "Last updated: 17 July 2026",
+  "privacy.scope.heading": "About this technical summary",
+  "privacy.scope.body":
+    "openByte is self-hosted software, so this built-in page is not a complete operator-specific notice under Article 13 GDPR. The operator must publish its own notice and can configure /privacy to redirect to it.",
+  "privacy.operator.heading": "Controller and complete notice",
   "privacy.operator.body":
-    "openByte is self-hosted open-source software; this instance is run by its own operator, who is responsible for the deployment, including any infrastructure in front of it (such as a reverse proxy) that may process additional data. If this deployment provides a legal notice, you can reach it from the link in the footer.",
+    "The controller is the person or organisation operating this instance, not the openByte project or its contributors. The operator's notice must identify the controller and contact details, any data protection officer, the purposes and legal bases, applicable legitimate interests, and the right to complain to a supervisory authority.",
+  "privacy.operator.link": "Open the operator's Legal Notice",
+  "privacy.test.heading": "Requests, speed tests, and IP addresses",
+  "privacy.test.body":
+    "Every request necessarily exposes its source IP address to this server and any reverse proxy. openByte uses it to answer the request, display the public IPv4 and IPv6 addresses, enforce transfer and request limits, and protect service capacity. The download and upload tests exchange meaningless random bytes that are discarded. A completed measurement is not written to the results database unless you choose Share.",
+  "privacy.share.heading": "Sharing a result",
+  "privacy.share.body":
+    "Only activating Share sends a result to the server database. The record contains download, upload, latency, jitter, latency under load, bufferbloat grade, the displayed public IPv4 and IPv6 addresses, server name, and the time it was shared. The random result link has no access control: anyone who knows it can view the record.",
+  "privacy.local.heading": "Storage on your device",
+  "privacy.local.body":
+    "Language and theme are stored in local storage only after you select them. Recent-test history is off by default; enabling it stores the setting and up to 10 results (measurements, time, and grade) in this browser until you turn it off or clear site data. The local copy is not transmitted automatically. Failed optional address probes are remembered in session storage for this tab, for no more than 24 hours.",
+  "privacy.tracking.heading": "Cookies and tracking",
+  "privacy.tracking.body":
+    "openByte sets no cookies, performs no analytics or advertising tracking, and embeds no third-party resources. Fonts and other application assets come from this server. Following an external link or an operator-configured redirect sends a request to that destination only after you navigate there.",
+  "privacy.recipients.heading": "Logs, recipients, and transfers",
+  "privacy.recipients.body":
+    "API logs may contain method, path, status, duration, and IP address. The operator and its configured reverse-proxy, hosting, logging, storage, or support providers may receive request data; anyone with a shared-result link receives that record. openByte itself sends no data to analytics or ad networks. Only the operator can name its actual processors, international transfers, and safeguards in its complete notice.",
+  "privacy.retention.heading": "Retention",
+  "privacy.retention.body":
+    "Transfer bytes are discarded with the request. IP rate-limit entries stay in volatile memory; inactive entries become eligible for cleanup after 10 minutes and disappear on later cleanup or a restart. An hourly job removes shared results once they are older than 90 days, and the configured count limit may remove them earlier. Operational failures can delay cleanup. The operator controls log and any backup retention and must disclose those periods in its notice.",
+  "privacy.rights.heading": "Your choices and rights",
+  "privacy.rights.body":
+    "Where GDPR applies, you may have rights to access, rectification, erasure, restriction, data portability, and objection, and to complain to a supervisory authority. Exercise those rights against the operator named in its notice; because openByte has no accounts, a result link or request details may be needed to find data. Turn off recent-test history or clear site data to remove browser-stored results.",
+  "privacy.required.heading": "Required data and automated decisions",
+  "privacy.required.body":
+    "An IP address is technically required for the server to answer; without a network request the page and speed test cannot be provided. Running a measurement and sharing it are optional, and openByte creates no statutory or contractual duty to provide data. It performs no profiling and makes no decision covered by Article 22 GDPR.",
 
   "announcement.complete":
     "Speed test complete. Download {download}. Upload {upload}. Latency {latency}.",

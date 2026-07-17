@@ -186,7 +186,7 @@ test.describe("openByte UI regressions", () => {
 
     const skips = await page.evaluate(() =>
       Object.keys(
-        JSON.parse(localStorage.getItem("openbyte-probe-skip")) ?? {},
+        JSON.parse(sessionStorage.getItem("openbyte-probe-skip")) ?? {},
       ).sort(),
     );
     expect(skips).toEqual(["v4.openbyte.localhost", "v6.openbyte.localhost"]);

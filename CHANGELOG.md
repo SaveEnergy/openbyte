@@ -7,11 +7,12 @@ in Git history and pull requests, not release notes.
 
 ### Added
 
-- **Legal pages**: a localized privacy page at `/privacy` describes exactly
-  what the server processes (nothing stored without sharing, no cookies, no
-  third parties, localStorage-only preferences and history), and an optional
-  `IMPRESSUM_URL` makes `/impressum` redirect to the operator's legal notice
-  while revealing the matching footer link on all pages.
+- **Legal and privacy controls**: a localized `/privacy` technical summary
+  documents request IPs, sharing, retention, logs, recipients, and device
+  storage. `PRIVACY_URL` can redirect to the operator-specific GDPR notice;
+  `IMPRESSUM_URL` redirects to the operator's legal notice and reveals its
+  footer link. Recent-result persistence is now an explicit, default-off
+  browser choice rather than an automatic write.
 
 - **Environment-driven visual branding**: operators can provide accessible
   dark/light primary and secondary colors plus a bounded local header logo;

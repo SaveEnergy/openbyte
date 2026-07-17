@@ -7,9 +7,15 @@ test.describe("Privacy page", () => {
     await page.goto("/privacy");
     await expect(page).toHaveTitle("openByte — Privacy");
     await expect(
-      page.getByRole("heading", { level: 1, name: "Data privacy" }),
+      page.getByRole("heading", {
+        level: 1,
+        name: "Privacy and data handling",
+      }),
     ).toBeVisible();
-    await expect(page.locator(".legal-section")).toHaveCount(7);
+    await expect(page.locator(".legal-section")).toHaveCount(10);
+    await expect(
+      page.getByText(/not a complete operator-specific notice/),
+    ).toBeVisible();
   });
 
   test("footer links the privacy page from the speed test", async ({
@@ -21,7 +27,10 @@ test.describe("Privacy page", () => {
     await privacyLink.click();
     await expect(page).toHaveURL(/\/privacy$/);
     await expect(
-      page.getByRole("heading", { level: 1, name: "Data privacy" }),
+      page.getByRole("heading", {
+        level: 1,
+        name: "Privacy and data handling",
+      }),
     ).toBeVisible();
   });
 });
@@ -34,14 +43,38 @@ test.describe("Privacy page in German", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "de");
     await expect(page).toHaveTitle("openByte — Datenschutz");
     await expect(
-      page.getByRole("heading", { level: 1, name: "Datenschutz" }),
+      page.getByRole("heading", {
+        level: 1,
+        name: "Datenschutz und Datenverarbeitung",
+      }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Geteilte Ergebnisse" }),
+      page.getByRole("heading", { name: "Ergebnis teilen" }),
     ).toBeVisible();
     await expect(page.locator('.footer-links a[href="/privacy"]')).toHaveText(
       "Datenschutz",
     );
+  });
+
+  test("configured legal links wrap on a narrow German viewport", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 800 });
+    await page.route("**/branding.css", async (route) => {
+      await route.fulfill({
+        contentType: "text/css",
+        body: ".footer-impressum { display: contents; }",
+      });
+    });
+    await page.goto("/");
+
+    await expect(page.locator('a[href="/impressum"]')).toBeVisible();
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 });
 

@@ -16,6 +16,7 @@ type Router struct {
 	brandingCSS      []byte
 	brandLogo        config.BrandLogo
 	impressumURL     string
+	privacyURL       string
 	speedtest        *SpeedTestHandler
 	resultsHandler   *resultHandler
 	limiter          *RateLimiter
@@ -49,6 +50,7 @@ func NewRouter(cfg *config.Config, resultsStore *results.Store) *Router {
 		brandingCSS:      renderBrandingCSS(palette, brandingConfigured, len(brandLogo.Data) > 0, impressumConfigured),
 		brandLogo:        brandLogo,
 		impressumURL:     cfg.ImpressumURL,
+		privacyURL:       cfg.PrivacyURL,
 		speedtest:        speedtest,
 		resultsHandler:   newResultHandler(resultsStore),
 		limiter:          newRateLimiter(cfg, resolver),
@@ -59,6 +61,7 @@ func NewRouter(cfg *config.Config, resultsStore *results.Store) *Router {
 
 func (r *Router) SetupRoutes() http.Handler {
 	mux := http.NewServeMux()
+	staticHandler := staticCacheMiddleware(newStaticAllowlistHandler(r.webFS))
 
 	if r.resultsHandler != nil {
 		mux.HandleFunc("POST "+apiV1Prefix+"/results", applyRateLimit(r.limiter, r.resultsHandler.save))
@@ -72,11 +75,16 @@ func (r *Router) SetupRoutes() http.Handler {
 	mux.HandleFunc("GET "+brandingCSSPath, r.serveBrandingCSS)
 	mux.HandleFunc("GET "+brandingLogoPath, r.serveBrandLogo)
 	mux.HandleFunc("GET "+impressumPath, r.serveImpressumRedirect)
+	privacyHandler := func(w http.ResponseWriter, req *http.Request) {
+		r.servePrivacy(w, req, staticHandler)
+	}
+	mux.HandleFunc("GET "+privacyPath, privacyHandler)
+	mux.HandleFunc("GET "+privacyPath+"/", privacyHandler)
+	mux.HandleFunc("GET "+privacyPath+".html", privacyHandler)
 	mux.HandleFunc("/api/v1/", func(w http.ResponseWriter, req *http.Request) {
 		respondJSON(w, map[string]string{"error": errNotFound}, http.StatusNotFound)
 	})
 
-	staticHandler := staticCacheMiddleware(newStaticAllowlistHandler(r.webFS))
 	if r.resultsHandler != nil {
 		resultsPageHandler := func(w http.ResponseWriter, req *http.Request) {
 			if !validResultID(req.PathValue("id")) {

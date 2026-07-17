@@ -435,7 +435,7 @@
   }
 
   .public-ip {
-    margin-top: var(--space-lg);
+    margin-top: var(--space-md);
   }
 
   .public-ip-grid {

@@ -77,6 +77,7 @@ func TestComposeUsesCanonicalContainerContract(t *testing.T) {
 	wantEnvironment := []string{
 		"SERVER_NAME",
 		"IMPRESSUM_URL",
+		"PRIVACY_URL",
 		"BRAND_PRIMARY_COLOR_DARK",
 		"BRAND_PRIMARY_COLOR_LIGHT",
 		"BRAND_SECONDARY_COLOR_DARK",

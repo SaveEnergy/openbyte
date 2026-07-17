@@ -60,13 +60,18 @@ test.describe("openByte UI", () => {
     expect(
       workerUrls.some((url) => url.includes("speedtest-worker.js")),
     ).toBeTruthy();
+    await expect(page.locator("#historySection")).toBeHidden();
+    expect(
+      await page.evaluate(() => localStorage.getItem("openbyte-history")),
+    ).toBeNull();
   });
 
-  test("shows phase stepper during test with history after", async ({
+  test("shows phase stepper and saves history after explicit opt-in", async ({
     page,
   }) => {
     await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
 
+    await page.locator("#historyPreference").check();
     await page.locator("#startBtn").click();
     await expect(page.locator("#phaseSteps")).toBeVisible();
     await expect(page.locator("#phaseStepPing")).toHaveAttribute(
@@ -79,6 +84,29 @@ test.describe("openByte UI", () => {
     });
     await expect(page.locator("#historySection")).toBeVisible();
     await expect(page.locator("#historyList .history-item")).toHaveCount(1);
+  });
+
+  test("turning off recent-test history clears its local data", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem("openbyte-history-enabled", "true");
+      localStorage.setItem(
+        "openbyte-history",
+        JSON.stringify([{ ts: Date.now(), down: 100, up: 20 }]),
+      );
+    });
+    await page.goto("/");
+
+    const preference = page.locator("#historyPreference");
+    await expect(preference).toBeChecked();
+    await preference.uncheck();
+    expect(
+      await page.evaluate(() => ({
+        enabled: localStorage.getItem("openbyte-history-enabled"),
+        entries: localStorage.getItem("openbyte-history"),
+      })),
+    ).toEqual({ enabled: null, entries: null });
   });
 
   test("theme toggle cycles system, light, dark", async ({ page }) => {
@@ -242,6 +270,7 @@ test.describe("openByte UI", () => {
   }) => {
     await page.goto("/?maxStreams=1&measureDuration=1&rampDuration=1");
 
+    await page.locator("#historyPreference").check();
     await page.locator("#startBtn").click();
     await expect
       .poll(

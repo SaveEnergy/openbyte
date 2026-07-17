@@ -1,11 +1,42 @@
-/** Recent-results history stored locally on this device. */
+/** Optional recent-results history stored locally on this device. */
 
 import { formatDateTime, formatRelativeTime, t } from "./i18n.js";
 import { formatLatency, formatSpeed } from "./presentation.js";
 
 const STORAGE_KEY = "openbyte-history";
+const ENABLED_KEY = "openbyte-history-enabled";
 const MAX_STORED_ENTRIES = 10;
 const MAX_DISPLAY_ENTRIES = 5;
+
+function isHistoryEnabled() {
+  try {
+    return localStorage.getItem(ENABLED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function clearStoredHistory() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Storage unavailable: there is nothing useful to clear.
+  }
+}
+
+function setHistoryEnabled(enabled) {
+  try {
+    if (enabled) {
+      localStorage.setItem(ENABLED_KEY, "true");
+    } else {
+      localStorage.removeItem(ENABLED_KEY);
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function isValidEntry(entry) {
   return (
@@ -18,6 +49,7 @@ function isValidEntry(entry) {
 }
 
 export function loadHistory() {
+  if (!isHistoryEnabled()) return [];
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
     return Array.isArray(parsed) ? parsed.filter(isValidEntry) : [];
@@ -27,13 +59,27 @@ export function loadHistory() {
 }
 
 export function saveHistoryEntry(entry) {
-  if (!isValidEntry(entry)) return;
+  if (!isHistoryEnabled() || !isValidEntry(entry)) return;
   try {
     const entries = [entry, ...loadHistory()].slice(0, MAX_STORED_ENTRIES);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   } catch {
     // Storage unavailable: history is a convenience, ignore.
   }
+}
+
+export function wireHistoryPreference(control, listEl, sectionEl) {
+  if (!control) return;
+
+  control.checked = isHistoryEnabled();
+  if (!control.checked) clearStoredHistory();
+
+  control.addEventListener("change", () => {
+    if (!setHistoryEnabled(control.checked)) {
+      control.checked = false;
+    }
+    renderHistory(listEl, sectionEl);
+  });
 }
 
 function formatWhen(ts) {
