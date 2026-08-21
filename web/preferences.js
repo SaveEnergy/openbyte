@@ -39,6 +39,7 @@ function setHistoryEnabled(enabled) {
 
 function wireDisclosure(menu) {
   const trigger = menu.querySelector("summary");
+  let pointerDownInside = false;
 
   menu.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || !menu.open) return;
@@ -47,11 +48,29 @@ function wireDisclosure(menu) {
     trigger?.focus();
   });
 
+  menu.addEventListener(
+    "pointerdown",
+    () => {
+      pointerDownInside = true;
+    },
+    { capture: true },
+  );
+
   menu.addEventListener("focusout", () => {
+    // WebKit may clear focus before completing an in-panel label click.
+    const fromPointer = pointerDownInside;
     setTimeout(() => {
-      if (!menu.contains(document.activeElement)) menu.open = false;
+      if (!fromPointer && !menu.contains(document.activeElement)) {
+        menu.open = false;
+      }
     });
   });
+
+  const endPointerInteraction = () => {
+    pointerDownInside = false;
+  };
+  document.addEventListener("pointerup", endPointerInteraction);
+  document.addEventListener("pointercancel", endPointerInteraction);
 
   document.addEventListener("pointerdown", (event) => {
     if (menu.open && !menu.contains(event.target)) menu.open = false;

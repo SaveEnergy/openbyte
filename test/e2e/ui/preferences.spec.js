@@ -42,6 +42,46 @@ test.describe("preferences disclosure", () => {
     await expect(menu).toHaveAttribute("open", "");
     await page.locator(".logo").click();
     await expect(menu).not.toHaveAttribute("open", "");
+
+    await trigger.click();
+    await page.getByRole("switch").focus();
+    await page.keyboard.press("Tab");
+    await expect(menu).not.toHaveAttribute("open", "");
+  });
+
+  test("keeps theme tiles clickable when pointer input does not move focus", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.locator(".preferences-trigger").click();
+
+    const menu = page.locator("#preferencesMenu");
+    const light = page.getByRole("radio", { name: "Light" });
+    const lightTile = page.locator('.theme-option:has(input[value="light"])');
+    await lightTile.evaluate((tile) => {
+      tile.addEventListener(
+        "pointerdown",
+        () => {
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+        },
+        { once: true },
+      );
+    });
+
+    const bounds = await lightTile.boundingBox();
+    expect(bounds).not.toBeNull();
+    await page.mouse.move(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height / 2,
+    );
+    await page.mouse.down();
+    await page.waitForTimeout(25);
+    await expect(menu).toHaveAttribute("open", "");
+    await page.mouse.up();
+    await expect(light).toBeChecked();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   });
 
   test("keeps native keyboard behavior for theme tiles and history switch", async ({
