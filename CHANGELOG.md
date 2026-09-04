@@ -93,6 +93,10 @@ in Git history and pull requests, not release notes.
 
 ### Fixed
 
+- Shared-result saves retry duplicate IDs without returning an existing result
+  as a successful save; exhausting the retry limit preserves the original result.
+- Result creation rejects JSON `null` and returns HTTP 413 when trailing
+  whitespace pushes a request past the 4096-byte body limit.
 - Prevented browsers from synthesizing unavailable display-font weights and
   made native form controls inherit the bundled DM Sans font.
 - Required `MAX_TEST_DURATION` to be whole seconds of at least `1s`, and bounded

@@ -2,11 +2,7 @@
 
 import { state, elements, TEST_CONFIG, toast } from "./state.js";
 import { formatNumber, t } from "./i18n.js";
-import {
-  formatLatency,
-  formatSpeed,
-  formatSpeedText as localizedSpeedText,
-} from "./presentation.js";
+import { formatSpeed } from "./presentation.js";
 import { enterResults } from "./ui-results.js";
 
 /** Circumference of the progress ring arc (r=90 in the 200x200 viewBox). */
@@ -49,14 +45,6 @@ function getToastElements(isError) {
     messageEl: elements.successMessage,
     duration: TEST_CONFIG.TOAST_SUCCESS_MS,
   };
-}
-
-export function formatLatencyMs(val) {
-  return formatLatency(val);
-}
-
-export function formatSpeedText(mbps) {
-  return localizedSpeedText(mbps);
 }
 
 function setInstrumentActivity(speed, direction) {

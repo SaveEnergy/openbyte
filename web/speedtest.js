@@ -4,7 +4,6 @@ import { getApiBase, state, TEST_CONFIG } from "./state.js";
 import {
   updateProgress,
   updateSpeed,
-  showState,
   resetProgress,
   updateTestType,
 } from "./ui.js";
@@ -14,18 +13,6 @@ import { getNextHopProtocol, updateNetworkDisplay } from "./network.js";
 
 /** Portion of a direction phase's progress allotted to the ramp-up stage. */
 const RAMP_PROGRESS_PORTION = 0.45;
-
-function setTestPhase(phase, labelKey, className, direction) {
-  state.phase = phase;
-  if (phase === "latency") {
-    showState("testing");
-  } else {
-    resetProgress();
-  }
-  updateTestType(labelKey, className, {
-    icon: direction === "download" ? "↓" : "↑",
-  });
-}
 
 function createDirectionProgressModel() {
   const now = performance.now();
@@ -89,14 +76,14 @@ function nextFrame() {
   return new Promise((resolve) => requestAnimationFrame(resolve));
 }
 
-export async function runDirectionPhase(
-  signal,
-  phase,
-  labelKey,
-  className,
-  direction,
-) {
-  setTestPhase(phase, labelKey, className, direction);
+export async function runDirectionPhase(signal, direction) {
+  state.phase = direction;
+  resetProgress();
+  updateTestType(
+    `test.phase.${direction}`,
+    direction === "download" ? "downloading" : "uploading",
+    { icon: direction === "download" ? "↓" : "↑" },
+  );
   await nextFrame();
   return runTest(direction, signal);
 }

@@ -9,6 +9,7 @@ import {
 } from "./state.js";
 import { t } from "./i18n.js";
 import { computeBufferbloatGrade } from "./utils.js";
+import { formatLatency, formatSpeedText } from "./presentation.js";
 import {
   showState,
   showResults,
@@ -19,8 +20,6 @@ import {
   resetPhaseSteps,
   setActivePhaseStep,
   setPhaseStepValue,
-  formatLatencyMs,
-  formatSpeedText,
 } from "./ui.js";
 import { measureLatency, runDirectionPhase } from "./speedtest.js";
 import {
@@ -97,15 +96,9 @@ export async function startTest() {
     state.latencyResult = latency.value;
     state.jitterResult = latency.jitter;
 
-    setPhaseStepValue("ping", formatLatencyMs(state.latencyResult));
+    setPhaseStepValue("ping", formatLatency(state.latencyResult));
     setActivePhaseStep("download");
-    const downloadResult = await runDirectionPhase(
-      signal,
-      "download",
-      "test.phase.download",
-      "downloading",
-      "download",
-    );
+    const downloadResult = await runDirectionPhase(signal, "download");
 
     if (!isCurrentRun(signal)) return;
     if (signal.aborted) {
@@ -116,13 +109,7 @@ export async function startTest() {
 
     setPhaseStepValue("download", formatSpeedText(state.downloadResult));
     setActivePhaseStep("upload");
-    const uploadResult = await runDirectionPhase(
-      signal,
-      "upload",
-      "test.phase.upload",
-      "uploading",
-      "upload",
-    );
+    const uploadResult = await runDirectionPhase(signal, "upload");
 
     if (!isCurrentRun(signal)) return;
     if (signal.aborted) {

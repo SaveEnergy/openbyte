@@ -3,26 +3,11 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
 const uploadRequestLogMinDuration = time.Second
-
-const (
-	apiPathPrefix       = "/api/"
-	apiPathPrefixLen    = len(apiPathPrefix)
-	uploadPathSuffix    = "/upload"
-	uploadPathSuffixLen = len(uploadPathSuffix)
-)
-
-func hasAPIPathPrefix(path string) bool {
-	return len(path) >= apiPathPrefixLen && path[:apiPathPrefixLen] == apiPathPrefix
-}
-
-func hasUploadPathSuffix(path string) bool {
-	lp := len(path)
-	return lp >= uploadPathSuffixLen && path[lp-uploadPathSuffixLen:] == uploadPathSuffix
-}
 
 type responseWriter struct {
 	http.ResponseWriter
@@ -45,17 +30,14 @@ func (rw *responseWriter) Flush() {
 }
 
 func shouldSkipRequestLog(path string) bool {
-	const suf = "/ping"
-	lp := len(path)
-	ls := len(suf)
-	return lp >= ls && path[lp-ls:] == suf
+	return strings.HasSuffix(path, "/ping")
 }
 
 func shouldLogRequest(path string, status int, duration time.Duration) bool {
-	if !hasAPIPathPrefix(path) || shouldSkipRequestLog(path) {
+	if !strings.HasPrefix(path, "/api/") || shouldSkipRequestLog(path) {
 		return false
 	}
-	if hasUploadPathSuffix(path) {
+	if strings.HasSuffix(path, "/upload") {
 		return status >= http.StatusBadRequest || duration >= uploadRequestLogMinDuration
 	}
 	return true
@@ -65,7 +47,7 @@ func (r *Router) LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		path := req.URL.Path
 
-		if hasAPIPathPrefix(path) && !shouldSkipRequestLog(path) {
+		if strings.HasPrefix(path, "/api/") && !shouldSkipRequestLog(path) {
 			start := time.Now()
 			rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 

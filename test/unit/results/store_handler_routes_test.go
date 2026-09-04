@@ -22,9 +22,14 @@ func TestHandlerSaveValidation(t *testing.T) {
 		status int
 	}{
 		{"valid", `{"download_mbps":100,"upload_mbps":50,"latency_ms":10,"jitter_ms":1}`, http.StatusCreated},
+		{"empty object", `{}`, http.StatusCreated},
+		{"object at body limit", `{}` + strings.Repeat(" ", 4094), http.StatusCreated},
+		{"null", `null`, http.StatusBadRequest},
+		{"null with whitespace", " \nnull\t ", http.StatusBadRequest},
 		{"negative download", `{"download_mbps":-1,"upload_mbps":50,"latency_ms":10,"jitter_ms":1}`, http.StatusBadRequest},
 		{"out of range", `{"download_mbps":200000,"upload_mbps":50,"latency_ms":10,"jitter_ms":1}`, http.StatusBadRequest},
 		{"multiple json objects", `{"download_mbps":100}{"upload_mbps":50}`, http.StatusBadRequest},
+		{"trailing null", `{"download_mbps":100}null`, http.StatusBadRequest},
 		{"invalid json", `{bad}`, http.StatusBadRequest},
 		{"empty body", ``, http.StatusBadRequest},
 	}

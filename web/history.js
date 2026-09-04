@@ -1,7 +1,7 @@
 /** Optional recent-results history stored locally on this device. */
 
 import { formatDateTime, formatRelativeTime, t } from "./i18n.js";
-import { formatLatency, formatSpeed } from "./presentation.js";
+import { formatLatency, formatSpeedText } from "./presentation.js";
 import { isHistoryEnabled } from "./preferences.js";
 
 const STORAGE_KEY = "openbyte-history";
@@ -51,11 +51,6 @@ function formatWhen(ts) {
   return formatDateTime(new Date(ts), { dateStyle: "medium" });
 }
 
-function speedText(mbps) {
-  const formatted = formatSpeed(mbps);
-  return `${formatted.value} ${formatted.unit}`;
-}
-
 export function renderHistory(listEl, sectionEl) {
   if (!listEl) return;
   const entries = loadHistory();
@@ -74,7 +69,7 @@ export function renderHistory(listEl, sectionEl) {
 
     const speeds = document.createElement("span");
     speeds.className = "history-speeds";
-    speeds.textContent = `↓ ${speedText(entry.down)}  ↑ ${speedText(entry.up)}`;
+    speeds.textContent = `↓ ${formatSpeedText(entry.down)}  ↑ ${formatSpeedText(entry.up)}`;
 
     const meta = document.createElement("span");
     meta.className = "history-meta";

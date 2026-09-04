@@ -34,11 +34,11 @@ func (s *Store) Save(ctx context.Context, r Result) (string, error) {
 			return "", fmt.Errorf("generate id: %w", err)
 		}
 
-		uniqueConflict, insertErr := s.insertResultWithRetry(ctx, id, r, now, busyDeadline)
+		insertErr := s.insertResultWithRetry(ctx, id, r, now, busyDeadline)
 		if insertErr == nil {
 			return id, nil
 		}
-		if uniqueConflict {
+		if isUniqueViolation(insertErr) {
 			continue
 		}
 		return "", insertErr
@@ -52,9 +52,9 @@ func (s *Store) insertResultWithRetry(
 	r Result,
 	now time.Time,
 	busyDeadline time.Time,
-) (uniqueConflict bool, err error) {
+) error {
 	for busyAttempt := 0; ; busyAttempt++ {
-		_, err = s.db.ExecContext(
+		_, err := s.db.ExecContext(
 			ctx,
 			`INSERT INTO results (id, download_mbps, upload_mbps, latency_ms, jitter_ms,
 				loaded_latency_ms, bufferbloat_grade, ipv4, ipv6, server_name, created_at)
@@ -64,28 +64,26 @@ func (s *Store) insertResultWithRetry(
 			now,
 		)
 		if err == nil {
-			return false, nil
-		}
-		if isUniqueViolation(err) {
-			return true, nil
+			return nil
 		}
 		if isBusyError(err) {
 			if waitErr := waitForBusyRetry(ctx, busyDeadline, busyAttempt); waitErr != nil {
 				if errors.Is(waitErr, errBusyRetryBudget) {
-					return false, fmt.Errorf("%w: insert result: %w", ErrStoreRetryable, err)
+					return fmt.Errorf("%w: insert result: %w", ErrStoreRetryable, err)
 				}
-				return false, fmt.Errorf("insert result: %w", waitErr)
+				return fmt.Errorf("insert result: %w", waitErr)
 			}
 			continue
 		}
-		return false, fmt.Errorf("insert result: %w", err)
+		return fmt.Errorf("insert result: %w", err)
 	}
 }
 
 func isUniqueViolation(err error) bool {
 	var sqliteErr *sqlite.Error
 	if errors.As(err, &sqliteErr) {
-		return sqliteErr.Code() == sqlite3.SQLITE_CONSTRAINT_UNIQUE
+		code := sqliteErr.Code()
+		return code == sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY || code == sqlite3.SQLITE_CONSTRAINT_UNIQUE
 	}
 	return strings.Contains(err.Error(), "UNIQUE constraint")
 }

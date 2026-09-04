@@ -157,24 +157,31 @@ func TestHandlerSaveBodyTooLarge(t *testing.T) {
 	defer store.Close()
 
 	h := newResultsAPI(store)
-	large := strings.Repeat("x", 5000)
-	body := `{"download_mbps":1,"upload_mbps":1,"latency_ms":1,"jitter_ms":1,"loaded_latency_ms":1,"bufferbloat_grade":"A","ipv4":"203.0.113.10","ipv6":"","server_name":"` + large + `"}`
+	for _, tt := range []struct {
+		name string
+		body string
+	}{
+		{"oversized object", `{"server_name":"` + strings.Repeat("x", 5000) + `"}`},
+		{"oversized trailing whitespace", `{}` + strings.Repeat(" ", 4095)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(tt.body))
+			req.Header.Set(contentTypeHeader, applicationJSON)
+			rec := httptest.NewRecorder()
 
-	req := httptest.NewRequest(http.MethodPost, resultsPath, strings.NewReader(body))
-	req.Header.Set(contentTypeHeader, applicationJSON)
-	rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
 
-	h.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusRequestEntityTooLarge)
-	}
-	var resp map[string]string
-	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-		t.Fatalf(decodeResponseFmt, err)
-	}
-	if got := resp["error"]; got != bodyTooLargeMsg {
-		t.Fatalf(errorWantFmt, got, bodyTooLargeMsg)
+			if rec.Code != http.StatusRequestEntityTooLarge {
+				t.Fatalf(statusCodeWantFmt, rec.Code, http.StatusRequestEntityTooLarge)
+			}
+			var resp map[string]string
+			if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+				t.Fatalf(decodeResponseFmt, err)
+			}
+			if got := resp["error"]; got != bodyTooLargeMsg {
+				t.Fatalf(errorWantFmt, got, bodyTooLargeMsg)
+			}
+		})
 	}
 }
 

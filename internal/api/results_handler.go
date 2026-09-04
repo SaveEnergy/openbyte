@@ -50,7 +50,7 @@ func (h *resultHandler) save(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req saveResultRequest
+	var req *saveResultRequest
 	if err := decodeSingleObject(w, r, &req, maxResultBodyBytes); err != nil {
 		var maxBytesErr *http.MaxBytesError
 		switch {
@@ -61,6 +61,10 @@ func (h *resultHandler) save(w http.ResponseWriter, r *http.Request) {
 		default:
 			respondResultError(w, "invalid request body", http.StatusBadRequest)
 		}
+		return
+	}
+	if req == nil {
+		respondResultError(w, "request body must contain a single JSON object", http.StatusBadRequest)
 		return
 	}
 
@@ -143,6 +147,10 @@ func decodeSingleObject(w http.ResponseWriter, r *http.Request, dst any, limit i
 	}
 	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		httpbody.DrainAndClose(w, r)
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			return err
+		}
 		return errTrailingJSON
 	}
 	return nil

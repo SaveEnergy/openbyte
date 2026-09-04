@@ -57,10 +57,6 @@ function setText(el, text) {
   if (el) el.textContent = text;
 }
 
-function formatLatencyValue(v) {
-  return formatLatency(v);
-}
-
 function bufferbloatBadgeClass(grade) {
   if (grade === "A+" || grade === "A") return "bb-good";
   if (grade === "B" || grade === "C") return "bb-mid";
@@ -142,10 +138,8 @@ function renderResult(d) {
     const serverValueEl = document.getElementById("serverValue");
     const testedAtEl = document.getElementById("testedAt");
 
-    const dl = formatSpeed(
-      Number.isFinite(d.download_mbps) ? d.download_mbps : 0,
-    );
-    const ul = formatSpeed(Number.isFinite(d.upload_mbps) ? d.upload_mbps : 0);
+    const dl = formatSpeed(d.download_mbps);
+    const ul = formatSpeed(d.upload_mbps);
 
     setText(downloadEl, dl.value);
     setText(uploadEl, ul.value);
@@ -155,9 +149,9 @@ function renderResult(d) {
     setText(dlUnit, dl.unit);
     setText(ulUnit, ul.unit);
 
-    setText(latencyEl, formatLatencyValue(d.latency_ms));
-    setText(jitterEl, formatLatencyValue(d.jitter_ms));
-    setText(loadedLatencyEl, formatLatencyValue(d.loaded_latency_ms));
+    setText(latencyEl, formatLatency(d.latency_ms));
+    setText(jitterEl, formatLatency(d.jitter_ms));
+    setText(loadedLatencyEl, formatLatency(d.loaded_latency_ms));
     renderBufferbloatBadge(bufferbloatEl, d.bufferbloat_grade);
     renderAdvisory(d);
 
