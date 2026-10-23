@@ -79,12 +79,16 @@ func (r *Router) serveBrandingCSS(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Router) serveBrandLogo(w http.ResponseWriter, req *http.Request) {
-	if len(r.brandLogo.Data) == 0 || r.brandLogo.ContentType == "" {
+	logo := r.brandLogo
+	if req.URL.Query().Get("theme") == "dark" {
+		logo = r.brandLogoDark
+	}
+	if len(logo.Data) == 0 || logo.ContentType == "" {
 		w.Header().Set(headerCacheControl, valueNoStore)
 		http.NotFound(w, req)
 		return
 	}
-	writeBrandingAsset(w, req, r.brandLogo.Data, r.brandLogo.ContentType)
+	writeBrandingAsset(w, req, logo.Data, logo.ContentType)
 }
 
 func writeBrandingAsset(

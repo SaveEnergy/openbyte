@@ -83,6 +83,8 @@ func TestComposeUsesCanonicalContainerContract(t *testing.T) {
 		"BRAND_SECONDARY_COLOR_DARK",
 		"BRAND_SECONDARY_COLOR_LIGHT",
 		"BRAND_LOGO_PATH",
+		"BRAND_LOGO_PATH_LIGHT",
+		"BRAND_LOGO_PATH_DARK",
 		"TRUST_PROXY_HEADERS",
 		"TRUSTED_PROXY_CIDRS",
 		"MAX_CONCURRENT_TRANSFERS",
@@ -217,7 +219,7 @@ func readRepositoryFile(t *testing.T, path ...string) string {
 	if err != nil {
 		t.Fatalf("read %s: %v", filepath.Join(path...), err)
 	}
-	return string(contents)
+	return strings.ReplaceAll(string(contents), "\r\n", "\n")
 }
 
 func requireText(t *testing.T, contents string, values ...string) {

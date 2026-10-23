@@ -283,6 +283,10 @@ body::before {
   display: block;
 }
 
+.brand-picture {
+  display: block;
+}
+
 .brand-logo {
   display: none;
   width: 180px;

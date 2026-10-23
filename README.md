@@ -93,6 +93,8 @@ or Compose overlay.
 | `BRAND_PRIMARY_COLOR_DARK` / `BRAND_PRIMARY_COLOR_LIGHT` | — | Primary action/download color pair, in exact `#RRGGBB` form |
 | `BRAND_SECONDARY_COLOR_DARK` / `BRAND_SECONDARY_COLOR_LIGHT` | — | Secondary/upload color pair, in exact `#RRGGBB` form |
 | `BRAND_LOGO_PATH`     | —                 | PNG or JPEG logo path readable by the server (maximum 1 MiB)       |
+| `BRAND_LOGO_PATH_LIGHT` | —               | Logo for light backgrounds; requires `BRAND_LOGO_PATH_DARK`        |
+| `BRAND_LOGO_PATH_DARK` | —                | Logo for dark backgrounds; requires `BRAND_LOGO_PATH_LIGHT`        |
 | `MAX_CONCURRENT_TRANSFERS` | 200           | Concurrent HTTP transfer streams allowed server-wide per direction |
 | `MAX_CONCURRENT_PER_IP` | 64              | Concurrent speed-test streams allowed per client IP and direction  |
 | `RATE_LIMIT_PER_IP`   | 100               | Per-IP requests/minute for shared-result routes                     |
@@ -137,8 +139,13 @@ ratio against the corresponding built-in surfaces; invalid combinations fail
 startup instead of silently producing an unreadable UI. A custom logo replaces
 the header wordmark on both the speed-test and shared-result pages. It is read
 once at startup, must be a bounded PNG or JPEG, and does not replace the
-favicon, page metadata, or upstream attribution. Use logo artwork that remains
-legible in both light and dark themes.
+favicon, page metadata, or upstream attribution. `BRAND_LOGO_PATH` uses the same
+artwork in both themes. Alternatively, leave it unset and configure both
+`BRAND_LOGO_PATH_LIGHT` (positive/dark artwork for light backgrounds) and
+`BRAND_LOGO_PATH_DARK` (negative/light artwork for dark backgrounds). Each image
+has the same format, size, and dimension limits. Incomplete pairs or combining
+the pair with `BRAND_LOGO_PATH` fail startup. Logos follow the user's Light,
+Dark, or System preference on the speed-test, shared-result, and privacy pages.
 
 ### Deployment With Environment Variables
 
@@ -168,6 +175,13 @@ Bundled Compose reads supported explicit overrides from `docker/.env` and
 mounts `BRAND_ASSETS_DIR` read-only at `/app/branding`. It does not forward
 listener, data-path, direct-TLS, HTTP/2, or pprof variables; declare those in a
 custom overlay when intentionally departing from the official image contract.
+
+For two logo variants, replace the single-logo variable in the example with
+`BRAND_LOGO_PATH_LIGHT=/app/branding/logo-positive.png` and
+`BRAND_LOGO_PATH_DARK=/app/branding/logo-negative.png`, and place both files in
+the mounted directory. Restart after changing images. Keep operator assets in
+the ignored `branding/` directory and private settings in an ignored `.env`
+file; neither belongs in the image or Git history.
 
 ### IPv4/IPv6 Detection
 

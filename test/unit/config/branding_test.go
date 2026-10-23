@@ -158,6 +158,30 @@ func TestBrandLogoLoadsPNGAndJPEGIntoMemory(t *testing.T) {
 	}
 }
 
+func TestBrandLogoThemeConfiguration(t *testing.T) {
+	for _, tc := range []struct {
+		name, single, light, dark, want string
+	}{
+		{"light only", "", "light.png", "", "must both be set"},
+		{"dark only", "", "", "dark.png", "must both be set"},
+		{"mixed modes", "logo.png", "light.png", "dark.png", "cannot be combined"},
+		{"invalid light image", "", "missing.png", "dark.png", "BRAND_LOGO_PATH_LIGHT"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("BRAND_LOGO_PATH", tc.single)
+			t.Setenv("BRAND_LOGO_PATH_LIGHT", tc.light)
+			t.Setenv("BRAND_LOGO_PATH_DARK", tc.dark)
+			cfg := config.DefaultConfig()
+			if err := cfg.LoadFromEnv(); err != nil {
+				t.Fatal(err)
+			}
+			if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("Validate = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
 func TestBrandLogoFollowsSymlinkToRegularImage(t *testing.T) {
 	var data bytes.Buffer
 	if err := png.Encode(&data, image.NewNRGBA(image.Rect(0, 0, 2, 2))); err != nil {
@@ -185,6 +209,14 @@ func TestBrandLogoFollowsSymlinkToRegularImage(t *testing.T) {
 
 func TestBrandLogoRejectsUnsafeFiles(t *testing.T) {
 	dir := t.TempDir()
+	var valid bytes.Buffer
+	if err := png.Encode(&valid, image.NewNRGBA(image.Rect(0, 0, 2, 2))); err != nil {
+		t.Fatal(err)
+	}
+	validPath := filepath.Join(dir, "valid.png")
+	if err := os.WriteFile(validPath, valid.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	oversized := filepath.Join(dir, "oversized.png")
 	if err := os.WriteFile(oversized, make([]byte, (1<<20)+1), 0o600); err != nil {
 		t.Fatalf("write oversized logo: %v", err)
@@ -210,10 +242,23 @@ func TestBrandLogoRejectsUnsafeFiles(t *testing.T) {
 		dir, empty, oversized, text, svg, truncated, filepath.Join(dir, "missing.png"),
 	} {
 		t.Run(filepath.Base(path), func(t *testing.T) {
-			cfg := config.DefaultConfig()
-			cfg.BrandLogoPath = path
-			if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "BRAND_LOGO_PATH") {
-				t.Fatalf("Validate error = %v, want BRAND_LOGO_PATH error", err)
+			for _, mode := range []string{"single", "light", "dark"} {
+				cfg := config.DefaultConfig()
+				want := "BRAND_LOGO_PATH"
+				if mode == "single" {
+					cfg.BrandLogoPath = path
+				} else {
+					cfg.BrandLogoPathLight, cfg.BrandLogoPathDark = validPath, validPath
+					if mode == "light" {
+						cfg.BrandLogoPathLight = path
+					} else {
+						cfg.BrandLogoPathDark = path
+					}
+					want += "_" + strings.ToUpper(mode)
+				}
+				if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), want) {
+					t.Fatalf("%s: Validate error = %v, want %s error", mode, err, want)
+				}
 			}
 		})
 	}

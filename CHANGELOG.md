@@ -5,6 +5,8 @@ in Git history and pull requests, not release notes.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-23
+
 ### Added
 
 - **Privacy controls**: a localized `/privacy` technical summary
@@ -18,6 +20,10 @@ in Git history and pull requests, not release notes.
 - **Environment-driven visual branding**: operators can provide accessible
   dark/light primary and secondary colors plus a bounded local header logo;
   both the speed-test and shared-result pages apply the branding before paint.
+- **Theme-specific logos**: `BRAND_LOGO_PATH_LIGHT` and `BRAND_LOGO_PATH_DARK`
+  select separate artwork for light and dark backgrounds, including saved and
+  system theme preferences. The existing single-logo option remains supported.
+  Operator assets and settings stay outside the published source and images.
 - **English and German UI**: the speed test and shared-result pages now detect
   the browser language, provide a persistent reload-based selector that exposes
   the resolved system language, localize accessible status text, and format
@@ -90,6 +96,8 @@ in Git history and pull requests, not release notes.
 - Raised the Go baseline to 1.26.5 for the `crypto/tls` fix tracked as
   GO-2026-5856; CI follows the latest 1.26.x patch and Dependabot watches Docker
   base images.
+- Updated the development-only Redocly CLI to 2.70.0, including the fix for
+  its split-command path traversal vulnerability.
 
 ### Fixed
 
@@ -166,7 +174,8 @@ in Git history and pull requests, not release notes.
 - Moved shared JSON decoding and HTTP client helpers into focused packages and
   upgraded the Go and dependency baselines.
 
-[Unreleased]: https://github.com/SaveEnergy/openbyte/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/SaveEnergy/openbyte/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/SaveEnergy/openbyte/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/SaveEnergy/openbyte/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/SaveEnergy/openbyte/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/SaveEnergy/openbyte/compare/v0.9.1...v0.10.0

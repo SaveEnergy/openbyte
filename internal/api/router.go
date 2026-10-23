@@ -15,6 +15,7 @@ type Router struct {
 	serverName       string
 	brandingCSS      []byte
 	brandLogo        config.BrandLogo
+	brandLogoDark    config.BrandLogo
 	impressumURL     string
 	privacyURL       string
 	speedtest        *SpeedTestHandler
@@ -49,6 +50,7 @@ func NewRouter(cfg *config.Config, resultsStore *results.Store) *Router {
 		serverName:       serverName,
 		brandingCSS:      renderBrandingCSS(palette, brandingConfigured, len(brandLogo.Data) > 0, impressumConfigured),
 		brandLogo:        brandLogo,
+		brandLogoDark:    cfg.BrandLogoForTheme("dark"),
 		impressumURL:     cfg.ImpressumURL,
 		privacyURL:       cfg.PrivacyURL,
 		speedtest:        speedtest,

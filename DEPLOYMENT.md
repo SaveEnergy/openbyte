@@ -97,8 +97,21 @@ Automated deployment instead reads `$REMOTE_DIR/.env`; it leaves
 `$REMOTE_DIR/branding` in place but does not upload operator-provided logos.
 Color values must be exact `#RRGGBB`; dark and light values are required as a
 pair and are contrast-checked at startup. Logos are read once at startup, so
-restart the service after replacing one; use artwork that stays legible in both
-light and dark themes.
+restart the service after replacing one. For separate positive/negative logos,
+remove `BRAND_LOGO_PATH` and set both paths instead:
+
+```dotenv
+BRAND_LOGO_PATH_LIGHT=/app/branding/logo-positive.png
+BRAND_LOGO_PATH_DARK=/app/branding/logo-negative.png
+```
+
+Place both files in `BRAND_ASSETS_DIR`. `LIGHT` means artwork for a light
+background; `DARK` means artwork for a dark background. Both must be PNG or
+JPEG, at most 1 MiB each, at most 4096 pixels per dimension and 16 million
+pixels total. A single theme path or mixing these paths with `BRAND_LOGO_PATH`
+fails startup. The browser follows both manual and system theme changes.
+Operator assets in `branding/` and configuration in `.env` files are excluded
+from Git and Docker build contexts; provision them privately on the host.
 
 This is visual branding rather than removal of all openByte identity: the
 favicon, metadata, translated product copy, and GitHub attribution remain.

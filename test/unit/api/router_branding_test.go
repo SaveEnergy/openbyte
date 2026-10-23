@@ -3,6 +3,7 @@ package api_test
 import (
 	"bytes"
 	"image"
+	"image/jpeg"
 	"image/png"
 	"net/http"
 	"net/http/httptest"
@@ -113,6 +114,11 @@ func TestBrandLogoServesStartupSnapshotAndHead(t *testing.T) {
 	if got := get.Header().Get(cacheControlKey); got != noStoreHeader {
 		t.Fatalf("logo cache-control = %q", got)
 	}
+	dark := httptest.NewRecorder()
+	handler.ServeHTTP(dark, httptest.NewRequest(http.MethodGet, exampleBaseURL+"/branding/logo?theme=dark", nil))
+	if dark.Code != http.StatusOK || !bytes.Equal(dark.Body.Bytes(), logo.Bytes()) {
+		t.Fatal("single logo must also serve the dark theme")
+	}
 
 	head := httptest.NewRecorder()
 	handler.ServeHTTP(head, httptest.NewRequest(http.MethodHead, exampleBaseURL+"/branding/logo", nil))
@@ -141,5 +147,63 @@ func TestBrandLogoReturnsNotFoundWhenUnset(t *testing.T) {
 	}
 	if got := rec.Header().Get(cacheControlKey); got != noStoreHeader {
 		t.Fatalf("cache-control = %q, want no-store", got)
+	}
+}
+
+func TestBrandLogosServeThemeSnapshots(t *testing.T) {
+	var light, dark bytes.Buffer
+	if err := png.Encode(&light, image.NewNRGBA(image.Rect(0, 0, 2, 2))); err != nil {
+		t.Fatal(err)
+	}
+	if err := jpeg.Encode(&dark, image.NewNRGBA(image.Rect(0, 0, 3, 3)), nil); err != nil {
+		t.Fatal(err)
+	}
+	lightPath := filepath.Join(t.TempDir(), "light.png")
+	darkPath := filepath.Join(t.TempDir(), "dark.jpg")
+	for path, data := range map[string][]byte{lightPath: light.Bytes(), darkPath: dark.Bytes()} {
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("BRAND_LOGO_PATH_LIGHT", lightPath)
+	t.Setenv("BRAND_LOGO_PATH_DARK", darkPath)
+	cfg := config.DefaultConfig()
+	if err := cfg.LoadFromEnv(); err != nil {
+		t.Fatal(err)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, theme := range []string{"light", "dark"} {
+		copy := cfg.BrandLogoForTheme(theme)
+		copy.Data[0] ^= 0xff
+		if bytes.Equal(copy.Data, cfg.BrandLogoForTheme(theme).Data) {
+			t.Fatal("logo snapshot is mutable")
+		}
+	}
+	handler := api.NewRouter(cfg, nil).SetupRoutes()
+	for _, path := range []string{lightPath, darkPath} {
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, tc := range []struct {
+		query, contentType string
+		data               []byte
+	}{
+		{"", "image/png", light.Bytes()},
+		{"?theme=light", "image/png", light.Bytes()},
+		{"?theme=dark", "image/jpeg", dark.Bytes()},
+	} {
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, httptest.NewRequest(method, exampleBaseURL+"/branding/logo"+tc.query, nil))
+			if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != tc.contentType || rec.Header().Get(cacheControlKey) != noStoreHeader {
+				t.Fatalf("%s %s: status=%d headers=%v", method, tc.query, rec.Code, rec.Header())
+			}
+			if method == http.MethodGet && !bytes.Equal(rec.Body.Bytes(), tc.data) || method == http.MethodHead && rec.Body.Len() != 0 {
+				t.Fatalf("%s %s: unexpected logo body", method, tc.query)
+			}
+		}
 	}
 }

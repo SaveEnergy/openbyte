@@ -38,8 +38,10 @@ type Config struct {
 	BrandSecondaryColorDark  string
 	BrandSecondaryColorLight string
 	BrandLogoPath            string
-	brandLogoData            []byte
-	brandLogoContentType     string
+	BrandLogoPathLight       string
+	BrandLogoPathDark        string
+	brandLogo                BrandLogo
+	brandLogoDark            BrandLogo
 
 	TLSCertFile string
 	TLSKeyFile  string

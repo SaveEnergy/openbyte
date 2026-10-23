@@ -8,6 +8,8 @@ func (c *Config) loadBrandingEnv() error {
 	setBrandingEnv("BRAND_SECONDARY_COLOR_DARK", &c.BrandSecondaryColorDark)
 	setBrandingEnv("BRAND_SECONDARY_COLOR_LIGHT", &c.BrandSecondaryColorLight)
 	setBrandingEnv("BRAND_LOGO_PATH", &c.BrandLogoPath)
+	setBrandingEnv("BRAND_LOGO_PATH_LIGHT", &c.BrandLogoPathLight)
+	setBrandingEnv("BRAND_LOGO_PATH_DARK", &c.BrandLogoPathDark)
 	return c.normalizeBrandColors()
 }
 

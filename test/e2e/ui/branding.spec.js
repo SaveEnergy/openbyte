@@ -57,13 +57,56 @@ async function mockBranding(page, logoGate = Promise.resolve()) {
   await page.route("**/branding.css", (route) =>
     route.fulfill({ contentType: "text/css", body: brandingCSS }),
   );
-  await page.route("**/branding/logo", async (route) => {
+  await page.route(/\/branding\/logo(?:\?theme=dark)?$/, async (route) => {
     await logoGate;
     await route.fulfill({ contentType: "image/svg+xml", body: logoSVG });
   });
 }
 
 test.describe("visual branding", () => {
+  test("loads only the saved theme's logo when it overrides the system", async ({ page }) => {
+    await mockBranding(page);
+    await page.emulateMedia({ colorScheme: "dark" });
+    await page.addInitScript(() => localStorage.setItem("openbyte-theme", "light"));
+    const requested = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/branding/logo")) requested.push(request.url());
+    });
+    await page.goto("/");
+    await expect.poll(() => page.locator(".brand-logo").evaluate((img) => img.naturalWidth)).toBe(360);
+    expect(requested).toEqual([new URL("/branding/logo", page.url()).href]);
+  });
+
+  for (const path of ["/", "/privacy", "/results.html"]) {
+    test(`logo follows system and explicit themes on ${path}`, async ({ page }) => {
+      await mockBranding(page);
+      await page.emulateMedia({ colorScheme: "light" });
+      await page.goto(path);
+      const logo = page.locator(".brand-logo");
+      const expectLogo = async (dark) => {
+        await expect.poll(() => logo.evaluate((img) => img.currentSrc))
+          .toBe(new URL(dark ? "/branding/logo?theme=dark" : "/branding/logo", page.url()).href);
+        await expect.poll(() => logo.evaluate((img) => img.naturalWidth)).toBe(360);
+      };
+      await expectLogo(false);
+      await page.emulateMedia({ colorScheme: "dark" });
+      await expectLogo(true);
+      await page.locator(".preferences-trigger").click();
+      const choose = (mode) => page.locator("label.theme-option")
+        .filter({ has: page.locator(`input[value="${mode}"]`) }).click();
+      await choose("light");
+      await expectLogo(false);
+      await page.reload();
+      await expectLogo(false);
+      await page.locator(".preferences-trigger").click();
+      await choose("dark");
+      await page.emulateMedia({ colorScheme: "light" });
+      await expectLogo(true);
+      await choose("system");
+      await expectLogo(false);
+    });
+  }
+
   test("uses generated colors and reserves the mobile logo slot", async ({
     page,
   }) => {

@@ -59,9 +59,17 @@ func (c *Config) BrandPalette() (BrandPalette, bool) {
 }
 
 func (c *Config) BrandLogo() BrandLogo {
+	return c.BrandLogoForTheme("light")
+}
+
+func (c *Config) BrandLogoForTheme(theme string) BrandLogo {
+	logo := c.brandLogo
+	if theme == "dark" {
+		logo = c.brandLogoDark
+	}
 	return BrandLogo{
-		Data:        bytes.Clone(c.brandLogoData),
-		ContentType: c.brandLogoContentType,
+		Data:        bytes.Clone(logo.Data),
+		ContentType: logo.ContentType,
 	}
 }
 
@@ -232,62 +240,83 @@ func (color rgbColor) rgba(alpha float64) string {
 }
 
 func (c *Config) loadBrandLogo() error {
-	c.brandLogoData = nil
-	c.brandLogoContentType = ""
-	if c.BrandLogoPath == "" {
-		return nil
-	}
-
-	pathInfo, err := os.Stat(c.BrandLogoPath)
+	c.brandLogo, c.brandLogoDark = BrandLogo{}, BrandLogo{}
+	paired, err := validateBrandPair("BRAND_LOGO_PATH", c.BrandLogoPathDark, c.BrandLogoPathLight)
 	if err != nil {
-		return fmt.Errorf("invalid BRAND_LOGO_PATH %q: %w", c.BrandLogoPath, err)
+		return err
+	}
+	if paired && c.BrandLogoPath != "" {
+		return fmt.Errorf("BRAND_LOGO_PATH cannot be combined with BRAND_LOGO_PATH_LIGHT and BRAND_LOGO_PATH_DARK")
+	}
+	paths := []struct {
+		name, path string
+		target     *BrandLogo
+	}{
+		{"BRAND_LOGO_PATH", c.BrandLogoPath, &c.brandLogo},
+		{"BRAND_LOGO_PATH_LIGHT", c.BrandLogoPathLight, &c.brandLogo},
+		{"BRAND_LOGO_PATH_DARK", c.BrandLogoPathDark, &c.brandLogoDark},
+	}
+	for _, item := range paths {
+		if item.path == "" {
+			continue
+		}
+		logo, err := readBrandLogo(item.path)
+		if err != nil {
+			return fmt.Errorf("invalid %s %q: %w", item.name, item.path, err)
+		}
+		*item.target = logo
+	}
+	if !paired {
+		c.brandLogoDark = c.brandLogo
+	}
+	return nil
+}
+
+func readBrandLogo(path string) (BrandLogo, error) {
+	pathInfo, err := os.Stat(path)
+	if err != nil {
+		return BrandLogo{}, err
 	}
 	if err := validateBrandLogoFileInfo(pathInfo); err != nil {
-		return fmt.Errorf("invalid BRAND_LOGO_PATH %q: %w", c.BrandLogoPath, err)
+		return BrandLogo{}, err
 	}
-	file, err := os.Open(c.BrandLogoPath)
+	file, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("invalid BRAND_LOGO_PATH %q: %w", c.BrandLogoPath, err)
+		return BrandLogo{}, err
 	}
 	defer file.Close()
 	info, err := file.Stat()
 	if err != nil {
-		return fmt.Errorf("invalid BRAND_LOGO_PATH %q: stat: %w", c.BrandLogoPath, err)
+		return BrandLogo{}, fmt.Errorf("stat: %w", err)
 	}
 	if err := validateBrandLogoFileInfo(info); err != nil {
-		return fmt.Errorf("invalid BRAND_LOGO_PATH %q: %w", c.BrandLogoPath, err)
+		return BrandLogo{}, err
 	}
 	data, err := io.ReadAll(io.LimitReader(file, maxBrandLogoBytes+1))
 	if err != nil {
-		return fmt.Errorf("invalid BRAND_LOGO_PATH %q: read: %w", c.BrandLogoPath, err)
+		return BrandLogo{}, fmt.Errorf("read: %w", err)
 	}
 	if len(data) == 0 || len(data) > maxBrandLogoBytes {
-		return fmt.Errorf("invalid BRAND_LOGO_PATH %q: size must be 1-%d bytes", c.BrandLogoPath, maxBrandLogoBytes)
+		return BrandLogo{}, fmt.Errorf("size must be 1-%d bytes", maxBrandLogoBytes)
 	}
 
 	decoded, format, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil || (format != "png" && format != "jpeg") {
-		return fmt.Errorf("invalid BRAND_LOGO_PATH %q: must be a PNG or JPEG image", c.BrandLogoPath)
+		return BrandLogo{}, fmt.Errorf("must be a PNG or JPEG image")
 	}
 	if decoded.Width <= 0 || decoded.Height <= 0 ||
 		decoded.Width > maxBrandLogoWidth || decoded.Height > maxBrandLogoHeight ||
 		int64(decoded.Width)*int64(decoded.Height) > maxBrandLogoPixels {
-		return fmt.Errorf(
-			"invalid BRAND_LOGO_PATH %q: dimensions must be <= %dx%d and <= %d pixels",
-			c.BrandLogoPath, maxBrandLogoWidth, maxBrandLogoHeight, maxBrandLogoPixels,
+		return BrandLogo{}, fmt.Errorf(
+			"dimensions must be <= %dx%d and <= %d pixels",
+			maxBrandLogoWidth, maxBrandLogoHeight, maxBrandLogoPixels,
 		)
 	}
 	if _, decodedFormat, decodeErr := image.Decode(bytes.NewReader(data)); decodeErr != nil || decodedFormat != format {
-		return fmt.Errorf("invalid BRAND_LOGO_PATH %q: image data is malformed", c.BrandLogoPath)
+		return BrandLogo{}, fmt.Errorf("image data is malformed")
 	}
 
-	c.brandLogoData = bytes.Clone(data)
-	if format == "png" {
-		c.brandLogoContentType = "image/png"
-	} else {
-		c.brandLogoContentType = "image/jpeg"
-	}
-	return nil
+	return BrandLogo{Data: data, ContentType: "image/" + format}, nil
 }
 
 func validateBrandLogoFileInfo(info os.FileInfo) error {
