@@ -57,7 +57,6 @@ export function initElements() {
   elements.networkIPv6 = document.getElementById("networkIPv6");
   elements.restartBtn = document.getElementById("restartBtn");
   elements.cancelBtn = document.getElementById("cancelBtn");
-  elements.serverInfo = document.getElementById("serverInfo");
   elements.serverDot = document.querySelector(".server-dot");
   elements.serverText = document.querySelector(".server-text");
   elements.errorToast = document.getElementById("errorToast");

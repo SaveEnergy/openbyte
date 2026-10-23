@@ -1,6 +1,18 @@
 .git
 .github
 .cursor
+.agent/
+.playwright/
+.env*
+**/.env*
+data/
+data-*/
+branding/
+*.db
+*.db-shm
+*.db-wal
+playwright-report/
+test-results/
 .gitignore
 .DS_Store
 
@@ -10,6 +22,7 @@ tmp/
 coverage.out
 coverage.html
 *.log
+*.pprof
 
 test/
 **/*_test.go

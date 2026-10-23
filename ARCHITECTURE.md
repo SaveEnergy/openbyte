@@ -28,7 +28,7 @@ the UI obtains the configured server name from its same-origin
 
 - Static assets are embedded with `//go:embed` and can be overridden with `WEB_ROOT` for development.
 - Speed tests use HTTP `/api/v1/download`, `/api/v1/upload`, and `/api/v1/ping` only.
-- Browser tests run in a module Web Worker where supported.
+- Browser transfers run in a module Web Worker where supported.
 - Adaptive ramping saturates the link, then measures using the selected stream count.
 - Client IP discovery stays eager on page load. `/api/v1/ping` alone allows cross-origin reads so the UI can probe dedicated IPv4/IPv6 hostnames; all other API routes are same-origin.
 - Static serving derives its allowed paths from `web/embed.go`; `WEB_ROOT` can override those files but cannot expose additional paths.
@@ -38,6 +38,9 @@ the UI obtains the configured server name from its same-origin
 - Routing uses stdlib `net/http.ServeMux` method patterns.
 - Download/upload handlers enforce bounded concurrency, per-IP limits, configured maximum duration, body deadlines, and body draining on error paths; download chunk requests are also range-checked. Upload bodies are read until EOF or the configured deadline and do not have a byte limit.
 - Results use pure-Go SQLite (`modernc.org/sqlite`) with WAL mode, 90-day retention, max-count cleanup, and cancellation-aware lock retries.
+- `internal/results/store_retry.go` owns the shared SQLite busy-retry policy for reads, inserts, migrations, and cleanup. A save keeps the same busy deadline across ID collisions; exhausted retries retain the SQLite cause and expose `ErrStoreRetryable`.
+- The speed-test handler owns its fixed-size upload buffer pool. The upload reader borrows and returns one buffer per request; transfer loops do not allocate a buffer per read.
+- Uploads use one deadline timer to unblock stalled bodies, stopped when the request finishes. The earlier of the request deadline and configured duration wins; successful uploads need no waiting goroutine or child context.
 - Config comes from defaults and environment variables.
 
 ## Deployment

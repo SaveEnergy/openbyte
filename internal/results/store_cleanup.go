@@ -3,7 +3,6 @@ package results
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"log/slog"
 	"time"
 )
@@ -44,35 +43,6 @@ func (s *Store) cleanup() {
 				slog.Info("results cleanup: trimmed to max", "removed", n, "max", s.maxResults)
 			}
 		}
-	}
-}
-
-func execWithBusyRetry(
-	ctx context.Context,
-	execer execContexter,
-	query string,
-	args ...any,
-) (sql.Result, error) {
-	var (
-		res          sql.Result
-		err          error
-		busyDeadline = time.Now().Add(busyRetryBudget)
-	)
-	for busyAttempt := 0; ; busyAttempt++ {
-		res, err = execer.ExecContext(ctx, query, args...)
-		if err == nil {
-			return res, nil
-		}
-		if isBusyError(err) {
-			if waitErr := waitForBusyRetry(ctx, busyDeadline, busyAttempt); waitErr != nil {
-				if errors.Is(waitErr, errBusyRetryBudget) {
-					return nil, err
-				}
-				return nil, waitErr
-			}
-			continue
-		}
-		return nil, err
 	}
 }
 

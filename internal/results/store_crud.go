@@ -12,15 +12,6 @@ import (
 	sqlite3 "modernc.org/sqlite/lib"
 )
 
-const (
-	busyRetryInitialBackoff = 25 * time.Millisecond
-	busyRetryMaxBackoff     = 250 * time.Millisecond
-	// Preserve the previous tolerance of four SQLite attempts at five seconds each.
-	busyRetryBudget = 20 * time.Second
-)
-
-var errBusyRetryBudget = errors.New("busy retry budget exhausted")
-
 func (s *Store) Save(ctx context.Context, r Result) (string, error) {
 	now := time.Now().UTC()
 	busyDeadline := time.Now().Add(busyRetryBudget)
@@ -53,7 +44,7 @@ func (s *Store) insertResultWithRetry(
 	now time.Time,
 	busyDeadline time.Time,
 ) error {
-	for busyAttempt := 0; ; busyAttempt++ {
+	err := retryBusy(ctx, busyDeadline, func() error {
 		_, err := s.db.ExecContext(
 			ctx,
 			`INSERT INTO results (id, download_mbps, upload_mbps, latency_ms, jitter_ms,
@@ -63,20 +54,12 @@ func (s *Store) insertResultWithRetry(
 			r.LoadedLatencyMs, r.BufferbloatGrade, r.IPv4, r.IPv6, r.ServerName,
 			now,
 		)
-		if err == nil {
-			return nil
-		}
-		if isBusyError(err) {
-			if waitErr := waitForBusyRetry(ctx, busyDeadline, busyAttempt); waitErr != nil {
-				if errors.Is(waitErr, errBusyRetryBudget) {
-					return fmt.Errorf("%w: insert result: %w", ErrStoreRetryable, err)
-				}
-				return fmt.Errorf("insert result: %w", waitErr)
-			}
-			continue
-		}
+		return err
+	})
+	if err != nil {
 		return fmt.Errorf("insert result: %w", err)
 	}
+	return nil
 }
 
 func isUniqueViolation(err error) bool {
@@ -99,10 +82,9 @@ func isBusyError(err error) bool {
 }
 
 func (s *Store) Get(ctx context.Context, id string) (*Result, error) {
-	busyDeadline := time.Now().Add(busyRetryBudget)
-	for busyAttempt := 0; ; busyAttempt++ {
-		var r Result
-		err := s.db.QueryRowContext(
+	var r Result
+	err := retryBusy(ctx, time.Now().Add(busyRetryBudget), func() error {
+		return s.db.QueryRowContext(
 			ctx,
 			`SELECT id, download_mbps, upload_mbps, latency_ms, jitter_ms,
 				loaded_latency_ms, bufferbloat_grade, ipv4, ipv6, server_name, created_at
@@ -110,60 +92,12 @@ func (s *Store) Get(ctx context.Context, id string) (*Result, error) {
 		).Scan(&r.ID, &r.DownloadMbps, &r.UploadMbps, &r.LatencyMs, &r.JitterMs,
 			&r.LoadedLatencyMs, &r.BufferbloatGrade, &r.IPv4, &r.IPv6, &r.ServerName,
 			&r.CreatedAt)
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		if err == nil {
-			return &r, nil
-		}
-		if isBusyError(err) {
-			if waitErr := waitForBusyRetry(ctx, busyDeadline, busyAttempt); waitErr != nil {
-				if errors.Is(waitErr, errBusyRetryBudget) {
-					return nil, fmt.Errorf("%w: query result: %w", ErrStoreRetryable, err)
-				}
-				return nil, fmt.Errorf("query result: %w", waitErr)
-			}
-			continue
-		}
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
 		return nil, fmt.Errorf("query result: %w", err)
 	}
-}
-
-func waitForBusyRetry(ctx context.Context, deadline time.Time, busyAttempt int) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	remaining := time.Until(deadline)
-	if remaining <= 0 {
-		return errBusyRetryBudget
-	}
-
-	delay := busyRetryDelay(busyAttempt)
-	budgetExpires := delay >= remaining
-	if budgetExpires {
-		delay = remaining
-	}
-	timer := time.NewTimer(delay)
-	defer timer.Stop()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if budgetExpires {
-			return errBusyRetryBudget
-		}
-		return nil
-	}
-}
-
-func busyRetryDelay(busyAttempt int) time.Duration {
-	if busyAttempt >= 4 {
-		return busyRetryMaxBackoff
-	}
-	return busyRetryInitialBackoff << busyAttempt
+	return &r, nil
 }

@@ -13,7 +13,7 @@ import {
   createCodedError,
 } from "./utils.js";
 import {
-  resolveChunkSize,
+  HTTP_CHUNK_BYTES,
   throwIfZeroBytes,
   applyHttpMeasureIntervalTick,
   createWarmUpDetector,
@@ -164,8 +164,7 @@ async function runUploadWindow(options) {
     adaptive,
   } = options;
   const startTime = performance.now();
-  const chunkSize = resolveChunkSize();
-  const blobSize = resolveUploadPayloadSize(chunkSize, duration, adaptive);
+  const blobSize = resolveUploadPayloadSize(HTTP_CHUNK_BYTES, duration, adaptive);
   const metricsState = {
     totalBytes: 0,
     allBytes: 0,

@@ -250,3 +250,27 @@ func TestUploadRespectsReadDeadlineWhenBodyStalls(t *testing.T) {
 		t.Fatalf("upload read deadline not enforced, elapsed=%v", elapsed)
 	}
 }
+
+func TestUploadRespectsEarlierRequestDeadlineWhenBodyStalls(t *testing.T) {
+	handler := api.NewSpeedTestHandler(10, 300)
+	body := &blockingUploadBody{closed: make(chan struct{})}
+	t.Cleanup(func() { _ = body.Close() })
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	req := httptest.NewRequest(http.MethodPost, uploadEndpoint, nil).WithContext(ctx)
+	req.Body = body
+	rec := httptest.NewRecorder()
+	done := make(chan struct{})
+	go func() {
+		handler.Upload(rec, req)
+		close(done)
+	}()
+	select {
+	case <-done:
+		if rec.Code != statusInternalServerErr {
+			t.Fatalf(speedtestStatusFmt, rec.Code, statusInternalServerErr)
+		}
+	case <-time.After(speedtestWaitTimeout):
+		t.Fatal("upload ignored the earlier request deadline")
+	}
+}

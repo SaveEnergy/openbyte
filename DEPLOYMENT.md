@@ -146,7 +146,8 @@ technical data-handling summary and cannot supply operator-specific details.
 
 Both CI and release call `scripts/deploy/deploy.sh`. It validates the host key,
 streams the compose bundle and its checksum manifest over one SSH connection,
-verifies every remote checksum, pulls the immutable image tag, and deploys.
+verifies every remote checksum, pulls the requested commit-SHA or release tag,
+and deploys. Tags are registry references, not immutable image digests.
 Automated deployment requires Docker Compose with `up --wait-timeout` support
 (upstream v2.17 or newer). The host script rejects older clients before login,
 network changes, image pulls, or application replacement.

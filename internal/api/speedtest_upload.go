@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"sync"
 	"time"
 )
 
@@ -22,18 +21,16 @@ func uploadReadDeadline(start time.Time, maxDurationSec int) time.Time {
 	return start.Add(time.Duration(maxDurationSec) * time.Second)
 }
 
-func readUploadBody(
+func (h *SpeedTestHandler) readUploadBody(
 	readCtx context.Context,
 	body io.Reader,
 	controller *http.ResponseController,
 	deadline time.Time,
-	pool *sync.Pool,
 ) (totalBytes int64, readFailed bool) {
-	bufPtr := getUploadBuf(pool)
+	// The constructor and this method exclusively own the fixed-size pool.
+	bufPtr := h.uploadBufPool.Get().(*[]byte)
+	defer h.uploadBufPool.Put(bufPtr)
 	buf := *bufPtr
-	if pool != nil {
-		defer pool.Put(bufPtr)
-	}
 	var nextDeadlineRefresh time.Time
 	for {
 		select {
@@ -55,22 +52,6 @@ func readUploadBody(
 			return totalBytes, !errors.Is(err, io.EOF)
 		}
 	}
-}
-
-func getUploadBuf(pool *sync.Pool) *[]byte {
-	if pool == nil {
-		return newUploadBuffer()
-	}
-	pooled := pool.Get()
-	if pooled == nil {
-		return newUploadBuffer()
-	}
-	if cast, ok := pooled.(*[]byte); ok && cast != nil && cap(*cast) >= uploadReadBufferSize {
-		buf := (*cast)[:uploadReadBufferSize]
-		*cast = buf
-		return cast
-	}
-	return newUploadBuffer()
 }
 
 func writeUploadResponse(w http.ResponseWriter, controller *http.ResponseController, totalBytes int64, startTime time.Time) {

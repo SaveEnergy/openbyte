@@ -1,4 +1,5 @@
 const { defineConfig } = require("@playwright/test");
+const path = require("node:path");
 
 // GHA: cap parallelism (typical 2 vCPU); reduces contention vs default. Local: Playwright default (CPU-based).
 // Override in any env: PLAYWRIGHT_WORKERS=1 bunx playwright test
@@ -40,7 +41,11 @@ module.exports = defineConfig({
   webServer: {
     // env (not a shell prefix) keeps the command portable across platforms.
     command: "go run ./cmd/openbyte",
-    env: { BIND_ADDRESS: "127.0.0.1", PORT: "8080" },
+    env: {
+      BIND_ADDRESS: "127.0.0.1",
+      PORT: "8080",
+      DATA_DIR: path.join(__dirname, ".playwright", "data"),
+    },
     url: "http://127.0.0.1:8080/health",
     timeout: 120_000,
     reuseExistingServer: false,

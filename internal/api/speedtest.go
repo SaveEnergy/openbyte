@@ -70,11 +70,7 @@ func NewSpeedTestHandlerWithPolicy(maxConcurrent, maxDurationSec, maxConcurrentP
 }
 
 func newUploadBuffer() *[]byte {
-	return newSpeedtestBuffer(uploadReadBufferSize)
-}
-
-func newSpeedtestBuffer(size int) *[]byte {
-	buf := make([]byte, size)
+	buf := make([]byte, uploadReadBufferSize)
 	return &buf
 }
 

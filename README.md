@@ -145,6 +145,7 @@ legible in both light and dark themes.
 ```bash
 # docker run
 docker run --rm -p 8080:8080 \
+  -v openbyte-data:/app/data \
   -e SERVER_NAME="Frankfurt 25G" \
   ghcr.io/saveenergy/openbyte:latest
 
@@ -152,6 +153,7 @@ docker run --rm -p 8080:8080 \
 mkdir -p branding
 cp /path/to/company-logo.png branding/logo.png
 docker run --rm -p 8080:8080 \
+  -v openbyte-data:/app/data \
   -v "$PWD/branding:/app/branding:ro" \
   -e BRAND_LOGO_PATH=/app/branding/logo.png \
   -e BRAND_PRIMARY_COLOR_DARK="#66E3FF" \
@@ -182,12 +184,16 @@ See [Deployment Guide](DEPLOYMENT.md#ipv4-and-ipv6-discovery) for details.
 ### UI E2E (Playwright)
 
 ```bash
+bun install
+bunx playwright install chromium
 bunx playwright test
 # or
 make test-ui
 ```
 
 Playwright starts and owns a local server on `127.0.0.1:8080`; the port must be free.
+Its SQLite files live in the ignored `.playwright/data` directory, independently
+of development data and any inherited `DATA_DIR`.
 
 ## Documentation
 
@@ -202,16 +208,18 @@ The server does not duplicate the OpenAPI contract as a browser page.
 
 ```
 cmd/
-  openbyte/   # Server binary entry point
-  server/     # Server implementation
+  openbyte/   # Server entry point and lifecycle
 internal/
   api/        # REST API + HTTP speed test handlers
   config/     # Configuration
+  httpbody/   # Bounded request-body draining and aborts
   results/    # SQLite results store
+  tlsutil/    # Development TLS certificate helper
 docker/       # Docker + Compose configurations
 web/          # Web UI (embedded in binary)
   fonts/      # Self-hosted font files
 test/         # Go unit/API and Playwright tests
+scripts/      # Deployment and manual performance harnesses
 ```
 
 ## License

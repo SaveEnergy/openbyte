@@ -13,23 +13,17 @@ import {
   createCodedError,
 } from "./utils.js";
 import {
-  resolveChunkSize,
+  HTTP_CHUNK_BYTES,
   throwIfZeroBytes,
   applyHttpMeasureTick,
   createWarmUpDetector,
   createEarlyStopDetector,
 } from "./speedtest-http-shared.js";
 
-function buildDownloadChunkAttempts(chunkSize) {
-  const preferredFallback = 256 * 1024;
-  const attempts = [chunkSize];
-  if (preferredFallback < chunkSize) attempts.push(preferredFallback);
-  if (65536 < (attempts.at(-1) ?? 0)) attempts.push(65536);
-  return attempts;
-}
+const downloadChunkAttempts = [HTTP_CHUNK_BYTES, 256 * 1024, 65536];
 
 async function runDownloadStream(downloadChunk, signal, streamState) {
-  const attempts = buildDownloadChunkAttempts(resolveChunkSize());
+  const attempts = downloadChunkAttempts;
   for (let attemptIndex = 0; attemptIndex < attempts.length; attemptIndex++) {
     for (let retry = 0; retry <= TEST_CONFIG.MAX_NETWORK_RETRIES; retry++) {
       if (signal.aborted) return "aborted";

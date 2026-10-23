@@ -3,9 +3,7 @@
 import { TEST_CONFIG } from "./state.js";
 import { createCodedError } from "./utils.js";
 
-export function resolveChunkSize() {
-  return 1024 * 1024;
-}
+export const HTTP_CHUNK_BYTES = 1024 * 1024;
 
 export function throwIfZeroBytes(streamState, totalBytes, direction) {
   if (totalBytes > 0) return;

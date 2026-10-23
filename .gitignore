@@ -11,6 +11,8 @@ bin/
 
 # Output of the go coverage tool
 *.out
+coverage.html
+*.pprof
 
 # Dependency directories
 vendor/
@@ -38,12 +40,15 @@ Thumbs.db
 
 # ENV
 .env
+.env.*
+!/.env.example
 
 # Operator-provided visual branding
 branding/
 
 # Build artifacts
 /tmp/
+dist/
 
 # Agent tasks/results
 .agent/

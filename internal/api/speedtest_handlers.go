@@ -1,10 +1,7 @@
 package api
 
 import (
-	"context"
-	"errors"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/saveenergy/openbyte/internal/httpbody"
@@ -45,21 +42,18 @@ func (h *SpeedTestHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 	startTime := time.Now()
 	deadline := uploadReadDeadline(startTime, h.maxDurationSec)
+	readCtx := r.Context()
+	if requestDeadline, ok := readCtx.Deadline(); ok && requestDeadline.Before(deadline) {
+		deadline = requestDeadline
+	}
 	controller := http.NewResponseController(w)
 	_ = refreshReadDeadline(controller, deadline)
-	readCtx, cancel := context.WithDeadline(r.Context(), deadline)
-	defer cancel()
-	var closeBodyOnce sync.Once
-	go func() {
-		<-readCtx.Done()
-		if errors.Is(readCtx.Err(), context.DeadlineExceeded) {
-			closeBodyOnce.Do(func() {
-				_ = r.Body.Close()
-			})
-		}
-	}()
+	// Unblock a stalled body even when the ResponseWriter cannot set deadlines.
+	// Successful uploads stop the timer without creating a waiting goroutine.
+	closeTimer := time.AfterFunc(time.Until(deadline), func() { _ = r.Body.Close() })
+	defer closeTimer.Stop()
 
-	totalBytes, readFailed := readUploadBody(readCtx, r.Body, controller, deadline, &h.uploadBufPool)
+	totalBytes, readFailed := h.readUploadBody(readCtx, r.Body, controller, deadline)
 	if readFailed {
 		httpbody.Abort(w, r)
 		respondSpeedtestError(w, "upload failed", http.StatusInternalServerError)

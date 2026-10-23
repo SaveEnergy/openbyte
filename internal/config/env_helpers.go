@@ -8,10 +8,8 @@ import (
 )
 
 const (
-	envTrue  = "true"
-	envOne   = "1"
-	envFalse = "false"
-	envZero  = "0"
+	envTrue = "true"
+	envOne  = "1"
 )
 
 func envBool(name string) bool {

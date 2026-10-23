@@ -130,6 +130,32 @@ func TestBusyRetryWaitReportsExpiredBudget(t *testing.T) {
 	}
 }
 
+func TestInsertResultReportsRetryableWhenBusyBudgetExpires(t *testing.T) {
+	store, err := New(filepath.Join(t.TempDir(), "budget.db"), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	ctx := context.Background()
+	conn, err := store.db.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		t.Fatal(err)
+	}
+	defer conn.ExecContext(ctx, "ROLLBACK")
+
+	// A real SQLite write lock must retain its cause and retryable classification
+	// when the save's existing budget is exhausted, rather than starting a new one.
+	now := time.Now()
+	err = store.insertResultWithRetry(ctx, "abcd1234", Result{}, now, now.Add(-time.Second))
+	if !errors.Is(err, ErrStoreRetryable) || !isBusyError(err) {
+		t.Fatalf("insert error = %v, want retryable SQLite busy error", err)
+	}
+}
+
 func TestBusyRetryDelayIsCapped(t *testing.T) {
 	if delay := busyRetryDelay(100); delay != busyRetryMaxBackoff {
 		t.Fatalf("busyRetryDelay(100) = %v, want %v", delay, busyRetryMaxBackoff)
